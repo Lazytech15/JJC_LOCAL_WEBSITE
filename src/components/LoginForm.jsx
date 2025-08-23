@@ -12,6 +12,8 @@ import {
   verifyToken 
 } from "../utils/auth";
 
+import { API_ENDPOINTS } from "../utils/public_api"
+
 const departmentInfo = {
   "Human Resources": {
     name: "Human Resources",
@@ -115,7 +117,7 @@ function LoginForm() {
         department: department
       }).toString();
 
-      const response = await fetch(`http://192.168.68.140:3001/api/auth?${queryParams}`, {
+      const response = await fetch(`${API_ENDPOINTS}/api/auth?${queryParams}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",

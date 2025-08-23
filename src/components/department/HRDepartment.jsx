@@ -4,6 +4,7 @@ import { useAuth } from "../../App"
 import { useState, useEffect } from "react"
 import EmployeeRecords from "../hr/EmployeeRecords"
 import Recruitment from "../hr/Recruitment"
+import { API_ENDPOINTS } from "../../utils/public_api"
 
 function HRDepartment() {
   const { user, logout, isDarkMode, toggleDarkMode } = useAuth()
@@ -21,7 +22,7 @@ function HRDepartment() {
   try {
     setLoading(true);
 
-    const response = await fetch("http://192.168.68.140:3001/api/tables/emp_list/data", {
+    const response = await fetch(`${API_ENDPOINTS}/api/tables/emp_list/data`, {
       method: "GET", // Use GET for fetching data without a body
       headers: {
         "Content-Type": "application/json",
@@ -43,7 +44,7 @@ function HRDepartment() {
 
   const addEmployee = async (employeeData) => {
     try {
-      const response = await fetch(`${window.location.origin}/api/data`, {
+      const response = await fetch(`${API_ENDPOINTS}/api/data`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

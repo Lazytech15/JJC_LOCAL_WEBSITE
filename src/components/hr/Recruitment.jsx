@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../App";
+import { API_ENDPOINTS } from "../../utils/public_api"
 
 function Recruitment() {
   const { user, isDarkMode } = useAuth();
@@ -71,7 +72,7 @@ function Recruitment() {
     setLoadingDepartments(true);
     try {
       const response = await fetch(
-        `http://192.168.68.140:3001/api/departments`
+        `${API_ENDPOINTS}/api/departments`
       );
       const data = await response.json();
 
@@ -156,7 +157,7 @@ function Recruitment() {
       const queryParams = new URLSearchParams();
       queryParams.append(fieldName, value.trim());
 
-      const url = `http://localhost:3001/api/employees/validate?${queryParams}`;
+      const url = `${window.location.origin}/api/employees/validate?${queryParams}`;
       console.log('Making validation request:', { fieldName, value: value.trim(), url });
 
       const response = await fetch(url);
@@ -345,7 +346,7 @@ function Recruitment() {
 
       console.log("Sending employee data:", employeeData); // Debug log
 
-      const response = await fetch(`http://192.168.68.140:3001/api/employees`, {
+      const response = await fetch(`${window.location.origin}/api/employees`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

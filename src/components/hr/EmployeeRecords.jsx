@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useAuth } from "../../App"
 import { X } from "lucide-react"
+import { API_ENDPOINTS } from "../../utils/public_api"
 
 function EmployeeRecords() {
   const { user, isDarkMode } = useAuth()
@@ -46,7 +47,7 @@ function EmployeeRecords() {
         sortOrder: sortOrder
       })
 
-      const response = await fetch(`http://192.168.68.140:3001/api/employees?${params}`, {
+      const response = await fetch(`${API_ENDPOINTS}/api/employees?${params}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
