@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "../../App"
-import { X } from "lucide-react"
-import { API_ENDPOINTS } from "../../utils/public_api"
+import { X, Eye, Download, FileText, ImageIcon, Trash2 } from "lucide-react"
+import apiService, { subscribeToUpdates } from "../../utils/public_api"
 
 function EmployeeRecords() {
   const { user, isDarkMode } = useAuth()
@@ -15,54 +15,178 @@ function EmployeeRecords() {
   const [statistics, setStatistics] = useState({})
   const [departments, setDepartments] = useState([])
   const [pagination, setPagination] = useState({ total: 0, currentPage: 1, limit: 50 })
-  
+
   // Modal states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isDocumentViewerOpen, setIsDocumentViewerOpen] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState(null)
   const [deleteEmployee, setDeleteEmployee] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
-  
+
+  // File upload states - support multiple documents
+  const [selectedProfileFile, setSelectedProfileFile] = useState(null)
+  const [selectedDocumentFiles, setSelectedDocumentFiles] = useState([])
+  const [profilePreview, setProfilePreview] = useState(null)
+  const [uploadingFiles, setUploadingFiles] = useState(false)
+
+  // Document viewer states
+  const [selectedDocuments, setSelectedDocuments] = useState([])
+  const [currentDocumentIndex, setCurrentDocumentIndex] = useState(0)
+  const [documentPreviewUrl, setDocumentPreviewUrl] = useState(null)
+
   // Filters
   const [filterDepartment, setFilterDepartment] = useState("")
   const [filterStatus, setFilterStatus] = useState("Active")
   const [sortBy, setSortBy] = useState("hireDate")
   const [sortOrder, setSortOrder] = useState("DESC")
 
+  const getProfilePictureUrl = (employee) => {
+    if (!employee?.profilePicture) return null
+
+    // The database stores the full relative path, use it directly
+    return apiService.getFileUrl(employee.profilePicture)
+  }
+
+  const getDocumentUrl = (document) => {
+    if (!document) return null
+
+    const filePath = typeof document === "string" ? document : document.relativePath || document.filename
+
+    // The database stores the full relative path, use it directly
+    return apiService.getFileUrl(filePath)
+  }
+
+  // Get file icon based on file type
+  const getFileIcon = (filename) => {
+    if (!filename) return <FileText className="w-4 h-4" />
+
+    const ext = filename.split(".").pop()?.toLowerCase()
+
+    if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) {
+      return <ImageIcon className="w-4 h-4" />
+    } else if (["pdf"].includes(ext)) {
+      return <FileText className="w-4 h-4 text-red-500" />
+    } else if (["doc", "docx"].includes(ext)) {
+      return <FileText className="w-4 h-4 text-blue-500" />
+    } else if (["xls", "xlsx"].includes(ext)) {
+      return <FileText className="w-4 h-4 text-green-500" />
+    } else if (["ppt", "pptx"].includes(ext)) {
+      return <FileText className="w-4 h-4 text-orange-500" />
+    }
+
+    return <FileText className="w-4 h-4" />
+  }
+
+  // Open document viewer
+  const openDocumentViewer = (employee) => {
+    if (!employee.documents || employee.documents.length === 0) return
+
+    setSelectedDocuments(employee.documents)
+    setCurrentDocumentIndex(0)
+    setIsDocumentViewerOpen(true)
+
+    // Set preview URL for first document
+    const firstDoc = employee.documents[0]
+    setDocumentPreviewUrl(getDocumentUrl(firstDoc))
+  }
+
+  // Navigate documents in viewer
+  const navigateDocument = (direction) => {
+    const newIndex =
+      direction === "next"
+        ? Math.min(currentDocumentIndex + 1, selectedDocuments.length - 1)
+        : Math.max(currentDocumentIndex - 1, 0)
+
+    setCurrentDocumentIndex(newIndex)
+    setDocumentPreviewUrl(getDocumentUrl(selectedDocuments[newIndex]))
+  }
+
+  const downloadDocument = async (document) => {
+    try {
+      const filename = typeof document === "string" ? document : document.filename
+      const originalName = typeof document === "object" ? document.originalName : filename
+
+      console.log("[v0] Downloading document:", { filename, originalName })
+
+      let blob
+
+      // Use the direct file URL since we have the relative path
+      try {
+        const response = await fetch(getDocumentUrl(document))
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        blob = await response.blob()
+        console.log("[v0] Document downloaded successfully")
+      } catch (err) {
+        console.error("[v0] Download failed:", err)
+        throw err
+      }
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = originalName || filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error("[v0] Download error:", err)
+      setError(`Failed to download document: ${err.message}`)
+    }
+  }
+
   useEffect(() => {
     fetchEmployees()
+
+    const unsubscribeUpdated = subscribeToUpdates("employee_updated", (data) => {
+      console.log("[EmployeeRecords] Employee updated:", data)
+      fetchEmployees()
+    })
+
+    const unsubscribeCreated = subscribeToUpdates("employee_created", (data) => {
+      console.log("[EmployeeRecords] Employee created:", data)
+      fetchEmployees()
+    })
+
+    const unsubscribeDeleted = subscribeToUpdates("employee_deleted", (data) => {
+      console.log("[EmployeeRecords] Employee deleted:", data)
+      fetchEmployees()
+      if (selectedEmployee?.id === data.id) {
+        setSelectedEmployee(null)
+      }
+    })
+
+    return () => {
+      unsubscribeUpdated()
+      unsubscribeCreated()
+      unsubscribeDeleted()
+    }
   }, [searchTerm, filterDepartment, filterStatus, sortBy, sortOrder, pagination.currentPage])
 
   const fetchEmployees = async () => {
     try {
       setLoading(true)
-      
-      const params = new URLSearchParams({
+
+      const params = {
         limit: pagination.limit.toString(),
         offset: ((pagination.currentPage - 1) * pagination.limit).toString(),
         search: searchTerm,
         department: filterDepartment,
         status: filterStatus,
         sortBy: sortBy,
-        sortOrder: sortOrder
-      })
+        sortOrder: sortOrder,
+      }
 
-      const response = await fetch(`${API_ENDPOINTS}/api/employees?${params}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
+      const result = await apiService.getEmployees(params)
 
-      if (!response.ok) throw new Error("Failed to fetch employees")
-
-      const result = await response.json()
-      
       if (result.success) {
         setEmployees(result.data.employees || [])
         setStatistics(result.data.statistics || {})
         setDepartments(result.data.departments || [])
-        setPagination(prev => ({ ...prev, total: result.data.pagination.total }))
+        setPagination((prev) => ({ ...prev, total: result.data.pagination.total }))
       } else {
         throw new Error(result.error || "Failed to fetch employees")
       }
@@ -77,9 +201,21 @@ function EmployeeRecords() {
   const handleEditEmployee = (employee) => {
     setEditingEmployee({
       ...employee,
-      birthDate: employee.birthDate ? employee.birthDate.split('T')[0] : '',
-      hireDate: employee.hireDate ? employee.hireDate.split('T')[0] : ''
+      birthDate: employee.birthDate ? employee.birthDate.split("T")[0] : "",
+      hireDate: employee.hireDate ? employee.hireDate.split("T")[0] : "",
+      documents: employee.documents || [],
     })
+
+    // Reset file states
+    setSelectedProfileFile(null)
+    setSelectedDocumentFiles([])
+    setProfilePreview(null)
+
+    // Set existing profile picture preview if available
+    if (employee.profilePicture) {
+      setProfilePreview(getProfilePictureUrl(employee))
+    }
+
     setIsEditModalOpen(true)
   }
 
@@ -93,14 +229,7 @@ function EmployeeRecords() {
 
     try {
       setIsSaving(true)
-      const response = await fetch(`http://192.168.68.140:3001/api/employees/${deleteEmployee.id}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) throw new Error("Failed to delete employee")
+      await apiService.deleteEmployee(deleteEmployee.id)
 
       await fetchEmployees()
       setSelectedEmployee(null)
@@ -113,27 +242,192 @@ function EmployeeRecords() {
     }
   }
 
+  const handleProfilePictureChange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    // Basic validation
+    const maxSize = 5 * 1024 * 1024 // 5MB
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+
+    if (!allowedTypes.includes(file.type)) {
+      setError("Invalid file type. Please select a valid image file (JPEG, PNG, GIF, or WebP).")
+      return
+    }
+
+    if (file.size > maxSize) {
+      setError("File size too large. Please select an image smaller than 5MB.")
+      return
+    }
+
+    setSelectedProfileFile(file)
+
+    try {
+      // Create preview using FileReader
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        setProfilePreview(event.target.result)
+        setError(null)
+      }
+      reader.onerror = () => {
+        setError("Error creating image preview")
+      }
+      reader.readAsDataURL(file)
+    } catch (err) {
+      console.error("Error creating image preview:", err)
+      setError("Error creating image preview")
+    }
+  }
+
+  // Handle multiple document selection with validation
+  const handleDocumentChange = (e) => {
+    const files = Array.from(e.target.files)
+    const validFiles = []
+    const errors = []
+
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    const allowedTypes = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain",
+      "application/rtf",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ]
+
+    files.forEach((file) => {
+      if (!allowedTypes.includes(file.type)) {
+        errors.push(`${file.name}: Invalid file type`)
+      } else if (file.size > maxSize) {
+        errors.push(`${file.name}: File size too large (max 10MB)`)
+      } else {
+        validFiles.push(file)
+      }
+    })
+
+    if (errors.length > 0) {
+      setError("Some files were rejected: " + errors.join(", "))
+    } else {
+      setError(null)
+    }
+
+    setSelectedDocumentFiles((prev) => [...prev, ...validFiles])
+  }
+
+  // Helper function to format file size
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return "0 Bytes"
+
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  }
+
+  // Remove selected document file
+  const removeSelectedDocument = (index) => {
+    setSelectedDocumentFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // Remove existing document from employee
+  const removeExistingDocument = async (docIndex) => {
+    if (!editingEmployee) return
+
+    const updatedDocuments = editingEmployee.documents.filter((_, index) => index !== docIndex)
+    setEditingEmployee((prev) => ({
+      ...prev,
+      documents: updatedDocuments,
+    }))
+  }
+
+  const uploadFiles = async () => {
+  const uploadedFiles = {}
+
+  try {
+    setUploadingFiles(true)
+
+    // Upload profile picture if selected
+    if (selectedProfileFile) {
+      try {
+        console.log("[v0] Uploading profile picture for user:", user.id)
+        const result = await apiService.uploadProfilePicture(selectedProfileFile, user.id)
+        console.log("[v0] Profile upload result:", result)
+
+        if (result.success) {
+          // Store the relative path returned from the server
+          uploadedFiles.profilePicture = result.data?.relativePath || result.relativePath
+        } else {
+          throw new Error(result.error || "Failed to upload profile picture")
+        }
+      } catch (err) {
+        console.error("[v0] Profile upload error:", err)
+        throw new Error(`Failed to upload profile picture: ${err.message}`)
+      }
+    }
+
+    // Upload multiple documents if selected
+    if (selectedDocumentFiles.length > 0) {
+      for (const file of selectedDocumentFiles) {
+        try {
+          console.log("[v0] Uploading document for user:", user.id, "file:", file.name)
+          const result = await apiService.uploadDocument(file, user.id)
+          console.log("[v0] Document upload result:", result)
+
+          if (!result.success) {
+            throw new Error(`Failed to upload ${file.name}: ${result.error}`)
+          }
+          
+          // Documents are already saved to database by backend, no need to store anything here
+          console.log(`[v0] Document ${file.name} uploaded and saved to database successfully`)
+          
+        } catch (fileErr) {
+          console.error(`[v0] Error uploading ${file.name}:`, fileErr)
+          throw new Error(`Failed to upload ${file.name}: ${fileErr.message}`)
+        }
+      }
+      
+      // Don't store documents in uploadedFiles since backend handles it
+      // uploadedFiles.documents is not needed
+    }
+
+    console.log("[v0] All files uploaded successfully:", uploadedFiles)
+    return uploadedFiles
+  } finally {
+    setUploadingFiles(false)
+  }
+}
+
   const handleSaveEmployee = async () => {
     if (!editingEmployee) return
 
     try {
       setIsSaving(true)
-      const response = await fetch(`http://192.168.68.140:3001/api/employees/${editingEmployee.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(editingEmployee)
-      })
 
-      if (!response.ok) throw new Error("Failed to update employee")
+      // Upload any selected files first
+      const uploadedFiles = await uploadFiles()
+
+      // Update employee data with uploaded file names
+      const updatedEmployeeData = {
+        ...editingEmployee,
+        ...uploadedFiles,
+      }
+
+      await apiService.updateEmployee(editingEmployee.id, updatedEmployeeData)
 
       await fetchEmployees()
       setIsEditModalOpen(false)
       setEditingEmployee(null)
+      setSelectedProfileFile(null)
+      setSelectedDocumentFiles([])
+      setProfilePreview(null)
+
       // Update selected employee if it was the one being edited
       if (selectedEmployee?.id === editingEmployee.id) {
-        setSelectedEmployee(editingEmployee)
+        setSelectedEmployee(updatedEmployeeData)
       }
     } catch (err) {
       setError(err.message)
@@ -143,7 +437,7 @@ function EmployeeRecords() {
   }
 
   const handlePageChange = (newPage) => {
-    setPagination(prev => ({ ...prev, currentPage: newPage }))
+    setPagination((prev) => ({ ...prev, currentPage: newPage }))
   }
 
   const formatPhoneNumber = (phone) => {
@@ -153,17 +447,17 @@ function EmployeeRecords() {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "N/A"
-    return new Date(dateStr).toLocaleDateString('en-PH', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    return new Date(dateStr).toLocaleDateString("en-PH", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     })
   }
 
   const handleInputChange = (field, value) => {
-    setEditingEmployee(prev => ({
+    setEditingEmployee((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }))
   }
 
@@ -207,15 +501,17 @@ function EmployeeRecords() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="px-4 py-2 rounded-lg bg-white/20 dark:bg-gray-800/60 backdrop-blur-sm border border-white/30 dark:border-gray-700/40 text-gray-800 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500"
           />
-          
+
           <select
             value={filterDepartment}
             onChange={(e) => setFilterDepartment(e.target.value)}
             className="px-4 py-2 rounded-lg bg-white/20 dark:bg-gray-800/60 backdrop-blur-sm border border-white/30 dark:border-gray-700/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
           >
             <option value="">All Departments</option>
-            {departments.map(dept => (
-              <option key={dept.name} value={dept.name}>{dept.name} ({dept.totalCount})</option>
+            {departments.map((dept) => (
+              <option key={dept.name} value={dept.name}>
+                {dept.name} ({dept.totalCount})
+              </option>
             ))}
           </select>
 
@@ -274,7 +570,7 @@ function EmployeeRecords() {
               Page {pagination.currentPage} of {Math.ceil(pagination.total / pagination.limit)}
             </div>
           </div>
-          
+
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {employees.map((employee) => (
               <div
@@ -286,27 +582,58 @@ function EmployeeRecords() {
                     : "bg-white/20 dark:bg-gray-700/30 border-white/20 dark:border-gray-600/30 hover:bg-white/30 dark:hover:bg-gray-700/50"
                 }`}
               >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-medium text-gray-800 dark:text-gray-100">
-                      {employee.fullName}
-                      {employee.isNewHire && <span className="ml-2 text-xs bg-green-500 text-white px-2 py-1 rounded">NEW</span>}
-                    </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">{employee.position}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{employee.department}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">ID: {employee.idNumber}</p>
+                <div className="flex items-center gap-3">
+                  {/* Profile Picture in List */}
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
+                    {employee.profilePicture ? (
+                      <img
+                        src={getProfilePictureUrl(employee) || "/placeholder.svg"}
+                        alt={`${employee.fullName} profile`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = "none"
+                          e.target.nextElementSibling.style.display = "flex"
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500 ${employee.profilePicture ? "hidden" : "flex"}`}
+                    >
+                      👤
+                    </div>
                   </div>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${
-                      employee.status === "Active"
-                        ? "bg-green-100/80 dark:bg-green-900/40 text-green-700 dark:text-green-300"
-                        : employee.status === "On Leave"
-                        ? "bg-yellow-100/80 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
-                        : "bg-red-100/80 dark:bg-red-900/40 text-red-700 dark:text-red-300"
-                    }`}
-                  >
-                    {employee.status}
-                  </span>
+
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-medium text-gray-800 dark:text-gray-100">
+                          {employee.fullName}
+                          {employee.isNewHire && (
+                            <span className="ml-2 text-xs bg-green-500 text-white px-2 py-1 rounded">NEW</span>
+                          )}
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">{employee.position}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{employee.department}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">ID: {employee.idNumber}</p>
+                        {employee.documents && employee.documents.length > 0 && (
+                          <p className="text-xs text-blue-600 dark:text-blue-400">
+                            📄 {employee.documents.length} document{employee.documents.length !== 1 ? "s" : ""}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs ${
+                          employee.status === "Active"
+                            ? "bg-green-100/80 dark:bg-green-900/40 text-green-700 dark:text-green-300"
+                            : employee.status === "On Leave"
+                              ? "bg-yellow-100/80 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
+                              : "bg-red-100/80 dark:bg-red-900/40 text-red-700 dark:text-red-300"
+                        }`}
+                      >
+                        {employee.status}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -340,9 +667,93 @@ function EmployeeRecords() {
           {selectedEmployee ? (
             <div className="space-y-4 max-h-96 overflow-y-auto">
               <div className="text-center pb-4 border-b border-white/30 dark:border-gray-600/30">
+                {/* Profile Picture Display */}
+                <div className="w-24 h-24 mx-auto mb-3 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
+                  {selectedEmployee.profilePicture ? (
+                    <img
+                      src={getProfilePictureUrl(selectedEmployee) || "/placeholder.svg"}
+                      alt={`${selectedEmployee.fullName} profile`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = "none"
+                        e.target.nextElementSibling.style.display = "flex"
+                      }}
+                    />
+                  ) : null}
+                  <div
+                    className={`w-full h-full flex items-center justify-center text-4xl text-gray-400 dark:text-gray-500 ${selectedEmployee.profilePicture ? "hidden" : "flex"}`}
+                  >
+                    👤
+                  </div>
+                </div>
+
                 <h4 className="text-xl font-bold text-gray-800 dark:text-gray-100">{selectedEmployee.fullName}</h4>
                 <p className="text-gray-600 dark:text-gray-300">{selectedEmployee.position}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">{selectedEmployee.department}</p>
+
+                {/* Multiple Documents Display */}
+                {selectedEmployee.documents && selectedEmployee.documents.length > 0 && (
+                  <div className="mt-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Documents ({selectedEmployee.documents.length}):
+                      </p>
+                      <button
+                        onClick={() => openDocumentViewer(selectedEmployee)}
+                        className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded flex items-center gap-1"
+                      >
+                        <Eye className="w-3 h-3" />
+                        View All
+                      </button>
+                    </div>
+                    <div className="space-y-1 max-h-24 overflow-y-auto">
+                      {selectedEmployee.documents.map((doc, index) => {
+                        const filename = typeof doc === "string" ? doc : doc.filename
+                        const originalName = typeof doc === "object" ? doc.originalName : filename
+                        const size = typeof doc === "object" ? doc.size : null
+
+                        return (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between bg-gray-100 dark:bg-gray-700 rounded p-2"
+                          >
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {getFileIcon(filename)}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-gray-700 dark:text-gray-300 truncate">
+                                  {originalName || filename}
+                                </p>
+                                {size && <p className="text-xs text-gray-500">{apiService.formatFileSize(size)}</p>}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  window.open(getDocumentUrl(doc), "_blank")
+                                }}
+                                className="p-1 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900 rounded"
+                                title="View document"
+                              >
+                                <Eye className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  downloadDocument(doc)
+                                }}
+                                className="p-1 text-green-600 hover:bg-green-100 dark:hover:bg-green-900 rounded"
+                                title="Download document"
+                              >
+                                <Download className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 gap-3">
@@ -364,7 +775,9 @@ function EmployeeRecords() {
                     </div>
                     <div>
                       <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">Contact</label>
-                      <p className="text-gray-800 dark:text-gray-100">{formatPhoneNumber(selectedEmployee.contactNumber)}</p>
+                      <p className="text-gray-800 dark:text-gray-100">
+                        {formatPhoneNumber(selectedEmployee.contactNumber)}
+                      </p>
                     </div>
                   </div>
                   <div className="mt-2">
@@ -391,13 +804,15 @@ function EmployeeRecords() {
                     </div>
                     <div>
                       <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">Status</label>
-                      <span className={`inline-block px-2 py-1 rounded-full text-xs ${
-                        selectedEmployee.status === "Active"
-                          ? "bg-green-100/80 dark:bg-green-900/40 text-green-700 dark:text-green-300"
-                          : selectedEmployee.status === "On Leave"
-                          ? "bg-yellow-100/80 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
-                          : "bg-red-100/80 dark:bg-red-900/40 text-red-700 dark:text-red-300"
-                      }`}>
+                      <span
+                        className={`inline-block px-2 py-1 rounded-full text-xs ${
+                          selectedEmployee.status === "Active"
+                            ? "bg-green-100/80 dark:bg-green-900/40 text-green-700 dark:text-green-300"
+                            : selectedEmployee.status === "On Leave"
+                              ? "bg-yellow-100/80 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
+                              : "bg-red-100/80 dark:bg-red-900/40 text-red-700 dark:text-red-300"
+                        }`}
+                      >
                         {selectedEmployee.status}
                       </span>
                     </div>
@@ -408,7 +823,9 @@ function EmployeeRecords() {
                   </div>
                   <div className="mt-2">
                     <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">ID Barcode</label>
-                    <p className="text-gray-800 dark:text-gray-100 font-mono text-xs">{selectedEmployee.idBarcode || "N/A"}</p>
+                    <p className="text-gray-800 dark:text-gray-100 font-mono text-xs">
+                      {selectedEmployee.idBarcode || "N/A"}
+                    </p>
                   </div>
                 </div>
 
@@ -418,26 +835,34 @@ function EmployeeRecords() {
                   <div className="grid grid-cols-1 gap-2 text-sm">
                     <div className="flex justify-between">
                       <label className="text-xs font-medium text-gray-600 dark:text-gray-300">TIN Number:</label>
-                      <p className="text-gray-800 dark:text-gray-100 font-mono">{selectedEmployee.tinNumber || "N/A"}</p>
+                      <p className="text-gray-800 dark:text-gray-100 font-mono">
+                        {selectedEmployee.tinNumber || "N/A"}
+                      </p>
                     </div>
                     <div className="flex justify-between">
                       <label className="text-xs font-medium text-gray-600 dark:text-gray-300">SSS Number:</label>
-                      <p className="text-gray-800 dark:text-gray-100 font-mono">{selectedEmployee.sssNumber || "N/A"}</p>
+                      <p className="text-gray-800 dark:text-gray-100 font-mono">
+                        {selectedEmployee.sssNumber || "N/A"}
+                      </p>
                     </div>
                     <div className="flex justify-between">
                       <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Pag-IBIG Number:</label>
-                      <p className="text-gray-800 dark:text-gray-100 font-mono">{selectedEmployee.pagibigNumber || "N/A"}</p>
+                      <p className="text-gray-800 dark:text-gray-100 font-mono">
+                        {selectedEmployee.pagibigNumber || "N/A"}
+                      </p>
                     </div>
                     <div className="flex justify-between">
                       <label className="text-xs font-medium text-gray-600 dark:text-gray-300">PhilHealth Number:</label>
-                      <p className="text-gray-800 dark:text-gray-100 font-mono">{selectedEmployee.philhealthNumber || "N/A"}</p>
+                      <p className="text-gray-800 dark:text-gray-100 font-mono">
+                        {selectedEmployee.philhealthNumber || "N/A"}
+                      </p>
                     </div>
                   </div>
                 </div>
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-white/30 dark:border-gray-600/30">
-                <button 
+                <button
                   onClick={() => handleEditEmployee(selectedEmployee)}
                   className="flex-1 bg-slate-600 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white py-2 rounded-lg transition-colors duration-200 text-sm"
                 >
@@ -460,6 +885,155 @@ function EmployeeRecords() {
         </div>
       </div>
 
+      {/* Document Viewer Modal */}
+      {isDocumentViewerOpen && selectedDocuments.length > 0 && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Document Viewer</h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                    {currentDocumentIndex + 1} of {selectedDocuments.length}
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => navigateDocument("prev")}
+                      disabled={currentDocumentIndex === 0}
+                      className="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded disabled:opacity-50"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      onClick={() => navigateDocument("next")}
+                      disabled={currentDocumentIndex === selectedDocuments.length - 1}
+                      className="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded disabled:opacity-50"
+                    >
+                      ›
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => downloadDocument(selectedDocuments[currentDocumentIndex])}
+                  className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                  title="Download current document"
+                >
+                  <Download size={16} />
+                </button>
+                <button
+                  onClick={() => setIsDocumentViewerOpen(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <X size={20} className="text-gray-500 dark:text-gray-400" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <div className="bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden">
+                {documentPreviewUrl && (
+                  <iframe
+                    src={documentPreviewUrl}
+                    className="w-full h-96"
+                    title={`Document ${currentDocumentIndex + 1}`}
+                  />
+                )}
+              </div>
+
+              {/* Document Info */}
+              <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-2">Document Information</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <label className="text-gray-600 dark:text-gray-300">Original Name:</label>
+                    <p className="text-gray-800 dark:text-gray-100 font-mono">
+                      {selectedDocuments[currentDocumentIndex].originalName ||
+                        selectedDocuments[currentDocumentIndex].filename ||
+                        selectedDocuments[currentDocumentIndex]}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-gray-600 dark:text-gray-300">File Size:</label>
+                    <p className="text-gray-800 dark:text-gray-100">
+                      {selectedDocuments[currentDocumentIndex].size
+                        ? apiService.formatFileSize(selectedDocuments[currentDocumentIndex].size)
+                        : "Unknown"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-gray-600 dark:text-gray-300">File Type:</label>
+                    <p className="text-gray-800 dark:text-gray-100">
+                      {selectedDocuments[currentDocumentIndex].type || "Unknown"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-gray-600 dark:text-gray-300">Uploaded:</label>
+                    <p className="text-gray-800 dark:text-gray-100">
+                      {selectedDocuments[currentDocumentIndex].uploadedAt
+                        ? formatDate(selectedDocuments[currentDocumentIndex].uploadedAt)
+                        : "Unknown"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Document List */}
+              <div className="mt-4">
+                <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-2">All Documents</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {selectedDocuments.map((doc, index) => {
+                    const filename = typeof doc === "string" ? doc : doc.filename
+                    const originalName = typeof doc === "object" ? doc.originalName : filename
+                    const isActive = index === currentDocumentIndex
+
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          setCurrentDocumentIndex(index)
+                          setDocumentPreviewUrl(getDocumentUrl(doc))
+                        }}
+                        className={`p-3 text-left rounded-lg border transition-colors ${
+                          isActive
+                            ? "bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700"
+                            : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {getFileIcon(filename)}
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className={`text-sm truncate ${
+                                isActive
+                                  ? "text-blue-800 dark:text-blue-200 font-medium"
+                                  : "text-gray-800 dark:text-gray-100"
+                              }`}
+                            >
+                              {originalName || filename}
+                            </p>
+                            {doc.size && (
+                              <p
+                                className={`text-xs ${
+                                  isActive ? "text-blue-600 dark:text-blue-300" : "text-gray-500 dark:text-gray-400"
+                                }`}
+                              >
+                                {apiService.formatFileSize(doc.size)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Employee Modal */}
       {isEditModalOpen && editingEmployee && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -473,73 +1047,227 @@ function EmployeeRecords() {
                 <X size={20} className="text-gray-500 dark:text-gray-400" />
               </button>
             </div>
-            
+
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
               <form className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2 space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
+                    File Uploads
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Profile Picture Upload */}
+                    <div className="space-y-3">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Profile Picture
+                      </label>
+                      <div className="flex items-center space-x-4">
+                        {profilePreview && (
+                          <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
+                            <img
+                              src={profilePreview || "/placeholder.svg"}
+                              alt="Profile preview"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleProfilePictureChange}
+                            disabled={isSaving || uploadingFiles}
+                            className="w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-slate-600 file:text-white hover:file:bg-slate-700 file:cursor-pointer"
+                          />
+                          {selectedProfileFile && (
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                              📁 {selectedProfileFile.name} selected (will upload when saved)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Select new profile picture (max 5MB, jpg/png/gif/webp). File will be uploaded when you save
+                        changes.
+                      </p>
+                    </div>
+
+                    {/* Document Upload */}
+                    <div className="space-y-3">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Add New Documents
+                      </label>
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          accept=".pdf,.doc,.docx,.txt,.rtf,.xls,.xlsx,.ppt,.pptx"
+                          multiple
+                          onChange={handleDocumentChange}
+                          disabled={isSaving || uploadingFiles}
+                          className="w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-slate-600 file:text-white hover:file:bg-slate-700 file:cursor-pointer"
+                        />
+
+                        {/* Show selected files to upload */}
+                        {selectedDocumentFiles.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                              Files to upload ({selectedDocumentFiles.length}):
+                            </p>
+                            {selectedDocumentFiles.map((file, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 p-2 rounded"
+                              >
+                                <div className="flex items-center gap-2">
+                                  {getFileIcon(file.name)}
+                                  <span className="text-xs text-green-700 dark:text-green-300">{file.name}</span>
+                                  <span className="text-xs text-gray-500">
+                                    ({apiService.formatFileSize(file.size)})
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeSelectedDocument(index)}
+                                  className="text-red-500 hover:text-red-700"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Show existing documents */}
+                        {editingEmployee.documents && editingEmployee.documents.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                              Current documents ({editingEmployee.documents.length}):
+                            </p>
+                            {editingEmployee.documents.map((doc, index) => {
+                              const filename = typeof doc === "string" ? doc : doc.filename
+                              const originalName = typeof doc === "object" ? doc.originalName : filename
+                              const size = typeof doc === "object" ? doc.size : null
+
+                              return (
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 p-2 rounded"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {getFileIcon(filename)}
+                                    <span className="text-xs text-gray-700 dark:text-gray-300">
+                                      {originalName || filename}
+                                    </span>
+                                    {size && (
+                                      <span className="text-xs text-gray-500">({apiService.formatFileSize(size)})</span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => window.open(getDocumentUrl(doc), "_blank")}
+                                      className="text-blue-500 hover:text-blue-700"
+                                      title="View document"
+                                    >
+                                      <Eye size={14} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeExistingDocument(index)}
+                                      className="text-red-500 hover:text-red-700"
+                                      title="Remove document"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Select multiple documents (max 10MB each, pdf/doc/docx/txt/rtf/xls/xlsx/ppt/pptx). Files will be
+                        uploaded when you save changes.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Personal Information */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
                     Personal Information
                   </h3>
-                  
+
                   <div className="grid grid-cols-1 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">First Name</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        First Name
+                      </label>
                       <input
                         type="text"
-                        value={editingEmployee.firstName || ''}
-                        onChange={(e) => handleInputChange('firstName', e.target.value)}
+                        value={editingEmployee.firstName || ""}
+                        onChange={(e) => handleInputChange("firstName", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     </div>
-                    
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Middle Name</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Middle Name
+                      </label>
                       <input
                         type="text"
-                        value={editingEmployee.middleName || ''}
-                        onChange={(e) => handleInputChange('middleName', e.target.value)}
+                        value={editingEmployee.middleName || ""}
+                        onChange={(e) => handleInputChange("middleName", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     </div>
-                    
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Last Name
+                      </label>
                       <input
                         type="text"
-                        value={editingEmployee.lastName || ''}
-                        onChange={(e) => handleInputChange('lastName', e.target.value)}
+                        value={editingEmployee.lastName || ""}
+                        onChange={(e) => handleInputChange("lastName", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Age</label>
                         <input
                           type="number"
-                          value={editingEmployee.age || ''}
-                          onChange={(e) => handleInputChange('age', e.target.value)}
+                          value={editingEmployee.age || ""}
+                          onChange={(e) => handleInputChange("age", e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         />
                       </div>
-                      
+
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Birth Date</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Birth Date
+                        </label>
                         <input
                           type="date"
-                          value={editingEmployee.birthDate || ''}
-                          onChange={(e) => handleInputChange('birthDate', e.target.value)}
+                          value={editingEmployee.birthDate || ""}
+                          onChange={(e) => handleInputChange("birthDate", e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         />
                       </div>
                     </div>
-                    
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Civil Status</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Civil Status
+                      </label>
                       <select
-                        value={editingEmployee.civilStatus || ''}
-                        onChange={(e) => handleInputChange('civilStatus', e.target.value)}
+                        value={editingEmployee.civilStatus || ""}
+                        onChange={(e) => handleInputChange("civilStatus", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       >
                         <option value="">Select Status</option>
@@ -549,33 +1277,35 @@ function EmployeeRecords() {
                         <option value="Widowed">Widowed</option>
                       </select>
                     </div>
-                    
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contact Number</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Contact Number
+                      </label>
                       <input
                         type="tel"
-                        value={editingEmployee.contactNumber || ''}
-                        onChange={(e) => handleInputChange('contactNumber', e.target.value)}
+                        value={editingEmployee.contactNumber || ""}
+                        onChange={(e) => handleInputChange("contactNumber", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         placeholder="+639123456789"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
                       <input
                         type="email"
-                        value={editingEmployee.email || ''}
-                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        value={editingEmployee.email || ""}
+                        onChange={(e) => handleInputChange("email", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Address</label>
                       <textarea
-                        value={editingEmployee.address || ''}
-                        onChange={(e) => handleInputChange('address', e.target.value)}
+                        value={editingEmployee.address || ""}
+                        onChange={(e) => handleInputChange("address", e.target.value)}
                         rows="3"
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
@@ -588,53 +1318,61 @@ function EmployeeRecords() {
                   <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
                     Employment Information
                   </h3>
-                  
+
                   <div className="grid grid-cols-1 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Position</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Position
+                      </label>
                       <input
                         type="text"
-                        value={editingEmployee.position || ''}
-                        onChange={(e) => handleInputChange('position', e.target.value)}
+                        value={editingEmployee.position || ""}
+                        onChange={(e) => handleInputChange("position", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     </div>
-                    
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Department
+                      </label>
                       <input
                         type="text"
-                        value={editingEmployee.department || ''}
-                        onChange={(e) => handleInputChange('department', e.target.value)}
+                        value={editingEmployee.department || ""}
+                        onChange={(e) => handleInputChange("department", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     </div>
-                    
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hire Date</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Hire Date
+                      </label>
                       <input
                         type="date"
-                        value={editingEmployee.hireDate || ''}
-                        onChange={(e) => handleInputChange('hireDate', e.target.value)}
+                        value={editingEmployee.hireDate || ""}
+                        onChange={(e) => handleInputChange("hireDate", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     </div>
-                    
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Employee ID</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Employee ID
+                      </label>
                       <input
                         type="text"
-                        value={editingEmployee.idNumber || ''}
-                        onChange={(e) => handleInputChange('idNumber', e.target.value)}
+                        value={editingEmployee.idNumber || ""}
+                        onChange={(e) => handleInputChange("idNumber", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
                       <select
-                        value={editingEmployee.status || ''}
-                        onChange={(e) => handleInputChange('status', e.target.value)}
+                        value={editingEmployee.status || ""}
+                        onChange={(e) => handleInputChange("status", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       >
                         <option value="">Select Status</option>
@@ -644,29 +1382,31 @@ function EmployeeRecords() {
                         <option value="Terminated">Terminated</option>
                       </select>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Salary</label>
                       <input
                         type="text"
-                        value={editingEmployee.salary || ''}
-                        onChange={(e) => handleInputChange('salary', e.target.value)}
+                        value={editingEmployee.salary || ""}
+                        onChange={(e) => handleInputChange("salary", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         placeholder="₱25,000"
                       />
                     </div>
-                    
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ID Barcode</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        ID Barcode
+                      </label>
                       <input
                         type="text"
-                        value={editingEmployee.idBarcode || ''}
-                        onChange={(e) => handleInputChange('idBarcode', e.target.value)}
+                        value={editingEmployee.idBarcode || ""}
+                        onChange={(e) => handleInputChange("idBarcode", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
                       />
                     </div>
                   </div>
-                  
+
                   {/* Government IDs */}
                   <div className="mt-6">
                     <h4 className="text-md font-medium text-gray-800 dark:text-gray-100 mb-3 border-b border-gray-200 dark:border-gray-700 pb-1">
@@ -674,41 +1414,49 @@ function EmployeeRecords() {
                     </h4>
                     <div className="grid grid-cols-1 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">TIN Number</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          TIN Number
+                        </label>
                         <input
                           type="text"
-                          value={editingEmployee.tinNumber || ''}
-                          onChange={(e) => handleInputChange('tinNumber', e.target.value)}
+                          value={editingEmployee.tinNumber || ""}
+                          onChange={(e) => handleInputChange("tinNumber", e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
                         />
                       </div>
-                      
+
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">SSS Number</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          SSS Number
+                        </label>
                         <input
                           type="text"
-                          value={editingEmployee.sssNumber || ''}
-                          onChange={(e) => handleInputChange('sssNumber', e.target.value)}
+                          value={editingEmployee.sssNumber || ""}
+                          onChange={(e) => handleInputChange("sssNumber", e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
                         />
                       </div>
-                      
+
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pag-IBIG Number</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Pag-IBIG Number
+                        </label>
                         <input
                           type="text"
-                          value={editingEmployee.pagibigNumber || ''}
-                          onChange={(e) => handleInputChange('pagibigNumber', e.target.value)}
+                          value={editingEmployee.pagibigNumber || ""}
+                          onChange={(e) => handleInputChange("pagibigNumber", e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
                         />
                       </div>
-                      
+
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">PhilHealth Number</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          PhilHealth Number
+                        </label>
                         <input
                           type="text"
-                          value={editingEmployee.philhealthNumber || ''}
-                          onChange={(e) => handleInputChange('philhealthNumber', e.target.value)}
+                          value={editingEmployee.philhealthNumber || ""}
+                          onChange={(e) => handleInputChange("philhealthNumber", e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
                         />
                       </div>
@@ -717,7 +1465,7 @@ function EmployeeRecords() {
                 </div>
               </form>
             </div>
-            
+
             <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
               <button
                 onClick={() => setIsEditModalOpen(false)}
@@ -728,10 +1476,10 @@ function EmployeeRecords() {
               </button>
               <button
                 onClick={handleSaveEmployee}
-                disabled={isSaving}
+                disabled={isSaving || uploadingFiles}
                 className="px-6 py-2 bg-slate-600 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSaving ? 'Saving...' : 'Save Changes'}
+                {isSaving ? (uploadingFiles ? "Uploading files..." : "Saving...") : "Save Changes"}
               </button>
             </div>
           </div>
@@ -744,24 +1492,44 @@ function EmployeeRecords() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full shadow-2xl">
             <div className="p-6">
               <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 dark:bg-red-900/40 rounded-full">
-                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                <svg
+                  className="w-6 h-6 text-red-600 dark:text-red-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
                 </svg>
               </div>
-              
+
               <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 text-center mb-2">
                 Delete Employee Record
               </h2>
-              
+
               <p className="text-gray-600 dark:text-gray-300 text-center mb-6">
-                Are you sure you want to delete <strong>{deleteEmployee.fullName}</strong>? 
-                This action cannot be undone and will permanently remove all employee data.
+                Are you sure you want to delete <strong>{deleteEmployee.fullName}</strong>? This action cannot be undone
+                and will permanently remove all employee data.
               </p>
-              
+
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
                 <div className="flex items-center">
-                  <svg className="w-5 h-5 text-red-500 dark:text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-5 h-5 text-red-500 dark:text-red-400 mr-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                   <div className="text-sm text-red-700 dark:text-red-300">
                     <p className="font-medium">Warning: This action is irreversible</p>
@@ -771,7 +1539,7 @@ function EmployeeRecords() {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
               <button
                 onClick={() => {
@@ -788,7 +1556,7 @@ function EmployeeRecords() {
                 disabled={isSaving}
                 className="px-6 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSaving ? 'Deleting...' : 'Delete Employee'}
+                {isSaving ? "Deleting..." : "Delete Employee"}
               </button>
             </div>
           </div>

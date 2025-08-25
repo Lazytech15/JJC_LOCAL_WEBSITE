@@ -1,18 +1,11 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "../App";
-import { 
-  createToken, 
-  storeTokens, 
-  getStoredToken, 
-  clearTokens, 
-  isTokenExpired, 
-  verifyToken 
-} from "../utils/auth";
+import { useState, useEffect } from "react"
+import { useParams, useNavigate } from "react-router-dom"
+import { useAuth } from "../App"
+import { createToken, storeTokens, getStoredToken, clearTokens, isTokenExpired, verifyToken } from "../utils/auth"
 
-import { API_ENDPOINTS } from "../utils/public_api"
+import apiService from "../utils/public_api"
 
 const departmentInfo = {
   "Human Resources": {
@@ -51,7 +44,7 @@ const departmentInfo = {
     color: "from-red-600 to-red-700",
     darkColor: "dark:from-red-700 dark:to-red-800",
   },
-};
+}
 
 // Default department info for fallback
 const defaultDepartmentInfo = {
@@ -59,76 +52,63 @@ const defaultDepartmentInfo = {
   icon: "🏢",
   color: "from-gray-600 to-gray-700",
   darkColor: "dark:from-gray-700 dark:to-gray-800",
-};
+}
 
 function LoginForm() {
-  const { department } = useParams();
-  const navigate = useNavigate();
-  const { login, isDarkMode, toggleDarkMode } = useAuth();
-  const [formData, setFormData] = useState({ username: "", password: "" });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
-  const [hasValidToken, setHasValidToken] = useState(false);
+  const { department } = useParams()
+  const navigate = useNavigate()
+  const { login, isDarkMode, toggleDarkMode } = useAuth()
+  const [formData, setFormData] = useState({ username: "", password: "" })
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [rememberMe, setRememberMe] = useState(false)
+  const [hasValidToken, setHasValidToken] = useState(false)
 
   // Safe department info retrieval with fallback
-  const deptInfo = department && departmentInfo[department] 
-    ? departmentInfo[department] 
-    : defaultDepartmentInfo;
+  const deptInfo = department && departmentInfo[department] ? departmentInfo[department] : defaultDepartmentInfo
 
   // Check if department is valid
-  const isValidDepartment = department && departmentInfo[department];
+  const isValidDepartment = department && departmentInfo[department]
 
   // If invalid department, show error and redirect
   useEffect(() => {
     if (department && !isValidDepartment) {
-      console.error(`Invalid department: ${department}`);
-      setError(`Invalid department: ${department}. Please select a valid department.`);
+      console.error(`Invalid department: ${department}`)
+      setError(`Invalid department: ${department}. Please select a valid department.`)
       // Optional: Redirect to home after a delay
       setTimeout(() => {
-        navigate("/");
-      }, 3000);
+        navigate("/")
+      }, 3000)
     }
-  }, [department, isValidDepartment, navigate]);
+  }, [department, isValidDepartment, navigate])
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    
+    e.preventDefault()
+
     // Check if department is valid before proceeding
     if (!isValidDepartment) {
-      setError("Invalid department selected. Please go back and select a valid department.");
-      return;
+      setError("Invalid department selected. Please go back and select a valid department.")
+      return
     }
-    
-    setIsLoading(true);
-    setError("");
+
+    setIsLoading(true)
+    setError("")
 
     // Validate input
     if (!formData.username.trim() || !formData.password.trim()) {
-      setError("Please enter both username and password");
-      setIsLoading(false);
-      return;
+      setError("Please enter both username and password")
+      setIsLoading(false)
+      return
     }
 
     try {
-      const queryParams = new URLSearchParams({
+      const authData = await apiService.login({
         username: formData.username.trim(),
         password: formData.password,
-        department: department
-      }).toString();
+        department: department,
+      })
 
-      const response = await fetch(`${API_ENDPOINTS}/api/auth?${queryParams}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          // If you have an existing token, include it for validation
-          ...(getStoredToken() && { 'Authorization': `Bearer ${getStoredToken()}` })
-        },
-      });
-
-      const authData = await response.json();
-
-      if (response.ok && authData.success) {
+      if (authData.success) {
         // Prepare user data for JWT
         const userData = {
           id: authData.user.id,
@@ -137,102 +117,111 @@ function LoginForm() {
           department: department,
           role: authData.user.role,
           permissions: authData.user.permissions || [],
-          access_level: authData.user.access_level
-        };
+          access_level: authData.user.access_level,
+        }
 
         // Create JWT tokens
-        const accessTokenExpiry = rememberMe ? '24h' : '1h';
-        const refreshTokenExpiry = rememberMe ? '7d' : '24h';
+        const accessTokenExpiry = rememberMe ? "24h" : "1h"
+        const refreshTokenExpiry = rememberMe ? "7d" : "24h"
 
-        const accessToken = authData.accessToken || createToken({
-          id: userData.id,
-          username: userData.username,
-          name: userData.name,
-          department: department,
-          role: userData.role,
-          permissions: userData.permissions,
-          access_level: userData.access_level
-        }, accessTokenExpiry);
+        const accessToken =
+          authData.accessToken ||
+          createToken(
+            {
+              id: userData.id,
+              username: userData.username,
+              name: userData.name,
+              department: department,
+              role: userData.role,
+              permissions: userData.permissions,
+              access_level: userData.access_level,
+            },
+            accessTokenExpiry,
+          )
 
-        const refreshToken = authData.refreshToken || createToken({ 
-          id: userData.id, 
-          type: 'refresh',
-          department: department
-        }, refreshTokenExpiry);
+        const refreshToken =
+          authData.refreshToken ||
+          createToken(
+            {
+              id: userData.id,
+              type: "refresh",
+              department: department,
+            },
+            refreshTokenExpiry,
+          )
 
         // Store tokens
-        storeTokens(accessToken, refreshToken);
+        storeTokens(accessToken, refreshToken)
 
         // Add login timestamp and token info
         const loginData = {
           ...userData,
           loginTime: new Date().toISOString(),
-          tokenExpiry: rememberMe ? '24 hours' : '1 hour',
-          hasValidToken: true
-        };
+          tokenExpiry: rememberMe ? "24 hours" : "1 hour",
+          hasValidToken: true,
+        }
 
         // Login user
-        login(loginData, department);
-        
-        // Navigate to department dashboard
-        navigate(`/${department}`);
-        
-        // Optional: Show success message
-        console.log('Login successful with JWT authentication');
+        login(loginData, department)
 
+        // Navigate to department dashboard
+        navigate(`/${department}`)
+
+        // Optional: Show success message
+        console.log("Login successful with JWT authentication")
       } else {
         // Clear any existing tokens on failed auth
-        clearTokens();
-        setError(authData.message || authData.error || "Authentication failed");
+        clearTokens()
+        setError(authData.message || authData.error || "Authentication failed")
       }
     } catch (err) {
-      console.error("Authentication error:", err);
-      clearTokens();
-      
+      console.error("Authentication error:", err)
+      clearTokens()
+
       // Network error handling
-      if (err.name === 'NetworkError' || !navigator.onLine) {
-        setError("Network connection error. Please check your internet connection.");
+      if (err.name === "NetworkError" || !navigator.onLine) {
+        setError("Network connection error. Please check your internet connection.")
       } else {
-        setError("Unable to connect to server. Please try again later.");
+        setError(err.message || "Unable to connect to server. Please try again later.")
       }
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const handleInputChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
-    });
+    })
     // Clear error when user starts typing
     if (error) {
-      setError("");
+      setError("")
     }
-  };
+  }
 
   // Check for existing valid token on component mount
   useEffect(() => {
-    if (!isValidDepartment) return;
-    
-    const existingToken = getStoredToken();
+    if (!isValidDepartment) return
+
+    const existingToken = getStoredToken()
     if (existingToken) {
-      const payload = verifyToken(existingToken);
+      const payload = verifyToken(existingToken)
       if (payload && payload.department === department) {
-        setHasValidToken(true);
+        setHasValidToken(true)
       } else {
-        setHasValidToken(false);
+        setHasValidToken(false)
         // Clear invalid or expired tokens
-        clearTokens();
+        clearTokens()
       }
     } else {
-      setHasValidToken(false);
+      setHasValidToken(false)
     }
-  }, [department, isValidDepartment]);
+  }, [department, isValidDepartment])
 
   const handleContinueWithToken = () => {
-    navigate(`/${department}`, { replace: true });
-  };
+    navigate(`/${department}`, { replace: true })
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-8 bg-gradient-to-br from-slate-100 via-gray-50 to-stone-100 dark:from-slate-900 dark:via-gray-900 dark:to-stone-900 transition-colors duration-300">
@@ -261,13 +250,11 @@ function LoginForm() {
             >
               <span className="text-2xl">{deptInfo.icon}</span>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2">
-              {deptInfo.name}
-            </h2>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2">{deptInfo.name}</h2>
             <p className="text-gray-600 dark:text-gray-400">
               {department === "super-admin"
                 ? "Administrator access required"
-                : isValidDepartment 
+                : isValidDepartment
                   ? "Please sign in to access this department"
                   : "Invalid department selected"}
             </p>
@@ -277,9 +264,7 @@ function LoginForm() {
             <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 mb-4">
               <div className="flex items-center">
                 <span className="text-red-600 dark:text-red-400 mr-2">⚠️</span>
-                <span className="text-red-600 dark:text-red-400 text-sm font-medium">
-                  Invalid Department
-                </span>
+                <span className="text-red-600 dark:text-red-400 text-sm font-medium">Invalid Department</span>
               </div>
               <p className="text-red-600 dark:text-red-400 text-xs mt-1">
                 The department "{department}" is not valid. You will be redirected to the department selection page.
@@ -323,10 +308,7 @@ function LoginForm() {
               )}
 
               <div>
-                <label
-                  htmlFor="username"
-                  className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2"
-                >
+                <label htmlFor="username" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
                   Username
                 </label>
                 <input
@@ -344,10 +326,7 @@ function LoginForm() {
               </div>
 
               <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2"
-                >
+                <label htmlFor="password" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
                   Password
                 </label>
                 <input
@@ -373,10 +352,7 @@ function LoginForm() {
                   className="mr-3 h-4 w-4 text-slate-600 focus:ring-slate-500 border-gray-300 rounded"
                   disabled={isLoading || !isValidDepartment}
                 />
-                <label
-                  htmlFor="rememberMe"
-                  className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer"
-                >
+                <label htmlFor="rememberMe" className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
                   Keep me signed in (24 hours)
                 </label>
               </div>
@@ -384,17 +360,7 @@ function LoginForm() {
               <button
                 type="submit"
                 disabled={isLoading || !isValidDepartment}
-                className={`
-                  w-full py-3 px-4 rounded-lg font-medium text-white
-                  bg-gradient-to-r ${deptInfo.color} ${deptInfo.darkColor}
-                  hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400
-                  transition-all duration-200 transform
-                  ${
-                    isLoading || !isValidDepartment
-                      ? "opacity-50 cursor-not-allowed"
-                      : "hover:scale-105"
-                  }
-                `}
+                className={`w-full py-3 px-4 rounded-lg font-medium text-white bg-gradient-to-r ${deptInfo.color} ${deptInfo.darkColor} hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400 transition-all duration-200 transform ${isLoading || !isValidDepartment ? "opacity-50 cursor-not-allowed" : "hover:scale-105"}`}
               >
                 {isLoading ? (
                   <span className="flex items-center justify-center">
@@ -435,9 +401,7 @@ function LoginForm() {
           <div className="mt-6 p-4 bg-white/5 dark:bg-black/10 rounded-lg border border-white/10 dark:border-gray-700/10">
             <div className="flex items-center mb-2">
               <span className="text-green-500 mr-2">🔐</span>
-              <p className="text-xs text-gray-500 dark:text-gray-500">
-                Secure JWT Authentication
-              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-500">Secure JWT Authentication</p>
             </div>
             <p className="text-xs text-gray-600 dark:text-gray-400">
               Your session is protected with JSON Web Tokens and automatic expiration.
@@ -449,9 +413,9 @@ function LoginForm() {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 // Export utility functions for use in other components
-export { getStoredToken, clearTokens, isTokenExpired, storeTokens, createToken };
-export default LoginForm;
+export { getStoredToken, clearTokens, isTokenExpired, storeTokens, createToken }
+export default LoginForm

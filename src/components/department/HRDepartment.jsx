@@ -4,7 +4,7 @@ import { useAuth } from "../../App"
 import { useState, useEffect } from "react"
 import EmployeeRecords from "../hr/EmployeeRecords"
 import Recruitment from "../hr/Recruitment"
-import { API_ENDPOINTS } from "../../utils/public_api"
+import apiService, { subscribeToUpdates } from "../../utils/public_api"
 
 function HRDepartment() {
   const { user, logout, isDarkMode, toggleDarkMode } = useAuth()
@@ -16,49 +16,49 @@ function HRDepartment() {
 
   useEffect(() => {
     fetchHRData()
+
+    const unsubscribeEmployeeUpdated = subscribeToUpdates("employee_updated", (data) => {
+      console.log("[HR] Employee updated:", data)
+      fetchHRData() // Refresh data when employee is updated
+    })
+
+    const unsubscribeEmployeeCreated = subscribeToUpdates("employee_created", (data) => {
+      console.log("[HR] Employee created:", data)
+      fetchHRData() // Refresh data when employee is created
+    })
+
+    const unsubscribeEmployeeDeleted = subscribeToUpdates("employee_deleted", (data) => {
+      console.log("[HR] Employee deleted:", data)
+      fetchHRData() // Refresh data when employee is deleted
+    })
+
+    // Cleanup subscriptions
+    return () => {
+      unsubscribeEmployeeUpdated()
+      unsubscribeEmployeeCreated()
+      unsubscribeEmployeeDeleted()
+    }
   }, [])
 
   const fetchHRData = async () => {
-  try {
-    setLoading(true);
+    try {
+      setLoading(true)
 
-    const response = await fetch(`${API_ENDPOINTS}/api/tables/emp_list/data`, {
-      method: "GET", // Use GET for fetching data without a body
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+      const data = await apiService.getHRData()
 
-    if (!response.ok) throw new Error("Failed to fetch employee data");
-
-    const data = await response.json();
-    setEmployees(data.employees || []);
-    setStats(data.stats || { total: 0, newHires: 0, openPositions: 0 });
-  } catch (err) {
-    setError(err.message);
-    console.error("Employee data fetch error:", err);
-  } finally {
-    setLoading(false);
+      setEmployees(data.employees || [])
+      setStats(data.stats || { total: 0, newHires: 0, openPositions: 0 })
+    } catch (err) {
+      setError(err.message)
+      console.error("Employee data fetch error:", err)
+    } finally {
+      setLoading(false)
+    }
   }
-};
 
   const addEmployee = async (employeeData) => {
     try {
-      const response = await fetch(`${API_ENDPOINTS}/api/data`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          department: "hr",
-          action: "add_employee",
-          data: employeeData,
-          user_id: user?.id,
-        }),
-      })
-
-      if (!response.ok) throw new Error("Failed to add employee")
-
+      await apiService.addHREmployee(employeeData, user?.id)
       await fetchHRData() // Refresh data
     } catch (err) {
       setError(err.message)

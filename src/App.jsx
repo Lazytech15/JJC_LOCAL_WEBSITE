@@ -48,7 +48,7 @@ function App() {
               role: payload.role,
               permissions: payload.permissions || [],
               access_level: payload.access_level,
-              loginTime: payload.iat ? new Date(payload.iat * 1000).toISOString() : new Date().toISOString()
+              loginTime: payload.iat ? new Date(payload.iat * 1000).toISOString() : new Date().toISOString(),
             })
             setSelectedDepartment(payload.department)
           } else {
@@ -102,17 +102,19 @@ function App() {
     isDarkMode,
     toggleDarkMode,
     isSuperAdmin: user?.role === "super-admin",
-    isLoading
+    isLoading,
   }
 
   // Show loading screen while checking authentication
   if (isLoading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center transition-all duration-300 ${
-        isDarkMode
-          ? "bg-gradient-to-br from-gray-900 via-slate-900 to-zinc-900 text-gray-100"
-          : "bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50 text-gray-900"
-      }`}>
+      <div
+        className={`min-h-screen flex items-center justify-center transition-all duration-300 ${
+          isDarkMode
+            ? "bg-gradient-to-br from-gray-900 via-slate-900 to-zinc-900 text-gray-100"
+            : "bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50 text-gray-900"
+        }`}
+      >
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-lg font-medium">Verifying authentication...</p>

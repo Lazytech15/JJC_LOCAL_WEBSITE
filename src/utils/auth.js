@@ -1,5 +1,5 @@
 // JWT Authentication utilities
-const JWT_SECRET = import.meta.env.VITE_JWT_SECRET;
+const JWT_SECRET = import.meta.env.VITE_JWT_SECRET
 const TOKEN_KEY = "auth_token"
 const REFRESH_TOKEN_KEY = "refresh_token"
 
@@ -51,7 +51,7 @@ export const createToken = (payload, expiresIn = "1h") => {
 
 export const verifyToken = (token) => {
   try {
-    if (!token || typeof token !== 'string') return null
+    if (!token || typeof token !== "string") return null
 
     const parts = token.split(".")
     if (parts.length !== 3) return null
@@ -124,7 +124,7 @@ export const isTokenExpired = (token) => {
 export const getUserFromToken = (token = null) => {
   const tokenToVerify = token || getStoredToken()
   if (!tokenToVerify) return null
-  
+
   const payload = verifyToken(tokenToVerify)
   return payload
 }
@@ -140,10 +140,10 @@ export const refreshAccessToken = async (refreshToken = null) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${tokenToUse}`
+        Authorization: `Bearer ${tokenToUse}`,
       },
       body: JSON.stringify({
-        refreshToken: tokenToUse
+        refreshToken: tokenToUse,
       }),
     })
 
@@ -152,13 +152,13 @@ export const refreshAccessToken = async (refreshToken = null) => {
     }
 
     const data = await response.json()
-    
+
     if (data.success && data.accessToken) {
       // Store the new access token
       localStorage.setItem(TOKEN_KEY, data.accessToken)
       return data.accessToken
     }
-    
+
     throw new Error("Invalid refresh response")
   } catch (error) {
     console.error("Error refreshing token:", error)
@@ -204,7 +204,7 @@ export const validateAndRefreshToken = async () => {
 // Utility to make authenticated API calls
 export const makeAuthenticatedRequest = async (url, options = {}) => {
   const token = await validateAndRefreshToken()
-  
+
   if (!token) {
     throw new Error("No valid authentication token")
   }
@@ -213,9 +213,9 @@ export const makeAuthenticatedRequest = async (url, options = {}) => {
     ...options,
     headers: {
       ...options.headers,
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json"
-    }
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
   })
 }
 
@@ -224,7 +224,7 @@ export const hasPermission = (permission, userPermissions = []) => {
   if (!userPermissions || !Array.isArray(userPermissions)) {
     return false
   }
-  return userPermissions.includes(permission) || userPermissions.includes('admin')
+  return userPermissions.includes(permission) || userPermissions.includes("admin")
 }
 
 // Get user role from token
@@ -236,5 +236,5 @@ export const getUserRole = (token = null) => {
 // Check if user is super admin
 export const isSuperAdmin = (token = null) => {
   const role = getUserRole(token)
-  return role === 'super-admin'
+  return role === "super-admin"
 }
