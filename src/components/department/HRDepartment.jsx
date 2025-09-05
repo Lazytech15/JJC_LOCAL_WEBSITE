@@ -4,6 +4,7 @@ import { useAuth } from "../../App"
 import { useState, useEffect } from "react"
 import EmployeeRecords from "../hr/EmployeeRecords"
 import Recruitment from "../hr/Recruitment"
+import Attendance from "../hr/Attendance"
 import apiService, { subscribeToUpdates } from "../../utils/public_api"
 
 function HRDepartment() {
@@ -75,6 +76,8 @@ function HRDepartment() {
         return <EmployeeRecords />
       case "recruitment":
         return <Recruitment />
+      case "attendance":
+        return <Attendance />
       default:
         return (
           <>
@@ -109,7 +112,7 @@ function HRDepartment() {
                   },
                   { name: "Payroll", icon: "💰", desc: "Process payroll and manage compensation", action: "payroll" },
                   {
-                    name: "Recruitment",
+                    name: "Add Employee",
                     icon: "🎯",
                     desc: "Manage job postings and applications",
                     action: "recruitment",
@@ -127,10 +130,10 @@ function HRDepartment() {
                     action: "training",
                   },
                   {
-                    name: "Benefits",
-                    icon: "🏥",
-                    desc: "Administer employee benefits and policies",
-                    action: "benefits",
+                    name: "Attendance",
+                    icon: "⏰", 
+                    desc: "Track employee attendance and working hours",
+                    action: "attendance",
                   },
                 ].map((module, index) => (
                   <div

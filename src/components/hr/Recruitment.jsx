@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "../../App"
+import { addEmployeeToEmpList, uploadProfileByUid } from "../../utils/public_api" // Updated imports
 import { API_ENDPOINTS } from "../../utils/public_api"
 
 function Recruitment() {
@@ -48,12 +49,15 @@ function Recruitment() {
   const [validationErrors, setValidationErrors] = useState({})
   const [validationLoading, setValidationLoading] = useState({})
 
-  const [profilePicture, setProfilePicture] = useState(null)
+  // Updated profile picture state management
+  const [profilePictureFile, setProfilePictureFile] = useState(null)
   const [document, setDocument] = useState(null)
   const [uploadingProfile, setUploadingProfile] = useState(false)
   const [uploadingDocument, setUploadingDocument] = useState(false)
   const [profilePreview, setProfilePreview] = useState(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [hasBeenValidated, setHasBeenValidated] = useState({})
+  const [createdEmployeeUid, setCreatedEmployeeUid] = useState(null) // Store created employee UID for profile upload
 
   // Civil status options
   const civilStatusOptions = ["Single", "Married", "Divorced", "Widowed", "Separated"]
@@ -263,38 +267,34 @@ function Recruitment() {
     }
   }
 
+  // Updated profile picture change handler
   const handleProfilePictureChange = async (e) => {
     const file = e.target.files[0]
     if (!file) return
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp']
+    if (!allowedTypes.includes(file.type)) {
+      setError("Invalid file type. Only image files (JPEG, PNG, GIF, WebP, BMP) are allowed.")
+      return
+    }
+
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    if (file.size > maxSize) {
+      setError("File size too large. Maximum size is 10MB.")
+      return
+    }
+
+    // Store the file for later upload (after employee is created)
+    setProfilePictureFile(file)
 
     // Create preview
     const reader = new FileReader()
     reader.onload = (e) => setProfilePreview(e.target.result)
     reader.readAsDataURL(file)
 
-    setUploadingProfile(true)
-    try {
-      const formData = new FormData()
-      formData.append("profilePicture", file)
-
-      const response = await fetch(`${API_ENDPOINTS.public}/api/uploads/profile-picture`, {
-        method: "POST",
-        body: formData,
-      })
-
-      const result = await response.json()
-      if (result.success) {
-        setProfilePicture(result.data)
-      } else {
-        throw new Error(result.error || "Failed to upload profile picture")
-      }
-    } catch (err) {
-      console.error("Error uploading profile picture:", err)
-      setError(err.message)
-      setProfilePreview(null)
-    } finally {
-      setUploadingProfile(false)
-    }
+    console.log("Profile picture selected:", file.name)
   }
 
   const handleDocumentChange = async (e) => {
@@ -360,130 +360,203 @@ function Recruitment() {
     }
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-    setSuccess(false)
+  // Upload profile picture after employee creation
+  const uploadProfilePictureForEmployee = async (employeeUid) => {
+    if (!profilePictureFile || !employeeUid) return
+
+    setUploadingProfile(true)
+    setUploadProgress(0)
 
     try {
-      // Final validation check
-      const finalValidationErrors = {}
+      console.log("Uploading profile picture for employee UID:", employeeUid)
 
-      // Check required fields
-      if (!formData.firstName) finalValidationErrors.firstName = "First name is required"
-      if (!formData.lastName) finalValidationErrors.lastName = "Last name is required"
-      if (!formData.email) finalValidationErrors.email = "Email is required"
-      if (!formData.position) finalValidationErrors.position = "Position is required"
-      if (!formData.department) finalValidationErrors.department = "Department is required"
-      if (!formData.idNumber) finalValidationErrors.idNumber = "ID Number is required" // CHANGED
+      // Use the new upload method with progress tracking
+      const result = await uploadProfileByUid(
+        employeeUid, 
+        profilePictureFile,
+        (progress) => {
+          setUploadProgress(progress)
+        }
+      )
 
-      // Only check email format
-      if (formData.email && !isValidEmail(formData.email)) {
-        finalValidationErrors.email = "Please enter a valid email address"
-      }
+      console.log("Profile picture upload successful:", result)
+      return result
 
-      if (Object.keys(finalValidationErrors).length > 0) {
-        setValidationErrors(finalValidationErrors)
-        throw new Error("Please correct the validation errors")
-      }
-
-      // Check for existing validation errors
-      const hasExistingErrors = Object.values(validationErrors).some((error) => error !== null)
-      if (hasExistingErrors) {
-        throw new Error("Please resolve all validation errors before submitting")
-      }
-
-      // Prepare data according to API structure
-      const employeeData = {
-        firstName: formData.firstName,
-        middleName: formData.middleName || null,
-        lastName: formData.lastName,
-        age: formData.age ? Number.parseInt(formData.age) : null,
-        birthDate: formData.birthDate || null,
-        contactNumber: formData.contactNumber || null,
-        email: formData.email,
-        civilStatus: formData.civilStatus || null,
-        address: formData.address || null,
-        position: formData.position,
-        department: formData.department,
-        salary: formData.salary ? Number.parseFloat(formData.salary.toString().replace(/[₱,]/g, "")) : null,
-        hireDate: formData.hireDate || new Date().toISOString().split("T")[0],
-        status: formData.status,
-        tinNumber: formData.tinNumber || null,
-        sssNumber: formData.sssNumber || null,
-        pagibigNumber: formData.pagibigNumber || null,
-        philhealthNumber: formData.philhealthNumber || null,
-        username: formData.username,
-        accessLevel: formData.accessLevel,
-        // Send the ID number and barcode to the server - UPDATED field name
-        idNumber: formData.idNumber || null, // Keep as employeeId for backend compatibility
-        idBarcode: formData.idBarcode || null,
-        profilePicture: profilePicture?.filename || null,
-        document: document?.filename || null,
-      }
-
-      console.log("Sending employee data:", employeeData) // Debug log
-
-      const response = await fetch(`${API_ENDPOINTS.public}/api/employees`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(employeeData),
-      })
-
-      const result = await response.json()
-      console.log("Server response:", result) // Debug log
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to add employee")
-      }
-
-      if (result.success) {
-        setSuccess(true)
-        // Reset form
-        setFormData({
-          firstName: "",
-          middleName: "",
-          lastName: "",
-          age: "",
-          birthDate: "",
-          contactNumber: "",
-          email: "",
-          civilStatus: "",
-          address: "",
-          position: "",
-          department: "",
-          salary: "",
-          hireDate: "",
-          status: "Active",
-          tinNumber: "",
-          sssNumber: "",
-          pagibigNumber: "",
-          philhealthNumber: "",
-          username: "",
-          accessLevel: "user",
-          idNumber: "", // CHANGED
-          idBarcode: "",
-        })
-        setValidationErrors({})
-        setValidationLoading({})
-        setProfilePicture(null)
-        setDocument(null)
-        setProfilePreview(null)
-
-        setTimeout(() => setSuccess(false), 5000)
-      } else {
-        throw new Error(result.error || "Failed to add employee")
-      }
     } catch (err) {
-      setError(err.message)
-      console.error("Error adding employee:", err)
+      console.error("Error uploading profile picture:", err)
+      // Don't throw - we don't want to fail the entire employee creation for profile upload issues
+      setError(`Employee created successfully, but profile picture upload failed: ${err.message}`)
+      return null
     } finally {
-      setLoading(false)
+      setUploadingProfile(false)
+      setUploadProgress(0)
     }
   }
+
+ const handleSubmit = async (e) => {
+  e.preventDefault()
+  setLoading(true)
+  setError(null)
+  setSuccess(false)
+
+  try {
+    // Final validation check
+    const finalValidationErrors = {}
+
+    // Check required fields
+    if (!formData.firstName) finalValidationErrors.firstName = "First name is required"
+    if (!formData.lastName) finalValidationErrors.lastName = "Last name is required"
+    if (!formData.email) finalValidationErrors.email = "Email is required"
+    if (!formData.position) finalValidationErrors.position = "Position is required"
+    if (!formData.department) finalValidationErrors.department = "Department is required"
+    if (!formData.idNumber) finalValidationErrors.idNumber = "ID Number is required"
+
+    // Only check email format
+    if (formData.email && !isValidEmail(formData.email)) {
+      finalValidationErrors.email = "Please enter a valid email address"
+    }
+
+    if (Object.keys(finalValidationErrors).length > 0) {
+      setValidationErrors(finalValidationErrors)
+      throw new Error("Please correct the validation errors")
+    }
+
+    // Check for existing validation errors
+    const hasExistingErrors = Object.values(validationErrors).some((error) => error !== null)
+    if (hasExistingErrors) {
+      throw new Error("Please resolve all validation errors before submitting")
+    }
+
+    // Prepare data to match your backend route structure
+    const employeeData = {
+      // Personal information - matching backend parameter names
+      first_name: formData.firstName,
+      middle_name: formData.middleName || null,
+      last_name: formData.lastName,
+      
+      // Contact information
+      email: formData.email,
+      contact_number: formData.contactNumber || null,
+      address: formData.address || null,
+      
+      // Personal details
+      age: formData.age ? parseInt(formData.age) : null,
+      birth_date: formData.birthDate || null,
+      civil_status: formData.civilStatus || null,
+      
+      // Job information
+      position: formData.position,
+      department: formData.department,
+      salary: formData.salary ? parseFloat(formData.salary.toString().replace(/[₱,]/g, "")) : null,
+      hire_date: formData.hireDate || new Date().toISOString().split("T")[0],
+      status: formData.status,
+      
+      // Government IDs
+      tin_number: formData.tinNumber || null,
+      sss_number: formData.sssNumber || null,
+      pagibig_number: formData.pagibigNumber || null,
+      philhealth_number: formData.philhealthNumber || null,
+      
+      // System information
+      username: formData.username,
+      access_level: formData.accessLevel,
+      
+      // Employee identification - matching backend parameter names
+      id_number: formData.idNumber,  // Backend expects id_number
+      id_barcode: formData.idBarcode || null,  // Backend expects id_barcode
+      
+      // File references - will be updated after profile upload
+      profile_picture: null, // Will be set after upload
+      document: document?.filename || null,
+      
+      // Optional fields that your backend might expect
+      action: null, // You can set this if needed
+      password: null // Password can be set later or generated
+    }
+
+    console.log("Sending employee data to backend:", employeeData)
+
+    // Direct API call to your backend route
+    const apiUrl = `${API_ENDPOINTS.public}/api/add`; // Assuming your route is mounted at /api/employees
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Add any authentication headers if needed
+        // 'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(employeeData)
+    });
+
+    console.log("Response status:", response.status);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("Server response:", result);
+
+    if (result.success) {
+      const employeeUid = result.data?.uid || result.data?.id
+
+      if (employeeUid) {
+        setCreatedEmployeeUid(employeeUid)
+
+        // Step 2: Upload profile picture if one was selected
+        if (profilePictureFile) {
+          await uploadProfilePictureForEmployee(employeeUid)
+        }
+      }
+
+      setSuccess(true)
+      
+      // Reset form
+      setFormData({
+        firstName: "",
+        middleName: "",
+        lastName: "",
+        age: "",
+        birthDate: "",
+        contactNumber: "",
+        email: "",
+        civilStatus: "",
+        address: "",
+        position: "",
+        department: "",
+        salary: "",
+        hireDate: "",
+        status: "Active",
+        tinNumber: "",
+        sssNumber: "",
+        pagibigNumber: "",
+        philhealthNumber: "",
+        username: "",
+        accessLevel: "user",
+        idNumber: "",
+        idBarcode: "",
+      })
+      setValidationErrors({})
+      setValidationLoading({})
+      setHasBeenValidated({})
+      setProfilePictureFile(null)
+      setDocument(null)
+      setProfilePreview(null)
+      setCreatedEmployeeUid(null)
+
+      setTimeout(() => setSuccess(false), 5000)
+    } else {
+      throw new Error(result.error || "Failed to add employee")
+    }
+  } catch (err) {
+    console.error("Error adding employee:", err)
+    setError(err.message)
+  } finally {
+    setLoading(false)
+  }
+}
 
   const validateForm = () => {
     const hasValidationErrors = Object.values(validationErrors).some((error) => error !== null)
@@ -598,7 +671,10 @@ function Recruitment() {
       {/* Success Message */}
       {success && (
         <div className="bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-lg p-4">
-          <p className="text-green-700 dark:text-green-400">✅ Employee added successfully!</p>
+          <p className="text-green-700 dark:text-green-400">✅ Employee added successfully to the employee list!</p>
+          {profilePictureFile && !uploadingProfile && (
+            <p className="text-green-600 dark:text-green-400 text-sm mt-1">Profile picture uploaded successfully!</p>
+          )}
         </div>
       )}
 
@@ -620,7 +696,7 @@ function Recruitment() {
             </h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Profile Picture Upload */}
+              {/* Profile Picture Upload - Updated */}
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Profile Picture</label>
                 <div className="flex items-center space-x-4">
@@ -638,19 +714,29 @@ function Recruitment() {
                       type="file"
                       accept="image/*"
                       onChange={handleProfilePictureChange}
-                      disabled={uploadingProfile}
+                      disabled={uploadingProfile || loading}
                       className="w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-slate-600 file:text-white hover:file:bg-slate-700 file:cursor-pointer"
                     />
-                    {uploadingProfile && <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Uploading...</p>}
-                    {profilePicture && (
+                    {uploadingProfile && (
+                      <div className="mt-2">
+                        <p className="text-xs text-blue-600 dark:text-blue-400">Uploading... {Math.round(uploadProgress)}%</p>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                            style={{ width: `${uploadProgress}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    )}
+                    {profilePictureFile && !uploadingProfile && (
                       <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                        ✅ {profilePicture.originalName} uploaded
+                        ✅ {profilePictureFile.name} selected (will upload after employee creation)
                       </p>
                     )}
                   </div>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Optional: Upload employee profile picture (max 5MB, jpg/png/gif/webp)
+                  Optional: Select employee profile picture (max 10MB, jpg/png/gif/webp/bmp)
                 </p>
               </div>
 
@@ -1120,7 +1206,7 @@ function Recruitment() {
         </form>
       </div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions
       <div className="bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-2xl p-6 border border-white/20 dark:border-gray-700/20">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Quick Actions</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1140,7 +1226,7 @@ function Recruitment() {
             <p className="text-gray-600 dark:text-gray-400 text-sm">Generate recruitment reports</p>
           </button>
         </div>
-      </div>
+      </div> */}
 
       {/* Department Statistics */}
       {departments.length > 0 && (
