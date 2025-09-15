@@ -1,6 +1,7 @@
+//client attendance.jsx
 import { useState, useEffect } from "react"
 import { useAuth } from "../../App"
-import apiService, { subscribeToUpdates } from "../../utils/public_api"
+import apiService from "../../utils/api/api-service"
 
 function Attendance() {
   const { user } = useAuth()
@@ -35,7 +36,7 @@ function Attendance() {
     if (!uid || profilePictures[uid]) return // Skip if already loaded or no UID
 
     try {
-      const result = await apiService.getProfileByUid(uid)
+      const result = await apiService.profiles.getProfileByUid(uid)
       if (result.success) {
         setProfilePictures(prev => ({
           ...prev,
@@ -74,7 +75,7 @@ function Attendance() {
 
     setConnectionStatus('connecting')
 
-    const unsubscribeAttendanceCreated = subscribeToUpdates("attendance_created", (data) => {
+    const unsubscribeAttendanceCreated = apiService.socket.subscribeToUpdates("attendance_created", (data) => {
       console.log("[Attendance] New attendance record:", data)
       setConnectionStatus('connected')
       setLastUpdate(new Date())
@@ -105,7 +106,7 @@ function Attendance() {
       fetchAttendanceStats()
     })
 
-    const unsubscribeAttendanceUpdated = subscribeToUpdates("attendance_updated", (data) => {
+    const unsubscribeAttendanceUpdated = apiService.socket.subscribeToUpdates("attendance_updated", (data) => {
       console.log("[Attendance] Attendance record updated:", data)
       setConnectionStatus('connected')
       setLastUpdate(new Date())
@@ -118,7 +119,7 @@ function Attendance() {
       fetchAttendanceStats()
     })
 
-    const unsubscribeAttendanceDeleted = subscribeToUpdates("attendance_deleted", (data) => {
+    const unsubscribeAttendanceDeleted = apiService.socket.subscribeToUpdates("attendance_deleted", (data) => {
       console.log("[Attendance] Attendance record deleted:", data)
       setConnectionStatus('connected')
       setLastUpdate(new Date())
@@ -129,7 +130,7 @@ function Attendance() {
       fetchAttendanceStats()
     })
 
-    const unsubscribeAttendanceSynced = subscribeToUpdates("attendance_synced", (data) => {
+    const unsubscribeAttendanceSynced = apiService.socket.subscribeToUpdates("attendance_synced", (data) => {
       console.log("[Attendance] Attendance records synced:", data)
       setConnectionStatus('connected')
       setLastUpdate(new Date())
@@ -138,7 +139,7 @@ function Attendance() {
       fetchAttendanceStats()
     })
 
-    const unsubscribeEmployeeUpdated = subscribeToUpdates("employee_updated", (data) => {
+    const unsubscribeEmployeeUpdated = apiService.socket.subscribeToUpdates("employee_updated", (data) => {
       console.log("[Attendance] Employee updated, refreshing attendance data")
       setConnectionStatus('connected')
       setLastUpdate(new Date())
@@ -183,7 +184,7 @@ function Attendance() {
       if (filters.clock_type) params.clock_type = filters.clock_type
       if (filters.date) params.date = filters.date
 
-      const result = await apiService.getAttendanceRecords(params)
+      const result = await apiService.attendance.getAttendanceRecords(params)
 
       if (result.success) {
         setAttendanceData(result.data)
@@ -204,7 +205,7 @@ function Attendance() {
 
   const fetchAttendanceStats = async () => {
     try {
-      const result = await apiService.getAttendanceStats({ date: filters.date })
+      const result = await apiService.attendance.getAttendanceStats({ date: filters.date })
 
       if (result.success) {
         setStats(result.data.statistics)
@@ -307,15 +308,6 @@ function Attendance() {
         [uid]: null
       }))
     }
-    
-    // Show loading state
-    // if (isLoading) {
-    //   return (
-    //     <div className={`${size} rounded-2xl bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center ring-4 ring-white/50 dark:ring-gray-700/50 shadow-lg animate-pulse`}>
-    //       <div className="w-1/2 h-1/2 rounded-full bg-white/50 dark:bg-slate-600/50 animate-spin border-2 border-transparent border-t-slate-400 dark:border-t-slate-300"></div>
-    //     </div>
-    //   )
-    // }
     
     // Only render image if we have a valid URL
     if (profileUrl && profileUrl !== 'undefined' && profileUrl !== null) {

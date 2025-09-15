@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import EmployeeRecords from "../hr/EmployeeRecords"
 import Recruitment from "../hr/Recruitment"
 import Attendance from "../hr/Attendance"
-import apiService, { subscribeToUpdates } from "../../utils/public_api"
+import apiService from "../../utils/api/api-service"
 
 function HRDepartment() {
   const { user, logout, isDarkMode, toggleDarkMode } = useAuth()
@@ -18,17 +18,17 @@ function HRDepartment() {
   useEffect(() => {
     fetchHRData()
 
-    const unsubscribeEmployeeUpdated = subscribeToUpdates("employee_updated", (data) => {
+    const unsubscribeEmployeeUpdated = apiService.socket.subscribeToUpdates("employee_updated", (data) => {
       console.log("[HR] Employee updated:", data)
       fetchHRData() // Refresh data when employee is updated
     })
 
-    const unsubscribeEmployeeCreated = subscribeToUpdates("employee_created", (data) => {
+    const unsubscribeEmployeeCreated = apiService.socket.subscribeToUpdates("employee_created", (data) => {
       console.log("[HR] Employee created:", data)
       fetchHRData() // Refresh data when employee is created
     })
 
-    const unsubscribeEmployeeDeleted = subscribeToUpdates("employee_deleted", (data) => {
+    const unsubscribeEmployeeDeleted = apiService.socket.subscribeToUpdates("employee_deleted", (data) => {
       console.log("[HR] Employee deleted:", data)
       fetchHRData() // Refresh data when employee is deleted
     })
@@ -45,7 +45,7 @@ function HRDepartment() {
     try {
       setLoading(true)
 
-      const data = await apiService.getHRData()
+      const data = await apiService.auth.getHRData()
 
       setEmployees(data.employees || [])
       setStats(data.stats || { total: 0, newHires: 0, openPositions: 0 })
@@ -54,15 +54,6 @@ function HRDepartment() {
       console.error("Employee data fetch error:", err)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const addEmployee = async (employeeData) => {
-    try {
-      await apiService.addHREmployee(employeeData, user?.id)
-      await fetchHRData() // Refresh data
-    } catch (err) {
-      setError(err.message)
     }
   }
 

@@ -1,11 +1,9 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useAuth } from "../App"
 import { createToken, storeTokens, getStoredToken, clearTokens, isTokenExpired, verifyToken } from "../utils/auth"
 
-import apiService from "../utils/public_api"
+import apiService from "../../src/utils/api/api-service"
 
 const departmentInfo = {
   "Human Resources": {
@@ -102,7 +100,7 @@ function LoginForm() {
     }
 
     try {
-      const authData = await apiService.login({
+      const authData = await apiService.auth.login({
         username: formData.username.trim(),
         password: formData.password,
         department: department,

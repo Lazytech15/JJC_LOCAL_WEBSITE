@@ -1,9 +1,6 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import { useAuth } from "../../App"
-import { addEmployeeToEmpList, uploadProfileByUid } from "../../utils/public_api" // Updated imports
-import { API_ENDPOINTS } from "../../utils/public_api"
+import apiService from "../../utils/api/api-service"
 
 function Recruitment() {
   const { user, isDarkMode } = useAuth()
@@ -36,7 +33,7 @@ function Recruitment() {
     username: "",
     accessLevel: "user",
 
-    // Employee ID and Barcode (manual input) - CHANGED from employeeId to idNumber
+    // Employee ID and Barcode (manual input)
     idNumber: "",
     idBarcode: "",
   })
@@ -51,13 +48,15 @@ function Recruitment() {
 
   // Updated profile picture state management
   const [profilePictureFile, setProfilePictureFile] = useState(null)
-  const [document, setDocument] = useState(null)
   const [uploadingProfile, setUploadingProfile] = useState(false)
-  const [uploadingDocument, setUploadingDocument] = useState(false)
   const [profilePreview, setProfilePreview] = useState(null)
-  const [uploadProgress, setUploadProgress] = useState(0)
   const [hasBeenValidated, setHasBeenValidated] = useState({})
-  const [createdEmployeeUid, setCreatedEmployeeUid] = useState(null) // Store created employee UID for profile upload
+  const [createdEmployeeUid, setCreatedEmployeeUid] = useState(null)
+
+  // Upload documents
+  const [documentFile, setDocumentFile] = useState(null)
+  const [uploadingDocument, setUploadingDocument] = useState(false)
+  const [documentPreview, setDocumentPreview] = useState(null)
 
   // Civil status options
   const civilStatusOptions = ["Single", "Married", "Divorced", "Widowed", "Separated"]
@@ -78,8 +77,7 @@ function Recruitment() {
   const fetchDepartments = async () => {
     setLoadingDepartments(true)
     try {
-      const response = await fetch(`${API_ENDPOINTS.public}/api/departments`)
-      const data = await response.json()
+      const data = await apiService.employees.getDepartment()
 
       if (data.success) {
         setDepartments(data.data || [])
@@ -127,126 +125,117 @@ function Recruitment() {
   const validationTimeouts = {}
 
   const validateField = async (fieldName, value, delay = 800) => {
-  // Clear existing timeout for this field
-  if (validationTimeouts[fieldName]) {
-    clearTimeout(validationTimeouts[fieldName])
-  }
+    // Clear existing timeout for this field
+    if (validationTimeouts[fieldName]) {
+      clearTimeout(validationTimeouts[fieldName])
+    }
 
-  // Clear previous error for immediate feedback
-  setValidationErrors((prev) => ({
-    ...prev,
-    [fieldName]: null,
-  }))
-
-  // Reset validation completion status when user starts typing
-  setHasBeenValidated((prev) => ({
-    ...prev,
-    [fieldName]: false,
-  }))
-
-  if (!value || !value.trim()) return
-
-  // Only format validation for email
-  if (fieldName === "email" && !isValidEmail(value)) {
+    // Clear previous error for immediate feedback
     setValidationErrors((prev) => ({
       ...prev,
-      [fieldName]: "Please enter a valid email address",
+      [fieldName]: null,
     }))
-    return
-  }
 
-  // Set loading state for this field
-  setValidationLoading((prev) => ({
-    ...prev,
-    [fieldName]: true,
-  }))
+    // Reset validation completion status when user starts typing
+    setHasBeenValidated((prev) => ({
+      ...prev,
+      [fieldName]: false,
+    }))
 
-  validationTimeouts[fieldName] = setTimeout(async () => {
-    try {
-      const queryParams = new URLSearchParams()
-      queryParams.append(fieldName, value.trim())
+    if (!value || !value.trim()) return
 
-      const url = `${API_ENDPOINTS.public}/api/employees/validate?${queryParams}`
-      console.log("Making validation request:", { fieldName, value: value.trim(), url })
+    // Only format validation for email
+    if (fieldName === "email" && !isValidEmail(value)) {
+      setValidationErrors((prev) => ({
+        ...prev,
+        [fieldName]: "Please enter a valid email address",
+      }))
+      return
+    }
 
-      const response = await fetch(url)
-      console.log("Validation response status:", response.status)
+    // Set loading state for this field
+    setValidationLoading((prev) => ({
+      ...prev,
+      [fieldName]: true,
+    }))
 
-      if (!response.ok) {
-        let errorDetails
-        try {
-          const errorJson = await response.json()
-          errorDetails = errorJson.error || errorJson.message || "Unknown error"
-          console.error("Validation error response (JSON):", errorJson)
+    validationTimeouts[fieldName] = setTimeout(async () => {
+      try {
+        const queryParams = new URLSearchParams()
+        queryParams.append(fieldName, value.trim())
 
-          if (errorJson.error === "Invalid ID number" && fieldName === "idNumber") {
+        const response = await apiService.employees.getValidate(queryParams)
+        console.log("Validation response status:", response.status)
+
+        if (!response.success) {
+          const errorDetails = response.error || response.message || "Unknown error"
+          console.error("Validation error response:", errorDetails)
+
+          // Special case: backend reports invalid ID number format
+          if (errorDetails === "Invalid ID number" && fieldName === "idNumber") {
             console.warn("Backend reported invalid ID number format, but proceeding with form submission")
+
             setValidationErrors((prev) => ({
               ...prev,
               [fieldName]: null,
             }))
-            // Mark as validated even if backend has format issues
+
             setHasBeenValidated((prev) => ({
               ...prev,
               [fieldName]: true,
             }))
+
             return
           }
-        } catch (jsonError) {
-          errorDetails = await response.text()
-          console.error("Validation error response (Text):", errorDetails)
+
+          throw new Error(`Validation failed: ${errorDetails}`)
         }
-        throw new Error(`HTTP error! status: ${response.status}, details: ${errorDetails}`)
-      }
 
-      const data = await response.json()
-      console.log("Validation response data:", data)
+        if (response.success) {
+          setValidationErrors((prev) => ({
+            ...prev,
+            [fieldName]: getValidationMessage(fieldName, response.data),
+          }))
 
-      if (data.success) {
-        setValidationErrors((prev) => ({
-          ...prev,
-          [fieldName]: getValidationMessage(fieldName, data.data),
-        }))
-        
-        // Mark field as validated after successful API response
-        setHasBeenValidated((prev) => ({
-          ...prev,
-          [fieldName]: true,
-        }))
-      } else {
-        throw new Error(data.error || "Validation failed")
-      }
-    } catch (err) {
-      console.error(`Error validating ${fieldName}:`, err)
+          // Mark field as validated after successful API response
+          setHasBeenValidated((prev) => ({
+            ...prev,
+            [fieldName]: true,
+          }))
+        } else {
+          throw new Error(data.error || "Validation failed")
+        }
+      } catch (err) {
+        console.error(`Error validating ${fieldName}:`, err)
 
-      if (fieldName === "idNumber" && err.message.includes("Invalid ID number")) {
-        console.warn("ID number format validation failed on backend, but allowing form submission")
-        setValidationErrors((prev) => ({
+        if (fieldName === "idNumber" && err.message.includes("Invalid ID number")) {
+          console.warn("ID number format validation failed on backend, but allowing form submission")
+          setValidationErrors((prev) => ({
+            ...prev,
+            [fieldName]: null,
+          }))
+          setHasBeenValidated((prev) => ({
+            ...prev,
+            [fieldName]: true,
+          }))
+        } else {
+          setValidationErrors((prev) => ({
+            ...prev,
+            [fieldName]: `Error checking ${fieldName} availability`,
+          }))
+          setHasBeenValidated((prev) => ({
+            ...prev,
+            [fieldName]: true,
+          }))
+        }
+      } finally {
+        setValidationLoading((prev) => ({
           ...prev,
-          [fieldName]: null,
-        }))
-        setHasBeenValidated((prev) => ({
-          ...prev,
-          [fieldName]: true,
-        }))
-      } else {
-        setValidationErrors((prev) => ({
-          ...prev,
-          [fieldName]: `Error checking ${fieldName} availability`,
-        }))
-        setHasBeenValidated((prev) => ({
-          ...prev,
-          [fieldName]: true,
+          [fieldName]: false,
         }))
       }
-    } finally {
-      setValidationLoading((prev) => ({
-        ...prev,
-        [fieldName]: false,
-      }))
-    }
-  }, delay)
-}
+    }, delay)
+  }
 
   // Get validation message based on field and result
   const getValidationMessage = (fieldName, validationData) => {
@@ -256,7 +245,7 @@ function Recruitment() {
         return !validationData.emailAvailable ? "Email already exists" : null
       case "username":
         return !validationData.usernameAvailable ? "Username already exists" : null
-      case "idNumber": // CHANGED from employeeId to idNumber
+      case "idNumber":
         return !validationData.idNumberAvailable && !validationData.employeeIdAvailable
           ? "ID Number already exists"
           : null
@@ -267,59 +256,90 @@ function Recruitment() {
     }
   }
 
-  // Updated profile picture change handler
+  // Updated profile picture change handler using ProfileService validation
   const handleProfilePictureChange = async (e) => {
     const file = e.target.files[0]
     if (!file) return
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp']
-    if (!allowedTypes.includes(file.type)) {
-      setError("Invalid file type. Only image files (JPEG, PNG, GIF, WebP, BMP) are allowed.")
-      return
+    try {
+      // Use ProfileService validation method
+      apiService.profiles.validateFile(file)
+
+      // Store the file for later upload (after employee is created)
+      setProfilePictureFile(file)
+
+      // Create preview
+      const reader = new FileReader()
+      reader.onload = (e) => setProfilePreview(e.target.result)
+      reader.readAsDataURL(file)
+
+      // Clear any previous errors
+      setError(null)
+      console.log("Profile picture selected:", file.name)
+    } catch (validationError) {
+      setError(validationError.message)
+      setProfilePictureFile(null)
+      setProfilePreview(null)
     }
-
-    // Validate file size (10MB limit)
-    const maxSize = 10 * 1024 * 1024 // 10MB
-    if (file.size > maxSize) {
-      setError("File size too large. Maximum size is 10MB.")
-      return
-    }
-
-    // Store the file for later upload (after employee is created)
-    setProfilePictureFile(file)
-
-    // Create preview
-    const reader = new FileReader()
-    reader.onload = (e) => setProfilePreview(e.target.result)
-    reader.readAsDataURL(file)
-
-    console.log("Profile picture selected:", file.name)
   }
 
+  // Updated document change handler using DocumentService validation
   const handleDocumentChange = async (e) => {
     const file = e.target.files[0]
-    if (!file) return
+    if (!file) {
+      setDocumentFile(null)
+      setDocumentPreview(null)
+      return
+    }
 
-    setUploadingDocument(true)
     try {
-      const formData = new FormData()
-      formData.append("document", file)
+      // Use DocumentService validation method
+      apiService.document.validateDocumentFile(file)
 
-      const response = await fetch(`${API_ENDPOINTS.public}/api/uploads/document`, {
-        method: "POST",
-        body: formData,
+      // Store the file for later upload
+      setDocumentFile(file)
+      
+      // Create preview info
+      setDocumentPreview({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        formattedSize: apiService.document.formatFileSize(file.size),
+        extension: apiService.document.getFileExtension(file.name)
       })
 
-      const result = await response.json()
-      if (result.success) {
-        setDocument(result.data)
+      // Clear any previous errors
+      setError(null)
+      console.log("Document selected:", file.name)
+    } catch (validationError) {
+      setError(validationError.message)
+      setDocumentFile(null)
+      setDocumentPreview(null)
+    }
+  }
+
+  // Updated document upload using DocumentService
+  const uploadDocumentForEmployee = async (employeeUid) => {
+    if (!documentFile || !employeeUid) return
+
+    setUploadingDocument(true)
+
+    try {
+      console.log("Uploading document for employee UID:", employeeUid)
+
+      // Use DocumentService uploadDocuments method
+      const result = await apiService.document.uploadDocuments(employeeUid, documentFile)
+
+      if (result && result.success) {
+        console.log("Document upload successful:", result)
+        return result
       } else {
-        throw new Error(result.error || "Failed to upload document")
+        throw new Error(result?.error || "Failed to upload document")
       }
     } catch (err) {
       console.error("Error uploading document:", err)
-      setError(err.message)
+      setError(`Employee created successfully, but document upload failed: ${err.message}`)
+      return null
     } finally {
       setUploadingDocument(false)
     }
@@ -354,209 +374,187 @@ function Recruitment() {
       }
     }
 
-    // Validate fields that require server-side validation - UPDATED field name
+    // Validate fields that require server-side validation
     if (["email", "username", "idNumber", "idBarcode"].includes(name) && value) {
       validateField(name, value)
     }
   }
 
-  // Upload profile picture after employee creation
+  // Updated profile picture upload using ProfileService
   const uploadProfilePictureForEmployee = async (employeeUid) => {
     if (!profilePictureFile || !employeeUid) return
 
     setUploadingProfile(true)
-    setUploadProgress(0)
 
     try {
       console.log("Uploading profile picture for employee UID:", employeeUid)
 
-      // Use the new upload method with progress tracking
-      const result = await uploadProfileByUid(
-        employeeUid, 
-        profilePictureFile,
-        (progress) => {
-          setUploadProgress(progress)
-        }
-      )
+      // Use ProfileService uploadProfileByUid method
+      const result = await apiService.profiles.uploadProfileByUid(employeeUid, profilePictureFile)
 
       console.log("Profile picture upload successful:", result)
       return result
 
     } catch (err) {
       console.error("Error uploading profile picture:", err)
-      // Don't throw - we don't want to fail the entire employee creation for profile upload issues
       setError(`Employee created successfully, but profile picture upload failed: ${err.message}`)
       return null
     } finally {
       setUploadingProfile(false)
-      setUploadProgress(0)
     }
   }
 
- const handleSubmit = async (e) => {
-  e.preventDefault()
-  setLoading(true)
-  setError(null)
-  setSuccess(false)
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+    setSuccess(false)
 
-  try {
-    // Final validation check
-    const finalValidationErrors = {}
+    try {
+      // Final validation check
+      const finalValidationErrors = {}
 
-    // Check required fields
-    if (!formData.firstName) finalValidationErrors.firstName = "First name is required"
-    if (!formData.lastName) finalValidationErrors.lastName = "Last name is required"
-    if (!formData.email) finalValidationErrors.email = "Email is required"
-    if (!formData.position) finalValidationErrors.position = "Position is required"
-    if (!formData.department) finalValidationErrors.department = "Department is required"
-    if (!formData.idNumber) finalValidationErrors.idNumber = "ID Number is required"
+      // Check required fields
+      if (!formData.firstName) finalValidationErrors.firstName = "First name is required"
+      if (!formData.lastName) finalValidationErrors.lastName = "Last name is required"
+      if (!formData.email) finalValidationErrors.email = "Email is required"
+      if (!formData.position) finalValidationErrors.position = "Position is required"
+      if (!formData.department) finalValidationErrors.department = "Department is required"
+      if (!formData.idNumber) finalValidationErrors.idNumber = "ID Number is required"
 
-    // Only check email format
-    if (formData.email && !isValidEmail(formData.email)) {
-      finalValidationErrors.email = "Please enter a valid email address"
-    }
-
-    if (Object.keys(finalValidationErrors).length > 0) {
-      setValidationErrors(finalValidationErrors)
-      throw new Error("Please correct the validation errors")
-    }
-
-    // Check for existing validation errors
-    const hasExistingErrors = Object.values(validationErrors).some((error) => error !== null)
-    if (hasExistingErrors) {
-      throw new Error("Please resolve all validation errors before submitting")
-    }
-
-    // Prepare data to match your backend route structure
-    const employeeData = {
-      // Personal information - matching backend parameter names
-      first_name: formData.firstName,
-      middle_name: formData.middleName || null,
-      last_name: formData.lastName,
-      
-      // Contact information
-      email: formData.email,
-      contact_number: formData.contactNumber || null,
-      address: formData.address || null,
-      
-      // Personal details
-      age: formData.age ? parseInt(formData.age) : null,
-      birth_date: formData.birthDate || null,
-      civil_status: formData.civilStatus || null,
-      
-      // Job information
-      position: formData.position,
-      department: formData.department,
-      salary: formData.salary ? parseFloat(formData.salary.toString().replace(/[₱,]/g, "")) : null,
-      hire_date: formData.hireDate || new Date().toISOString().split("T")[0],
-      status: formData.status,
-      
-      // Government IDs
-      tin_number: formData.tinNumber || null,
-      sss_number: formData.sssNumber || null,
-      pagibig_number: formData.pagibigNumber || null,
-      philhealth_number: formData.philhealthNumber || null,
-      
-      // System information
-      username: formData.username,
-      access_level: formData.accessLevel,
-      
-      // Employee identification - matching backend parameter names
-      id_number: formData.idNumber,  // Backend expects id_number
-      id_barcode: formData.idBarcode || null,  // Backend expects id_barcode
-      
-      // File references - will be updated after profile upload
-      profile_picture: null, // Will be set after upload
-      document: document?.filename || null,
-      
-      // Optional fields that your backend might expect
-      action: null, // You can set this if needed
-      password: null // Password can be set later or generated
-    }
-
-    console.log("Sending employee data to backend:", employeeData)
-
-    // Direct API call to your backend route
-    const apiUrl = `${API_ENDPOINTS.public}/api/add`; // Assuming your route is mounted at /api/employees
-    
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Add any authentication headers if needed
-        // 'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(employeeData)
-    });
-
-    console.log("Response status:", response.status);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    console.log("Server response:", result);
-
-    if (result.success) {
-      const employeeUid = result.data?.uid || result.data?.id
-
-      if (employeeUid) {
-        setCreatedEmployeeUid(employeeUid)
-
-        // Step 2: Upload profile picture if one was selected
-        if (profilePictureFile) {
-          await uploadProfilePictureForEmployee(employeeUid)
-        }
+      // Only check email format
+      if (formData.email && !isValidEmail(formData.email)) {
+        finalValidationErrors.email = "Please enter a valid email address"
       }
 
-      setSuccess(true)
-      
-      // Reset form
-      setFormData({
-        firstName: "",
-        middleName: "",
-        lastName: "",
-        age: "",
-        birthDate: "",
-        contactNumber: "",
-        email: "",
-        civilStatus: "",
-        address: "",
-        position: "",
-        department: "",
-        salary: "",
-        hireDate: "",
-        status: "Active",
-        tinNumber: "",
-        sssNumber: "",
-        pagibigNumber: "",
-        philhealthNumber: "",
-        username: "",
-        accessLevel: "user",
-        idNumber: "",
-        idBarcode: "",
-      })
-      setValidationErrors({})
-      setValidationLoading({})
-      setHasBeenValidated({})
-      setProfilePictureFile(null)
-      setDocument(null)
-      setProfilePreview(null)
-      setCreatedEmployeeUid(null)
+      if (Object.keys(finalValidationErrors).length > 0) {
+        setValidationErrors(finalValidationErrors)
+        throw new Error("Please correct the validation errors")
+      }
 
-      setTimeout(() => setSuccess(false), 5000)
-    } else {
-      throw new Error(result.error || "Failed to add employee")
+      // Check for existing validation errors
+      const hasExistingErrors = Object.values(validationErrors).some((error) => error !== null)
+      if (hasExistingErrors) {
+        throw new Error("Please resolve all validation errors before submitting")
+      }
+
+      // Prepare data to match your backend route structure
+      const employeeData = {
+        // Personal information - matching backend parameter names
+        first_name: formData.firstName,
+        middle_name: formData.middleName || null,
+        last_name: formData.lastName,
+
+        // Contact information
+        email: formData.email,
+        contact_number: formData.contactNumber || null,
+        address: formData.address || null,
+
+        // Personal details
+        age: formData.age ? parseInt(formData.age) : null,
+        birth_date: formData.birthDate || null,
+        civil_status: formData.civilStatus || null,
+
+        // Job information
+        position: formData.position,
+        department: formData.department,
+        salary: formData.salary ? parseFloat(formData.salary.toString().replace(/[₱,]/g, "")) : null,
+        hire_date: formData.hireDate || new Date().toISOString().split("T")[0],
+        status: formData.status,
+
+        // Government IDs
+        tin_number: formData.tinNumber || null,
+        sss_number: formData.sssNumber || null,
+        pagibig_number: formData.pagibigNumber || null,
+        philhealth_number: formData.philhealthNumber || null,
+
+        // System information
+        username: formData.username,
+        access_level: formData.accessLevel,
+
+        // Employee identification - matching backend parameter names
+        id_number: formData.idNumber,
+        id_barcode: formData.idBarcode || null,
+
+        // File references - will be updated after uploads
+        profile_picture: null,
+        document: null,
+
+        // Optional fields
+        action: null,
+        password: null
+      }
+
+      console.log("Sending employee data to backend:", employeeData)
+
+      // Step 1: Create employee using your EmployeeService
+      const result = await apiService.employees.addEmployeeToEmpList(employeeData)
+      console.log("Server response:", result)
+
+      if (result && result.success) {
+        const employeeUid = result.data?.uid || result.data?.id
+
+        if (employeeUid) {
+          setCreatedEmployeeUid(employeeUid)
+
+          // Step 2: Upload profile picture if one was selected
+          if (profilePictureFile) {
+            await uploadProfilePictureForEmployee(employeeUid)
+          }
+
+          // Step 3: Upload document if one was selected
+          if (documentFile) {
+            await uploadDocumentForEmployee(employeeUid)
+          }
+        }
+
+        setSuccess(true)
+
+        // Reset form
+        setFormData({
+          firstName: "",
+          middleName: "",
+          lastName: "",
+          age: "",
+          birthDate: "",
+          contactNumber: "",
+          email: "",
+          civilStatus: "",
+          address: "",
+          position: "",
+          department: "",
+          salary: "",
+          hireDate: "",
+          status: "Active",
+          tinNumber: "",
+          sssNumber: "",
+          pagibigNumber: "",
+          philhealthNumber: "",
+          username: "",
+          accessLevel: "user",
+          idNumber: "",
+          idBarcode: "",
+        })
+        setValidationErrors({})
+        setValidationLoading({})
+        setHasBeenValidated({})
+        setProfilePictureFile(null)
+        setProfilePreview(null)
+        setDocumentFile(null)
+        setDocumentPreview(null)
+        setCreatedEmployeeUid(null)
+
+        setTimeout(() => setSuccess(false), 5000)
+      } else {
+        throw new Error(result?.error || "Failed to add employee")
+      }
+    } catch (err) {
+      console.error("Error adding employee:", err)
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
-  } catch (err) {
-    console.error("Error adding employee:", err)
-    setError(err.message)
-  } finally {
-    setLoading(false)
   }
-}
 
   const validateForm = () => {
     const hasValidationErrors = Object.values(validationErrors).some((error) => error !== null)
@@ -621,7 +619,7 @@ function Recruitment() {
     return () => {
       Object.values(validationTimers).forEach(clearTimeout)
     }
-  }, [hasBeenValidated]) // run whenever validation completion flags change
+  }, [hasBeenValidated])
 
   const renderValidationStatus = (fieldName) => {
     // Show loading spinner while validation is in progress
@@ -675,6 +673,9 @@ function Recruitment() {
           {profilePictureFile && !uploadingProfile && (
             <p className="text-green-600 dark:text-green-400 text-sm mt-1">Profile picture uploaded successfully!</p>
           )}
+          {documentFile && !uploadingDocument && (
+            <p className="text-green-600 dark:text-green-400 text-sm mt-1">Document uploaded successfully!</p>
+          )}
         </div>
       )}
 
@@ -696,7 +697,7 @@ function Recruitment() {
             </h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Profile Picture Upload - Updated */}
+              {/* Profile Picture Upload */}
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Profile Picture</label>
                 <div className="flex items-center space-x-4">
@@ -719,13 +720,7 @@ function Recruitment() {
                     />
                     {uploadingProfile && (
                       <div className="mt-2">
-                        <p className="text-xs text-blue-600 dark:text-blue-400">Uploading... {Math.round(uploadProgress)}%</p>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                            style={{ width: `${uploadProgress}%` }}
-                          ></div>
-                        </div>
+                        <p className="text-xs text-blue-600 dark:text-blue-400">Uploading profile picture...</p>
                       </div>
                     )}
                     {profilePictureFile && !uploadingProfile && (
@@ -746,18 +741,20 @@ function Recruitment() {
                 <div className="space-y-2">
                   <input
                     type="file"
-                    accept=".pdf,.doc,.docx,.txt,.rtf,.xls,.xlsx,.ppt,.pptx"
+                    accept=".pdf,.doc,.docx,.txt,.rtf,.xls,.xlsx,.ppt,.pptx,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,.zip,.rar"
                     onChange={handleDocumentChange}
-                    disabled={uploadingDocument}
+                    disabled={uploadingDocument || loading}
                     className="w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-slate-600 file:text-white hover:file:bg-slate-700 file:cursor-pointer"
                   />
-                  {uploadingDocument && <p className="text-xs text-blue-600 dark:text-blue-400">Uploading...</p>}
-                  {document && (
-                    <p className="text-xs text-green-600 dark:text-green-400">✅ {document.originalName} uploaded</p>
+                  {uploadingDocument && <p className="text-xs text-blue-600 dark:text-blue-400">Uploading document...</p>}
+                  {documentPreview && (
+                    <p className="text-xs text-green-600 dark:text-green-400">
+                      ✅ {documentPreview.name} selected ({documentPreview.formattedSize}) - will upload after employee creation
+                    </p>
                   )}
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Optional: Upload resume or other documents (max 10MB, pdf/doc/docx/txt/rtf/xls/xlsx/ppt/pptx)
+                  Optional: Upload resume or documents (max 50MB, supports various formats)
                 </p>
               </div>
             </div>
@@ -778,32 +775,33 @@ function Recruitment() {
                   value={formData.idNumber}
                   onChange={handleInputChange}
                   placeholder="Enter employee ID (e.g., EMP-2024-001)"
-                  className={`w-full px-4 py-3 pr-12 rounded-lg bg-white/10 dark:bg-black/20 border ${
-                    validationErrors.idNumber
+                  className={`w-full px-4 py-3 pr-12 rounded-lg bg-white/10 dark:bg-black/20 border ${validationErrors.idNumber
                       ? "border-red-500 dark:border-red-400"
                       : "border-gray-300/20 dark:border-gray-700/20"
-                  } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
+                    } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
                   required
                 />
                 {renderValidationStatus("idNumber")}
                 {validationErrors.idNumber && (
                   <p className="text-red-500 dark:text-red-400 text-sm mt-1">{validationErrors.idNumber}</p>
                 )}
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Optional: For ID card barcode printing</p>
               </div>
+           
 
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">ID Barcode</label>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Employee Barcode *</label>
                 <input
                   type="text"
                   name="idBarcode"
                   value={formData.idBarcode}
                   onChange={handleInputChange}
-                  placeholder="Enter barcode (e.g., *EMP001* or 123456789)"
-                  className={`w-full px-4 py-3 pr-12 rounded-lg bg-white/10 dark:bg-black/20 border ${
-                    validationErrors.idBarcode
+                  placeholder="Enter employee ID (e.g., EMP-2024-001)"
+                  className={`w-full px-4 py-3 pr-12 rounded-lg bg-white/10 dark:bg-black/20 border ${validationErrors.idBarcode
                       ? "border-red-500 dark:border-red-400"
                       : "border-gray-300/20 dark:border-gray-700/20"
-                  } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
+                    } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
+                  required
                 />
                 {renderValidationStatus("idBarcode")}
                 {validationErrors.idBarcode && (
@@ -811,7 +809,7 @@ function Recruitment() {
                 )}
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Optional: For ID card barcode printing</p>
               </div>
-            </div>
+               </div>
           </div>
 
           {/* Personal Information Section */}
@@ -829,11 +827,10 @@ function Recruitment() {
                   value={formData.firstName}
                   onChange={handleInputChange}
                   placeholder="John"
-                  className={`w-full px-4 py-3 rounded-lg bg-white/10 dark:bg-black/20 border ${
-                    validationErrors.firstName
+                  className={`w-full px-4 py-3 rounded-lg bg-white/10 dark:bg-black/20 border ${validationErrors.firstName
                       ? "border-red-500 dark:border-red-400"
                       : "border-gray-300/20 dark:border-gray-700/20"
-                  } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
+                    } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
                   required
                 />
                 {validationErrors.firstName && (
@@ -861,11 +858,10 @@ function Recruitment() {
                   value={formData.lastName}
                   onChange={handleInputChange}
                   placeholder="Doe"
-                  className={`w-full px-4 py-3 rounded-lg bg-white/10 dark:bg-black/20 border ${
-                    validationErrors.lastName
+                  className={`w-full px-4 py-3 rounded-lg bg-white/10 dark:bg-black/20 border ${validationErrors.lastName
                       ? "border-red-500 dark:border-red-400"
                       : "border-gray-300/20 dark:border-gray-700/20"
-                  } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
+                    } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
                   required
                 />
                 {validationErrors.lastName && (
@@ -943,11 +939,10 @@ function Recruitment() {
                   value={formData.email}
                   onChange={handleInputChange}
                   placeholder="john.doe@company.com"
-                  className={`w-full px-4 py-3 pr-12 rounded-lg bg-white/10 dark:bg-black/20 border ${
-                    validationErrors.email
+                  className={`w-full px-4 py-3 pr-12 rounded-lg bg-white/10 dark:bg-black/20 border ${validationErrors.email
                       ? "border-red-500 dark:border-red-400"
                       : "border-gray-300/20 dark:border-gray-700/20"
-                  } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
+                    } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
                   required
                 />
                 {renderValidationStatus("email")}
@@ -985,11 +980,10 @@ function Recruitment() {
                   value={formData.position}
                   onChange={handleInputChange}
                   placeholder="Software Engineer"
-                  className={`w-full px-4 py-3 rounded-lg bg-white/10 dark:bg-black/20 border ${
-                    validationErrors.position
+                  className={`w-full px-4 py-3 rounded-lg bg-white/10 dark:bg-black/20 border ${validationErrors.position
                       ? "border-red-500 dark:border-red-400"
                       : "border-gray-300/20 dark:border-gray-700/20"
-                  } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
+                    } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
                   required
                 />
                 {validationErrors.position && (
@@ -1003,11 +997,10 @@ function Recruitment() {
                   name="department"
                   value={formData.department}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 rounded-lg bg-white/10 dark:bg-black/20 border ${
-                    validationErrors.department
+                  className={`w-full px-4 py-3 rounded-lg bg-white/10 dark:bg-black/20 border ${validationErrors.department
                       ? "border-red-500 dark:border-red-400"
                       : "border-gray-300/20 dark:border-gray-700/20"
-                  } text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-slate-500`}
+                    } text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-slate-500`}
                   required
                   disabled={loadingDepartments}
                 >
@@ -1152,11 +1145,10 @@ function Recruitment() {
                   value={formData.username}
                   onChange={handleInputChange}
                   placeholder="Auto-generated from name"
-                  className={`w-full px-4 py-3 pr-12 rounded-lg bg-white/10 dark:bg-black/20 border ${
-                    validationErrors.username
+                  className={`w-full px-4 py-3 pr-12 rounded-lg bg-white/10 dark:bg-black/20 border ${validationErrors.username
                       ? "border-red-500 dark:border-red-400"
                       : "border-gray-300/20 dark:border-gray-700/20"
-                  } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
+                    } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
                 />
                 {renderValidationStatus("username")}
                 {validationErrors.username && (
@@ -1187,11 +1179,10 @@ function Recruitment() {
             <button
               type="submit"
               disabled={!validateForm() || loading}
-              className={`px-8 py-3 rounded-lg font-medium transition-all duration-200 ${
-                validateForm() && !loading
+              className={`px-8 py-3 rounded-lg font-medium transition-all duration-200 ${validateForm() && !loading
                   ? "bg-slate-600 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white transform hover:scale-105"
                   : "bg-gray-400 dark:bg-gray-600 text-gray-200 cursor-not-allowed"
-              }`}
+                }`}
             >
               {loading ? (
                 <div className="flex items-center gap-2">
@@ -1205,28 +1196,6 @@ function Recruitment() {
           </div>
         </form>
       </div>
-
-      {/* Quick Actions
-      <div className="bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-2xl p-6 border border-white/20 dark:border-gray-700/20">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="p-4 bg-white/5 dark:bg-black/10 rounded-lg border border-white/10 dark:border-gray-700/10 hover:bg-white/10 dark:hover:bg-black/20 transition-colors duration-200">
-            <div className="text-2xl mb-2">📄</div>
-            <h4 className="text-gray-800 dark:text-gray-200 font-medium">Bulk Import</h4>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">Import multiple employees from CSV</p>
-          </button>
-          <button className="p-4 bg-white/5 dark:bg-black/10 rounded-lg border border-white/10 dark:border-gray-700/10 hover:bg-white/10 dark:hover:bg-black/20 transition-colors duration-200">
-            <div className="text-2xl mb-2">📋</div>
-            <h4 className="text-gray-800 dark:text-gray-200 font-medium">Job Templates</h4>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">Use predefined job templates</p>
-          </button>
-          <button className="p-4 bg-white/5 dark:bg-black/10 rounded-lg border border-white/10 dark:border-gray-700/10 hover:bg-white/10 dark:hover:bg-black/20 transition-colors duration-200">
-            <div className="text-2xl mb-2">📊</div>
-            <h4 className="text-gray-800 dark:text-gray-200 font-medium">Reports</h4>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">Generate recruitment reports</p>
-          </button>
-        </div>
-      </div> */}
 
       {/* Department Statistics */}
       {departments.length > 0 && (
@@ -1273,3 +1242,31 @@ function Recruitment() {
 }
 
 export default Recruitment
+
+
+
+              //   {renderValidationStatus("idNumber")}
+              //   {validationErrors.idNumber && (
+              //     <p className="text-red-500 dark:text-red-400 text-sm mt-1">{validationErrors.idNumber}</p>
+              //   )}
+              // </div>
+
+              // <div className="relative">
+              //   <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">ID Barcode</label>
+              //   <input
+              //     type="text"
+              //     name="idBarcode"
+              //     value={formData.idBarcode}
+              //     onChange={handleInputChange}
+              //     placeholder="Enter barcode (e.g., *EMP001* or 123456789)"
+              //     className={`w-full px-4 py-3 pr-12 rounded-lg bg-white/10 dark:bg-black/20 border ${validationErrors.idBarcode
+              //         ? "border-red-500 dark:border-red-400"
+              //         : "border-gray-300/20 dark:border-gray-700/20"
+              //       } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
+              //   />
+              //   {renderValidationStatus("idBarcode")}
+              //   {validationErrors.idBarcode && (
+              //     <p className="text-red-500 dark:text-red-400 text-sm mt-1">{validationErrors.idBarcode}</p>
+              //   )}
+              //   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Optional: For ID card barcode printing</p>
+              // </div>

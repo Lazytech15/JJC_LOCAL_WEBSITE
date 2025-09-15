@@ -1,174 +1,308 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { useAuth } from "../../App"
-import { X, Eye, Download, FileText, ImageIcon, Trash2 } from "lucide-react"
-import apiService, { subscribeToUpdates } from "../../utils/public_api"
+import { useState, useEffect } from "react";
+import { useAuth } from "../../App";
+import { X, Eye, Download, FileText, ImageIcon, Trash2 } from "lucide-react";
+import apiService from "../../utils/api/api-service";
 
 function EmployeeRecords() {
-  const { user, isDarkMode } = useAuth()
-  const [employees, setEmployees] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedEmployee, setSelectedEmployee] = useState(null)
-  const [statistics, setStatistics] = useState({})
-  const [departments, setDepartments] = useState([])
-  const [pagination, setPagination] = useState({ total: 0, currentPage: 1, limit: 50 })
+  const { user, isDarkMode } = useAuth();
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [statistics, setStatistics] = useState({});
+  const [departments, setDepartments] = useState([]);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    currentPage: 1,
+    limit: 50,
+  });
 
   // Modal states
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-  const [isDocumentViewerOpen, setIsDocumentViewerOpen] = useState(false)
-  const [editingEmployee, setEditingEmployee] = useState(null)
-  const [deleteEmployee, setDeleteEmployee] = useState(null)
-  const [isSaving, setIsSaving] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDocumentViewerOpen, setIsDocumentViewerOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [deleteEmployee, setDeleteEmployee] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // File upload states - support multiple documents
-  const [selectedProfileFile, setSelectedProfileFile] = useState(null)
-  const [selectedDocumentFiles, setSelectedDocumentFiles] = useState([])
-  const [profilePreview, setProfilePreview] = useState(null)
-  const [uploadingFiles, setUploadingFiles] = useState(false)
+  const [selectedProfileFile, setSelectedProfileFile] = useState(null);
+  const [selectedDocumentFiles, setSelectedDocumentFiles] = useState([]);
+  const [profilePreview, setProfilePreview] = useState(null);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
 
   // Document viewer states
-  const [selectedDocuments, setSelectedDocuments] = useState([])
-  const [currentDocumentIndex, setCurrentDocumentIndex] = useState(0)
-  const [documentPreviewUrl, setDocumentPreviewUrl] = useState(null)
+  const [selectedDocuments, setSelectedDocuments] = useState([]);
+  const [currentDocumentIndex, setCurrentDocumentIndex] = useState(0);
+  const [documentPreviewUrl, setDocumentPreviewUrl] = useState(null);
+
+  // Employee documents data
+  const [employeeDocuments, setEmployeeDocuments] = useState([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+
+  // Profile picture cache - use id as key
+  const [profilePictures, setProfilePictures] = useState(new Map());
 
   // Filters
-  const [filterDepartment, setFilterDepartment] = useState("")
-  const [filterStatus, setFilterStatus] = useState("Active")
-  const [sortBy, setSortBy] = useState("hireDate")
-  const [sortOrder, setSortOrder] = useState("DESC")
+  const [filterDepartment, setFilterDepartment] = useState("");
+  const [filterStatus, setFilterStatus] = useState("Active");
+  const [sortBy, setSortBy] = useState("hireDate");
+  const [sortOrder, setSortOrder] = useState("DESC");
+
+  // Load employee documents when selected employee changes
+  useEffect(() => {
+    if (selectedEmployee?.id) {
+      fetchEmployeeDocuments(selectedEmployee.id);
+    } else {
+      setEmployeeDocuments([]);
+    }
+  }, [selectedEmployee]);
+
+  // Load profile pictures after employees are loaded
+  useEffect(() => {
+    if (employees.length > 0) {
+      loadProfilePictures();
+    }
+  }, [employees]);
+
+  // Clear caches on component unmount
+  useEffect(() => {
+    return () => {
+      // Clean up profile picture URLs
+      profilePictures.forEach((url) => {
+        if (url && url.startsWith("blob:")) {
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+  }, [profilePictures]);
+
+  const loadProfilePictures = async () => {
+    const loadPromises = employees
+      .filter((employee) => employee.id && !profilePictures.has(employee.id))
+      .map(async (employee) => {
+        try {
+          const result = await apiService.profiles.getProfileByUid(employee.id);
+          if (result.success && result.url) {
+            setProfilePictures(
+              (prev) => new Map(prev.set(employee.id, result.url))
+            );
+            console.log(
+              `[EmployeeRecords] Profile loaded for ${employee.fullName}`
+            );
+          }
+        } catch (err) {
+          // Silently handle missing profile pictures
+          console.log(
+            `[EmployeeRecords] No profile picture for employee ${employee.id}: ${err.message}`
+          );
+        }
+      });
+
+    if (loadPromises.length > 0) {
+      await Promise.allSettled(loadPromises);
+    }
+  };
+
+  const fetchEmployeeDocuments = async (id) => {
+    if (!id) {
+      console.error("[EmployeeRecords] No id provided for document fetch");
+      return;
+    }
+
+    try {
+      setLoadingDocuments(true);
+      console.log(`[EmployeeRecords] Fetching documents for id: ${id}`);
+
+      const result = await apiService.document.getEmployeeDocuments(id);
+      if (result.success) {
+        const documents = result.data?.documents || [];
+        setEmployeeDocuments(documents);
+        console.log(
+          `[EmployeeRecords] Loaded ${documents.length} documents for id: ${id}`
+        );
+      } else {
+        console.error("Failed to fetch employee documents:", result.error);
+        setEmployeeDocuments([]);
+      }
+    } catch (err) {
+      console.error("Error fetching employee documents:", err);
+      setEmployeeDocuments([]);
+      setError(`Failed to load documents: ${err.message}`);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
 
   const getProfilePictureUrl = (employee) => {
-    if (!employee?.profilePicture) return null
+    if (!employee?.id) return null;
+    return apiService.profiles.getProfileUrlByUid(employee.id);
+  };
 
-    // The database stores the full relative path, use it directly
-    return apiService.getFileUrl(employee.profilePicture)
-  }
-
-  const getDocumentUrl = (document) => {
-    if (!document) return null
-
-    const filePath = typeof document === "string" ? document : document.relativePath || document.filename
-
-    // The database stores the full relative path, use it directly
-    return apiService.getFileUrl(filePath)
-  }
+  const getDocumentUrl = (id, filename) => {
+    return apiService.document.getDocumentUrl(id, filename);
+  };
 
   // Get file icon based on file type
   const getFileIcon = (filename) => {
-    if (!filename) return <FileText className="w-4 h-4" />
+    if (!filename) return <FileText className="w-4 h-4" />;
 
-    const ext = filename.split(".").pop()?.toLowerCase()
+    const ext = filename.split(".").pop()?.toLowerCase();
 
     if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) {
-      return <ImageIcon className="w-4 h-4" />
+      return <ImageIcon className="w-4 h-4" />;
     } else if (["pdf"].includes(ext)) {
-      return <FileText className="w-4 h-4 text-red-500" />
+      return <FileText className="w-4 h-4 text-red-500" />;
     } else if (["doc", "docx"].includes(ext)) {
-      return <FileText className="w-4 h-4 text-blue-500" />
+      return <FileText className="w-4 h-4 text-blue-500" />;
     } else if (["xls", "xlsx"].includes(ext)) {
-      return <FileText className="w-4 h-4 text-green-500" />
+      return <FileText className="w-4 h-4 text-green-500" />;
     } else if (["ppt", "pptx"].includes(ext)) {
-      return <FileText className="w-4 h-4 text-orange-500" />
+      return <FileText className="w-4 h-4 text-orange-500" />;
     }
 
-    return <FileText className="w-4 h-4" />
-  }
+    return <FileText className="w-4 h-4" />;
+  };
 
   // Open document viewer
-  const openDocumentViewer = (employee) => {
-    if (!employee.documents || employee.documents.length === 0) return
+  const openDocumentViewer = () => {
+    if (!employeeDocuments || employeeDocuments.length === 0) return;
 
-    setSelectedDocuments(employee.documents)
-    setCurrentDocumentIndex(0)
-    setIsDocumentViewerOpen(true)
+    setSelectedDocuments(employeeDocuments);
+    setCurrentDocumentIndex(0);
+    setIsDocumentViewerOpen(true);
 
     // Set preview URL for first document
-    const firstDoc = employee.documents[0]
-    setDocumentPreviewUrl(getDocumentUrl(firstDoc))
-  }
+    const firstDoc = employeeDocuments[0];
+    setDocumentPreviewUrl(
+      getDocumentUrl(selectedEmployee.id, firstDoc.filename)
+    );
+  };
 
   // Navigate documents in viewer
   const navigateDocument = (direction) => {
     const newIndex =
       direction === "next"
         ? Math.min(currentDocumentIndex + 1, selectedDocuments.length - 1)
-        : Math.max(currentDocumentIndex - 1, 0)
+        : Math.max(currentDocumentIndex - 1, 0);
 
-    setCurrentDocumentIndex(newIndex)
-    setDocumentPreviewUrl(getDocumentUrl(selectedDocuments[newIndex]))
-  }
+    setCurrentDocumentIndex(newIndex);
+    setDocumentPreviewUrl(
+      getDocumentUrl(selectedEmployee.id, selectedDocuments[newIndex].filename)
+    );
+  };
 
   const downloadDocument = async (document) => {
     try {
-      const filename = typeof document === "string" ? document : document.filename
-      const originalName = typeof document === "object" ? document.originalName : filename
+      const filename = document.filename;
+      const originalName = document.originalName || filename;
 
-      console.log("[v0] Downloading document:", { filename, originalName })
+      console.log("[EmployeeRecords] Downloading document:", {
+        filename,
+        originalName,
+      });
 
-      let blob
-
-      // Use the direct file URL since we have the relative path
-      try {
-        const response = await fetch(getDocumentUrl(document))
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-        }
-        blob = await response.blob()
-        console.log("[v0] Document downloaded successfully")
-      } catch (err) {
-        console.error("[v0] Download failed:", err)
-        throw err
-      }
-
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = originalName || filename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      const blob = await apiService.document.downloadDocument(
+        selectedEmployee.id,
+        filename
+      );
+      apiService.document.downloadBlob(blob, originalName || filename);
     } catch (err) {
-      console.error("[v0] Download error:", err)
-      setError(`Failed to download document: ${err.message}`)
+      console.error("[EmployeeRecords] Download error:", err);
+      setError(`Failed to download document: ${err.message}`);
     }
-  }
+  };
+
+  const deleteDocument = async (document) => {
+    try {
+      setLoadingDocuments(true);
+      await apiService.document.deleteDocument(
+        selectedEmployee.id,
+        document.filename
+      );
+
+      // Refresh the documents list
+      await fetchEmployeeDocuments(selectedEmployee.id);
+
+      // Close document viewer if the deleted document was being viewed
+      if (
+        isDocumentViewerOpen &&
+        selectedDocuments[currentDocumentIndex]?.filename === document.filename
+      ) {
+        if (selectedDocuments.length === 1) {
+          setIsDocumentViewerOpen(false);
+        } else {
+          // Navigate to next document or previous if at the end
+          const newIndex =
+            currentDocumentIndex >= selectedDocuments.length - 1
+              ? Math.max(0, currentDocumentIndex - 1)
+              : currentDocumentIndex;
+          setCurrentDocumentIndex(newIndex);
+          setDocumentPreviewUrl(
+            getDocumentUrl(
+              selectedEmployee.id,
+              selectedDocuments[newIndex].filename
+            )
+          );
+        }
+      }
+    } catch (err) {
+      console.error("[EmployeeRecords] Document deletion error:", err);
+      setError(`Failed to delete document: ${err.message}`);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
 
   useEffect(() => {
-    fetchEmployees()
+    fetchEmployees();
 
-    const unsubscribeUpdated = subscribeToUpdates("employee_updated", (data) => {
-      console.log("[EmployeeRecords] Employee updated:", data)
-      fetchEmployees()
-    })
-
-    const unsubscribeCreated = subscribeToUpdates("employee_created", (data) => {
-      console.log("[EmployeeRecords] Employee created:", data)
-      fetchEmployees()
-    })
-
-    const unsubscribeDeleted = subscribeToUpdates("employee_deleted", (data) => {
-      console.log("[EmployeeRecords] Employee deleted:", data)
-      fetchEmployees()
-      if (selectedEmployee?.id === data.id) {
-        setSelectedEmployee(null)
+    const unsubscribeUpdated = apiService.socket.subscribeToUpdates(
+      "employee_updated",
+      (data) => {
+        console.log("[EmployeeRecords] Employee updated:", data);
+        fetchEmployees();
       }
-    })
+    );
+
+    const unsubscribeCreated = apiService.socket.subscribeToUpdates(
+      "employee_created",
+      (data) => {
+        console.log("[EmployeeRecords] Employee created:", data);
+        fetchEmployees();
+      }
+    );
+
+    const unsubscribeDeleted = apiService.socket.subscribeToUpdates(
+      "employee_deleted",
+      (data) => {
+        console.log("[EmployeeRecords] Employee deleted:", data);
+        fetchEmployees();
+        if (selectedEmployee?.id === data.id) {
+          setSelectedEmployee(null);
+        }
+      }
+    );
 
     return () => {
-      unsubscribeUpdated()
-      unsubscribeCreated()
-      unsubscribeDeleted()
-    }
-  }, [searchTerm, filterDepartment, filterStatus, sortBy, sortOrder, pagination.currentPage])
+      unsubscribeUpdated();
+      unsubscribeCreated();
+      unsubscribeDeleted();
+    };
+  }, [
+    searchTerm,
+    filterDepartment,
+    filterStatus,
+    sortBy,
+    sortOrder,
+    pagination.currentPage,
+  ]);
 
   const fetchEmployees = async () => {
     try {
-      setLoading(true)
+      setLoading(true);
+      setError(null);
 
       const params = {
         limit: pagination.limit.toString(),
@@ -178,296 +312,288 @@ function EmployeeRecords() {
         status: filterStatus,
         sortBy: sortBy,
         sortOrder: sortOrder,
-      }
+      };
 
-      const result = await apiService.getEmployees(params)
+      console.log("[EmployeeRecords] Fetching employees with params:", params);
+
+      const result = await apiService.employees.getEmployees(params);
 
       if (result.success) {
-        setEmployees(result.data.employees || [])
-        setStatistics(result.data.statistics || {})
-        setDepartments(result.data.departments || [])
-        setPagination((prev) => ({ ...prev, total: result.data.pagination.total }))
+        const employeesData = result.data.employees || [];
+        setEmployees(employeesData);
+        setStatistics(result.data.statistics || {});
+        setDepartments(result.data.departments || []);
+        setPagination((prev) => ({
+          ...prev,
+          total: result.data.pagination.total,
+        }));
+
+        console.log(
+          `[EmployeeRecords] Loaded ${employeesData.length} employees`
+        );
       } else {
-        throw new Error(result.error || "Failed to fetch employees")
+        throw new Error(result.error || "Failed to fetch employees");
       }
     } catch (err) {
-      setError(err.message)
-      console.error("Error fetching employees:", err)
+      setError(err.message);
+      console.error("Error fetching employees:", err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const handleEditEmployee = (employee) => {
+  const handleEditEmployee = async (employee) => {
     setEditingEmployee({
       ...employee,
       birthDate: employee.birthDate ? employee.birthDate.split("T")[0] : "",
       hireDate: employee.hireDate ? employee.hireDate.split("T")[0] : "",
-      documents: employee.documents || [],
-    })
+    });
 
     // Reset file states
-    setSelectedProfileFile(null)
-    setSelectedDocumentFiles([])
-    setProfilePreview(null)
+    setSelectedProfileFile(null);
+    setSelectedDocumentFiles([]);
+    setProfilePreview(null);
 
     // Set existing profile picture preview if available
-    if (employee.profilePicture) {
-      setProfilePreview(getProfilePictureUrl(employee))
+    const profileUrl = getProfilePictureUrl(employee);
+    if (profileUrl) {
+      setProfilePreview(profileUrl);
     }
 
-    setIsEditModalOpen(true)
-  }
+    setIsEditModalOpen(true);
+  };
 
   const handleDeleteClick = (employee) => {
-    setDeleteEmployee(employee)
-    setIsDeleteModalOpen(true)
-  }
+    setDeleteEmployee(employee);
+    setIsDeleteModalOpen(true);
+  };
 
   const confirmDelete = async () => {
-    if (!deleteEmployee) return
+    if (!deleteEmployee) return;
 
     try {
-      setIsSaving(true)
-      await apiService.deleteEmployee(deleteEmployee.id)
+      setIsSaving(true);
+      await apiService.employees.deleteEmployee(deleteEmployee.id);
 
-      await fetchEmployees()
-      setSelectedEmployee(null)
-      setIsDeleteModalOpen(false)
-      setDeleteEmployee(null)
+      await fetchEmployees();
+      setSelectedEmployee(null);
+      setIsDeleteModalOpen(false);
+      setDeleteEmployee(null);
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
-  const handleProfilePictureChange = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-
-    // Basic validation
-    const maxSize = 5 * 1024 * 1024 // 5MB
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
-
-    if (!allowedTypes.includes(file.type)) {
-      setError("Invalid file type. Please select a valid image file (JPEG, PNG, GIF, or WebP).")
-      return
-    }
-
-    if (file.size > maxSize) {
-      setError("File size too large. Please select an image smaller than 5MB.")
-      return
-    }
-
-    setSelectedProfileFile(file)
+  const handleProfilePictureChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
     try {
+      // Use ProfileService validation
+      apiService.profiles.validateFile(file);
+
+      setSelectedProfileFile(file);
+
       // Create preview using FileReader
-      const reader = new FileReader()
+      const reader = new FileReader();
       reader.onload = (event) => {
-        setProfilePreview(event.target.result)
-        setError(null)
-      }
+        setProfilePreview(event.target.result);
+        setError(null);
+      };
       reader.onerror = () => {
-        setError("Error creating image preview")
-      }
-      reader.readAsDataURL(file)
+        setError("Error creating image preview");
+      };
+      reader.readAsDataURL(file);
     } catch (err) {
-      console.error("Error creating image preview:", err)
-      setError("Error creating image preview")
+      setError(err.message);
+      setSelectedProfileFile(null);
+      setProfilePreview(null);
     }
-  }
+  };
 
   // Handle multiple document selection with validation
   const handleDocumentChange = (e) => {
-    const files = Array.from(e.target.files)
-    const validFiles = []
-    const errors = []
-
-    const maxSize = 10 * 1024 * 1024 // 10MB
-    const allowedTypes = [
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "text/plain",
-      "application/rtf",
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-powerpoint",
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    ]
+    const files = Array.from(e.target.files);
+    const validFiles = [];
+    const errors = [];
 
     files.forEach((file) => {
-      if (!allowedTypes.includes(file.type)) {
-        errors.push(`${file.name}: Invalid file type`)
-      } else if (file.size > maxSize) {
-        errors.push(`${file.name}: File size too large (max 10MB)`)
-      } else {
-        validFiles.push(file)
+      try {
+        apiService.document.validateDocumentFile(file);
+        validFiles.push(file);
+      } catch (err) {
+        errors.push(`${file.name}: ${err.message}`);
       }
-    })
+    });
 
     if (errors.length > 0) {
-      setError("Some files were rejected: " + errors.join(", "))
+      setError("Some files were rejected: " + errors.join(", "));
     } else {
-      setError(null)
+      setError(null);
     }
 
-    setSelectedDocumentFiles((prev) => [...prev, ...validFiles])
-  }
-
-  // Helper function to format file size
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return "0 Bytes"
-
-    const k = 1024
-    const sizes = ["Bytes", "KB", "MB", "GB", "TB"]
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-
-    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
-  }
+    setSelectedDocumentFiles((prev) => [...prev, ...validFiles]);
+  };
 
   // Remove selected document file
   const removeSelectedDocument = (index) => {
-    setSelectedDocumentFiles((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  // Remove existing document from employee
-  const removeExistingDocument = async (docIndex) => {
-    if (!editingEmployee) return
-
-    const updatedDocuments = editingEmployee.documents.filter((_, index) => index !== docIndex)
-    setEditingEmployee((prev) => ({
-      ...prev,
-      documents: updatedDocuments,
-    }))
-  }
+    setSelectedDocumentFiles((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const uploadFiles = async () => {
-  const uploadedFiles = {}
-
-  try {
-    setUploadingFiles(true)
-
-    // Upload profile picture if selected
-    if (selectedProfileFile) {
-      try {
-        console.log("[v0] Uploading profile picture for user:", user.id)
-        const result = await apiService.uploadProfilePicture(selectedProfileFile, user.id)
-        console.log("[v0] Profile upload result:", result)
-
-        if (result.success) {
-          // Store the relative path returned from the server
-          uploadedFiles.profilePicture = result.data?.relativePath || result.relativePath
-        } else {
-          throw new Error(result.error || "Failed to upload profile picture")
-        }
-      } catch (err) {
-        console.error("[v0] Profile upload error:", err)
-        throw new Error(`Failed to upload profile picture: ${err.message}`)
-      }
-    }
-
-    // Upload multiple documents if selected
-    if (selectedDocumentFiles.length > 0) {
-      for (const file of selectedDocumentFiles) {
-        try {
-          console.log("[v0] Uploading document for user:", user.id, "file:", file.name)
-          const result = await apiService.uploadDocument(file, user.id)
-          console.log("[v0] Document upload result:", result)
-
-          if (!result.success) {
-            throw new Error(`Failed to upload ${file.name}: ${result.error}`)
-          }
-          
-          // Documents are already saved to database by backend, no need to store anything here
-          console.log(`[v0] Document ${file.name} uploaded and saved to database successfully`)
-          
-        } catch (fileErr) {
-          console.error(`[v0] Error uploading ${file.name}:`, fileErr)
-          throw new Error(`Failed to upload ${file.name}: ${fileErr.message}`)
-        }
-      }
-      
-      // Don't store documents in uploadedFiles since backend handles it
-      // uploadedFiles.documents is not needed
-    }
-
-    console.log("[v0] All files uploaded successfully:", uploadedFiles)
-    return uploadedFiles
-  } finally {
-    setUploadingFiles(false)
-  }
-}
-
-  const handleSaveEmployee = async () => {
-    if (!editingEmployee) return
+    const uploadResults = {};
 
     try {
-      setIsSaving(true)
+      setUploadingFiles(true);
+
+      // Upload profile picture if selected
+      if (selectedProfileFile) {
+        try {
+          console.log(
+            "[EmployeeRecords] Uploading profile picture for employee:",
+            editingEmployee.uid
+          );
+          const result = await apiService.profiles.uploadReplaceProfileByid(
+            editingEmployee.id,
+            selectedProfileFile
+          );
+          console.log("[EmployeeRecords] Profile upload result:", result);
+
+          if (result.success) {
+            uploadResults.profilePicture =
+              result.data?.relativePath || result.relativePath;
+
+            // Clear and reload profile picture cache for this employee
+            apiService.profiles.clearProfileFromCache(editingEmployee.id);
+            const newProfileResult = await apiService.profiles.getProfileByid(
+              editingEmployee.id
+            );
+            if (newProfileResult.success) {
+              setProfilePictures(
+                (prev) =>
+                  new Map(prev.set(editingEmployee.id, newProfileResult.url))
+              );
+            }
+          } else {
+            throw new Error(result.error || "Failed to upload profile picture");
+          }
+        } catch (err) {
+          console.error("[EmployeeRecords] Profile upload error:", err);
+          throw new Error(`Failed to upload profile picture: ${err.message}`);
+        }
+      }
+
+      // Upload multiple documents if selected
+      if (selectedDocumentFiles.length > 0) {
+        try {
+          console.log(
+            "[EmployeeRecords] Uploading documents for employee:",
+            editingEmployee.id
+          );
+          const result = await apiService.document.uploadDocuments(
+            editingEmployee.id,
+            selectedDocumentFiles
+          );
+          console.log("[EmployeeRecords] Documents upload result:", result);
+
+          if (!result.success) {
+            throw new Error(`Failed to upload documents: ${result.error}`);
+          }
+
+          console.log("[EmployeeRecords] Documents uploaded successfully");
+        } catch (err) {
+          console.error("[EmployeeRecords] Documents upload error:", err);
+          throw new Error(`Failed to upload documents: ${err.message}`);
+        }
+      }
+
+      console.log(
+        "[EmployeeRecords] All files uploaded successfully:",
+        uploadResults
+      );
+      return uploadResults;
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
+  const handleSaveEmployee = async () => {
+    if (!editingEmployee) return;
+
+    try {
+      setIsSaving(true);
 
       // Upload any selected files first
-      const uploadedFiles = await uploadFiles()
+      const uploadResults = await uploadFiles();
 
-      // Update employee data with uploaded file names
+      // Update employee data with uploaded file information
       const updatedEmployeeData = {
         ...editingEmployee,
-        ...uploadedFiles,
-      }
+        ...uploadResults,
+      };
 
-      await apiService.updateEmployee(editingEmployee.id, updatedEmployeeData)
+      await apiService.employees.updateEmployee(
+        editingEmployee.id,
+        updatedEmployeeData
+      );
 
-      await fetchEmployees()
-      setIsEditModalOpen(false)
-      setEditingEmployee(null)
-      setSelectedProfileFile(null)
-      setSelectedDocumentFiles([])
-      setProfilePreview(null)
+      await fetchEmployees();
+      setIsEditModalOpen(false);
+      setEditingEmployee(null);
+      setSelectedProfileFile(null);
+      setSelectedDocumentFiles([]);
+      setProfilePreview(null);
 
-      // Update selected employee if it was the one being edited
+      // Update selected employee if it was the one being edited and refresh documents
       if (selectedEmployee?.id === editingEmployee.id) {
-        setSelectedEmployee(updatedEmployeeData)
+        const updatedEmployee = { ...selectedEmployee, ...updatedEmployeeData };
+        setSelectedEmployee(updatedEmployee);
+        // Refresh documents for the updated employee
+        await fetchEmployeeDocuments(updatedEmployee.id);
       }
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   const handlePageChange = (newPage) => {
-    setPagination((prev) => ({ ...prev, currentPage: newPage }))
-  }
+    setPagination((prev) => ({ ...prev, currentPage: newPage }));
+  };
 
   const formatPhoneNumber = (phone) => {
-    if (!phone) return "N/A"
-    return phone.replace(/(\+63)(\d{3})(\d{3})(\d{4})/, "$1 $2 $3 $4")
-  }
+    if (!phone) return "N/A";
+    return phone.replace(/(\+63)(\d{3})(\d{3})(\d{4})/, "$1 $2 $3 $4");
+  };
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return "N/A"
+    if (!dateStr) return "N/A";
     return new Date(dateStr).toLocaleDateString("en-PH", {
       year: "numeric",
       month: "long",
       day: "numeric",
-    })
-  }
+    });
+  };
 
   const handleInputChange = (field, value) => {
     setEditingEmployee((prev) => ({
       ...prev,
       [field]: value,
-    }))
-  }
+    }));
+  };
 
   if (loading) {
     return (
       <div className="text-center py-8">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-600 dark:border-slate-400 mx-auto"></div>
-        <p className="text-gray-600 dark:text-gray-300 mt-4">Loading employee records...</p>
+        <p className="text-gray-600 dark:text-gray-300 mt-4">
+          Loading employee records...
+        </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -475,7 +601,9 @@ function EmployeeRecords() {
       {/* Header with Statistics */}
       <div className="flex justify-between items-start">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">👥 Employee Records</h2>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+            👥 Employee Records
+          </h2>
           <div className="flex gap-4 mt-2 text-sm text-gray-600 dark:text-gray-300">
             <span>Total: {statistics.totalEmployees || 0}</span>
             <span>Active: {statistics.activeEmployees || 0}</span>
@@ -555,6 +683,12 @@ function EmployeeRecords() {
       {error && (
         <div className="bg-red-100/80 dark:bg-red-900/30 backdrop-blur-sm border border-red-300 dark:border-red-700/50 rounded-lg p-4">
           <p className="text-red-700 dark:text-red-300">Error: {error}</p>
+          <button
+            onClick={() => setError(null)}
+            className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
@@ -567,7 +701,8 @@ function EmployeeRecords() {
               Employees ({employees.length} of {pagination.total})
             </h3>
             <div className="text-sm text-gray-600 dark:text-gray-300">
-              Page {pagination.currentPage} of {Math.ceil(pagination.total / pagination.limit)}
+              Page {pagination.currentPage} of{" "}
+              {Math.ceil(pagination.total / pagination.limit)}
             </div>
           </div>
 
@@ -585,19 +720,21 @@ function EmployeeRecords() {
                 <div className="flex items-center gap-3">
                   {/* Profile Picture in List */}
                   <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
-                    {employee.profilePicture ? (
+                    {getProfilePictureUrl(employee) ? (
                       <img
-                        src={getProfilePictureUrl(employee) || "/placeholder.svg"}
+                        src={getProfilePictureUrl(employee)}
                         alt={`${employee.fullName} profile`}
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          e.target.style.display = "none"
-                          e.target.nextElementSibling.style.display = "flex"
+                          e.target.style.display = "none";
+                          e.target.nextElementSibling.style.display = "flex";
                         }}
                       />
                     ) : null}
                     <div
-                      className={`w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500 ${employee.profilePicture ? "hidden" : "flex"}`}
+                      className={`w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500 ${
+                        getProfilePictureUrl(employee) ? "hidden" : "flex"
+                      }`}
                     >
                       👤
                     </div>
@@ -609,25 +746,28 @@ function EmployeeRecords() {
                         <h4 className="font-medium text-gray-800 dark:text-gray-100">
                           {employee.fullName}
                           {employee.isNewHire && (
-                            <span className="ml-2 text-xs bg-green-500 text-white px-2 py-1 rounded">NEW</span>
+                            <span className="ml-2 text-xs bg-green-500 text-white px-2 py-1 rounded">
+                              NEW
+                            </span>
                           )}
                         </h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-300">{employee.position}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{employee.department}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">ID: {employee.idNumber}</p>
-                        {employee.documents && employee.documents.length > 0 && (
-                          <p className="text-xs text-blue-600 dark:text-blue-400">
-                            📄 {employee.documents.length} document{employee.documents.length !== 1 ? "s" : ""}
-                          </p>
-                        )}
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                          {employee.position}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {employee.department}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          ID: {employee.idNumber}
+                        </p>
                       </div>
                       <span
                         className={`px-2 py-1 rounded-full text-xs ${
                           employee.status === "Active"
                             ? "bg-green-100/80 dark:bg-green-900/40 text-green-700 dark:text-green-300"
                             : employee.status === "On Leave"
-                              ? "bg-yellow-100/80 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
-                              : "bg-red-100/80 dark:bg-red-900/40 text-red-700 dark:text-red-300"
+                            ? "bg-yellow-100/80 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
+                            : "bg-red-100/80 dark:bg-red-900/40 text-red-700 dark:text-red-300"
                         }`}
                       >
                         {employee.status}
@@ -649,11 +789,15 @@ function EmployeeRecords() {
               Previous
             </button>
             <span className="px-3 py-1 text-gray-700 dark:text-gray-300">
-              {pagination.currentPage} / {Math.ceil(pagination.total / pagination.limit)}
+              {pagination.currentPage} /{" "}
+              {Math.ceil(pagination.total / pagination.limit)}
             </span>
             <button
               onClick={() => handlePageChange(pagination.currentPage + 1)}
-              disabled={pagination.currentPage >= Math.ceil(pagination.total / pagination.limit)}
+              disabled={
+                pagination.currentPage >=
+                Math.ceil(pagination.total / pagination.limit)
+              }
               className="px-3 py-1 rounded bg-slate-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
@@ -663,43 +807,59 @@ function EmployeeRecords() {
 
         {/* Employee Details */}
         <div className="bg-white/20 dark:bg-gray-800/40 backdrop-blur-md rounded-2xl p-6 border border-white/30 dark:border-gray-700/30 shadow-lg">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Employee Details</h3>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
+            Employee Details
+          </h3>
           {selectedEmployee ? (
             <div className="space-y-4 max-h-96 overflow-y-auto">
               <div className="text-center pb-4 border-b border-white/30 dark:border-gray-600/30">
                 {/* Profile Picture Display */}
                 <div className="w-24 h-24 mx-auto mb-3 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
-                  {selectedEmployee.profilePicture ? (
+                  {getProfilePictureUrl(selectedEmployee) ? (
                     <img
-                      src={getProfilePictureUrl(selectedEmployee) || "/placeholder.svg"}
+                      src={getProfilePictureUrl(selectedEmployee)}
                       alt={`${selectedEmployee.fullName} profile`}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        e.target.style.display = "none"
-                        e.target.nextElementSibling.style.display = "flex"
+                        e.target.style.display = "none";
+                        e.target.nextElementSibling.style.display = "flex";
                       }}
                     />
                   ) : null}
                   <div
-                    className={`w-full h-full flex items-center justify-center text-4xl text-gray-400 dark:text-gray-500 ${selectedEmployee.profilePicture ? "hidden" : "flex"}`}
+                    className={`w-full h-full flex items-center justify-center text-4xl text-gray-400 dark:text-gray-500 ${
+                      getProfilePictureUrl(selectedEmployee) ? "hidden" : "flex"
+                    }`}
                   >
                     👤
                   </div>
                 </div>
 
-                <h4 className="text-xl font-bold text-gray-800 dark:text-gray-100">{selectedEmployee.fullName}</h4>
-                <p className="text-gray-600 dark:text-gray-300">{selectedEmployee.position}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{selectedEmployee.department}</p>
+                <h4 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                  {selectedEmployee.fullName}
+                </h4>
+                <p className="text-gray-600 dark:text-gray-300">
+                  {selectedEmployee.position}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {selectedEmployee.department}
+                </p>
 
-                {/* Multiple Documents Display */}
-                {selectedEmployee.documents && selectedEmployee.documents.length > 0 && (
+                {/* Documents Display */}
+                {loadingDocuments ? (
+                  <div className="mt-3">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Loading documents...
+                    </p>
+                  </div>
+                ) : employeeDocuments && employeeDocuments.length > 0 ? (
                   <div className="mt-3">
                     <div className="flex justify-between items-center mb-2">
                       <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Documents ({selectedEmployee.documents.length}):
+                        Documents ({employeeDocuments.length}):
                       </p>
                       <button
-                        onClick={() => openDocumentViewer(selectedEmployee)}
+                        onClick={openDocumentViewer}
                         className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded flex items-center gap-1"
                       >
                         <Eye className="w-3 h-3" />
@@ -707,51 +867,61 @@ function EmployeeRecords() {
                       </button>
                     </div>
                     <div className="space-y-1 max-h-24 overflow-y-auto">
-                      {selectedEmployee.documents.map((doc, index) => {
-                        const filename = typeof doc === "string" ? doc : doc.filename
-                        const originalName = typeof doc === "object" ? doc.originalName : filename
-                        const size = typeof doc === "object" ? doc.size : null
-
-                        return (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between bg-gray-100 dark:bg-gray-700 rounded p-2"
-                          >
-                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                              {getFileIcon(filename)}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs text-gray-700 dark:text-gray-300 truncate">
-                                  {originalName || filename}
+                      {employeeDocuments.map((doc, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between bg-gray-100 dark:bg-gray-700 rounded p-2"
+                        >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {getFileIcon(doc.filename)}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-700 dark:text-gray-300 truncate">
+                                {doc.originalName || doc.filename}
+                              </p>
+                              {doc.size && (
+                                <p className="text-xs text-gray-500">
+                                  {apiService.document.formatFileSize(doc.size)}
                                 </p>
-                                {size && <p className="text-xs text-gray-500">{apiService.formatFileSize(size)}</p>}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  window.open(getDocumentUrl(doc), "_blank")
-                                }}
-                                className="p-1 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900 rounded"
-                                title="View document"
-                              >
-                                <Eye className="w-3 h-3" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  downloadDocument(doc)
-                                }}
-                                className="p-1 text-green-600 hover:bg-green-100 dark:hover:bg-green-900 rounded"
-                                title="Download document"
-                              >
-                                <Download className="w-3 h-3" />
-                              </button>
+                              )}
                             </div>
                           </div>
-                        )
-                      })}
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(
+                                  getDocumentUrl(
+                                    selectedEmployee.id,
+                                    doc.filename
+                                  ),
+                                  "_blank"
+                                );
+                              }}
+                              className="p-1 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900 rounded"
+                              title="View document"
+                            >
+                              <Eye className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                downloadDocument(doc);
+                              }}
+                              className="p-1 text-green-600 hover:bg-green-100 dark:hover:bg-green-900 rounded"
+                              title="Download document"
+                            >
+                              <Download className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
+                  </div>
+                ) : (
+                  <div className="mt-3">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      No documents uploaded
+                    </p>
                   </div>
                 )}
               </div>
@@ -759,70 +929,112 @@ function EmployeeRecords() {
               <div className="grid grid-cols-1 gap-3">
                 {/* Personal Information */}
                 <div className="border-b border-white/20 dark:border-gray-600/20 pb-3">
-                  <h5 className="font-medium text-gray-700 dark:text-gray-200 mb-2">Personal Information</h5>
+                  <h5 className="font-medium text-gray-700 dark:text-gray-200 mb-2">
+                    Personal Information
+                  </h5>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">Age</label>
-                      <p className="text-gray-800 dark:text-gray-100">{selectedEmployee.age || "N/A"}</p>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                        Age
+                      </label>
+                      <p className="text-gray-800 dark:text-gray-100">
+                        {selectedEmployee.age || "N/A"}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">Birth Date</label>
-                      <p className="text-gray-800 dark:text-gray-100">{formatDate(selectedEmployee.birthDate)}</p>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                        Birth Date
+                      </label>
+                      <p className="text-gray-800 dark:text-gray-100">
+                        {formatDate(selectedEmployee.birthDate)}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">Civil Status</label>
-                      <p className="text-gray-800 dark:text-gray-100">{selectedEmployee.civilStatus || "N/A"}</p>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                        Civil Status
+                      </label>
+                      <p className="text-gray-800 dark:text-gray-100">
+                        {selectedEmployee.civilStatus || "N/A"}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">Contact</label>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                        Contact
+                      </label>
                       <p className="text-gray-800 dark:text-gray-100">
                         {formatPhoneNumber(selectedEmployee.contactNumber)}
                       </p>
                     </div>
                   </div>
                   <div className="mt-2">
-                    <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">Email</label>
-                    <p className="text-gray-800 dark:text-gray-100">{selectedEmployee.email || "N/A"}</p>
+                    <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                      Email
+                    </label>
+                    <p className="text-gray-800 dark:text-gray-100">
+                      {selectedEmployee.email || "N/A"}
+                    </p>
                   </div>
                   <div className="mt-2">
-                    <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">Address</label>
-                    <p className="text-gray-800 dark:text-gray-100 text-sm">{selectedEmployee.address || "N/A"}</p>
+                    <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                      Address
+                    </label>
+                    <p className="text-gray-800 dark:text-gray-100 text-sm">
+                      {selectedEmployee.address || "N/A"}
+                    </p>
                   </div>
                 </div>
 
                 {/* Employment Information */}
                 <div className="border-b border-white/20 dark:border-gray-600/20 pb-3">
-                  <h5 className="font-medium text-gray-700 dark:text-gray-200 mb-2">Employment Information</h5>
+                  <h5 className="font-medium text-gray-700 dark:text-gray-200 mb-2">
+                    Employment Information
+                  </h5>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">Hire Date</label>
-                      <p className="text-gray-800 dark:text-gray-100">{formatDate(selectedEmployee.hireDate)}</p>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                        Hire Date
+                      </label>
+                      <p className="text-gray-800 dark:text-gray-100">
+                        {formatDate(selectedEmployee.hireDate)}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">Employee ID</label>
-                      <p className="text-gray-800 dark:text-gray-100">{selectedEmployee.idNumber || "N/A"}</p>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                        Employee ID
+                      </label>
+                      <p className="text-gray-800 dark:text-gray-100">
+                        {selectedEmployee.idNumber || "N/A"}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">Status</label>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                        Status
+                      </label>
                       <span
                         className={`inline-block px-2 py-1 rounded-full text-xs ${
                           selectedEmployee.status === "Active"
                             ? "bg-green-100/80 dark:bg-green-900/40 text-green-700 dark:text-green-300"
                             : selectedEmployee.status === "On Leave"
-                              ? "bg-yellow-100/80 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
-                              : "bg-red-100/80 dark:bg-red-900/40 text-red-700 dark:text-red-300"
+                            ? "bg-yellow-100/80 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
+                            : "bg-red-100/80 dark:bg-red-900/40 text-red-700 dark:text-red-300"
                         }`}
                       >
                         {selectedEmployee.status}
                       </span>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">Salary</label>
-                      <p className="text-gray-800 dark:text-gray-100 font-medium">{selectedEmployee.salary || "N/A"}</p>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                        Salary
+                      </label>
+                      <p className="text-gray-800 dark:text-gray-100 font-medium">
+                        {selectedEmployee.salary || "N/A"}
+                      </p>
                     </div>
                   </div>
                   <div className="mt-2">
-                    <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">ID Barcode</label>
+                    <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                      ID Barcode
+                    </label>
                     <p className="text-gray-800 dark:text-gray-100 font-mono text-xs">
                       {selectedEmployee.idBarcode || "N/A"}
                     </p>
@@ -831,28 +1043,38 @@ function EmployeeRecords() {
 
                 {/* Government IDs */}
                 <div className="pb-3">
-                  <h5 className="font-medium text-gray-700 dark:text-gray-200 mb-2">Government IDs & Numbers</h5>
+                  <h5 className="font-medium text-gray-700 dark:text-gray-200 mb-2">
+                    Government IDs & Numbers
+                  </h5>
                   <div className="grid grid-cols-1 gap-2 text-sm">
                     <div className="flex justify-between">
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300">TIN Number:</label>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                        TIN Number:
+                      </label>
                       <p className="text-gray-800 dark:text-gray-100 font-mono">
                         {selectedEmployee.tinNumber || "N/A"}
                       </p>
                     </div>
                     <div className="flex justify-between">
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300">SSS Number:</label>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                        SSS Number:
+                      </label>
                       <p className="text-gray-800 dark:text-gray-100 font-mono">
                         {selectedEmployee.sssNumber || "N/A"}
                       </p>
                     </div>
                     <div className="flex justify-between">
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Pag-IBIG Number:</label>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                        Pag-IBIG Number:
+                      </label>
                       <p className="text-gray-800 dark:text-gray-100 font-mono">
                         {selectedEmployee.pagibigNumber || "N/A"}
                       </p>
                     </div>
                     <div className="flex justify-between">
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300">PhilHealth Number:</label>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                        PhilHealth Number:
+                      </label>
                       <p className="text-gray-800 dark:text-gray-100 font-mono">
                         {selectedEmployee.philhealthNumber || "N/A"}
                       </p>
@@ -879,7 +1101,9 @@ function EmployeeRecords() {
           ) : (
             <div className="text-center py-8">
               <div className="text-6xl mb-4">👤</div>
-              <p className="text-gray-500 dark:text-gray-400">Select an employee to view detailed information</p>
+              <p className="text-gray-500 dark:text-gray-400">
+                Select an employee to view detailed information
+              </p>
             </div>
           )}
         </div>
@@ -891,7 +1115,9 @@ function EmployeeRecords() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
             <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-4">
-                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Document Viewer</h2>
+                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                  Document Viewer
+                </h2>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-600 dark:text-gray-300">
                     {currentDocumentIndex + 1} of {selectedDocuments.length}
@@ -906,7 +1132,9 @@ function EmployeeRecords() {
                     </button>
                     <button
                       onClick={() => navigateDocument("next")}
-                      disabled={currentDocumentIndex === selectedDocuments.length - 1}
+                      disabled={
+                        currentDocumentIndex === selectedDocuments.length - 1
+                      }
                       className="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded disabled:opacity-50"
                     >
                       ›
@@ -916,11 +1144,23 @@ function EmployeeRecords() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => downloadDocument(selectedDocuments[currentDocumentIndex])}
+                  onClick={() =>
+                    downloadDocument(selectedDocuments[currentDocumentIndex])
+                  }
                   className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                   title="Download current document"
                 >
                   <Download size={16} />
+                </button>
+                <button
+                  onClick={() =>
+                    deleteDocument(selectedDocuments[currentDocumentIndex])
+                  }
+                  className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                  title="Delete current document"
+                  disabled={loadingDocuments}
+                >
+                  <Trash2 size={16} />
                 </button>
                 <button
                   onClick={() => setIsDocumentViewerOpen(false)}
@@ -944,35 +1184,48 @@ function EmployeeRecords() {
 
               {/* Document Info */}
               <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-2">Document Information</h4>
+                <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-2">
+                  Document Information
+                </h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <label className="text-gray-600 dark:text-gray-300">Original Name:</label>
+                    <label className="text-gray-600 dark:text-gray-300">
+                      Original Name:
+                    </label>
                     <p className="text-gray-800 dark:text-gray-100 font-mono">
                       {selectedDocuments[currentDocumentIndex].originalName ||
-                        selectedDocuments[currentDocumentIndex].filename ||
-                        selectedDocuments[currentDocumentIndex]}
+                        selectedDocuments[currentDocumentIndex].filename}
                     </p>
                   </div>
                   <div>
-                    <label className="text-gray-600 dark:text-gray-300">File Size:</label>
+                    <label className="text-gray-600 dark:text-gray-300">
+                      File Size:
+                    </label>
                     <p className="text-gray-800 dark:text-gray-100">
                       {selectedDocuments[currentDocumentIndex].size
-                        ? apiService.formatFileSize(selectedDocuments[currentDocumentIndex].size)
+                        ? apiService.document.formatFileSize(
+                            selectedDocuments[currentDocumentIndex].size
+                          )
                         : "Unknown"}
                     </p>
                   </div>
                   <div>
-                    <label className="text-gray-600 dark:text-gray-300">File Type:</label>
-                    <p className="text-gray-800 dark:text-gray-100">
-                      {selectedDocuments[currentDocumentIndex].type || "Unknown"}
+                    <label className="text-gray-600 dark:text-gray-300">
+                      File Name:
+                    </label>
+                    <p className="text-gray-800 dark:text-gray-100 font-mono">
+                      {selectedDocuments[currentDocumentIndex].filename}
                     </p>
                   </div>
                   <div>
-                    <label className="text-gray-600 dark:text-gray-300">Uploaded:</label>
+                    <label className="text-gray-600 dark:text-gray-300">
+                      Created:
+                    </label>
                     <p className="text-gray-800 dark:text-gray-100">
-                      {selectedDocuments[currentDocumentIndex].uploadedAt
-                        ? formatDate(selectedDocuments[currentDocumentIndex].uploadedAt)
+                      {selectedDocuments[currentDocumentIndex].created
+                        ? formatDate(
+                            selectedDocuments[currentDocumentIndex].created
+                          )
                         : "Unknown"}
                     </p>
                   </div>
@@ -981,19 +1234,21 @@ function EmployeeRecords() {
 
               {/* Document List */}
               <div className="mt-4">
-                <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-2">All Documents</h4>
+                <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-2">
+                  All Documents
+                </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {selectedDocuments.map((doc, index) => {
-                    const filename = typeof doc === "string" ? doc : doc.filename
-                    const originalName = typeof doc === "object" ? doc.originalName : filename
-                    const isActive = index === currentDocumentIndex
+                    const isActive = index === currentDocumentIndex;
 
                     return (
                       <button
                         key={index}
                         onClick={() => {
-                          setCurrentDocumentIndex(index)
-                          setDocumentPreviewUrl(getDocumentUrl(doc))
+                          setCurrentDocumentIndex(index);
+                          setDocumentPreviewUrl(
+                            getDocumentUrl(selectedEmployee.id, doc.filename)
+                          );
                         }}
                         className={`p-3 text-left rounded-lg border transition-colors ${
                           isActive
@@ -1002,7 +1257,7 @@ function EmployeeRecords() {
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          {getFileIcon(filename)}
+                          {getFileIcon(doc.filename)}
                           <div className="flex-1 min-w-0">
                             <p
                               className={`text-sm truncate ${
@@ -1011,21 +1266,23 @@ function EmployeeRecords() {
                                   : "text-gray-800 dark:text-gray-100"
                               }`}
                             >
-                              {originalName || filename}
+                              {doc.originalName || doc.filename}
                             </p>
                             {doc.size && (
                               <p
                                 className={`text-xs ${
-                                  isActive ? "text-blue-600 dark:text-blue-300" : "text-gray-500 dark:text-gray-400"
+                                  isActive
+                                    ? "text-blue-600 dark:text-blue-300"
+                                    : "text-gray-500 dark:text-gray-400"
                                 }`}
                               >
-                                {apiService.formatFileSize(doc.size)}
+                                {apiService.document.formatFileSize(doc.size)}
                               </p>
                             )}
                           </div>
                         </div>
                       </button>
-                    )
+                    );
                   })}
                 </div>
               </div>
@@ -1039,7 +1296,9 @@ function EmployeeRecords() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
             <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Edit Employee</h2>
+              <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                Edit Employee
+              </h2>
               <button
                 onClick={() => setIsEditModalOpen(false)}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -1065,7 +1324,7 @@ function EmployeeRecords() {
                         {profilePreview && (
                           <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
                             <img
-                              src={profilePreview || "/placeholder.svg"}
+                              src={profilePreview}
                               alt="Profile preview"
                               className="w-full h-full object-cover"
                             />
@@ -1081,14 +1340,16 @@ function EmployeeRecords() {
                           />
                           {selectedProfileFile && (
                             <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                              📁 {selectedProfileFile.name} selected (will upload when saved)
+                              📁 {selectedProfileFile.name} selected (will
+                              upload when saved)
                             </p>
                           )}
                         </div>
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Select new profile picture (max 5MB, jpg/png/gif/webp). File will be uploaded when you save
-                        changes.
+                        Select new profile picture (max 10MB,
+                        jpg/png/gif/webp/bmp). File will be uploaded when you
+                        save changes.
                       </p>
                     </div>
 
@@ -1100,7 +1361,7 @@ function EmployeeRecords() {
                       <div className="space-y-2">
                         <input
                           type="file"
-                          accept=".pdf,.doc,.docx,.txt,.rtf,.xls,.xlsx,.ppt,.pptx"
+                          accept=".pdf,.doc,.docx,.txt,.csv,.rtf,.xls,.xlsx,.ppt,.pptx,image/*,.zip,.rar"
                           multiple
                           onChange={handleDocumentChange}
                           disabled={isSaving || uploadingFiles}
@@ -1120,9 +1381,15 @@ function EmployeeRecords() {
                               >
                                 <div className="flex items-center gap-2">
                                   {getFileIcon(file.name)}
-                                  <span className="text-xs text-green-700 dark:text-green-300">{file.name}</span>
+                                  <span className="text-xs text-green-700 dark:text-green-300">
+                                    {file.name}
+                                  </span>
                                   <span className="text-xs text-gray-500">
-                                    ({apiService.formatFileSize(file.size)})
+                                    (
+                                    {apiService.document.formatFileSize(
+                                      file.size
+                                    )}
+                                    )
                                   </span>
                                 </div>
                                 <button
@@ -1138,56 +1405,65 @@ function EmployeeRecords() {
                         )}
 
                         {/* Show existing documents */}
-                        {editingEmployee.documents && editingEmployee.documents.length > 0 && (
+                        {employeeDocuments && employeeDocuments.length > 0 && (
                           <div className="space-y-1">
                             <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                              Current documents ({editingEmployee.documents.length}):
+                              Current documents ({employeeDocuments.length}):
                             </p>
-                            {editingEmployee.documents.map((doc, index) => {
-                              const filename = typeof doc === "string" ? doc : doc.filename
-                              const originalName = typeof doc === "object" ? doc.originalName : filename
-                              const size = typeof doc === "object" ? doc.size : null
-
-                              return (
-                                <div
-                                  key={index}
-                                  className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 p-2 rounded"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    {getFileIcon(filename)}
-                                    <span className="text-xs text-gray-700 dark:text-gray-300">
-                                      {originalName || filename}
+                            {employeeDocuments.map((doc, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 p-2 rounded"
+                              >
+                                <div className="flex items-center gap-2">
+                                  {getFileIcon(doc.filename)}
+                                  <span className="text-xs text-gray-700 dark:text-gray-300">
+                                    {doc.originalName || doc.filename}
+                                  </span>
+                                  {doc.size && (
+                                    <span className="text-xs text-gray-500">
+                                      (
+                                      {apiService.document.formatFileSize(
+                                        doc.size
+                                      )}
+                                      )
                                     </span>
-                                    {size && (
-                                      <span className="text-xs text-gray-500">({apiService.formatFileSize(size)})</span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      type="button"
-                                      onClick={() => window.open(getDocumentUrl(doc), "_blank")}
-                                      className="text-blue-500 hover:text-blue-700"
-                                      title="View document"
-                                    >
-                                      <Eye size={14} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => removeExistingDocument(index)}
-                                      className="text-red-500 hover:text-red-700"
-                                      title="Remove document"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </div>
+                                  )}
                                 </div>
-                              )
-                            })}
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      window.open(
+                                        getDocumentUrl(
+                                          editingEmployee.id,
+                                          doc.filename
+                                        ),
+                                        "_blank"
+                                      )
+                                    }
+                                    className="text-blue-500 hover:text-blue-700"
+                                    title="View document"
+                                  >
+                                    <Eye size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteDocument(doc)}
+                                    className="text-red-500 hover:text-red-700"
+                                    title="Remove document"
+                                    disabled={loadingDocuments}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Select multiple documents (max 10MB each, pdf/doc/docx/txt/rtf/xls/xlsx/ppt/pptx). Files will be
+                        Select multiple documents (max 50MB each). Files will be
                         uploaded when you save changes.
                       </p>
                     </div>
@@ -1208,42 +1484,24 @@ function EmployeeRecords() {
                       <input
                         type="text"
                         value={editingEmployee.firstName || ""}
-                        onChange={(e) => handleInputChange("firstName", e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Middle Name
-                      </label>
-                      <input
-                        type="text"
-                        value={editingEmployee.middleName || ""}
-                        onChange={(e) => handleInputChange("middleName", e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Last Name
-                      </label>
-                      <input
-                        type="text"
-                        value={editingEmployee.lastName || ""}
-                        onChange={(e) => handleInputChange("lastName", e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("firstName", e.target.value)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Age</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Age
+                        </label>
                         <input
                           type="number"
                           value={editingEmployee.age || ""}
-                          onChange={(e) => handleInputChange("age", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange("age", e.target.value)
+                          }
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         />
                       </div>
@@ -1255,7 +1513,9 @@ function EmployeeRecords() {
                         <input
                           type="date"
                           value={editingEmployee.birthDate || ""}
-                          onChange={(e) => handleInputChange("birthDate", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange("birthDate", e.target.value)
+                          }
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         />
                       </div>
@@ -1267,7 +1527,9 @@ function EmployeeRecords() {
                       </label>
                       <select
                         value={editingEmployee.civilStatus || ""}
-                        onChange={(e) => handleInputChange("civilStatus", e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("civilStatus", e.target.value)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       >
                         <option value="">Select Status</option>
@@ -1285,27 +1547,37 @@ function EmployeeRecords() {
                       <input
                         type="tel"
                         value={editingEmployee.contactNumber || ""}
-                        onChange={(e) => handleInputChange("contactNumber", e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("contactNumber", e.target.value)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         placeholder="+639123456789"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Email
+                      </label>
                       <input
                         type="email"
                         value={editingEmployee.email || ""}
-                        onChange={(e) => handleInputChange("email", e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("email", e.target.value)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Address</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Address
+                      </label>
                       <textarea
                         value={editingEmployee.address || ""}
-                        onChange={(e) => handleInputChange("address", e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("address", e.target.value)
+                        }
                         rows="3"
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
@@ -1327,7 +1599,9 @@ function EmployeeRecords() {
                       <input
                         type="text"
                         value={editingEmployee.position || ""}
-                        onChange={(e) => handleInputChange("position", e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("position", e.target.value)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     </div>
@@ -1339,7 +1613,9 @@ function EmployeeRecords() {
                       <input
                         type="text"
                         value={editingEmployee.department || ""}
-                        onChange={(e) => handleInputChange("department", e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("department", e.target.value)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     </div>
@@ -1351,7 +1627,9 @@ function EmployeeRecords() {
                       <input
                         type="date"
                         value={editingEmployee.hireDate || ""}
-                        onChange={(e) => handleInputChange("hireDate", e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("hireDate", e.target.value)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     </div>
@@ -1363,16 +1641,22 @@ function EmployeeRecords() {
                       <input
                         type="text"
                         value={editingEmployee.idNumber || ""}
-                        onChange={(e) => handleInputChange("idNumber", e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("idNumber", e.target.value)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Status
+                      </label>
                       <select
                         value={editingEmployee.status || ""}
-                        onChange={(e) => handleInputChange("status", e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("status", e.target.value)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       >
                         <option value="">Select Status</option>
@@ -1384,11 +1668,15 @@ function EmployeeRecords() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Salary</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Salary
+                      </label>
                       <input
                         type="text"
                         value={editingEmployee.salary || ""}
-                        onChange={(e) => handleInputChange("salary", e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("salary", e.target.value)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         placeholder="₱25,000"
                       />
@@ -1401,7 +1689,9 @@ function EmployeeRecords() {
                       <input
                         type="text"
                         value={editingEmployee.idBarcode || ""}
-                        onChange={(e) => handleInputChange("idBarcode", e.target.value)}
+                        onChange={(e) =>
+                          handleInputChange("idBarcode", e.target.value)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
                       />
                     </div>
@@ -1420,7 +1710,9 @@ function EmployeeRecords() {
                         <input
                           type="text"
                           value={editingEmployee.tinNumber || ""}
-                          onChange={(e) => handleInputChange("tinNumber", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange("tinNumber", e.target.value)
+                          }
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
                         />
                       </div>
@@ -1432,7 +1724,9 @@ function EmployeeRecords() {
                         <input
                           type="text"
                           value={editingEmployee.sssNumber || ""}
-                          onChange={(e) => handleInputChange("sssNumber", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange("sssNumber", e.target.value)
+                          }
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
                         />
                       </div>
@@ -1444,7 +1738,9 @@ function EmployeeRecords() {
                         <input
                           type="text"
                           value={editingEmployee.pagibigNumber || ""}
-                          onChange={(e) => handleInputChange("pagibigNumber", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange("pagibigNumber", e.target.value)
+                          }
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
                         />
                       </div>
@@ -1456,7 +1752,12 @@ function EmployeeRecords() {
                         <input
                           type="text"
                           value={editingEmployee.philhealthNumber || ""}
-                          onChange={(e) => handleInputChange("philhealthNumber", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange(
+                              "philhealthNumber",
+                              e.target.value
+                            )
+                          }
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
                         />
                       </div>
@@ -1479,7 +1780,11 @@ function EmployeeRecords() {
                 disabled={isSaving || uploadingFiles}
                 className="px-6 py-2 bg-slate-600 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSaving ? (uploadingFiles ? "Uploading files..." : "Saving...") : "Save Changes"}
+                {isSaving
+                  ? uploadingFiles
+                    ? "Uploading files..."
+                    : "Saving..."
+                  : "Save Changes"}
               </button>
             </div>
           </div>
@@ -1512,8 +1817,9 @@ function EmployeeRecords() {
               </h2>
 
               <p className="text-gray-600 dark:text-gray-300 text-center mb-6">
-                Are you sure you want to delete <strong>{deleteEmployee.fullName}</strong>? This action cannot be undone
-                and will permanently remove all employee data.
+                Are you sure you want to delete{" "}
+                <strong>{deleteEmployee.fullName}</strong>? This action cannot
+                be undone and will permanently remove all employee data.
               </p>
 
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
@@ -1532,7 +1838,9 @@ function EmployeeRecords() {
                     />
                   </svg>
                   <div className="text-sm text-red-700 dark:text-red-300">
-                    <p className="font-medium">Warning: This action is irreversible</p>
+                    <p className="font-medium">
+                      Warning: This action is irreversible
+                    </p>
                     <p>Employee ID: {deleteEmployee.idNumber}</p>
                     <p>Department: {deleteEmployee.department}</p>
                   </div>
@@ -1543,8 +1851,8 @@ function EmployeeRecords() {
             <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
               <button
                 onClick={() => {
-                  setIsDeleteModalOpen(false)
-                  setDeleteEmployee(null)
+                  setIsDeleteModalOpen(false);
+                  setDeleteEmployee(null);
                 }}
                 className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200"
                 disabled={isSaving}
@@ -1563,7 +1871,7 @@ function EmployeeRecords() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default EmployeeRecords
+export default EmployeeRecords;
