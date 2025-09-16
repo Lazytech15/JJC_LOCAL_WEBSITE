@@ -2,7 +2,7 @@
 // config/api-config.js
 // ============================================================================
 export const API_ENDPOINTS = {
-  public: "http://192.168.68.140:3001",
+  public: "http://192.168.1.71:3001",
   // public: window.location.origin,
 }
 
