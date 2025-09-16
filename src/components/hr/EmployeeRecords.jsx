@@ -50,6 +50,8 @@ function EmployeeRecords() {
   const [sortBy, setSortBy] = useState("hireDate");
   const [sortOrder, setSortOrder] = useState("DESC");
 
+  const [bulkLoadingProfiles, setBulkLoadingProfiles] = useState(false);
+
   // Load employee documents when selected employee changes
   useEffect(() => {
     if (selectedEmployee?.id) {
@@ -58,13 +60,6 @@ function EmployeeRecords() {
       setEmployeeDocuments([]);
     }
   }, [selectedEmployee]);
-
-  // Load profile pictures after employees are loaded
-  useEffect(() => {
-    if (employees.length > 0) {
-      loadProfilePictures();
-    }
-  }, [employees]);
 
   // Clear caches on component unmount
   useEffect(() => {
@@ -78,30 +73,153 @@ function EmployeeRecords() {
     };
   }, [profilePictures]);
 
-  const loadProfilePictures = async () => {
-    const loadPromises = employees
-      .filter((employee) => employee.id && !profilePictures.has(employee.id))
-      .map(async (employee) => {
+
+  const loadProfilePicturesBulkZip = async (employeeList = employees) => {
+    if (!employeeList || employeeList.length === 0) return;
+
+    try {
+      // Filter employees that don't have cached profile pictures
+      const employeesToLoad = employeeList.filter(employee =>
+        employee.id && !getProfilePictureUrl(employee)
+      );
+
+      const uidsToLoad = employeesToLoad.map(employee => employee.id);
+
+      if (uidsToLoad.length === 0) return;
+
+      console.log(`[EmployeeRecords] Bulk downloading ${uidsToLoad.length} profile pictures as zip`);
+
+      // Use bulk download to get a zip file with all images
+      const result = await apiService.profiles.downloadBulkProfilesPost(uidsToLoad, {
+        include_summary: true,
+        compression_level: 6
+      });
+
+      if (result.success && result.blob) {
+        // Extract and distribute images using employee list for UID mapping
+        const extractedImages = await extractAndDistributeImages(result.blob, uidsToLoad, employeesToLoad);
+
+        if (extractedImages.size > 0) {
+          setProfilePictures(prev => new Map([...prev, ...extractedImages]));
+          console.log(`[EmployeeRecords] Successfully distributed ${extractedImages.size} images to employees`);
+        }
+      }
+    } catch (err) {
+      console.log(`[EmployeeRecords] Zip bulk loading failed, using batched: ${err.message}`);
+      await loadProfilePicturesBatched(uidsToLoad);
+    }
+  };
+
+  // Helper function to extract images from zip and distribute to employees
+  const extractAndDistributeImages = async (zipBlob, expectedUids, employeeList = []) => {
+    const distributedImages = new Map();
+
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = await JSZip.loadAsync(zipBlob);
+
+      console.log(`[EmployeeRecords] Processing zip with ${Object.keys(zip.files).length} files`);
+
+      // Create a map of possible identifiers for each employee
+      const employeeIdentifiers = new Map();
+      employeeList.forEach(employee => {
+        const identifiers = [
+          employee.id?.toString(), // Primary ID (like 90)
+          employee.idNumber?.toString(), // Employee ID number (like 25063)
+          employee.idBarcode?.toString(), // Barcode (like 12307584)
+        ].filter(Boolean);
+
+        identifiers.forEach(identifier => {
+          employeeIdentifiers.set(identifier, employee.id);
+        });
+
+        console.log(`[EmployeeRecords] Employee ${employee.fullName} (ID: ${employee.id}) mapped with identifiers:`, identifiers);
+      });
+
+      // Process each file in the zip
+      for (const [filename, file] of Object.entries(zip.files)) {
+        console.log(`[EmployeeRecords] Processing file: ${filename}`);
+
+        // Skip directories and non-image files
+        if (file.dir || !filename.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i)) {
+          console.log(`[EmployeeRecords] Skipping non-image file: ${filename}`);
+          continue;
+        }
+
         try {
-          const result = await apiService.profiles.getProfileByUid(employee.id);
+          let matchedEmployeeId = null;
+
+          // Extract all numbers from filename
+          const numberMatches = filename.match(/\d+/g);
+
+          if (numberMatches) {
+            console.log(`[EmployeeRecords] Found numbers in ${filename}:`, numberMatches);
+
+            // Try each extracted number against our employee identifiers
+            for (const number of numberMatches) {
+              if (employeeIdentifiers.has(number)) {
+                matchedEmployeeId = employeeIdentifiers.get(number);
+                console.log(`[EmployeeRecords] Matched "${filename}" with number "${number}" to employee ID: ${matchedEmployeeId}`);
+                break;
+              }
+            }
+          }
+
+          // If we found a match and it's in our expected UIDs list
+          if (matchedEmployeeId && expectedUids.includes(matchedEmployeeId)) {
+            const imageBlob = await file.async('blob');
+            const imageUrl = URL.createObjectURL(imageBlob);
+
+            distributedImages.set(matchedEmployeeId, imageUrl);
+            console.log(`[EmployeeRecords] Successfully distributed image for employee ID: ${matchedEmployeeId}`);
+          } else if (matchedEmployeeId) {
+            console.log(`[EmployeeRecords] Employee ID ${matchedEmployeeId} not in expected list, skipping`);
+          } else {
+            console.log(`[EmployeeRecords] No matching employee found for file: ${filename}`);
+          }
+
+        } catch (fileError) {
+          console.warn(`[EmployeeRecords] Failed to process file ${filename}:`, fileError);
+        }
+      }
+
+      console.log(`[EmployeeRecords] Final distribution: ${distributedImages.size} images mapped to employees`);
+      distributedImages.forEach((url, employeeId) => {
+        const employee = employeeList.find(e => e.id === employeeId);
+        console.log(`[EmployeeRecords] Employee ID ${employeeId} (${employee?.fullName}) -> ${url.substring(0, 50)}...`);
+      });
+
+    } catch (error) {
+      console.error('[EmployeeRecords] Error extracting images from zip:', error);
+    }
+
+    return distributedImages;
+  };
+  const loadProfilePicturesBatched = async (uidsToLoad) => {
+    const batchSize = 5; // Process 5 at a time instead of all at once
+
+    for (let i = 0; i < uidsToLoad.length; i += batchSize) {
+      const batch = uidsToLoad.slice(i, i + batchSize);
+
+      const batchPromises = batch.map(async (uid) => {
+        try {
+          const result = await apiService.profiles.getProfileByUid(uid);
           if (result.success && result.url) {
-            setProfilePictures(
-              (prev) => new Map(prev.set(employee.id, result.url))
-            );
-            console.log(
-              `[EmployeeRecords] Profile loaded for ${employee.fullName}`
-            );
+            setProfilePictures(prev => new Map(prev.set(uid, result.url)));
+            console.log(`[EmployeeRecords] Loaded profile for UID: ${uid}`);
           }
         } catch (err) {
-          // Silently handle missing profile pictures
-          console.log(
-            `[EmployeeRecords] No profile picture for employee ${employee.id}: ${err.message}`
-          );
+          // Silently handle missing profiles - this is normal
+          console.log(`[EmployeeRecords] No profile for UID ${uid}: ${err.message}`);
         }
       });
 
-    if (loadPromises.length > 0) {
-      await Promise.allSettled(loadPromises);
+      await Promise.allSettled(batchPromises);
+
+      // Small delay between batches
+      if (i + batchSize < uidsToLoad.length) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
     }
   };
 
@@ -137,9 +255,15 @@ function EmployeeRecords() {
 
   const getProfilePictureUrl = (employee) => {
     if (!employee?.id) return null;
-    return apiService.profiles.getProfileUrlByUid(employee.id);
-  };
 
+    // Check if we have it cached from bulk loading
+    if (profilePictures.has(employee.id)) {
+      return profilePictures.get(employee.id);
+    }
+
+    // DO NOT return individual URL - this prevents browser requests
+    return null;
+  };
   const getDocumentUrl = (id, filename) => {
     return apiService.document.getDocumentUrl(id, filename);
   };
@@ -182,15 +306,12 @@ function EmployeeRecords() {
 
   // Navigate documents in viewer
   const navigateDocument = (direction) => {
-    const newIndex =
-      direction === "next"
-        ? Math.min(currentDocumentIndex + 1, selectedDocuments.length - 1)
-        : Math.max(currentDocumentIndex - 1, 0);
+    const newIndex = direction === "next"
+      ? Math.min(currentDocumentIndex + 1, selectedDocuments.length - 1)
+      : Math.max(currentDocumentIndex - 1, 0);
 
     setCurrentDocumentIndex(newIndex);
-    setDocumentPreviewUrl(
-      getDocumentUrl(selectedEmployee.id, selectedDocuments[newIndex].filename)
-    );
+    setDocumentPreviewUrl(getDocumentPreviewUrl(selectedEmployee.id, selectedDocuments[newIndex].filename));
   };
 
   const downloadDocument = async (document) => {
@@ -317,7 +438,6 @@ function EmployeeRecords() {
       console.log("[EmployeeRecords] Fetching employees with params:", params);
 
       const result = await apiService.employees.getEmployees(params);
-
       if (result.success) {
         const employeesData = result.data.employees || [];
         setEmployees(employeesData);
@@ -328,9 +448,12 @@ function EmployeeRecords() {
           total: result.data.pagination.total,
         }));
 
-        console.log(
-          `[EmployeeRecords] Loaded ${employeesData.length} employees`
-        );
+        console.log(`[EmployeeRecords] Loaded ${employeesData.length} employees`);
+
+        // Load profile pictures using batched approach (NOT individual)
+        if (employeesData.length > 0) {
+          loadProfilePicturesBulkZip(employeesData);
+        }
       } else {
         throw new Error(result.error || "Failed to fetch employees");
       }
@@ -550,6 +673,18 @@ function EmployeeRecords() {
       if (selectedEmployee?.id === editingEmployee.id) {
         const updatedEmployee = { ...selectedEmployee, ...updatedEmployeeData };
         setSelectedEmployee(updatedEmployee);
+
+        // If profile picture was updated, clear it from cache and reload
+        if (uploadResults.profilePicture) {
+          setProfilePictures(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(editingEmployee.id);
+            return newMap;
+          });
+          // Trigger a single profile reload for this employee
+          loadProfilePicturesBulkZip([updatedEmployee]);
+        }
+
         // Refresh documents for the updated employee
         await fetchEmployeeDocuments(updatedEmployee.id);
       }
@@ -583,6 +718,27 @@ function EmployeeRecords() {
       ...prev,
       [field]: value,
     }));
+  };
+
+  const canPreviewInline = (filename) => {
+    if (!filename) return false;
+    const ext = filename.split('.').pop()?.toLowerCase();
+
+    // Files that can be previewed directly in iframe
+    const previewableTypes = ['pdf', 'txt', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+    return previewableTypes.includes(ext);
+  };
+
+  // Add this function to get the proper document preview URL
+  const getDocumentPreviewUrl = (employeeId, filename) => {
+    // Add inline parameter to force inline viewing instead of download
+    const baseUrl = apiService.document.getDocumentUrl(employeeId, filename);
+
+    // Check if URL already has query parameters
+    const separator = baseUrl.includes('?') ? '&' : '?';
+
+    // Add inline=true parameter to tell server to serve with inline content disposition
+    return `${baseUrl}${separator}inline=true&view=preview`;
   };
 
   if (loading) {
@@ -711,11 +867,10 @@ function EmployeeRecords() {
               <div
                 key={employee.id}
                 onClick={() => setSelectedEmployee(employee)}
-                className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
-                  selectedEmployee?.id === employee.id
+                className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${selectedEmployee?.id === employee.id
                     ? "bg-white/40 dark:bg-gray-700/60 border-slate-300 dark:border-slate-500"
                     : "bg-white/20 dark:bg-gray-700/30 border-white/20 dark:border-gray-600/30 hover:bg-white/30 dark:hover:bg-gray-700/50"
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   {/* Profile Picture in List */}
@@ -732,9 +887,8 @@ function EmployeeRecords() {
                       />
                     ) : null}
                     <div
-                      className={`w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500 ${
-                        getProfilePictureUrl(employee) ? "hidden" : "flex"
-                      }`}
+                      className={`w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500 ${getProfilePictureUrl(employee) ? "hidden" : "flex"
+                        }`}
                     >
                       👤
                     </div>
@@ -762,13 +916,12 @@ function EmployeeRecords() {
                         </p>
                       </div>
                       <span
-                        className={`px-2 py-1 rounded-full text-xs ${
-                          employee.status === "Active"
+                        className={`px-2 py-1 rounded-full text-xs ${employee.status === "Active"
                             ? "bg-green-100/80 dark:bg-green-900/40 text-green-700 dark:text-green-300"
                             : employee.status === "On Leave"
-                            ? "bg-yellow-100/80 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
-                            : "bg-red-100/80 dark:bg-red-900/40 text-red-700 dark:text-red-300"
-                        }`}
+                              ? "bg-yellow-100/80 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
+                              : "bg-red-100/80 dark:bg-red-900/40 text-red-700 dark:text-red-300"
+                          }`}
                       >
                         {employee.status}
                       </span>
@@ -827,9 +980,8 @@ function EmployeeRecords() {
                     />
                   ) : null}
                   <div
-                    className={`w-full h-full flex items-center justify-center text-4xl text-gray-400 dark:text-gray-500 ${
-                      getProfilePictureUrl(selectedEmployee) ? "hidden" : "flex"
-                    }`}
+                    className={`w-full h-full flex items-center justify-center text-4xl text-gray-400 dark:text-gray-500 ${getProfilePictureUrl(selectedEmployee) ? "hidden" : "flex"
+                      }`}
                   >
                     👤
                   </div>
@@ -886,22 +1038,6 @@ function EmployeeRecords() {
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.open(
-                                  getDocumentUrl(
-                                    selectedEmployee.id,
-                                    doc.filename
-                                  ),
-                                  "_blank"
-                                );
-                              }}
-                              className="p-1 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900 rounded"
-                              title="View document"
-                            >
-                              <Eye className="w-3 h-3" />
-                            </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1011,13 +1147,12 @@ function EmployeeRecords() {
                         Status
                       </label>
                       <span
-                        className={`inline-block px-2 py-1 rounded-full text-xs ${
-                          selectedEmployee.status === "Active"
+                        className={`inline-block px-2 py-1 rounded-full text-xs ${selectedEmployee.status === "Active"
                             ? "bg-green-100/80 dark:bg-green-900/40 text-green-700 dark:text-green-300"
                             : selectedEmployee.status === "On Leave"
-                            ? "bg-yellow-100/80 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
-                            : "bg-red-100/80 dark:bg-red-900/40 text-red-700 dark:text-red-300"
-                        }`}
+                              ? "bg-yellow-100/80 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
+                              : "bg-red-100/80 dark:bg-red-900/40 text-red-700 dark:text-red-300"
+                          }`}
                       >
                         {selectedEmployee.status}
                       </span>
@@ -1132,9 +1267,7 @@ function EmployeeRecords() {
                     </button>
                     <button
                       onClick={() => navigateDocument("next")}
-                      disabled={
-                        currentDocumentIndex === selectedDocuments.length - 1
-                      }
+                      disabled={currentDocumentIndex === selectedDocuments.length - 1}
                       className="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded disabled:opacity-50"
                     >
                       ›
@@ -1144,18 +1277,14 @@ function EmployeeRecords() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() =>
-                    downloadDocument(selectedDocuments[currentDocumentIndex])
-                  }
+                  onClick={() => downloadDocument(selectedDocuments[currentDocumentIndex])}
                   className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                   title="Download current document"
                 >
                   <Download size={16} />
                 </button>
                 <button
-                  onClick={() =>
-                    deleteDocument(selectedDocuments[currentDocumentIndex])
-                  }
+                  onClick={() => deleteDocument(selectedDocuments[currentDocumentIndex])}
                   className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
                   title="Delete current document"
                   disabled={loadingDocuments}
@@ -1173,13 +1302,143 @@ function EmployeeRecords() {
 
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
               <div className="bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden">
-                {documentPreviewUrl && (
-                  <iframe
-                    src={documentPreviewUrl}
-                    className="w-full h-96"
-                    title={`Document ${currentDocumentIndex + 1}`}
-                  />
-                )}
+                {(() => {
+                  const currentDoc = selectedDocuments[currentDocumentIndex];
+                  const filename = currentDoc.filename;
+                  const ext = filename.split('.').pop()?.toLowerCase();
+
+                  // Handle different file types appropriately
+                  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) {
+                    // Display images directly
+                    return (
+                      <div className="flex justify-center items-center min-h-96 bg-gray-50 dark:bg-gray-800">
+                        <img
+                          src={getDocumentPreviewUrl(selectedEmployee.id, filename)}
+                          alt={currentDoc.originalName || filename}
+                          className="max-w-full max-h-96 object-contain rounded-lg shadow-lg"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextElementSibling.style.display = 'flex';
+                          }}
+                        />
+                        <div className="hidden flex-col items-center justify-center min-h-96 text-gray-500">
+                          <FileText size={48} className="mb-4" />
+                          <p>Unable to preview image</p>
+                          <button
+                            onClick={() => downloadDocument(currentDoc)}
+                            className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                          >
+                            Download to View
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  } else if (ext === 'pdf') {
+                    const pdfUrl = getDocumentPreviewUrl(selectedEmployee.id, filename);
+                    const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(pdfUrl)}`;
+                    return (
+                      <div className="relative">
+                        <iframe
+                          src={pdfUrl}
+                          className="w-full h-96 border-0"
+                          title={`PDF: ${currentDoc.originalName || filename}`}
+                          onError={(e) => {
+                            console.log('PDF iframe failed, trying Google Viewer');
+                            e.target.src = officeViewerUrl;
+                          }}
+                        />
+                        <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                          PDF Document
+                        </div>
+                      </div>
+                    );
+                  } else if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
+                    const docUrl = getDocumentPreviewUrl(selectedEmployee.id, filename);
+                    const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(docUrl)}`;
+
+                    return (
+                      <div className="relative">
+                        <iframe
+                          src={officeViewerUrl}
+                          className="w-full h-96 border-0"
+                          title={`Document: ${currentDoc.originalName || filename}`}
+                          onLoad={(e) => {
+                            // Hide loading message
+                            const loadingDiv = e.target.parentElement.querySelector('.loading-message');
+                            if (loadingDiv) loadingDiv.style.display = 'none';
+                          }}
+                          onError={(e) => {
+                            // Show fallback message
+                            const errorDiv = e.target.parentElement.querySelector('.error-message');
+                            if (errorDiv) errorDiv.style.display = 'flex';
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                        <div className="loading-message absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-700">
+                          <div className="text-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                            <p className="text-gray-600 dark:text-gray-300">Loading document preview...</p>
+                          </div>
+                        </div>
+                        <div className="error-message hidden absolute inset-0 flex-col items-center justify-center bg-gray-100 dark:bg-gray-700">
+                          <FileText size={48} className="mb-4 text-gray-400" />
+                          <p className="text-gray-600 dark:text-gray-300 mb-4">Unable to preview this document</p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => window.open(getDocumentPreviewUrl(selectedEmployee.id, filename), '_blank')}
+                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                              Open in New Tab
+                            </button>
+                            <button
+                              onClick={() => downloadDocument(currentDoc)}
+                              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                            >
+                              Download
+                            </button>
+                          </div>
+                        </div>
+                        <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                          {ext.toUpperCase()} Document
+                        </div>
+                      </div>
+                    );
+                  } else if (ext === 'txt') {
+                    // Display text files directly
+                    return (
+                      <div className="p-4 bg-white dark:bg-gray-800 min-h-96">
+                        <iframe
+                          src={getDocumentPreviewUrl(selectedEmployee.id, filename)}
+                          className="w-full h-80 border-0 bg-white"
+                          title={`Text: ${currentDoc.originalName || filename}`}
+                        />
+                      </div>
+                    );
+                  } else {
+                    // Unsupported file type
+                    return (
+                      <div className="flex flex-col items-center justify-center min-h-96 text-gray-500">
+                        <FileText size={48} className="mb-4" />
+                        <p className="mb-2">Preview not available for {ext?.toUpperCase()} files</p>
+                        <p className="text-sm text-gray-400 mb-4">{currentDoc.originalName || filename}</p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => window.open(getDocumentPreviewUrl(selectedEmployee.id, filename), '_blank')}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                          >
+                            Try Opening in New Tab
+                          </button>
+                          <button
+                            onClick={() => downloadDocument(currentDoc)}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                          >
+                            Download
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                })()}
               </div>
 
               {/* Document Info */}
@@ -1189,50 +1448,38 @@ function EmployeeRecords() {
                 </h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <label className="text-gray-600 dark:text-gray-300">
-                      Original Name:
-                    </label>
+                    <label className="text-gray-600 dark:text-gray-300">Original Name:</label>
                     <p className="text-gray-800 dark:text-gray-100 font-mono">
                       {selectedDocuments[currentDocumentIndex].originalName ||
                         selectedDocuments[currentDocumentIndex].filename}
                     </p>
                   </div>
                   <div>
-                    <label className="text-gray-600 dark:text-gray-300">
-                      File Size:
-                    </label>
+                    <label className="text-gray-600 dark:text-gray-300">File Size:</label>
                     <p className="text-gray-800 dark:text-gray-100">
                       {selectedDocuments[currentDocumentIndex].size
-                        ? apiService.document.formatFileSize(
-                            selectedDocuments[currentDocumentIndex].size
-                          )
+                        ? apiService.document.formatFileSize(selectedDocuments[currentDocumentIndex].size)
                         : "Unknown"}
                     </p>
                   </div>
                   <div>
-                    <label className="text-gray-600 dark:text-gray-300">
-                      File Name:
-                    </label>
+                    <label className="text-gray-600 dark:text-gray-300">File Name:</label>
                     <p className="text-gray-800 dark:text-gray-100 font-mono">
                       {selectedDocuments[currentDocumentIndex].filename}
                     </p>
                   </div>
                   <div>
-                    <label className="text-gray-600 dark:text-gray-300">
-                      Created:
-                    </label>
+                    <label className="text-gray-600 dark:text-gray-300">Created:</label>
                     <p className="text-gray-800 dark:text-gray-100">
                       {selectedDocuments[currentDocumentIndex].created
-                        ? formatDate(
-                            selectedDocuments[currentDocumentIndex].created
-                          )
+                        ? formatDate(selectedDocuments[currentDocumentIndex].created)
                         : "Unknown"}
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Document List */}
+              {/* Document List - Rest remains the same */}
               <div className="mt-4">
                 <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-2">
                   All Documents
@@ -1246,36 +1493,27 @@ function EmployeeRecords() {
                         key={index}
                         onClick={() => {
                           setCurrentDocumentIndex(index);
-                          setDocumentPreviewUrl(
-                            getDocumentUrl(selectedEmployee.id, doc.filename)
-                          );
+                          setDocumentPreviewUrl(getDocumentPreviewUrl(selectedEmployee.id, doc.filename));
                         }}
-                        className={`p-3 text-left rounded-lg border transition-colors ${
-                          isActive
+                        className={`p-3 text-left rounded-lg border transition-colors ${isActive
                             ? "bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700"
                             : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-2">
                           {getFileIcon(doc.filename)}
                           <div className="flex-1 min-w-0">
-                            <p
-                              className={`text-sm truncate ${
-                                isActive
-                                  ? "text-blue-800 dark:text-blue-200 font-medium"
-                                  : "text-gray-800 dark:text-gray-100"
-                              }`}
-                            >
+                            <p className={`text-sm truncate ${isActive
+                                ? "text-blue-800 dark:text-blue-200 font-medium"
+                                : "text-gray-800 dark:text-gray-100"
+                              }`}>
                               {doc.originalName || doc.filename}
                             </p>
                             {doc.size && (
-                              <p
-                                className={`text-xs ${
-                                  isActive
-                                    ? "text-blue-600 dark:text-blue-300"
-                                    : "text-gray-500 dark:text-gray-400"
-                                }`}
-                              >
+                              <p className={`text-xs ${isActive
+                                  ? "text-blue-600 dark:text-blue-300"
+                                  : "text-gray-500 dark:text-gray-400"
+                                }`}>
                                 {apiService.document.formatFileSize(doc.size)}
                               </p>
                             )}
@@ -1291,10 +1529,12 @@ function EmployeeRecords() {
         </div>
       )}
 
+      {/* <div className="fixed inset-0 bg-gray-30 bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50 p-4"></div> make content blur */}
+
       {/* Edit Employee Modal */}
       {isEditModalOpen && editingEmployee && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 bg-gray-30 bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full max-h-[93vh] overflow-hidden shadow-2xl">
             <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
                 Edit Employee

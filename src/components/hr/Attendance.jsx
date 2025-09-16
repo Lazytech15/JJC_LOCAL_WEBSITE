@@ -6,7 +6,7 @@ import apiService from "../../utils/api/api-service"
 function Attendance() {
   const { user } = useAuth()
   const [attendanceData, setAttendanceData] = useState([])
-  const [profilePictures, setProfilePictures] = useState({}) // Cache for profile pictures
+  const [profilePictures, setProfilePictures] = useState({})
   const [stats, setStats] = useState({
     total_records: 0,
     unique_employees: 0,
