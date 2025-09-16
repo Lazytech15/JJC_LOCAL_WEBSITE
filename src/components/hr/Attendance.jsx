@@ -1,12 +1,16 @@
-//client attendance.jsx
+//client attendance.jsx - Enhanced with employee details modal and statistics
 import { useState, useEffect } from "react"
 import { useAuth } from "../../App"
 import apiService from "../../utils/api/api-service"
+import JSZip from "jszip"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
 
 function Attendance() {
   const { user } = useAuth()
   const [attendanceData, setAttendanceData] = useState([])
   const [profilePictures, setProfilePictures] = useState({})
+  const [profileLoadingState, setProfileLoadingState] = useState('idle') // 'idle', 'loading', 'loaded', 'error'
+  const [currentBulkRequest, setCurrentBulkRequest] = useState(null) // Track ongoing bulk requests
   const [stats, setStats] = useState({
     total_records: 0,
     unique_employees: 0,
@@ -31,9 +35,270 @@ function Attendance() {
   })
   const [newRecordIds, setNewRecordIds] = useState(new Set())
 
-  // Load profile picture for an employee UID
-  const loadProfilePicture = async (uid) => {
-    if (!uid || profilePictures[uid]) return // Skip if already loaded or no UID
+  // Employee Details Modal State
+  const [selectedEmployee, setSelectedEmployee] = useState(null)
+  const [showEmployeeModal, setShowEmployeeModal] = useState(false)
+  const [employeeStats, setEmployeeStats] = useState(null)
+  const [employeeHistory, setEmployeeHistory] = useState([])
+  const [loadingEmployeeData, setLoadingEmployeeData] = useState(false)
+
+  // Group attendance records by employee and date
+  const groupAttendanceByEmployee = (records) => {
+    const grouped = {}
+    
+    records.forEach(record => {
+      const key = `${record.employee_uid}-${record.date}`
+      if (!grouped[key]) {
+        grouped[key] = {
+          employee_uid: record.employee_uid,
+          employee_info: {
+            first_name: record.first_name,
+            middle_name: record.middle_name,
+            last_name: record.last_name,
+            id_number: record.id_number,
+            department: record.department,
+            position: record.position
+          },
+          date: record.date,
+          records: [],
+          total_regular_hours: 0,
+          total_overtime_hours: 0,
+          is_late: false,
+          has_unsynced: false,
+          latest_clock_time: null
+        }
+      }
+      
+      grouped[key].records.push(record)
+      grouped[key].total_regular_hours += record.regular_hours || 0
+      grouped[key].total_overtime_hours += record.overtime_hours || 0
+      grouped[key].is_late = grouped[key].is_late || record.is_late
+      grouped[key].has_unsynced = grouped[key].has_unsynced || !record.is_synced
+      
+      // Track the latest clock time for sorting
+      const clockTime = new Date(record.clock_time)
+      if (!grouped[key].latest_clock_time || clockTime > new Date(grouped[key].latest_clock_time)) {
+        grouped[key].latest_clock_time = record.clock_time
+      }
+    })
+    
+    // Convert to array and sort by latest clock time
+    return Object.values(grouped).sort((a, b) => 
+      new Date(b.latest_clock_time) - new Date(a.latest_clock_time)
+    )
+  }
+
+  // Load detailed employee data
+  const loadEmployeeDetails = async (employee_uid, employee_info) => {
+    setSelectedEmployee({ uid: employee_uid, info: employee_info })
+    setShowEmployeeModal(true)
+    setLoadingEmployeeData(true)
+
+    try {
+      // Get employee's daily summary for the past 30 days
+      const endDate = new Date().toISOString().split('T')[0]
+      const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      
+      const [summaryResult, statsResult] = await Promise.all([
+        apiService.summary.getEmployeeDailySummary(employee_uid, {
+          start_date: startDate,
+          end_date: endDate,
+          limit: 30
+        }),
+        apiService.summary.getDailySummaryStats({
+          start_date: startDate,
+          end_date: endDate
+        })
+      ])
+
+      if (summaryResult.success) {
+        setEmployeeHistory(summaryResult.data.records || [])
+        setEmployeeStats(summaryResult.data.summary || {})
+      } else {
+        throw new Error(summaryResult.error || 'Failed to load employee summary')
+      }
+
+    } catch (error) {
+      console.error('Error loading employee details:', error)
+      setEmployeeHistory([])
+      setEmployeeStats(null)
+    } finally {
+      setLoadingEmployeeData(false)
+    }
+  }
+
+  // Close employee modal
+  const closeEmployeeModal = () => {
+    setShowEmployeeModal(false)
+    setSelectedEmployee(null)
+    setEmployeeStats(null)
+    setEmployeeHistory([])
+  }
+
+  // Prepare chart data for employee history
+  const prepareChartData = (history) => {
+    return history.map(record => ({
+      date: record.date,
+      regular_hours: record.regular_hours || 0,
+      overtime_hours: record.overtime_hours || 0,
+      total_hours: record.total_hours || 0,
+      is_late: record.has_late_entry ? 1 : 0,
+      is_incomplete: record.is_incomplete ? 1 : 0
+    })).reverse() // Reverse to show chronological order
+  }
+
+  // Prepare pie chart data for hours distribution
+  const preparePieData = (stats) => {
+    if (!stats) return []
+    return [
+      { name: 'Regular Hours', value: stats.total_regular_hours || 0, color: '#10b981' },
+      { name: 'Overtime Hours', value: stats.total_overtime_hours || 0, color: '#f59e0b' }
+    ].filter(item => item.value > 0)
+  }
+
+  // Bulk load all profile pictures as a zip file with deduplication
+  const loadBulkProfilePictures = async (uniqueUids) => {
+    if (!uniqueUids || uniqueUids.length === 0) return
+    
+    // Filter out UIDs that we already have loaded or are currently loading
+    const uidsToLoad = uniqueUids.filter(uid => 
+      uid && !profilePictures[uid] && profilePictures[uid] !== null
+    )
+    
+    if (uidsToLoad.length === 0) return
+
+    // Check if there's already a bulk request in progress with the same UIDs
+    const requestKey = uidsToLoad.sort().join(',')
+    if (currentBulkRequest === requestKey) {
+      console.log('Bulk request already in progress for these UIDs, skipping...')
+      return
+    }
+
+    // If there's a different bulk request in progress, wait for it to complete
+    if (currentBulkRequest) {
+      console.log('Another bulk request in progress, waiting...')
+      // Wait a bit and try again
+      setTimeout(() => loadBulkProfilePictures(uniqueUids), 100)
+      return
+    }
+
+    try {
+      setCurrentBulkRequest(requestKey)
+      setProfileLoadingState('loading')
+      console.log(`Loading ${uidsToLoad.length} profile pictures in bulk...`, uidsToLoad)
+
+      // Use POST method for bulk download with specific UIDs
+      const result = await apiService.profiles.downloadBulkProfilesPost(uidsToLoad, {
+        include_summary: false, // We don't need summary for this use case
+        compression_level: 6
+      })
+
+      if (result.success) {
+        // Extract the zip file using JSZip
+        const zip = new JSZip()
+        const zipContent = await zip.loadAsync(result.blob)
+        const newProfilePictures = { ...profilePictures }
+        
+        console.log('Zip file contents:', Object.keys(zipContent.files))
+
+        // Process each file in the zip
+        for (const [filename, file] of Object.entries(zipContent.files)) {
+          if (!file.dir) {
+            // Extract UID from the file path
+            // Handle both formats: "uid/filename.ext" and "filename.ext"
+            let extractedUid = null
+            
+            if (filename.includes('/')) {
+              // Format: "uid/filename.ext"
+              const pathParts = filename.split('/')
+              extractedUid = pathParts[0]
+            } else {
+              // Try to extract UID from filename if it starts with the UID
+              // Format might be "uid_filename.ext" or just "uid.ext"
+              const filenameParts = filename.split('_')[0].split('.')[0]
+              extractedUid = filenameParts
+            }
+            
+            // Convert to number if it's a numeric string to match employee_uid format
+            const numericUid = !isNaN(extractedUid) ? Number(extractedUid) : extractedUid
+            
+            console.log(`Processing file: ${filename}, extracted UID: ${extractedUid}, numeric UID: ${numericUid}`)
+            
+            // Check if this UID matches any of the UIDs we requested
+            const matchingUid = uidsToLoad.find(uid => 
+              uid == extractedUid || uid == numericUid || 
+              String(uid) === String(extractedUid) || 
+              String(uid) === String(numericUid)
+            )
+            
+            if (matchingUid) {
+              try {
+                // Get the file as a blob
+                const fileBlob = await file.async('blob')
+                
+                // Create object URL for the image
+                const imageUrl = URL.createObjectURL(fileBlob)
+                
+                // Store using the original UID format from our data
+                newProfilePictures[matchingUid] = imageUrl
+                console.log(`Successfully loaded profile picture for UID: ${matchingUid} from file: ${filename}`)
+              } catch (fileError) {
+                console.warn(`Failed to process file ${filename}:`, fileError)
+                newProfilePictures[matchingUid] = null
+              }
+            } else {
+              console.log(`No matching UID found for file: ${filename} (extracted: ${extractedUid})`)
+            }
+          }
+        }
+
+        // Mark UIDs that weren't found in the zip as null (no profile available)
+        uidsToLoad.forEach(uid => {
+          if (!newProfilePictures.hasOwnProperty(uid)) {
+            newProfilePictures[uid] = null
+            console.log(`No profile picture found for UID: ${uid}`)
+          }
+        })
+
+        setProfilePictures(newProfilePictures)
+        setProfileLoadingState('loaded')
+        
+        const loadedCount = uidsToLoad.filter(uid => newProfilePictures[uid] && newProfilePictures[uid] !== null).length
+        console.log(`Successfully loaded ${loadedCount} out of ${uidsToLoad.length} requested profile pictures`)
+
+      } else {
+        console.error('Failed to download bulk profiles:', result.error)
+        // Mark all requested UIDs as null (failed to load)
+        const updatedProfiles = { ...profilePictures }
+        uidsToLoad.forEach(uid => {
+          updatedProfiles[uid] = null
+        })
+        setProfilePictures(updatedProfiles)
+        setProfileLoadingState('error')
+      }
+
+    } catch (error) {
+      console.error('Bulk profile loading error:', error)
+      // Mark all requested UIDs as null (failed to load)
+      const updatedProfiles = { ...profilePictures }
+      uidsToLoad.forEach(uid => {
+        updatedProfiles[uid] = null
+      })
+      setProfilePictures(updatedProfiles)
+      setProfileLoadingState('error')
+    } finally {
+      setCurrentBulkRequest(null)
+    }
+  }
+
+  // Extract unique UIDs from attendance records
+  const getUniqueUids = (records) => {
+    return [...new Set(records.map(record => record.employee_uid).filter(Boolean))]
+  }
+
+  // Load profile pictures for new records that come via WebSocket
+  const loadNewProfilePicture = async (uid) => {
+    if (!uid || profilePictures[uid] || profilePictures[uid] === null) return
 
     try {
       const result = await apiService.profiles.getProfileByUid(uid)
@@ -43,7 +308,6 @@ function Attendance() {
           [uid]: result.url
         }))
       } else {
-        // Mark as no profile available
         setProfilePictures(prev => ({
           ...prev,
           [uid]: null
@@ -55,17 +319,6 @@ function Attendance() {
         ...prev,
         [uid]: null
       }))
-    }
-  }
-
-  // Load profile pictures for all attendance records
-  const loadProfilePictures = async (records) => {
-    const uniqueUids = [...new Set(records.map(record => record.employee_uid).filter(Boolean))]
-    
-    for (const uid of uniqueUids) {
-      if (!profilePictures[uid] && profilePictures[uid] !== null) {
-        await loadProfilePicture(uid)
-      }
     }
   }
 
@@ -93,9 +346,9 @@ function Attendance() {
               })
             }, 5000)
             
-            // Load profile picture for new record
+            // Load profile picture for new record individually (real-time update)
             if (data.employee_uid) {
-              loadProfilePicture(data.employee_uid)
+              loadNewProfilePicture(data.employee_uid)
             }
             
             return [data, ...prev.slice(0, filters.limit - 1)]
@@ -190,8 +443,11 @@ function Attendance() {
         setAttendanceData(result.data)
         setError(null)
         
-        // Load profile pictures for the fetched records
-        await loadProfilePictures(result.data)
+        // Load profile pictures in bulk for the fetched records
+        const uniqueUids = getUniqueUids(result.data)
+        if (uniqueUids.length > 0) {
+          await loadBulkProfilePictures(uniqueUids)
+        }
       } else {
         throw new Error(result.error || 'Failed to fetch attendance data')
       }
@@ -211,9 +467,12 @@ function Attendance() {
         setStats(result.data.statistics)
         setRecentActivity(result.data.recent_activity || [])
         
-        // Load profile pictures for recent activity
+        // Load profile pictures in bulk for recent activity
         if (result.data.recent_activity) {
-          await loadProfilePictures(result.data.recent_activity)
+          const uniqueUids = getUniqueUids(result.data.recent_activity)
+          if (uniqueUids.length > 0) {
+            await loadBulkProfilePictures(uniqueUids)
+          }
         }
       } else {
         throw new Error(result.error || 'Failed to fetch attendance statistics')
@@ -249,8 +508,8 @@ function Attendance() {
     }
   }
 
-  const formatEmployeeName = (record) => {
-    const parts = [record.first_name, record.middle_name, record.last_name].filter(Boolean)
+  const formatEmployeeName = (employeeInfo) => {
+    const parts = [employeeInfo.first_name, employeeInfo.middle_name, employeeInfo.last_name].filter(Boolean)
     return parts.length > 0 ? parts.join(' ') : 'Unknown Employee'
   }
 
@@ -278,10 +537,10 @@ function Attendance() {
     return icons[clockType] || '⏰'
   }
 
-  // Profile Picture Component
+  // Profile Picture Component with loading state
   const ProfilePicture = ({ uid, name, size = 'w-16 h-16' }) => {
     const profileUrl = profilePictures[uid]
-    // const isLoading = profileLoadingStates[uid]
+    const isLoading = profileLoadingState === 'loading' && !profileUrl && profileUrl !== null
     const initials = name ? name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '??'
     
     // Handle image loading errors
@@ -307,6 +566,15 @@ function Attendance() {
         ...prev,
         [uid]: null
       }))
+    }
+
+    // Show loading state
+    if (isLoading) {
+      return (
+        <div className={`${size} rounded-2xl bg-gradient-to-br from-slate-200 via-slate-300 to-slate-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 flex items-center justify-center ring-4 ring-white/50 dark:ring-gray-700/50 shadow-lg animate-pulse`}>
+          <div className="w-6 h-6 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      )
     }
     
     // Only render image if we have a valid URL
@@ -341,8 +609,639 @@ function Attendance() {
     )
   }
 
+  // Employee Details Modal Component
+  const EmployeeDetailsModal = () => {
+    if (!showEmployeeModal || !selectedEmployee) return null
+
+    const employeeName = formatEmployeeName(selectedEmployee.info)
+    const chartData = prepareChartData(employeeHistory)
+    const pieData = preparePieData(employeeStats)
+
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+          {/* Modal Header */}
+          <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-t-3xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <ProfilePicture 
+                  uid={selectedEmployee.uid}
+                  name={employeeName}
+                  size="w-20 h-20"
+                />
+                <div>
+                  <h2 className="text-3xl font-bold text-white">{employeeName}</h2>
+                  <div className="text-indigo-100 mt-2 space-y-1">
+                    <p><span className="font-medium">ID:</span> {selectedEmployee.info.id_number || selectedEmployee.uid}</p>
+                    <p><span className="font-medium">Department:</span> {selectedEmployee.info.department || 'N/A'}</p>
+                    <p><span className="font-medium">Position:</span> {selectedEmployee.info.position || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={closeEmployeeModal}
+                className="p-3 bg-white/20 hover:bg-white/30 rounded-2xl text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Modal Content */}
+          <div className="p-6">
+            {loadingEmployeeData ? (
+              <div className="text-center py-16">
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 dark:border-indigo-800 mx-auto mb-4"></div>
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-transparent border-t-indigo-600 dark:border-t-indigo-400 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-8"></div>
+                <p className="text-slate-600 dark:text-slate-400 text-lg">Loading employee statistics...</p>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {/* Summary Statistics */}
+                {employeeStats && (
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 rounded-2xl p-6">
+                      <div className="text-center">
+                        <div className="text-3xl mb-2">📅</div>
+                        <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+                          {employeeStats.total_days || 0}
+                        </div>
+                        <div className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                          Total Days
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-2xl p-6">
+                      <div className="text-center">
+                        <div className="text-3xl mb-2">⏰</div>
+                        <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                          {(employeeStats.total_regular_hours || 0).toFixed(1)}h
+                        </div>
+                        <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                          Regular Hours
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-2xl p-6">
+                      <div className="text-center">
+                        <div className="text-3xl mb-2">🌙</div>
+                        <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                          {(employeeStats.total_overtime_hours || 0).toFixed(1)}h
+                        </div>
+                        <div className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                          Overtime Hours
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-2xl p-6">
+                      <div className="text-center">
+                        <div className="text-3xl mb-2">⚠️</div>
+                        <div className="text-2xl font-bold text-red-700 dark:text-red-300">
+                          {employeeStats.days_with_late_entry || 0}
+                        </div>
+                        <div className="text-sm font-medium text-red-600 dark:text-red-400">
+                          Late Days
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Charts Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Hours Trend Chart */}
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+                      📈 Hours Trend (Last 30 Days)
+                    </h3>
+                    {chartData.length > 0 ? (
+                      <div className="h-80">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                            <XAxis 
+                              dataKey="date" 
+                              tick={{ fontSize: 12 }}
+                              tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            />
+                            <YAxis tick={{ fontSize: 12 }} />
+                            <Tooltip 
+                              labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                              formatter={(value, name) => [value + 'h', name.replace('_', ' ').toUpperCase()]}
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="regular_hours" 
+                              stroke="#10b981" 
+                              strokeWidth={3}
+                              name="Regular Hours"
+                              dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="overtime_hours" 
+                              stroke="#f59e0b" 
+                              strokeWidth={3}
+                              name="Overtime Hours"
+                              dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }}
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="total_hours" 
+                              stroke="#6366f1" 
+                              strokeWidth={2}
+                              strokeDasharray="5 5"
+                              name="Total Hours"
+                              dot={{ fill: '#6366f1', strokeWidth: 2, r: 3 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-80 flex items-center justify-center text-slate-500 dark:text-slate-400">
+                        No data available for chart
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Hours Distribution Pie Chart */}
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+                      📊 Hours Distribution
+                    </h3>
+                    {pieData.length > 0 ? (
+                      <div className="h-80">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={pieData}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              label={({ name, value }) => `${name}: ${value.toFixed(1)}h`}
+                              outerRadius={100}
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              {pieData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value) => [value.toFixed(1) + 'h', 'Hours']} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-80 flex items-center justify-center text-slate-500 dark:text-slate-400">
+                        No data available for chart
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Daily Performance Bar Chart */}
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+                      📊 Daily Performance Analysis
+                    </h3>
+                    {chartData.length > 0 ? (
+                      <div className="h-80">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                            <XAxis 
+                              dataKey="date" 
+                              tick={{ fontSize: 12 }}
+                              tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            />
+                            <YAxis tick={{ fontSize: 12 }} />
+                            <Tooltip 
+                              labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                              formatter={(value, name) => {
+                                if (name === 'is_late' || name === 'is_incomplete') {
+                                  return [value ? 'Yes' : 'No', name.replace('_', ' ').replace('is', '').trim()]
+                                }
+                                return [value + 'h', name.replace('_', ' ').toUpperCase()]
+                              }}
+                            />
+                            <Bar dataKey="regular_hours" stackId="a" fill="#10b981" name="Regular Hours" />
+                            <Bar dataKey="overtime_hours" stackId="a" fill="#f59e0b" name="Overtime Hours" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-80 flex items-center justify-center text-slate-500 dark:text-slate-400">
+                        No data available for chart
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Attendance Pattern Heatmap-style Chart */}
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+                      🔥 Attendance Pattern
+                    </h3>
+                    {chartData.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-7 gap-2">
+                          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                            <div key={day} className="text-center text-xs font-medium text-slate-600 dark:text-slate-400 p-2">
+                              {day}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-7 gap-2">
+                          {chartData.slice(-28).map((record, index) => {
+                            const date = new Date(record.date)
+                            const dayOfWeek = date.getDay()
+                            const intensity = Math.min(record.total_hours / 12, 1) // Max 12 hours for full intensity
+                            const isLate = record.is_late
+                            const isIncomplete = record.is_incomplete
+                            
+                            return (
+                              <div 
+                                key={index} 
+                                className={`
+                                  h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold border-2
+                                  ${isLate ? 'border-red-400' : isIncomplete ? 'border-amber-400' : 'border-transparent'}
+                                  ${intensity > 0.8 ? 'bg-emerald-600 text-white' :
+                                    intensity > 0.6 ? 'bg-emerald-500 text-white' :
+                                    intensity > 0.4 ? 'bg-emerald-400 text-white' :
+                                    intensity > 0.2 ? 'bg-emerald-300 text-slate-800' :
+                                    intensity > 0 ? 'bg-emerald-200 text-slate-800' :
+                                    'bg-slate-200 dark:bg-slate-700 text-slate-500'
+                                  }
+                                `}
+                                title={`${record.date}: ${record.total_hours}h${isLate ? ' (Late)' : ''}${isIncomplete ? ' (Incomplete)' : ''}`}
+                              >
+                                {record.total_hours.toFixed(0)}
+                              </div>
+                            )
+                          })}
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+                          <span>Less productive</span>
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                            <div className="w-3 h-3 bg-emerald-200 rounded"></div>
+                            <div className="w-3 h-3 bg-emerald-300 rounded"></div>
+                            <div className="w-3 h-3 bg-emerald-400 rounded"></div>
+                            <div className="w-3 h-3 bg-emerald-500 rounded"></div>
+                            <div className="w-3 h-3 bg-emerald-600 rounded"></div>
+                          </div>
+                          <span>More productive</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-80 flex items-center justify-center text-slate-500 dark:text-slate-400">
+                        No data available for pattern analysis
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Additional Statistics Row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  {/* Weekly Performance Breakdown */}
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+                      📅 Weekly Breakdown
+                    </h3>
+                    {(() => {
+                      const weeklyData = chartData.reduce((acc, record) => {
+                        const date = new Date(record.date)
+                        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
+                        if (!acc[dayName]) {
+                          acc[dayName] = { total_hours: 0, count: 0, late_count: 0 }
+                        }
+                        acc[dayName].total_hours += record.total_hours
+                        acc[dayName].count += 1
+                        if (record.is_late) acc[dayName].late_count += 1
+                        return acc
+                      }, {})
+
+                      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                      
+                      return (
+                        <div className="space-y-3">
+                          {days.map(day => {
+                            const data = weeklyData[day]
+                            if (!data) return null
+                            const avgHours = data.total_hours / data.count
+                            const latePercentage = (data.late_count / data.count) * 100
+                            
+                            return (
+                              <div key={day} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                                <div>
+                                  <div className="font-semibold text-slate-800 dark:text-slate-200">{day}</div>
+                                  <div className="text-sm text-slate-600 dark:text-slate-400">
+                                    {data.count} days worked
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-bold text-slate-800 dark:text-slate-200">
+                                    {avgHours.toFixed(1)}h avg
+                                  </div>
+                                  {latePercentage > 0 && (
+                                    <div className="text-xs text-red-600 dark:text-red-400">
+                                      {latePercentage.toFixed(0)}% late
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    })()}
+                  </div>
+
+                  {/* Performance Trends */}
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+                      📈 Trends & Patterns
+                    </h3>
+                    {(() => {
+                      if (chartData.length === 0) return <div className="text-slate-500">No data available</div>
+                      
+                      const recentData = chartData.slice(-7)
+                      const olderData = chartData.slice(-14, -7)
+                      
+                      const recentAvg = recentData.reduce((sum, r) => sum + r.total_hours, 0) / recentData.length
+                      const olderAvg = olderData.length > 0 ? olderData.reduce((sum, r) => sum + r.total_hours, 0) / olderData.length : recentAvg
+                      
+                      const trend = recentAvg - olderAvg
+                      const trendPercentage = olderAvg > 0 ? (trend / olderAvg) * 100 : 0
+                      
+                      const recentLateCount = recentData.filter(r => r.is_late).length
+                      const olderLateCount = olderData.filter(r => r.is_late).length
+                      
+                      const mostProductiveDay = chartData.reduce((max, record) => 
+                        record.total_hours > max.total_hours ? record : max, chartData[0] || {})
+                      
+                      const leastProductiveDay = chartData.reduce((min, record) => 
+                        record.total_hours < min.total_hours ? record : min, chartData[0] || {})
+
+                      return (
+                        <div className="space-y-4">
+                          <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Hours Trend</div>
+                            <div className={`text-lg font-bold ${trend >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {trend >= 0 ? '↗️' : '↘️'} {Math.abs(trendPercentage).toFixed(1)}%
+                            </div>
+                            <div className="text-xs text-slate-600 dark:text-slate-400">
+                              vs previous week
+                            </div>
+                          </div>
+                          
+                          <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Punctuality</div>
+                            <div className={`text-lg font-bold ${recentLateCount <= olderLateCount ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {recentLateCount <= olderLateCount ? '✅' : '⚠️'} {recentLateCount} late days
+                            </div>
+                            <div className="text-xs text-slate-600 dark:text-slate-400">
+                              in last 7 days
+                            </div>
+                          </div>
+                          
+                          <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Peak Performance</div>
+                            <div className="text-lg font-bold text-indigo-600">
+                              🏆 {mostProductiveDay.total_hours?.toFixed(1) || 0}h
+                            </div>
+                            <div className="text-xs text-slate-600 dark:text-slate-400">
+                              {mostProductiveDay.date ? new Date(mostProductiveDay.date).toLocaleDateString() : 'N/A'}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+
+                  {/* Monthly Summary */}
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+                      📊 Monthly Summary
+                    </h3>
+                    {(() => {
+                      if (!employeeStats) return <div className="text-slate-500">No data available</div>
+                      
+                      const expectedWorkingDays = 22 // Average working days per month
+                      const attendanceRate = employeeStats.total_days ? (employeeStats.total_days / expectedWorkingDays) * 100 : 0
+                      const overtimeRate = employeeStats.total_days ? (employeeStats.days_with_overtime / employeeStats.total_days) * 100 : 0
+                      const punctualityRate = employeeStats.total_days ? ((employeeStats.total_days - (employeeStats.days_with_late_entry || 0)) / employeeStats.total_days) * 100 : 0
+                      
+                      return (
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                            <div>
+                              <div className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Attendance Rate</div>
+                              <div className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">
+                                {attendanceRate.toFixed(0)}%
+                              </div>
+                            </div>
+                            <div className="text-3xl">📈</div>
+                          </div>
+                          
+                          <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                            <div>
+                              <div className="text-sm font-medium text-blue-700 dark:text-blue-300">Punctuality Rate</div>
+                              <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
+                                {punctualityRate.toFixed(0)}%
+                              </div>
+                            </div>
+                            <div className="text-3xl">⏰</div>
+                          </div>
+                          
+                          <div className="flex justify-between items-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                            <div>
+                              <div className="text-sm font-medium text-amber-700 dark:text-amber-300">Overtime Days</div>
+                              <div className="text-2xl font-bold text-amber-800 dark:text-amber-200">
+                                {overtimeRate.toFixed(0)}%
+                              </div>
+                            </div>
+                            <div className="text-3xl">🌙</div>
+                          </div>
+                          
+                          <div className="flex justify-between items-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                            <div>
+                              <div className="text-sm font-medium text-purple-700 dark:text-purple-300">Total Hours</div>
+                              <div className="text-2xl font-bold text-purple-800 dark:text-purple-200">
+                                {(employeeStats.grand_total_hours || 0).toFixed(0)}h
+                              </div>
+                            </div>
+                            <div className="text-3xl">⚡</div>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                </div>
+
+                {/* Attendance History Table */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                      📋 Attendance History
+                    </h3>
+                  </div>
+                  
+                  <div className="overflow-x-auto">
+                    {employeeHistory.length > 0 ? (
+                      <table className="w-full">
+                        <thead className="bg-slate-50 dark:bg-slate-800">
+                          <tr>
+                            <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">Date</th>
+                            <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">Regular Hours</th>
+                            <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">Overtime Hours</th>
+                            <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">Total Hours</th>
+                            <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">Status</th>
+                            <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">Clock Times</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {employeeHistory.map((record, index) => (
+                            <tr key={record.id || index} className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                              <td className="p-4 font-medium text-slate-800 dark:text-slate-200">
+                                {new Date(record.date).toLocaleDateString()}
+                              </td>
+                              <td className="p-4 text-slate-700 dark:text-slate-300">
+                                {(record.regular_hours || 0).toFixed(1)}h
+                              </td>
+                              <td className="p-4 text-slate-700 dark:text-slate-300">
+                                {(record.overtime_hours || 0).toFixed(1)}h
+                              </td>
+                              <td className="p-4 font-semibold text-slate-800 dark:text-slate-200">
+                                {(record.total_hours || 0).toFixed(1)}h
+                              </td>
+                              <td className="p-4">
+                                <div className="flex items-center gap-2">
+                                  {record.has_late_entry ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/30">
+                                      ⚠️ Late
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800/30">
+                                      ✅ On Time
+                                    </span>
+                                  )}
+                                  {record.is_incomplete ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800/30">
+                                      ⏳ Incomplete
+                                    </span>
+                                  ) : null}
+                                  {record.has_overtime ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800/30">
+                                      🌙 Overtime
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <div className="text-sm text-slate-600 dark:text-slate-400">
+                                  {record.first_clock_in && (
+                                    <div>In: {formatTime(record.first_clock_in)}</div>
+                                  )}
+                                  {record.last_clock_out && (
+                                    <div>Out: {formatTime(record.last_clock_out)}</div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="text-center py-16">
+                        <div className="text-6xl mb-4">📭</div>
+                        <h4 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">No History Found</h4>
+                        <p className="text-slate-500 dark:text-slate-400">No attendance history available for this employee.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Performance Insights */}
+                {employeeStats && (
+                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-2xl p-6 border border-indigo-200 dark:border-indigo-800/30">
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+                      💡 Performance Insights
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-3">Attendance Metrics</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-slate-600 dark:text-slate-400">Average Daily Hours:</span>
+                            <span className="font-medium text-slate-800 dark:text-slate-200">
+                              {(employeeStats.avg_daily_hours || 0).toFixed(1)}h
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600 dark:text-slate-400">Days with Overtime:</span>
+                            <span className="font-medium text-slate-800 dark:text-slate-200">
+                              {employeeStats.days_with_overtime || 0}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600 dark:text-slate-400">Incomplete Days:</span>
+                            <span className="font-medium text-slate-800 dark:text-slate-200">
+                              {employeeStats.incomplete_days || 0}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600 dark:text-slate-400">Punctuality Rate:</span>
+                            <span className="font-medium text-slate-800 dark:text-slate-200">
+                              {employeeStats.total_days > 0 
+                                ? (((employeeStats.total_days - (employeeStats.days_with_late_entry || 0)) / employeeStats.total_days) * 100).toFixed(1)
+                                : 0
+                              }%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-3">Work Pattern</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-slate-600 dark:text-slate-400">Most Active Period:</span>
+                            <span className="font-medium text-slate-800 dark:text-slate-200">
+                              {(employeeStats.total_regular_hours || 0) > (employeeStats.total_overtime_hours || 0) ? 'Regular Hours' : 'Overtime Hours'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600 dark:text-slate-400">Consistency Score:</span>
+                            <span className="font-medium text-slate-800 dark:text-slate-200">
+                              {employeeStats.incomplete_days === 0 && (employeeStats.days_with_late_entry || 0) === 0 ? 'Excellent' :
+                               (employeeStats.incomplete_days || 0) <= 2 && (employeeStats.days_with_late_entry || 0) <= 2 ? 'Good' :
+                               'Needs Improvement'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Group the attendance data
+  const groupedAttendance = groupAttendanceByEmployee(attendanceData)
+
   return (
     <div className="space-y-8">
+      {/* Employee Details Modal */}
+      <EmployeeDetailsModal />
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -351,22 +1250,33 @@ function Attendance() {
           </h1>
           <p className="text-slate-600 dark:text-slate-400 text-lg mt-2">Track employee attendance and working hours in real-time</p>
         </div>
-        <div className="flex items-center gap-3 px-4 py-2 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl border border-white/30 dark:border-gray-700/30">
-          <div className={`w-3 h-3 rounded-full ${
-            connectionStatus === 'connected' ? 'bg-emerald-500 shadow-lg shadow-emerald-500/50' :
-            connectionStatus === 'connecting' ? 'bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50' :
-            'bg-red-500 shadow-lg shadow-red-500/50'
-          }`}></div>
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            {connectionStatus === 'connected' ? 'Live Updates' :
-             connectionStatus === 'connecting' ? 'Connecting...' :
-             'Disconnected'}
-          </span>
-          {lastUpdate && (
-            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">
-              {lastUpdate.toLocaleTimeString()}
-            </span>
+        <div className="flex items-center gap-3">
+          {/* Profile Loading Indicator */}
+          {profileLoadingState === 'loading' && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 backdrop-blur-sm rounded-xl border border-blue-200/30 dark:border-blue-800/30">
+              <div className="w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Loading profiles...</span>
+            </div>
           )}
+          
+          {/* Connection Status */}
+          <div className="flex items-center gap-3 px-4 py-2 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl border border-white/30 dark:border-gray-700/30">
+            <div className={`w-3 h-3 rounded-full ${
+              connectionStatus === 'connected' ? 'bg-emerald-500 shadow-lg shadow-emerald-500/50' :
+              connectionStatus === 'connecting' ? 'bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50' :
+              'bg-red-500 shadow-lg shadow-red-500/50'
+            }`}></div>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              {connectionStatus === 'connected' ? 'Live Updates' :
+               connectionStatus === 'connecting' ? 'Connecting...' :
+               'Disconnected'}
+            </span>
+            {lastUpdate && (
+              <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">
+                {lastUpdate.toLocaleTimeString()}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -553,7 +1463,7 @@ function Attendance() {
         </div>
       </div>
 
-      {/* Employee Cards */}
+      {/* Grouped Employee Cards */}
       {!loading && (
         <div className="space-y-6">
           <div className="flex items-center gap-3">
@@ -561,9 +1471,12 @@ function Attendance() {
               <span className="text-xl">👤</span>
             </div>
             <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">Employee Attendance</h2>
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              Click on any card to view detailed statistics
+            </div>
           </div>
           
-          {attendanceData.length === 0 ? (
+          {groupedAttendance.length === 0 ? (
             <div className="text-center py-16 bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl rounded-3xl border border-white/40 dark:border-gray-700/40">
               <div className="text-6xl mb-4">📭</div>
               <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">No Records Found</h3>
@@ -571,32 +1484,38 @@ function Attendance() {
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {attendanceData.map((record, index) => {
-                const isNewRecord = newRecordIds.has(record.id)
-                const employeeName = formatEmployeeName(record)
+              {groupedAttendance.map((employee, index) => {
+                const employeeName = formatEmployeeName(employee.employee_info)
+                const hasNewRecords = employee.records.some(record => newRecordIds.has(record.id))
                 
                 return (
                   <div
-                    key={record.id || index}
-                    className={`group relative overflow-hidden rounded-3xl border transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl ${
-                      isNewRecord 
+                    key={`${employee.employee_uid}-${employee.date}-${index}`}
+                    onClick={() => loadEmployeeDetails(employee.employee_uid, employee.employee_info)}
+                    className={`group relative overflow-hidden rounded-3xl border transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl cursor-pointer ${
+                      hasNewRecords 
                         ? 'bg-gradient-to-br from-emerald-50/90 to-emerald-100/70 dark:from-emerald-900/30 dark:to-emerald-800/20 border-emerald-300/60 dark:border-emerald-700/60 shadow-2xl animate-pulse shadow-emerald-500/20'
-                        : 'bg-gradient-to-br from-white/80 to-white/60 dark:from-slate-800/80 dark:to-slate-900/60 border-white/40 dark:border-slate-700/40 hover:shadow-xl backdrop-blur-xl'
+                        : 'bg-gradient-to-br from-white/80 to-white/60 dark:from-slate-800/80 dark:to-slate-900/60 border-white/40 dark:border-slate-700/40 hover:shadow-xl backdrop-blur-xl hover:border-indigo-300/60 dark:hover:border-indigo-700/60'
                     }`}
                   >
                     {/* New Record Indicator */}
-                    {isNewRecord && (
+                    {hasNewRecords && (
                       <div className="absolute top-4 right-4 px-3 py-1 bg-emerald-500 text-white text-xs font-bold rounded-full animate-bounce">
                         NEW
                       </div>
                     )}
+
+                    {/* Click to View Details Indicator */}
+                    <div className="absolute top-4 right-4 px-3 py-1 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-medium rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      Click for details
+                    </div>
 
                     <div className="p-6">
                       {/* Header Section */}
                       <div className="flex items-start gap-4 mb-6">
                         <div className="flex-shrink-0">
                           <ProfilePicture 
-                            uid={record.employee_uid}
+                            uid={employee.employee_uid}
                             name={employeeName}
                             size="w-16 h-16"
                           />
@@ -607,7 +1526,7 @@ function Attendance() {
                             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 truncate">
                               {employeeName}
                             </h3>
-                            {record.is_late ? (
+                            {employee.is_late ? (
                               <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/30">
                                 <span className="w-2 h-2 bg-red-500 rounded-full"></span>
                                 Late
@@ -618,73 +1537,79 @@ function Attendance() {
                                 On Time
                               </span>
                             )}
+                            {employee.has_unsynced && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800/30">
+                                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
+                                Unsynced
+                              </span>
+                            )}
                           </div>
                           
                           <div className="text-sm text-slate-600 dark:text-slate-400 space-y-1">
-                            <p><span className="font-medium">ID:</span> {record.id_number || record.employee_uid || 'N/A'}</p>
-                            <p><span className="font-medium">Department:</span> {record.department || 'N/A'}</p>
-                            <p><span className="font-medium">Position:</span> {record.position || 'N/A'}</p>
+                            <p><span className="font-medium">ID:</span> {employee.employee_info.id_number || employee.employee_uid || 'N/A'}</p>
+                            <p><span className="font-medium">Department:</span> {employee.employee_info.department || 'N/A'}</p>
+                            <p><span className="font-medium">Position:</span> {employee.employee_info.position || 'N/A'}</p>
+                            <p><span className="font-medium">Date:</span> {employee.date}</p>
                           </div>
                         </div>
                       </div>
 
-                      {/* Clock Info Section */}
+                      {/* Clock Records Section */}
                       <div className="bg-white/50 dark:bg-slate-700/30 backdrop-blur-sm rounded-2xl p-4 mb-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="text-2xl">
-                              {getClockTypeIcon(record.clock_type)}
-                            </div>
-                            <div>
-                              <span className={`inline-flex items-center px-3 py-1 text-sm font-semibold rounded-full border ${getClockTypeColor(record.clock_type)}`}>
-                                {formatClockType(record.clock_type)}
-                              </span>
-                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                {record.date}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">
-                              {formatTime(record.clock_time)}
-                            </p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                              {record.is_synced ? (
-                                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                                  Synced
+                        <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Clock Records ({employee.records.length})</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {employee.records.map((record, recordIndex) => (
+                            <div
+                              key={record.id || recordIndex}
+                              className={`flex items-center justify-between p-3 rounded-xl border ${getClockTypeColor(record.clock_type)}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">
+                                  {getClockTypeIcon(record.clock_type)}
                                 </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                                  <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
-                                  Pending
-                                </span>
-                              )}
-                            </p>
-                          </div>
+                                <div>
+                                  <p className="font-semibold text-sm">
+                                    {formatClockType(record.clock_type)}
+                                  </p>
+                                  <p className="text-xs opacity-75">
+                                    {formatTime(record.clock_time)}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {record.is_synced ? (
+                                  <span className="w-2 h-2 bg-emerald-500 rounded-full" title="Synced"></span>
+                                ) : (
+                                  <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" title="Pending sync"></span>
+                                )}
+                                {record.is_late && (
+                                  <span className="w-2 h-2 bg-red-500 rounded-full ml-1" title="Late arrival"></span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
 
-                      {/* Hours Section */}
+                      {/* Hours Summary Section */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-slate-50/50 dark:bg-slate-800/30 backdrop-blur-sm rounded-xl p-3">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-lg">⏰</span>
-                            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Regular</span>
+                            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Regular Hours</span>
                           </div>
                           <p className="text-xl font-bold text-slate-800 dark:text-slate-200">
-                            {(record.regular_hours || 0).toFixed(1)}h
+                            {employee.total_regular_hours.toFixed(1)}h
                           </p>
                         </div>
                         
                         <div className="bg-orange-50/50 dark:bg-orange-900/20 backdrop-blur-sm rounded-xl p-3">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-lg">🌙</span>
-                            <span className="text-sm font-medium text-orange-600 dark:text-orange-400">Overtime</span>
+                            <span className="text-sm font-medium text-orange-600 dark:text-orange-400">Overtime Hours</span>
                           </div>
                           <p className="text-xl font-bold text-orange-700 dark:text-orange-300">
-                            {(record.overtime_hours || 0).toFixed(1)}h
+                            {employee.total_overtime_hours.toFixed(1)}h
                           </p>
                         </div>
                       </div>
@@ -692,6 +1617,15 @@ function Attendance() {
 
                     {/* Hover Effect Overlay */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                    
+                    {/* Interactive Indicator */}
+                    <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="p-2 bg-indigo-500 text-white rounded-full shadow-lg">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
                 )
               })}
@@ -717,7 +1651,14 @@ function Attendance() {
               return (
                 <div
                   key={index}
-                  className="group bg-white/60 dark:bg-slate-700/60 backdrop-blur-sm rounded-2xl p-4 border border-white/40 dark:border-slate-600/40 hover:bg-white/80 dark:hover:bg-slate-700/80 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+                  onClick={() => loadEmployeeDetails(activity.employee_uid, {
+                    first_name: activity.first_name,
+                    last_name: activity.last_name,
+                    id_number: activity.id_number,
+                    department: activity.department,
+                    position: activity.position
+                  })}
+                  className="group bg-white/60 dark:bg-slate-700/60 backdrop-blur-sm rounded-2xl p-4 border border-white/40 dark:border-slate-600/40 hover:bg-white/80 dark:hover:bg-slate-700/80 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer hover:border-indigo-300/60 dark:hover:border-indigo-700/60"
                 >
                   <div className="flex items-center gap-3">
                     <ProfilePicture 

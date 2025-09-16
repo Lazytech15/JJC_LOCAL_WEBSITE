@@ -2,7 +2,7 @@
 // config/api-config.js
 // ============================================================================
 export const API_ENDPOINTS = {
-  public: "https://disk-pensions-predicted-polyester.trycloudflare.com",
+  public: "http://192.168.68.140:3001",
   // public: window.location.origin,
 }
 
