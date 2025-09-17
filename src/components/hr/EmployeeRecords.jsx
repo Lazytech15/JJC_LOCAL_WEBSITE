@@ -578,7 +578,7 @@ function EmployeeRecords() {
             "[EmployeeRecords] Uploading profile picture for employee:",
             editingEmployee.uid
           );
-          const result = await apiService.profiles.uploadReplaceProfileByid(
+          const result = await apiService.profiles.uploadProfileByUid(
             editingEmployee.id,
             selectedProfileFile
           );
@@ -590,7 +590,7 @@ function EmployeeRecords() {
 
             // Clear and reload profile picture cache for this employee
             apiService.profiles.clearProfileFromCache(editingEmployee.id);
-            const newProfileResult = await apiService.profiles.getProfileByid(
+            const newProfileResult = await apiService.profiles.getProfileUrlByUid(
               editingEmployee.id
             );
             if (newProfileResult.success) {
