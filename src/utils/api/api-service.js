@@ -10,6 +10,7 @@ import { RecruitmentService } from "./services/recruitment-service.js"
 import { SocketManager } from "./websocket/socket-managers.js"
 import { DocumentService } from "./services/document-service.js"
 import { DailySummaryService } from "./services/daily-summary-service.js"
+import { ItemsService } from "./services/items-service.js"
 
 class APIService {
   constructor() {
@@ -23,6 +24,7 @@ class APIService {
     this.socket = new SocketManager()
     this.document = new DocumentService()
     this.summary = new DailySummaryService()
+    this.items = new ItemsService()
     
   }
 
@@ -63,5 +65,6 @@ export const {
   recruitment,
   socket,
   document,
-  summary
+  summary,
+  items,
 } = apiService

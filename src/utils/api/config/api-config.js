@@ -2,7 +2,7 @@
 // config/api-config.js
 // ============================================================================
 export const API_ENDPOINTS = {
-  local: "https://filed-instrumental-involvement-expense.trycloudflare.com",
+  local: "http://192.168.68.140:3001",
   public: window.location.origin,
 }
 

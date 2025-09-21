@@ -72,9 +72,9 @@ function Attendance() {
         grouped[key] = {
           employee_uid: record.employee_uid,
           employee_info: {
+            last_name: record.last_name,
             first_name: record.first_name,
             middle_name: record.middle_name,
-            last_name: record.last_name,
             id_number: record.id_number,
             department: record.department,
             position: record.position,
@@ -194,423 +194,531 @@ function Attendance() {
   };
 
   // Excel Export Functions
-  const exportToExcel = async () => {
-    try {
-      setIsExporting(true);
+  // Updated Excel Export Functions - Replace the existing exportToExcel function
+const exportToExcel = async () => {
+  try {
+    setIsExporting(true);
 
-      // Determine date parameters based on range mode
-      const dateParams = {};
-      if (filters.useRange && filters.startDate && filters.endDate) {
-        dateParams.start_date = filters.startDate;
-        dateParams.end_date = filters.endDate;
-      } else {
-        dateParams.date = filters.date;
-      }
+    // Determine date parameters based on range mode
+    const dateParams = {};
+    if (filters.useRange && filters.startDate && filters.endDate) {
+      dateParams.start_date = filters.startDate;
+      dateParams.end_date = filters.endDate;
+    } else {
+      dateParams.date = filters.date;
+    }
 
-      // Get comprehensive data for the selected date/range
-      const [attendanceResult, summaryResult] = await Promise.all([
-        apiService.attendance.getAttendanceRecords({
-          ...dateParams,
-          limit: "1000",
-          sort_by: "employee_uid,clock_time",
-          sort_order: "ASC",
-        }),
-        apiService.summary.getDailySummaryRecords({
-          ...dateParams,
-          limit: "1000",
-          sort_by: "employee_uid,date",
-          sort_order: "ASC",
-        }),
-      ]);
+    // Get comprehensive data for the selected date/range
+    const [attendanceResult, summaryResult] = await Promise.all([
+      apiService.attendance.getAttendanceRecords({
+        ...dateParams,
+        limit: "1000",
+        sort_by: "employee_uid,clock_time",
+        sort_order: "ASC",
+      }),
+      apiService.summary.getDailySummaryRecords({
+        ...dateParams,
+        limit: "1000",
+        sort_by: "employee_uid,date",
+        sort_order: "ASC",
+      }),
+    ]);
 
-      if (!attendanceResult.success) {
-        throw new Error(
-          attendanceResult.error || "Failed to fetch attendance data"
-        );
-      }
+    if (!attendanceResult.success) {
+      throw new Error(
+        attendanceResult.error || "Failed to fetch attendance data"
+      );
+    }
 
-      const workbook = XLSX.utils.book_new();
+    const workbook = XLSX.utils.book_new();
 
-      // Updated header information for range support
-      const dateRange =
-        filters.useRange && filters.startDate && filters.endDate
-          ? `${new Date(filters.startDate).toLocaleDateString()} - ${new Date(
-              filters.endDate
-            ).toLocaleDateString()}`
-          : new Date(filters.date).toLocaleDateString();
+    // Updated header information for range support
+    const dateRange =
+      filters.useRange && filters.startDate && filters.endDate
+        ? `${new Date(filters.startDate).toLocaleDateString()} - ${new Date(
+            filters.endDate
+          ).toLocaleDateString()}`
+        : new Date(filters.date).toLocaleDateString();
 
-      // 1. Summary Sheet
-      const summaryData = [];
+    // 1. Summary Sheet
+    const summaryData = [];
 
-      // Header information
-      summaryData.push(["ATTENDANCE SUMMARY REPORT"]);
-      summaryData.push([`Date Range: ${dateRange}`]);
-      summaryData.push([`Generated: ${new Date().toLocaleString()}`]);
-      summaryData.push([`Total Records: ${attendanceResult.data.length}`]);
-      summaryData.push([]); // Empty row
+    // Header information
+    summaryData.push(["ATTENDANCE SUMMARY REPORT"]);
+    summaryData.push([`Date Range: ${dateRange}`]);
+    summaryData.push([`Generated: ${new Date().toLocaleString()}`]);
+    summaryData.push([`Total Records: ${attendanceResult.data.length}`]);
+    summaryData.push([]); // Empty row
 
-      // Calculate statistics for the range
-      const rangeStats = {
-        total_records: attendanceResult.data.length,
-        unique_employees: new Set(
-          attendanceResult.data.map((r) => r.employee_uid)
-        ).size,
-        total_regular_hours: attendanceResult.data.reduce(
-          (sum, r) => sum + (r.regular_hours || 0),
-          0
-        ),
-        total_overtime_hours: attendanceResult.data.reduce(
-          (sum, r) => sum + (r.overtime_hours || 0),
-          0
-        ),
-        late_count: attendanceResult.data.filter((r) => r.is_late).length,
-        clock_ins: attendanceResult.data.filter((r) =>
-          r.clock_type.includes("_in")
-        ).length,
-        clock_outs: attendanceResult.data.filter((r) =>
-          r.clock_type.includes("_out")
-        ).length,
-        unsynced_count: attendanceResult.data.filter((r) => !r.is_synced)
-          .length,
-      };
+    // Calculate statistics for the range
+    const rangeStats = {
+      total_records: attendanceResult.data.length,
+      unique_employees: new Set(
+        attendanceResult.data.map((r) => r.employee_uid)
+      ).size,
+      total_regular_hours: attendanceResult.data.reduce(
+        (sum, r) => sum + (r.regular_hours || 0),
+        0
+      ),
+      total_overtime_hours: attendanceResult.data.reduce(
+        (sum, r) => sum + (r.overtime_hours || 0),
+        0
+      ),
+      late_count: attendanceResult.data.filter((r) => r.is_late).length,
+      clock_ins: attendanceResult.data.filter((r) =>
+        r.clock_type.includes("_in")
+      ).length,
+      clock_outs: attendanceResult.data.filter((r) =>
+        r.clock_type.includes("_out")
+      ).length,
+      unsynced_count: attendanceResult.data.filter((r) => !r.is_synced)
+        .length,
+    };
 
-      // Overall statistics
-      summaryData.push(["OVERALL STATISTICS"]);
-      summaryData.push(["Metric", "Count", "Hours"]);
-      summaryData.push(["Total Records", rangeStats.total_records, ""]);
-      summaryData.push(["Unique Employees", rangeStats.unique_employees, ""]);
-      summaryData.push([
-        "Regular Hours",
-        "",
-        rangeStats.total_regular_hours.toFixed(2),
-      ]);
-      summaryData.push([
-        "Overtime Hours",
-        "",
-        rangeStats.total_overtime_hours.toFixed(2),
-      ]);
-      summaryData.push(["Late Arrivals", rangeStats.late_count, ""]);
-      summaryData.push(["Clock Ins", rangeStats.clock_ins, ""]);
-      summaryData.push(["Clock Outs", rangeStats.clock_outs, ""]);
-      summaryData.push(["Unsynced Records", rangeStats.unsynced_count, ""]);
-      summaryData.push([]); // Empty row
+    // Overall statistics
+    summaryData.push(["OVERALL STATISTICS"]);
+    summaryData.push(["Metric", "Count", "Hours"]);
+    summaryData.push(["Total Records", rangeStats.total_records, ""]);
+    summaryData.push(["Unique Employees", rangeStats.unique_employees, ""]);
+    summaryData.push([
+      "Regular Hours",
+      "",
+      rangeStats.total_regular_hours.toFixed(2),
+    ]);
+    summaryData.push([
+      "Overtime Hours",
+      "",
+      rangeStats.total_overtime_hours.toFixed(2),
+    ]);
+    summaryData.push(["Late Arrivals", rangeStats.late_count, ""]);
+    summaryData.push(["Clock Ins", rangeStats.clock_ins, ""]);
+    summaryData.push(["Clock Outs", rangeStats.clock_outs, ""]);
+    summaryData.push(["Unsynced Records", rangeStats.unsynced_count, ""]);
+    summaryData.push([]); // Empty row
 
-      // Daily breakdown for range reports
-      if (filters.useRange && filters.startDate && filters.endDate) {
-        const dailyBreakdown = {};
-        attendanceResult.data.forEach((record) => {
-          const date = record.date;
-          if (!dailyBreakdown[date]) {
-            dailyBreakdown[date] = {
-              records: 0,
-              employees: new Set(),
-              regular_hours: 0,
-              overtime_hours: 0,
-              late_count: 0,
-            };
-          }
-          dailyBreakdown[date].records++;
-          dailyBreakdown[date].employees.add(record.employee_uid);
-          dailyBreakdown[date].regular_hours += record.regular_hours || 0;
-          dailyBreakdown[date].overtime_hours += record.overtime_hours || 0;
-          if (record.is_late) dailyBreakdown[date].late_count++;
-        });
-
-        summaryData.push(["DAILY BREAKDOWN"]);
-        summaryData.push([
-          "Date",
-          "Records",
-          "Employees",
-          "Regular Hours",
-          "Overtime Hours",
-          "Late Count",
-        ]);
-        Object.entries(dailyBreakdown)
-          .sort(([a], [b]) => new Date(a) - new Date(b))
-          .forEach(([date, data]) => {
-            summaryData.push([
-              new Date(date).toLocaleDateString(),
-              data.records,
-              data.employees.size,
-              data.regular_hours.toFixed(2),
-              data.overtime_hours.toFixed(2),
-              data.late_count,
-            ]);
-          });
-        summaryData.push([]); // Empty row
-      }
-
-      // Clock type breakdown (rest of the existing code remains the same...)
-      const clockTypeBreakdown = {};
+    // Daily breakdown for range reports
+    if (filters.useRange && filters.startDate && filters.endDate) {
+      const dailyBreakdown = {};
       attendanceResult.data.forEach((record) => {
-        clockTypeBreakdown[record.clock_type] =
-          (clockTypeBreakdown[record.clock_type] || 0) + 1;
-      });
-
-      summaryData.push(["CLOCK TYPE BREAKDOWN"]);
-      summaryData.push(["Clock Type", "Count"]);
-      Object.entries(clockTypeBreakdown).forEach(([type, count]) => {
-        summaryData.push([formatClockType(type), count]);
-      });
-
-      const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-
-      // Style the summary sheet
-      const summaryRange = XLSX.utils.decode_range(summarySheet["!ref"]);
-      summarySheet["!cols"] = [
-        { wch: 25 }, // Column A
-        { wch: 15 }, // Column B
-        { wch: 15 }, // Column C
-        { wch: 15 }, // Column D
-        { wch: 15 }, // Column E
-        { wch: 15 }, // Column F
-      ];
-
-      XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
-
-      // 2. Detailed Attendance Sheet
-      const detailedHeaders = [
-        "Employee ID",
-        "Employee Name",
-        "Department",
-        "Position",
-        "Date",
-        "Clock Type",
-        "Clock Time",
-        "Regular Hours",
-        "Overtime Hours",
-        "Is Late",
-        "Is Synced",
-        "Location",
-        "Device Info",
-      ];
-
-      const detailedData = [detailedHeaders];
-
-      attendanceResult.data.forEach((record) => {
-        const employeeName = formatEmployeeName({
-          first_name: record.first_name,
-          middle_name: record.middle_name,
-          last_name: record.last_name,
-        });
-
-        detailedData.push([
-          record.employee_uid || "N/A",
-          employeeName,
-          record.department || "N/A",
-          record.position || "N/A",
-          record.date,
-          formatClockType(record.clock_type),
-          formatTime(record.clock_time),
-          (record.regular_hours || 0).toFixed(2),
-          (record.overtime_hours || 0).toFixed(2),
-          record.is_late ? "YES" : "NO",
-          record.is_synced ? "YES" : "NO",
-          record.location || "N/A",
-          record.device_info || "N/A",
-        ]);
-      });
-
-      const detailedSheet = XLSX.utils.aoa_to_sheet(detailedData);
-
-      // Style the detailed sheet
-      detailedSheet["!cols"] = [
-        { wch: 12 }, // Employee ID
-        { wch: 25 }, // Employee Name
-        { wch: 15 }, // Department
-        { wch: 20 }, // Position
-        { wch: 12 }, // Date
-        { wch: 15 }, // Clock Type
-        { wch: 12 }, // Clock Time
-        { wch: 12 }, // Regular Hours
-        { wch: 12 }, // Overtime Hours
-        { wch: 8 }, // Is Late
-        { wch: 8 }, // Is Synced
-        { wch: 15 }, // Location
-        { wch: 15 }, // Device Info
-      ];
-
-      XLSX.utils.book_append_sheet(workbook, detailedSheet, "Detailed Records");
-
-      // 3. Employee Summary Sheet (if daily summary data is available)
-      if (summaryResult.success && summaryResult.data.length > 0) {
-        const employeeSummaryHeaders = [
-          "Employee ID",
-          "Employee Name",
-          "Department",
-          "Position",
-          "Date",
-          "Morning In",
-          "Morning Out",
-          "Afternoon In",
-          "Afternoon Out",
-          "Overtime In",
-          "Overtime Out",
-          "Regular Hours",
-          "Overtime Hours",
-          "Total Hours",
-          "Has Late Entry",
-          "Is Incomplete",
-          "Has Overtime",
-        ];
-
-        const employeeSummaryData = [employeeSummaryHeaders];
-
-        summaryResult.data.forEach((summary) => {
-          const employeeName = formatEmployeeName({
-            first_name: summary.first_name,
-            middle_name: summary.middle_name,
-            last_name: summary.last_name,
-          });
-
-          employeeSummaryData.push([
-            summary.employee_uid || "N/A",
-            employeeName,
-            summary.department || "N/A",
-            summary.position || "N/A",
-            summary.date,
-            summary.morning_in ? formatTime(summary.morning_in) : "N/A",
-            summary.morning_out ? formatTime(summary.morning_out) : "N/A",
-            summary.afternoon_in ? formatTime(summary.afternoon_in) : "N/A",
-            summary.afternoon_out ? formatTime(summary.afternoon_out) : "N/A",
-            summary.overtime_in ? formatTime(summary.overtime_in) : "N/A",
-            summary.overtime_out ? formatTime(summary.overtime_out) : "N/A",
-            (summary.regular_hours || 0).toFixed(2),
-            (summary.overtime_hours || 0).toFixed(2),
-            (summary.total_hours || 0).toFixed(2),
-            summary.has_late_entry ? "YES" : "NO",
-            summary.is_incomplete ? "YES" : "NO",
-            summary.has_overtime ? "YES" : "NO",
-          ]);
-        });
-
-        const employeeSummarySheet =
-          XLSX.utils.aoa_to_sheet(employeeSummaryData);
-
-        // Style the employee summary sheet
-        employeeSummarySheet["!cols"] = [
-          { wch: 12 }, // Employee ID
-          { wch: 25 }, // Employee Name
-          { wch: 15 }, // Department
-          { wch: 20 }, // Position
-          { wch: 12 }, // Date
-          { wch: 12 }, // Morning In
-          { wch: 12 }, // Morning Out
-          { wch: 12 }, // Afternoon In
-          { wch: 12 }, // Afternoon Out
-          { wch: 12 }, // Overtime In
-          { wch: 12 }, // Overtime Out
-          { wch: 12 }, // Regular Hours
-          { wch: 12 }, // Overtime Hours
-          { wch: 12 }, // Total Hours
-          { wch: 12 }, // Has Late Entry
-          { wch: 12 }, // Is Incomplete
-          { wch: 12 }, // Has Overtime
-        ];
-
-        XLSX.utils.book_append_sheet(
-          workbook,
-          employeeSummarySheet,
-          "Employee Summary"
-        );
-      }
-
-      // 4. Time Analysis Sheet - showing patterns by time slots
-      const timeAnalysisData = [];
-      timeAnalysisData.push(["TIME ANALYSIS REPORT"]);
-
-      // Fix: Use the appropriate date based on filter mode
-      const displayDate =
-        filters.useRange && filters.startDate && filters.endDate
-          ? `${filters.startDate} to ${filters.endDate}`
-          : filters.date;
-
-      timeAnalysisData.push([`Date: ${displayDate}`]);
-      timeAnalysisData.push([]);
-
-      // Group by hour
-      const hourlyBreakdown = {};
-      attendanceResult.data.forEach((record) => {
-        const hour = new Date(record.clock_time).getHours();
-        const timeSlot = `${hour.toString().padStart(2, "0")}:00 - ${(hour + 1)
-          .toString()
-          .padStart(2, "0")}:00`;
-        if (!hourlyBreakdown[timeSlot]) {
-          hourlyBreakdown[timeSlot] = {
-            morning_in: 0,
-            morning_out: 0,
-            afternoon_in: 0,
-            afternoon_out: 0,
-            overtime_in: 0,
-            overtime_out: 0,
-            total: 0,
+        const date = record.date;
+        if (!dailyBreakdown[date]) {
+          dailyBreakdown[date] = {
+            records: 0,
+            employees: new Set(),
+            regular_hours: 0,
+            overtime_hours: 0,
+            late_count: 0,
           };
         }
-        hourlyBreakdown[timeSlot][record.clock_type] =
-          (hourlyBreakdown[timeSlot][record.clock_type] || 0) + 1;
-        hourlyBreakdown[timeSlot].total++;
+        dailyBreakdown[date].records++;
+        dailyBreakdown[date].employees.add(record.employee_uid);
+        dailyBreakdown[date].regular_hours += record.regular_hours || 0;
+        dailyBreakdown[date].overtime_hours += record.overtime_hours || 0;
+        if (record.is_late) dailyBreakdown[date].late_count++;
       });
 
-      timeAnalysisData.push(["HOURLY BREAKDOWN"]);
-      timeAnalysisData.push([
-        "Time Slot",
-        "Morning In",
-        "Morning Out",
-        "Afternoon In",
-        "Afternoon Out",
-        "Overtime In",
-        "Overtime Out",
-        "Total",
+      summaryData.push(["DAILY BREAKDOWN"]);
+      summaryData.push([
+        "Date",
+        "Records",
+        "Employees",
+        "Regular Hours",
+        "Overtime Hours",
+        "Late Count",
       ]);
+      Object.entries(dailyBreakdown)
+        .sort(([a], [b]) => new Date(a) - new Date(b))
+        .forEach(([date, data]) => {
+          summaryData.push([
+            new Date(date).toLocaleDateString(),
+            data.records,
+            data.employees.size,
+            data.regular_hours.toFixed(2),
+            data.overtime_hours.toFixed(2),
+            data.late_count,
+          ]);
+        });
+      summaryData.push([]); // Empty row
+    }
 
-      Object.entries(hourlyBreakdown)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .forEach(([timeSlot, counts]) => {
-          timeAnalysisData.push([
-            timeSlot,
-            counts.morning_in || 0,
-            counts.morning_out || 0,
-            counts.afternoon_in || 0,
-            counts.afternoon_out || 0,
-            counts.overtime_in || 0,
-            counts.overtime_out || 0,
-            counts.total || 0,
+    // Clock type breakdown
+    const clockTypeBreakdown = {};
+    attendanceResult.data.forEach((record) => {
+      clockTypeBreakdown[record.clock_type] =
+        (clockTypeBreakdown[record.clock_type] || 0) + 1;
+    });
+
+    summaryData.push(["CLOCK TYPE BREAKDOWN"]);
+    summaryData.push(["Clock Type", "Count"]);
+    Object.entries(clockTypeBreakdown).forEach(([type, count]) => {
+      summaryData.push([formatClockType(type), count]);
+    });
+
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+
+    // Style the summary sheet
+    summarySheet["!cols"] = [
+      { wch: 25 }, // Column A
+      { wch: 15 }, // Column B
+      { wch: 15 }, // Column C
+      { wch: 15 }, // Column D
+      { wch: 15 }, // Column E
+      { wch: 15 }, // Column F
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
+
+    // 2. Detailed Attendance Sheet
+    const detailedHeaders = [
+      "Employee ID",
+      "Employee Name",
+      "Department",
+      "Position",
+      "Date",
+      "Clock Type",
+      "Clock Time",
+      "Regular Hours",
+      "Overtime Hours",
+      "Is Late",
+      "Is Synced",
+      "Location",
+      "Device Info",
+    ];
+
+    const detailedData = [detailedHeaders];
+
+    attendanceResult.data.forEach((record) => {
+      const employeeName = formatEmployeeName({
+        last_name: record.last_name,
+        middle_name: record.middle_name,
+        first_name: record.first_name,
+      });
+
+      detailedData.push([
+        record.employee_uid || "N/A",
+        employeeName,
+        record.department || "N/A",
+        record.position || "N/A",
+        record.date,
+        formatClockType(record.clock_type),
+        formatTime(record.clock_time),
+        (record.regular_hours || 0).toFixed(2),
+        (record.overtime_hours || 0).toFixed(2),
+        record.is_late ? "YES" : "NO",
+        record.is_synced ? "YES" : "NO",
+        record.location || "N/A",
+        record.device_info || "N/A",
+      ]);
+    });
+
+    const detailedSheet = XLSX.utils.aoa_to_sheet(detailedData);
+
+    // Style the detailed sheet
+    detailedSheet["!cols"] = [
+      { wch: 12 }, // Employee ID
+      { wch: 25 }, // Employee Name
+      { wch: 15 }, // Department
+      { wch: 20 }, // Position
+      { wch: 12 }, // Date
+      { wch: 15 }, // Clock Type
+      { wch: 12 }, // Clock Time
+      { wch: 12 }, // Regular Hours
+      { wch: 12 }, // Overtime Hours
+      { wch: 8 }, // Is Late
+      { wch: 8 }, // Is Synced
+      { wch: 15 }, // Location
+      { wch: 15 }, // Device Info
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, detailedSheet, "Detailed Records");
+
+    // 3. Enhanced Employee Summary Sheet with Sunday Column and proper formatting
+    if (summaryResult.success && summaryResult.data.length > 0) {
+      const employeeSummaryHeaders = [
+        "uii_name", // First column matches your image
+        "date_of_log", 
+        "AM_login",
+        "AM_logout",
+        "PM_login", 
+        "PM_logout",
+        "OT_login",
+        "OT_logout",
+        "REG HRS", // Regular Hours
+        "OT HRS",  // Overtime Hours
+        "SUNDAY",  // New Sunday column
+        "REMARKS"  // Last column
+      ];
+
+      const employeeSummaryData = [employeeSummaryHeaders];
+
+      // Helper function to check if date is Sunday and calculate total hours
+      const getSundayHours = (dateStr, regularHours, overtimeHours) => {
+        const date = new Date(dateStr);
+        const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        
+        if (dayOfWeek === 0) { // Sunday
+          const totalHours = (regularHours || 0) + (overtimeHours || 0);
+          return totalHours > 0 ? totalHours.toFixed(1) : "";
+        }
+        return ""; // Empty for non-Sunday dates
+      };
+
+      // Format clock times to show only time (not full datetime)
+      const formatTimeOnly = (datetime) => {
+        if (!datetime) return "";
+        try {
+          return formatTime(datetime); // Uses existing formatTime function
+        } catch {
+          return "";
+        }
+      };
+
+      // Sort data by last_name, then by date
+      const sortedData = summaryResult.data.sort((a, b) => {
+        // First sort by last_name
+        const lastNameComparison = (a.last_name || "").localeCompare(b.last_name || "");
+        if (lastNameComparison !== 0) return lastNameComparison;
+        
+        // Then sort by date
+        return new Date(a.date) - new Date(b.date);
+      });
+
+      // Group data by employee (last_name)
+      const groupedByEmployee = {};
+      sortedData.forEach((summary) => {
+        const key = summary.last_name || "Unknown";
+        if (!groupedByEmployee[key]) {
+          groupedByEmployee[key] = [];
+        }
+        groupedByEmployee[key].push(summary);
+      });
+
+      // Track grand totals
+      let grandTotalRegularHours = 0;
+      let grandTotalOvertimeHours = 0;
+      let grandTotalSundayHours = 0;
+
+      // Process each employee group
+      Object.keys(groupedByEmployee).sort().forEach((employeeLastName, groupIndex) => {
+        const employeeRecords = groupedByEmployee[employeeLastName];
+        
+        // Track subtotals for this employee
+        let subtotalRegularHours = 0;
+        let subtotalOvertimeHours = 0;
+        let subtotalSundayHours = 0;
+
+        // Add employee records
+        employeeRecords.forEach((summary) => {
+          const employeeName = formatEmployeeName({
+            last_name: summary.last_name,
+            middle_name: summary.middle_name,
+            first_name: summary.first_name,
+          });
+
+          // Calculate Sunday hours
+          const sundayHours = getSundayHours(
+            summary.date, 
+            summary.regular_hours, 
+            summary.overtime_hours
+          );
+
+          const regularHours = summary.regular_hours || 0;
+          const overtimeHours = summary.overtime_hours || 0;
+
+          // Add to subtotals
+          subtotalRegularHours += regularHours;
+          subtotalOvertimeHours += overtimeHours;
+          if (sundayHours) {
+            subtotalSundayHours += parseFloat(sundayHours);
+          }
+
+          employeeSummaryData.push([
+            employeeName, // Employee Name first
+            summary.date,
+            formatTimeOnly(summary.morning_in),   // AM_login
+            formatTimeOnly(summary.morning_out),  // AM_logout
+            formatTimeOnly(summary.afternoon_in), // PM_login
+            formatTimeOnly(summary.afternoon_out), // PM_logout
+            formatTimeOnly(summary.overtime_in),  // OT_login
+            formatTimeOnly(summary.overtime_out), // OT_logout
+            regularHours.toFixed(1), // REG HRS
+            overtimeHours.toFixed(1), // OT HRS
+            sundayHours, // SUNDAY column
+            "" // REMARKS - empty for now
           ]);
         });
 
-      const timeAnalysisSheet = XLSX.utils.aoa_to_sheet(timeAnalysisData);
-      timeAnalysisSheet["!cols"] = [
-        { wch: 15 }, // Time Slot
-        { wch: 12 }, // Morning In
-        { wch: 12 }, // Morning Out
-        { wch: 12 }, // Afternoon In
-        { wch: 12 }, // Afternoon Out
-        { wch: 12 }, // Overtime In
-        { wch: 12 }, // Overtime Out
-        { wch: 10 }, // Total
+        // Add subtotal row for this employee
+        employeeSummaryData.push([
+          "", // Empty uii_name
+          "", // Empty date_of_log
+          "", // Empty AM_login
+          "", // Empty AM_logout
+          "", // Empty PM_login
+          "", // Empty PM_logout
+          "", // Empty OT_login
+          "TOTAL HOURS", // Label in OT_logout column (column H)
+          subtotalRegularHours.toFixed(1), // Subtotal regular hours (REG HRS column)
+          subtotalOvertimeHours.toFixed(1), // Subtotal overtime hours (OT HRS column)
+          subtotalSundayHours > 0 ? subtotalSundayHours.toFixed(1) : "", // Subtotal Sunday hours (SUNDAY column)
+          "" // Empty REMARKS
+        ]);
+
+        // Add to grand totals
+        grandTotalRegularHours += subtotalRegularHours;
+        grandTotalOvertimeHours += subtotalOvertimeHours;
+        grandTotalSundayHours += subtotalSundayHours;
+
+        // Add empty row between employees (except for the last group)
+        if (groupIndex < Object.keys(groupedByEmployee).length - 1) {
+          employeeSummaryData.push([
+            "", "", "", "", "", "", "", "", "", "", "", ""
+          ]);
+        }
+      });
+
+      // Add final empty row before grand total
+      employeeSummaryData.push([
+        "", "", "", "", "", "", "", "", "", "", "", ""
+      ]);
+
+      // Add the GRAND TOTAL HOURS row at the bottom
+      employeeSummaryData.push([
+        "", // Empty uii_name
+        "", // Empty date_of_log
+        "", // Empty AM_login
+        "", // Empty AM_logout
+        "", // Empty PM_login
+        "", // Empty PM_logout
+        "", // Empty OT_login
+        "TOTAL HOURS", // Label in OT_logout column (column H)
+        grandTotalRegularHours.toFixed(1), // Grand total regular hours (REG HRS column)
+        grandTotalOvertimeHours.toFixed(1), // Grand total overtime hours (OT HRS column)
+        grandTotalSundayHours > 0 ? grandTotalSundayHours.toFixed(1) : "", // Grand total Sunday hours (SUNDAY column)
+        "" // Empty REMARKS
+      ]);
+
+      const employeeSummarySheet = XLSX.utils.aoa_to_sheet(employeeSummaryData);
+
+      // Style the employee summary sheet to match the image layout
+      employeeSummarySheet["!cols"] = [
+        { wch: 18 }, // uii_name
+        { wch: 12 }, // date_of_log
+        { wch: 10 }, // AM_login
+        { wch: 10 }, // AM_logout
+        { wch: 10 }, // PM_login
+        { wch: 10 }, // PM_logout
+        { wch: 10 }, // OT_login
+        { wch: 10 }, // OT_logout
+        { wch: 10 }, // REG HRS
+        { wch: 8 },  // OT HRS
+        { wch: 8 },  // SUNDAY
+        { wch: 15 }, // REMARKS
       ];
 
       XLSX.utils.book_append_sheet(
         workbook,
-        timeAnalysisSheet,
-        "Time Analysis"
+        employeeSummarySheet,
+        "Employee Summary"
       );
-
-      // Generate filename with appropriate date range
-      const filenameDatePart =
-        filters.useRange && filters.startDate && filters.endDate
-          ? `${filters.startDate}_to_${filters.endDate}`
-          : filters.date;
-
-      const fileName = `Attendance_Report_${filenameDatePart}_${new Date().getTime()}.xlsx`;
-      XLSX.writeFile(workbook, fileName);
-    } catch (error) {
-      console.error("Error exporting to Excel:", error);
-      alert("Failed to export data. Please try again.");
-    } finally {
-      setIsExporting(false);
     }
-  };
+
+    // 4. Time Analysis Sheet - showing patterns by time slots
+    const timeAnalysisData = [];
+    timeAnalysisData.push(["TIME ANALYSIS REPORT"]);
+
+    // Fix: Use the appropriate date based on filter mode
+    const displayDate =
+      filters.useRange && filters.startDate && filters.endDate
+        ? `${filters.startDate} to ${filters.endDate}`
+        : filters.date;
+
+    timeAnalysisData.push([`Date: ${displayDate}`]);
+    timeAnalysisData.push([]);
+
+    // Group by hour
+    const hourlyBreakdown = {};
+    attendanceResult.data.forEach((record) => {
+      const hour = new Date(record.clock_time).getHours();
+      const timeSlot = `${hour.toString().padStart(2, "0")}:00 - ${(hour + 1)
+        .toString()
+        .padStart(2, "0")}:00`;
+      if (!hourlyBreakdown[timeSlot]) {
+        hourlyBreakdown[timeSlot] = {
+          morning_in: 0,
+          morning_out: 0,
+          afternoon_in: 0,
+          afternoon_out: 0,
+          overtime_in: 0,
+          overtime_out: 0,
+          total: 0,
+        };
+      }
+      hourlyBreakdown[timeSlot][record.clock_type] =
+        (hourlyBreakdown[timeSlot][record.clock_type] || 0) + 1;
+      hourlyBreakdown[timeSlot].total++;
+    });
+
+    timeAnalysisData.push(["HOURLY BREAKDOWN"]);
+    timeAnalysisData.push([
+      "Time Slot",
+      "Morning In",
+      "Morning Out",
+      "Afternoon In",
+      "Afternoon Out",
+      "Overtime In",
+      "Overtime Out",
+      "Total",
+    ]);
+
+    Object.entries(hourlyBreakdown)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([timeSlot, counts]) => {
+        timeAnalysisData.push([
+          timeSlot,
+          counts.morning_in || 0,
+          counts.morning_out || 0,
+          counts.afternoon_in || 0,
+          counts.afternoon_out || 0,
+          counts.overtime_in || 0,
+          counts.overtime_out || 0,
+          counts.total || 0,
+        ]);
+      });
+
+    const timeAnalysisSheet = XLSX.utils.aoa_to_sheet(timeAnalysisData);
+    timeAnalysisSheet["!cols"] = [
+      { wch: 15 }, // Time Slot
+      { wch: 12 }, // Morning In
+      { wch: 12 }, // Morning Out
+      { wch: 12 }, // Afternoon In
+      { wch: 12 }, // Afternoon Out
+      { wch: 12 }, // Overtime In
+      { wch: 12 }, // Overtime Out
+      { wch: 10 }, // Total
+    ];
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      timeAnalysisSheet,
+      "Time Analysis"
+    );
+
+    // Generate filename with appropriate date range
+    const filenameDatePart =
+      filters.useRange && filters.startDate && filters.endDate
+        ? `${filters.startDate}_to_${filters.endDate}`
+        : filters.date;
+
+    const fileName = `Attendance_Report_${filenameDatePart}_${new Date().getTime()}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  } catch (error) {
+    console.error("Error exporting to Excel:", error);
+    alert("Failed to export data. Please try again.");
+  } finally {
+    setIsExporting(false);
+  }
+};
 
   // Bulk load all profile pictures as a zip file with deduplication
   const loadBulkProfilePictures = async (uniqueUids) => {
@@ -1009,9 +1117,9 @@ function Attendance() {
 
   const formatEmployeeName = (employeeInfo) => {
     const parts = [
+      employeeInfo.last_name,
       employeeInfo.first_name,
       employeeInfo.middle_name,
-      employeeInfo.last_name,
     ].filter(Boolean);
     return parts.length > 0 ? parts.join(" ") : "Unknown Employee";
   };
