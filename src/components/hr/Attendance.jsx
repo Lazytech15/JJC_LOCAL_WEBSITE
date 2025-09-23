@@ -481,7 +481,7 @@ const exportToExcel = async () => {
 
     XLSX.utils.book_append_sheet(workbook, detailedSheet, "Detailed Records");
 
-    // 3. Enhanced Employee Summary Sheet with intelligent remarks
+    // 3. Enhanced Employee Summary Sheet with intelligent remarks - FIXED SORTING
     if (summaryResult.success && summaryResult.data.length > 0) {
       const employeeSummaryHeaders = [
         "EMPLOYEE_NAME", "DATE_OF_LOG", "MORNING_IN", "MORNING_OUT",
@@ -492,23 +492,50 @@ const exportToExcel = async () => {
       // Start with empty array - no initial header row
       const employeeSummaryData = [];
 
-      // Helper function to generate intelligent remarks
+      // Helper function to generate intelligent remarks - FIXED VERSION
       const generateRemarks = (summary) => {
         const remarks = [];
         
-        // Check for incomplete clock cycles
-        const hasClockIn = summary.morning_in || summary.afternoon_in || summary.overtime_in;
-        const hasClockOut = summary.morning_out || summary.afternoon_out || summary.overtime_out;
+        // Check for clock records existence - FIXED: properly define variables
+        const hasAnyClockIn = summary.morning_in || summary.afternoon_in || summary.overtime_in;
+        const hasAnyClockOut = summary.morning_out || summary.afternoon_out || summary.overtime_out;
         
         // Check for perfect attendance first - if perfect, return empty
-        if (summary.total_hours >= 8 && !summary.has_late_entry && hasClockIn && hasClockOut) {
+        if (summary.total_hours >= 8 && !summary.has_late_entry && hasAnyClockIn && hasAnyClockOut) {
           return ""; // Perfect attendance = no remarks
         }
         
-        if (hasClockIn && !hasClockOut) {
-          remarks.push("INCOMPLETE - Missing clock out");
-        } else if (!hasClockIn && hasClockOut) {
-          remarks.push("INCOMPLETE - Missing clock in");
+        // Check specific incomplete cycles
+        const missingOuts = [];
+        if (summary.morning_in && !summary.morning_out) {
+          missingOuts.push("Morning Out");
+        }
+        if (summary.afternoon_in && !summary.afternoon_out) {
+          missingOuts.push("Afternoon Out");
+        }
+        if (summary.overtime_in && !summary.overtime_out) {
+          missingOuts.push("Overtime Out");
+        }
+        
+        const missingIns = [];
+        if (!summary.morning_in && summary.morning_out) {
+          missingIns.push("Morning In");
+        }
+        if (!summary.afternoon_in && summary.afternoon_out) {
+          missingIns.push("Afternoon In");
+        }
+        if (!summary.overtime_in && summary.overtime_out) {
+          missingIns.push("Overtime In");
+        }
+        
+        // Add specific missing clock out remarks
+        if (missingOuts.length > 0) {
+          remarks.push("INCOMPLETE - Missing " + missingOuts.join(", "));
+        }
+        
+        // Add specific missing clock in remarks
+        if (missingIns.length > 0) {
+          remarks.push("INCOMPLETE - Missing " + missingIns.join(", "));
         }
         
         // Check for late entry
@@ -538,8 +565,8 @@ const exportToExcel = async () => {
           remarks.push("WEEKEND WORK");
         }
         
-        // Check for no activity
-        if (!hasClockIn && !hasClockOut && (summary.total_hours === 0 || !summary.total_hours)) {
+        // Check for no activity - FIXED: use the properly defined variables
+        if (!hasAnyClockIn && !hasAnyClockOut && (summary.total_hours === 0 || !summary.total_hours)) {
           remarks.push("NO ACTIVITY");
         }
         
@@ -567,16 +594,25 @@ const exportToExcel = async () => {
         }
       };
 
-      // Sort and group data
+      // FIXED SORTING: Sort by last_name, then first_name, then date
       const sortedData = summaryResult.data.sort((a, b) => {
+        // First compare last names
         const lastNameComparison = (a.last_name || "").localeCompare(b.last_name || "");
         if (lastNameComparison !== 0) return lastNameComparison;
+        
+        // If last names are the same, compare first names
+        const firstNameComparison = (a.first_name || "").localeCompare(b.first_name || "");
+        if (firstNameComparison !== 0) return firstNameComparison;
+        
+        // If both names are the same, compare dates
         return new Date(a.date) - new Date(b.date);
       });
 
+      // FIXED GROUPING: Group by both last_name and first_name
       const groupedByEmployee = {};
       sortedData.forEach((summary) => {
-        const key = summary.last_name || "Unknown";
+        // Create a unique key combining last_name and first_name
+        const key = `${summary.last_name || "Unknown"}, ${summary.first_name || "Unknown"}`;
         if (!groupedByEmployee[key]) {
           groupedByEmployee[key] = [];
         }
@@ -592,8 +628,8 @@ const exportToExcel = async () => {
       let totalPerfectAttendanceCount = 0;
 
       // Process each employee group
-      Object.keys(groupedByEmployee).sort().forEach((employeeLastName, groupIndex) => {
-        const employeeRecords = groupedByEmployee[employeeLastName];
+      Object.keys(groupedByEmployee).sort().forEach((employeeKey, groupIndex) => {
+        const employeeRecords = groupedByEmployee[employeeKey];
         
         // Add header row for each employee (like in the sample Excel)
         if (groupIndex > 0) {
@@ -840,7 +876,7 @@ const exportToExcel = async () => {
 
     XLSX.utils.book_append_sheet(workbook, timeAnalysisSheet, "Time Analysis");
 
-    // 5. NEW: Performance Analytics Sheet
+    // 5. Performance Analytics Sheet
     const performanceData = [];
     performanceData.push(["EMPLOYEE PERFORMANCE ANALYTICS"]);
     performanceData.push([`Analysis Period: ${dateRange}`]);
@@ -1004,7 +1040,7 @@ const exportToExcel = async () => {
 
     XLSX.utils.book_append_sheet(workbook, performanceSheet, "Performance Analytics");
 
-    // 6. NEW: Attendance Patterns & Insights Sheet
+    // 6. Attendance Patterns & Insights Sheet
     const patternsData = [];
     patternsData.push(["ATTENDANCE PATTERNS & BEHAVIORAL INSIGHTS"]);
     patternsData.push([`Analysis Period: ${dateRange}`]);
@@ -3359,3 +3395,6 @@ const exportToExcel = async () => {
 }
 
 export default Attendance;
+
+
+
