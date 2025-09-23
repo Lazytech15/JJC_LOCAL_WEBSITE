@@ -497,8 +497,8 @@ const exportToExcel = async () => {
         const remarks = [];
         
         // Check for clock records existence - FIXED: properly define variables
-        const hasAnyClockIn = summary.morning_in || summary.afternoon_in || summary.overtime_in;
-        const hasAnyClockOut = summary.morning_out || summary.afternoon_out || summary.overtime_out;
+        const hasAnyClockIn = summary.morning_in || summary.afternoon_in || summary.evening_in;
+        const hasAnyClockOut = summary.morning_out || summary.afternoon_out || summary.evening_out;
         
         // Check for perfect attendance first - if perfect, return empty
         if (summary.total_hours >= 8 && !summary.has_late_entry && hasAnyClockIn && hasAnyClockOut) {
@@ -513,7 +513,7 @@ const exportToExcel = async () => {
         if (summary.afternoon_in && !summary.afternoon_out) {
           missingOuts.push("Afternoon Out");
         }
-        if (summary.overtime_in && !summary.overtime_out) {
+        if (summary.evening_in && !summary.evening_out) {
           missingOuts.push("Overtime Out");
         }
         
@@ -524,7 +524,7 @@ const exportToExcel = async () => {
         if (!summary.afternoon_in && summary.afternoon_out) {
           missingIns.push("Afternoon In");
         }
-        if (!summary.overtime_in && summary.overtime_out) {
+        if (!summary.evening_in && summary.evening_out) {
           missingIns.push("Overtime In");
         }
         
@@ -681,8 +681,8 @@ const exportToExcel = async () => {
             formatTimeOnly(summary.morning_out),
             formatTimeOnly(summary.afternoon_in),
             formatTimeOnly(summary.afternoon_out),
-            formatTimeOnly(summary.overtime_in),
-            formatTimeOnly(summary.overtime_out),
+            formatTimeOnly(summary.evening_in),
+            formatTimeOnly(summary.evening_out),
             regularHours.toFixed(1),
             overtimeHours.toFixed(1),
             sundayHours,
@@ -808,7 +808,7 @@ const exportToExcel = async () => {
       if (!hourlyBreakdown[timeSlot]) {
         hourlyBreakdown[timeSlot] = {
           morning_in: 0, morning_out: 0, afternoon_in: 0,
-          afternoon_out: 0, overtime_in: 0, overtime_out: 0, total: 0
+          afternoon_out: 0, evening_in: 0, evening_out: 0, total: 0
         };
         timeSlotInsights[timeSlot] = { late_count: 0, departments: new Set() };
       }
@@ -838,7 +838,7 @@ const exportToExcel = async () => {
         timeAnalysisData.push([
           timeSlot, counts.morning_in || 0, counts.morning_out || 0,
           counts.afternoon_in || 0, counts.afternoon_out || 0,
-          counts.overtime_in || 0, counts.overtime_out || 0,
+          counts.evening_in || 0, counts.evening_out || 0,
           counts.total || 0, insights.late_count,
           insights.departments.size, efficiencyRating
         ]);
