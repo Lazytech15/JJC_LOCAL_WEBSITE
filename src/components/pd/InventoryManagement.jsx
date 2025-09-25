@@ -2,6 +2,8 @@ import { useState, useEffect } from "react"
 import apiService from "../../utils/api/api-service"
 import * as XLSX from 'xlsx'
 import Swal from "sweetalert2"
+import ModalPortal from "/src/components/pd/ModalPortal"
+import QRCodeSmall from "/src/components/pd/QRCodeSmall"
 
 function InventoryManagement() {
   // Inventory Management States
@@ -12,6 +14,13 @@ function InventoryManagement() {
   const [showForm, setShowForm] = useState(false)
   const [showStockInsert, setShowStockInsert] = useState(false)
   const [stockInsertData, setStockInsertData] = useState({ quantity: 0, reason: "" })
+  const [showStockManager, setShowStockManager] = useState(false)
+  const [stockManagerData, setStockManagerData] = useState({
+    stock_in: 0,
+    stock_out: 0,
+    reason: "",
+    current_balance: 0
+  })
   const [statistics, setStatistics] = useState({})
   const [filters, setFilters] = useState({
     search: "",
@@ -34,8 +43,12 @@ function InventoryManagement() {
     supplier: "",
   })
 
+  // Client-side pagination state for grid view (20 per batch)
+  const [visibleCount, setVisibleCount] = useState(20)
+
   useEffect(() => {
     fetchItems()
+    setVisibleCount(20)
   }, [filters])
 
   const fetchItems = async () => {
@@ -51,15 +64,54 @@ function InventoryManagement() {
       }, {})
       
       // Use ItemsService instead of direct fetch
-      const result = await apiService.items.getItems(cleanFilters)
-      setItems(result.data || [])
-      setStatistics(result.statistics || {})
+  const result = await apiService.items.getItems({ ...cleanFilters, limit: 1000 })
+      const fetched = result.data || []
+      setItems(fetched)
+      // Prefer server-declared total if present (covers soft-deletes or server filters)
+      const serverTotal =
+        (result.statistics && (result.statistics.total_items ?? result.statistics.total)) ??
+        result.total ?? result.count ?? (Array.isArray(result.data) ? result.data.length : 0)
+      setStatistics((prev) => ({ ...prev, server_total_items: serverTotal }))
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
   }
+
+  // Recompute statistics whenever items change
+  useEffect(() => {
+    // Derive reliable statistics locally to avoid backend mismatches
+    const statusFromText = (text) => {
+      if (!text) return null
+      const t = String(text).toLowerCase().trim()
+      if (t.includes("out")) return "Out Of Stock"
+      if (t.includes("low")) return "Low In Stock"
+      if (t.includes("in")) return "In Stock"
+      return null
+    }
+    const deriveStatus = (item) => {
+      const bal = Number(item.balance) || 0
+      const min = Number(item.min_stock) || 0
+      if (bal === 0) return "Out Of Stock"
+      if (min > 0 && bal < min) return "Low In Stock"
+      return "In Stock"
+    }
+
+    const total_items = items.length
+    const statuses = items.map((i) => statusFromText(i.item_status) || deriveStatus(i))
+    const in_stock = statuses.filter((s) => s === "In Stock").length
+    const low_stock = statuses.filter((s) => s === "Low In Stock").length
+    const out_of_stock = statuses.filter((s) => s === "Out Of Stock").length
+
+    setStatistics((prev) => ({
+      ...prev,
+      total_items,
+      in_stock,
+      low_stock,
+      out_of_stock,
+    }))
+  }, [items])
 
   const handleSaveItem = async (itemData) => {
     try {
@@ -170,6 +222,68 @@ function InventoryManagement() {
     }
   }
 
+  const handleStockManagement = (item) => {
+    setSelectedItem(item)
+    setStockManagerData({
+      stock_in: 0,
+      stock_out: 0,
+      reason: "",
+      current_balance: item.balance || 0
+    })
+    setShowStockManager(true)
+  }
+
+  const handleStockManagerSave = async () => {
+    if (!selectedItem || (!stockManagerData.stock_in && !stockManagerData.stock_out)) return
+
+    try {
+      let result = null
+
+      // Handle stock in (addition)
+      if (stockManagerData.stock_in > 0) {
+        await apiService.items.insertStock(selectedItem.item_no, {
+          quantity: stockManagerData.stock_in,
+          reason: stockManagerData.reason || "Stock added via inventory management"
+        })
+      }
+
+      // Handle stock out (removal)
+      if (stockManagerData.stock_out > 0) {
+        await apiService.items.recordItemOut(selectedItem.item_no, {
+          quantity: stockManagerData.stock_out,
+          notes: stockManagerData.reason || "Stock removed via inventory management",
+          out_by: "Inventory Manager"
+        })
+      }
+
+      // Refresh the items list
+      await fetchItems()
+      
+      setShowStockManager(false)
+      setSelectedItem(null)
+      setStockManagerData({ stock_in: 0, stock_out: 0, reason: "", current_balance: 0 })
+      
+      const changeText = []
+      if (stockManagerData.stock_in > 0) changeText.push(`+${stockManagerData.stock_in}`)
+      if (stockManagerData.stock_out > 0) changeText.push(`-${stockManagerData.stock_out}`)
+      
+      Swal.fire({
+        title: "Success!",
+        text: `Stock updated successfully! Changes: ${changeText.join(', ')} units`,
+        icon: "success",
+        confirmButtonText: "OK",
+      })
+    } catch (error) {
+      console.error("Error updating stock:", error)
+      Swal.fire({
+        title: "Error!",
+        text: `Error: ${error.message}`,
+        icon: "error",
+        confirmButtonText: "OK",
+      })
+    }
+  }
+
   const exportBarcodesToExcel = async () => {
   if (items.length === 0) {
     Swal.fire({
@@ -186,7 +300,7 @@ function InventoryManagement() {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>GOOJPRT Compatible Barcodes</title>
+        <title>CODE-128 ITM Format Barcodes</title>
         <style>
           @page {
             size: A4;
@@ -258,14 +372,16 @@ function InventoryManagement() {
       </head>
       <body>
         <div class="header no-print">
-          <h1>GOOJPRT Compatible Barcodes</h1>
+          <h1>CODE-128 ITM Format Barcodes</h1>
           <p>Generated on: ${new Date().toLocaleDateString()}</p>
           <p>Total Items: ${items.length}</p>
+          <p><strong>Format:</strong> ITM001, ITM002, ITM003...</p>
           
           <div class="instructions">
-            <h3>GOOJPRT Scanner Setup Instructions:</h3>
+            <h3>CODE-128 Scanner Setup Instructions:</h3>
             <ol style="text-align: left; max-width: 600px; margin: 0 auto;">
-              <li><strong>Check Scanner Settings:</strong> Make sure CODE128 is enabled on your scanner</li>
+              <li><strong>Check Scanner Settings:</strong> Make sure CODE-128 is enabled on your scanner</li>
+              <li><strong>Barcode Format:</strong> These barcodes use ITM prefix format (ITM001, ITM002, etc.)</li>
               <li><strong>Print Quality:</strong> Use high quality print settings (600 DPI minimum)</li>
               <li><strong>Paper:</strong> Use white paper with good contrast</li>
               <li><strong>Size:</strong> Don't resize - print at 100%</li>
@@ -281,13 +397,14 @@ function InventoryManagement() {
     `
 
     items.forEach((item, index) => {
-      // Ensure item_no is clean and compatible
-      const cleanItemNo = String(item.item_no).replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+      // Generate ITM format barcode ID (ITM + padded item_no)
+      const paddedNo = item.item_no.toString().padStart(3, '0')
+      const barcodeId = `ITM${paddedNo}`
       
       htmlContent += `
         <div class="barcode-item">
           <svg id="barcode-${index}" class="barcode-svg"></svg>
-          <div class="item-id">ID: ${cleanItemNo}</div>
+          <div class="item-id">ID: ${barcodeId}</div>
           <div class="item-name">${item.item_name}</div>
           <div class="item-details"><strong>Brand:</strong> ${item.brand || 'No Brand'}</div>
           <div class="item-details"><strong>Location:</strong> ${item.location || 'No Location'}</div>
@@ -305,11 +422,13 @@ function InventoryManagement() {
     `
 
     items.forEach((item, index) => {
-      const cleanItemNo = String(item.item_no).replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+      // Generate ITM format barcode ID (ITM + padded item_no)
+      const paddedNo = item.item_no.toString().padStart(3, '0')
+      const barcodeId = `ITM${paddedNo}`
       
       htmlContent += `
               try {
-                JsBarcode("#barcode-${index}", "${cleanItemNo}", {
+                JsBarcode("#barcode-${index}", "${barcodeId}", {
                   format: "CODE128",
                   width: 3,
                   height: 80,
@@ -323,9 +442,9 @@ function InventoryManagement() {
                   textMargin: 8
                 });
               } catch(e) {
-                console.error("Error generating barcode for ${cleanItemNo}:", e);
+                console.error("Error generating barcode for ${barcodeId}:", e);
                 document.getElementById("barcode-${index}").innerHTML = 
-                  '<div style="border:2px solid red; padding:20px; color:red;">Error generating barcode for ${cleanItemNo}</div>';
+                  '<div style="border:2px solid red; padding:20px; color:red;">Error generating barcode for ${barcodeId}</div>';
               }
       `
     })
@@ -437,7 +556,7 @@ function InventoryManagement() {
               📦
             </div>
           </div>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">{statistics.total_items || 0}</p>
+          <p className="text-3xl font-bold text-gray-900 dark:text-white">{statistics.server_total_items ?? statistics.total_items ?? 0}</p>
         </div>
 
         <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 rounded-2xl p-6 shadow-lg border border-emerald-200 dark:border-emerald-800">
@@ -587,7 +706,7 @@ function InventoryManagement() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {items.map((item) => (
+          {items.slice(0, visibleCount).map((item) => (
             <div
               key={item.item_no}
               className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-200 flex flex-col"
@@ -599,11 +718,15 @@ function InventoryManagement() {
                   <p className="text-gray-600 dark:text-gray-400 font-medium">{item.brand}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">ID: {item.item_no}</p>
                 </div>
-                <span
-                  className={`px-3 py-1 rounded-full text-sm font-bold border-2 ${getStatusColor(item.item_status)}`}
-                >
-                  {item.item_status}
-                </span>
+                {(() => {
+                  const bal = Number(item.balance) || 0
+                  const min = Number(item.min_stock) || 0
+                  const status = bal === 0 ? "Out Of Stock" : (min > 0 && bal < min ? "Low In Stock" : "In Stock")
+                  const color = status === "Out Of Stock" ? "bg-red-500" : status === "Low In Stock" ? "bg-yellow-400" : "bg-green-500"
+                  return (
+                    <span className={`inline-block w-3.5 h-3.5 rounded-full ${color}`} title={status} aria-label={status} />
+                  )
+                })()}
               </div>
 
               {/* Item Details */}
@@ -632,14 +755,15 @@ function InventoryManagement() {
                   </div>
                 </div>
 
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
-                  <span className="font-bold text-blue-700 dark:text-blue-300 block text-sm">
-                    Price per Unit
-                  </span>
-                  <span className="text-blue-900 dark:text-blue-200 font-bold text-lg">
-                    {formatCurrency(item.price_per_unit)}
-                  </span>
-                </div>
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-blue-700 dark:text-blue-300 block text-sm">Price per Unit</span>
+                      <span className="text-blue-900 dark:text-blue-200 font-bold text-lg">{formatCurrency(item.price_per_unit)}</span>
+                    </div>
+                    <div className="ml-4">
+                      <QRCodeSmall itemNo={item.item_no} size={2} />
+                    </div>
+                  </div>
               </div>
 
               {/* Action Buttons */}
@@ -651,10 +775,7 @@ function InventoryManagement() {
                   Edit
                 </button>
                 <button
-                  onClick={() => {
-                    setSelectedItem(item)
-                    setShowStockInsert(true)
-                  }}
+                  onClick={() => handleStockManagement(item)}
                   className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
                 >
                   Stock
@@ -668,113 +789,91 @@ function InventoryManagement() {
               </div>
             </div>
           ))}
+          {items.length > visibleCount && (
+            <div className="col-span-full flex justify-center">
+              <button
+                onClick={() => setVisibleCount((c) => Math.min(c + 20, items.length))}
+                className="mt-2 px-5 py-2 bg-zinc-600 hover:bg-zinc-700 text-white rounded-lg"
+              >
+                Load more ({Math.min(20, items.length - visibleCount)})
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       {/* Modals */}
       {showStockInsert && selectedItem && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">
-                Insert Stock - {selectedItem.item_name}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowStockInsert(false)
-                  setSelectedItem(null)
-                  setStockInsertData({ quantity: 0, reason: "" })
-                }}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Current Balance</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {selectedItem.balance}
-                </p>
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl p-6 w-full max-w-md">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Insert Stock - {selectedItem.item_name}</h3>
+                <button
+                  onClick={() => {
+                    setShowStockInsert(false)
+                    setSelectedItem(null)
+                    setStockInsertData({ quantity: 0, reason: "" })
+                  }}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Quantity to Add *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={stockInsertData.quantity}
-                  onChange={(e) =>
-                    setStockInsertData({
-                      ...stockInsertData,
-                      quantity: Number.parseInt(e.target.value) || 0,
-                    })
-                  }
-                  className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-green-500/20 focus:border-green-500 font-medium text-lg"
-                  placeholder="Enter quantity"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Reason (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={stockInsertData.reason}
-                  onChange={(e) =>
-                    setStockInsertData({
-                      ...stockInsertData,
-                      reason: e.target.value,
-                    })
-                  }
-                  className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-green-500/20 focus:border-green-500 font-medium"
-                  placeholder="e.g., New shipment, Restocking"
-                />
-              </div>
-
-              {stockInsertData.quantity > 0 && (
-                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-                  <p className="text-sm text-green-700 dark:text-green-300 mb-1">New Balance Will Be</p>
-                  <p className="text-xl font-bold text-green-800 dark:text-green-200">
-                    {selectedItem.balance + stockInsertData.quantity} {selectedItem.unit_of_measure}
-                  </p>
+              <div className="space-y-4">
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Current Balance</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{selectedItem.balance}</p>
                 </div>
-              )}
-            </div>
 
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={handleStockInsert}
-                disabled={stockInsertData.quantity <= 0}
-                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl font-semibold transition-all duration-200"
-              >
-                Insert Stock
-              </button>
-              <button
-                onClick={() => {
-                  setShowStockInsert(false)
-                  setSelectedItem(null)
-                  setStockInsertData({ quantity: 0, reason: "" })
-                }}
-                className="px-4 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-semibold"
-              >
-                Cancel
-              </button>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quantity to Add *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={stockInsertData.quantity}
+                    onChange={(e) => setStockInsertData({ ...stockInsertData, quantity: Number.parseInt(e.target.value) || 0 })}
+                    className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-green-500/20 focus:border-green-500 font-medium text-lg"
+                    placeholder="Enter quantity"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Reason (Optional)</label>
+                  <input
+                    type="text"
+                    value={stockInsertData.reason}
+                    onChange={(e) => setStockInsertData({ ...stockInsertData, reason: e.target.value })}
+                    className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-green-500/20 focus:border-green-500 font-medium"
+                    placeholder="e.g., New shipment, Restocking"
+                  />
+                </div>
+
+                {stockInsertData.quantity > 0 && (
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                    <p className="text-sm text-green-700 dark:text-green-300 mb-1">New Balance Will Be</p>
+                    <p className="text-xl font-bold text-green-800 dark:text-green-200">{selectedItem.balance + stockInsertData.quantity} {selectedItem.unit_of_measure}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button onClick={handleStockInsert} disabled={stockInsertData.quantity <= 0} className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl font-semibold transition-all duration-200">Insert Stock</button>
+                <button onClick={() => { setShowStockInsert(false); setSelectedItem(null); setStockInsertData({ quantity: 0, reason: "" }) }} className="px-4 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-semibold">Cancel</button>
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Item Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
+            <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-200">
                 {selectedItem ? "Edit Item" : "Add New Item"}
@@ -954,8 +1053,151 @@ function InventoryManagement() {
                 </button>
               </div>
             </form>
+            </div>
           </div>
-        </div>
+        </ModalPortal>
+      )}
+
+      {/* Stock Manager Modal */}
+      {showStockManager && selectedItem && (
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl p-6 w-full max-w-md">
+              <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">
+                Manage Stock - {selectedItem.item_name}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowStockManager(false)
+                  setSelectedItem(null)
+                  setStockManagerData({ stock_in: 0, stock_out: 0, reason: "", current_balance: 0 })
+                }}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+              <div className="space-y-4">
+              <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Current Balance</span>
+                  <span className="text-2xl font-bold text-gray-800 dark:text-gray-200">
+                    {selectedItem.balance || 0} {selectedItem.unit_of_measure || ''}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Stock In (Add) 📈
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={stockManagerData.stock_in}
+                    onChange={(e) =>
+                      setStockManagerData({
+                        ...stockManagerData,
+                        stock_in: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full border-2 border-green-300 dark:border-green-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-green-500/20 focus:border-green-500 font-medium text-lg"
+                    placeholder="Add stock"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Stock Out (Remove) 📉
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max={selectedItem.balance || 0}
+                    value={stockManagerData.stock_out}
+                    onChange={(e) =>
+                      setStockManagerData({
+                        ...stockManagerData,
+                        stock_out: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full border-2 border-red-300 dark:border-red-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-red-500/20 focus:border-red-500 font-medium text-lg"
+                    placeholder="Remove stock"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Reason/Notes
+                </label>
+                <input
+                  type="text"
+                  value={stockManagerData.reason}
+                  onChange={(e) =>
+                    setStockManagerData({
+                      ...stockManagerData,
+                      reason: e.target.value,
+                    })
+                  }
+                  className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+                  placeholder="e.g., New shipment, Sale, Transfer, etc."
+                />
+              </div>
+
+              {(stockManagerData.stock_in > 0 || stockManagerData.stock_out > 0) && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-blue-700 dark:text-blue-300">New Balance Preview</span>
+                    <span className="text-xl font-bold text-blue-800 dark:text-blue-200">
+                      {(selectedItem.balance || 0) + (stockManagerData.stock_in || 0) - (stockManagerData.stock_out || 0)} {selectedItem.unit_of_measure || ''}
+                    </span>
+                  </div>
+                  <div className="text-xs text-blue-600 dark:text-blue-400">
+                    {stockManagerData.stock_in > 0 && `+${stockManagerData.stock_in} `}
+                    {stockManagerData.stock_out > 0 && `-${stockManagerData.stock_out} `}
+                    from current balance
+                  </div>
+                </div>
+              )}
+
+              {stockManagerData.stock_out > (selectedItem.balance || 0) && (
+                <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
+                  <div className="text-sm text-red-700 dark:text-red-300">
+                    ⚠️ Cannot remove more stock than available ({selectedItem.balance || 0} available)
+                  </div>
+                </div>
+              )}
+            </div>
+
+              <div className="flex gap-3 mt-6">
+              <button
+                onClick={handleStockManagerSave}
+                disabled={(!stockManagerData.stock_in && !stockManagerData.stock_out) || 
+                         stockManagerData.stock_out > (selectedItem.balance || 0)}
+                className="flex-1 bg-zinc-600 hover:bg-zinc-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl font-semibold transition-all duration-200"
+              >
+                💾 Commit Changes
+              </button>
+              <button
+                onClick={() => {
+                  setShowStockManager(false)
+                  setSelectedItem(null)
+                  setStockManagerData({ stock_in: 0, stock_out: 0, reason: "", current_balance: 0 })
+                }}
+                className="px-4 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-semibold"
+              >
+                Cancel
+              </button>
+            </div>
+            </div>
+          </div>
+        </ModalPortal>
       )}
     </div>
   )
