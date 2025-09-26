@@ -1,0 +1,243 @@
+item_no,item_name,barcode_id,barcode_path
+1,Acetylene Cutting Tip 2NX (HARRIS),ITM001,barcode\1\ITM001.png
+2,Acetylene Cutting Tip 6290-2 (HARRIS),ITM002,barcode\2\ITM002.png
+3,Acetylene Cutting Tip 6290-3 (HARRIS),ITM003,barcode\3\ITM003.png
+4,"Allen Bolt 1"" x 2-1/2"" NC (FT)",ITM004,barcode\4\ITM004.png
+5,"Allen Bolt 1"" x 2-1/4"" NC (FT)",ITM005,barcode\5\ITM005.png
+6,"Allen Bolt 1/2"" x 1"" NC (FT)",ITM006,barcode\6\ITM006.png
+7,"Allen Bolt 1/2"" x 1-1/2"" NC (FT)",ITM007,barcode\7\ITM007.png
+8,"Allen Bolt 1/2"" x 1-1/4"" NC (FT)",ITM008,barcode\8\ITM008.png
+9,"Allen Bolt 1/2"" x 3/4"" NC (FT)",ITM009,barcode\9\ITM009.png
+10,"Allen Bolt 1/4"" x 1"" NF (FT)",ITM010,barcode\10\ITM010.png
+11,"Allen Bolt 1/4"" x 1-1/2"" NC (HT)",ITM011,barcode\11\ITM011.png
+12,"Allen Bolt 1/4"" x 2"" NC (HT)",ITM012,barcode\12\ITM012.png
+13,"Allen Bolt 1-3/8"" x 1"" NC (FT)",ITM013,barcode\13\ITM013.png
+14,"Allen Bolt 3/16"" x 1/2"" NF (FT)",ITM014,barcode\14\ITM014.png
+15,"Allen Bolt 3/4"" x 2"" NC (FT)",ITM015,barcode\15\ITM015.png
+16,"Allen Bolt 3/8"" x 1"" NF (FT)",ITM016,barcode\16\ITM016.png
+17,"Allen Bolt 5/8"" x 2-1/4"" NC (FT)",ITM017,barcode\17\ITM017.png
+18,"Allen Bolt 5/8"" x 4"" NC (FT)",ITM018,barcode\18\ITM018.png
+19,"Allen Bolt 7/16"" x 3/4"" NF (FT)",ITM019,barcode\19\ITM019.png
+20,"Allen Wrench 3/16""",ITM020,barcode\20\ITM020.png
+21,"Angle Grinder 4""",ITM021,barcode\21\ITM021.png
+22,Bandsaw Blade 34 x 34,ITM022,barcode\22\ITM022.png
+23,Black Coal Tar (Master),ITM023,barcode\23\ITM023.png
+24,Bronze Packing Ring,ITM024,barcode\24\ITM024.png
+25,Cap Brush 10 x 1.25,ITM025,barcode\25\ITM025.png
+26,"Carbide 1/2"" x 1/2"" (LH) (TUNGATIP)",ITM026,barcode\26\ITM026.png
+27,"Carbide 1/2"" x 1/2"" (RH) (TUNGATIP)",ITM027,barcode\27\ITM027.png
+28,"Carbide 1/2"" x 1/2"" (ST) (TUNGATIP)",ITM028,barcode\28\ITM028.png
+29,"Carbide 3/4"" x 3/4"" (LH) (TUNGATIP)",ITM029,barcode\29\ITM029.png
+30,"Carbide 3/4"" x 3/4"" (RH) (TUNGATIP)",ITM030,barcode\30\ITM030.png
+31,"Carbide 3/4"" x 3/4"" (ST) (TUNGATIP)",ITM031,barcode\31\ITM031.png
+32,"Carbide 3/8"" x 3/8"" (LH) (TUNGATIP)",ITM032,barcode\32\ITM032.png
+33,"Carbide 3/8"" x 3/8"" (RH) (TUNGATIP)",ITM033,barcode\33\ITM033.png
+34,"Carbide 3/8"" x 3/8"" (ST) (TUNGATIP)",ITM034,barcode\34\ITM034.png
+35,Carbon Brush CB325 (Big),ITM035,barcode\35\ITM035.png
+36,Carbon Brush CB325 (Small),ITM036,barcode\36\ITM036.png
+37,Carbon Brush CB-64A (MAKITA),ITM037,barcode\37\ITM037.png
+38,"Circular Steel Wire Brush 8"" dia. (POWERHOUSE)",ITM038,barcode\38\ITM038.png
+39,Clear Glass,ITM039,barcode\39\ITM039.png
+40,Common Nail #1,ITM040,barcode\40\ITM040.png
+41,"Common nail #1-1/2""",ITM041,barcode\41\ITM041.png
+42,Common Nail #2,ITM042,barcode\42\ITM042.png
+43,Common Nail #3,ITM043,barcode\43\ITM043.png
+44,Common Nail #4,ITM044,barcode\44\ITM044.png
+45,Coolant,ITM045,barcode\45\ITM045.png
+46,Cotton Gloves (Black),ITM046,barcode\46\ITM046.png
+47,"Counter Sunk 3/8"" x 1""",ITM047,barcode\47\ITM047.png
+48,"Counter Sunk 5/16"" x 1""",ITM048,barcode\48\ITM048.png
+49,"Counter Sunk 5/16"" x 1-1/2""",ITM049,barcode\49\ITM049.png
+50,"Cut-off Wheel 14"" x 1/8"" (TAILIN)",ITM050,barcode\50\ITM050.png
+51,"Cut-off Wheel 4"" 100 x 3 x 16 mm (TAILIN)",ITM051,barcode\51\ITM051.png
+52,Cut-off Wheel Super Thin 105 x 1 x 16 mm SS (TAILIN),ITM052,barcode\52\ITM052.png
+53,"Cutting Disc 4"" 105"" x 1.0 x 16mm (DOMORE)",ITM053,barcode\53\ITM053.png
+54,Dark Glass #10,ITM054,barcode\54\ITM054.png
+55,Dark Glass #12,ITM055,barcode\55\ITM055.png
+56,Devcon Steel Putty (Tube) (DEVCON),ITM056,barcode\56\ITM056.png
+57,"Drill Bit 1/16"" (DORMER)",ITM057,barcode\57\ITM057.png
+58,"Drill Bit 1/2"" (DORMER)",ITM058,barcode\58\ITM058.png
+59,"Drill Bit 1/4"" (DORMER)",ITM059,barcode\59\ITM059.png
+60,"Drill Bit 1/8"" (DORMER)",ITM060,barcode\60\ITM060.png
+61,Drill Bit 10.5mm (DORMER),ITM061,barcode\61\ITM061.png
+62,Drill Bit 10mm (DORMER),ITM062,barcode\62\ITM062.png
+63,Drill Bit 11mm (DORMER),ITM063,barcode\63\ITM063.png
+64,Drill Bit 14mm (DORMER),ITM064,barcode\64\ITM064.png
+65,Drill Bit 3.5mm (DORMER),ITM065,barcode\65\ITM065.png
+66,"Drill Bit 3/16"" (DORMER)",ITM066,barcode\66\ITM066.png
+67,"Drill Bit 3/8"" (DORMER)",ITM067,barcode\67\ITM067.png
+68,Drill Bit 4.0mm (DORMER),ITM068,barcode\68\ITM068.png
+69,Drill Bit 5.5mm (DORMER),ITM069,barcode\69\ITM069.png
+70,"Drill Bit 5/16"" (DORMER)",ITM070,barcode\70\ITM070.png
+71,"Drill Bit 5/32"" (DORMER)",ITM071,barcode\71\ITM071.png
+72,"Drill Bit 5/8"" (DORMER)",ITM072,barcode\72\ITM072.png
+73,Drill Bit 5mm (DORMER),ITM073,barcode\73\ITM073.png
+74,Drill Bit 6mm (DORMER),ITM074,barcode\74\ITM074.png
+75,Drill Bit 7.5mm (DORMER),ITM075,barcode\75\ITM075.png
+76,"Drill Bit 7/16"" (DORMER)",ITM076,barcode\76\ITM076.png
+77,Drill Bit 7mm (DORMER),ITM077,barcode\77\ITM077.png
+78,Drill Bit 8.5mm (DORMER),ITM078,barcode\78\ITM078.png
+79,Electrical Tape (ARMAK),ITM079,barcode\79\ITM079.png
+80,Epoxy Primer w/ Catalyst Grey (ILLINOIS),ITM080,barcode\80\ITM080.png
+81,Flap Wheel A80 150 x 25 x 25 mm (JIAYAN),ITM081,barcode\81\ITM081.png
+82,"Flat File 12"" (Bastard) (NICHOLSON)",ITM082,barcode\82\ITM082.png
+83,"Flat File 12"" (Fine) (NICHOLSON)",ITM083,barcode\83\ITM083.png
+84,"Flat File 8"" (Bastard) (NICHOLSON)",ITM084,barcode\84\ITM084.png
+85,"Flat File 8"" (Fine) (NICHOLSON)",ITM085,barcode\85\ITM085.png
+86,G.I. Wire #16,ITM086,barcode\86\ITM086.png
+87,"Grinding Disc 4"" x 1/4"" x 5/8"" (TAILIN)",ITM087,barcode\87\ITM087.png
+88,"Grinding Disc 5"" (TAILIN)",ITM088,barcode\88\ITM088.png
+89,"Grinding Disc 7"" x 1/4"" x 7/8"" (TAILIN)",ITM089,barcode\89\ITM089.png
+90,"Grinding Wheel 1/4"" (GICA)",ITM090,barcode\90\ITM090.png
+91,Grinding Wheel WA46 6 x 2 x 1-1/4 (White) (GICA),ITM091,barcode\91\ITM091.png
+92,Grinding Wheel WA46 8 x 4 x 60 mm (White) (GICA),ITM092,barcode\92\ITM092.png
+93,"Hacksaw Blade 12""/300mm [Orange] (SANDFLEX)",ITM093,barcode\93\ITM093.png
+94,"Half Moon File 12"" (Bastard) (NICHOLSON)",ITM094,barcode\94\ITM094.png
+95,"Half Moon File 12"" (Fine) (NICHOLSON)",ITM095,barcode\95\ITM095.png
+96,"Half Moon File 8"" (Bastard) (NICHOLSON)",ITM096,barcode\96\ITM096.png
+97,"Half Moon File 8"" (Fine) (NICHOLSON)",ITM097,barcode\97\ITM097.png
+98,Helical Spring for Safety Switch (Long) (ISI),ITM098,barcode\98\ITM098.png
+99,Helical Spring for Safety Switch (Short) (ISI),ITM099,barcode\99\ITM099.png
+100,"Hexagonal Bolt 1"" x 3"" NC (FT)",ITM100,barcode\100\ITM100.png
+101,"Hexagonal Bolt 1"" x 4"" NC (HT)",ITM101,barcode\101\ITM101.png
+102,"Hexagonal Bolt 1"" x 4"" NF (HT)",ITM102,barcode\102\ITM102.png
+103,"Hexagonal Bolt 1"" x 5"" NC (HT)",ITM103,barcode\103\ITM103.png
+104,"Hexagonal Bolt 1"" x 6-1/4"" NC (HT)",ITM104,barcode\104\ITM104.png
+105,"Hexagonal Bolt 1"" x 7"" NC (HT)",ITM105,barcode\105\ITM105.png
+106,"Hexagonal Bolt 1"" x 8"" NC (HT)",ITM106,barcode\106\ITM106.png
+107,"Hexagonal Bolt 1/2"" x 1"" NC (FT)",ITM107,barcode\107\ITM107.png
+108,"Hexagonal Bolt 1/2"" x 1-1/2"" NC (FT)",ITM108,barcode\108\ITM108.png
+109,"Hexagonal Bolt 1/2"" x 2"" NC (HT)",ITM109,barcode\109\ITM109.png
+110,"Hexagonal Bolt 1/2"" x 2-1/2"" NC (HT)",ITM110,barcode\110\ITM110.png
+111,"Hexagonal Bolt 1/2"" x 3"" NC (FT)",ITM111,barcode\111\ITM111.png
+112,"Hexagonal Bolt 1/2"" x 3-1/2"" NC (HT)",ITM112,barcode\112\ITM112.png
+113,"Hexagonal Bolt 1/2"" x 4"" NC (FT)",ITM113,barcode\113\ITM113.png
+114,"Hexagonal Bolt 1/4"" x 1"" NC (FT)",ITM114,barcode\114\ITM114.png
+115,"Hexagonal Bolt 1-1/2"" x 5"" NC (HT)",ITM115,barcode\115\ITM115.png
+116,"Hexagonal Bolt 1-1/4"" x 2-1/2"" NC (FT)",ITM116,barcode\116\ITM116.png
+117,"Hexagonal Bolt 1-1/4"" x 4"" NC (FT)",ITM117,barcode\117\ITM117.png
+118,"Hexagonal Bolt 1-1/4"" x 4-1/2"" NC (HT)",ITM118,barcode\118\ITM118.png
+119,"Hexagonal Bolt 1-1/4"" x 5-1/2"" NC (HT)",ITM119,barcode\119\ITM119.png
+120,"Hexagonal Bolt 1-1/4"" x 6"" NC (HT)",ITM120,barcode\120\ITM120.png
+121,"Hexagonal Bolt 1-3/8"" x 4"" NC (FT)",ITM121,barcode\121\ITM121.png
+122,"Hexagonal Bolt 1-3/8"" x 6"" NC (HT)",ITM122,barcode\122\ITM122.png
+123,"Hexagonal Bolt 3/4"" x 2"" NC (FT)",ITM123,barcode\123\ITM123.png
+124,"Hexagonal Bolt 3/4"" x 2-1/2"" NC (FT)",ITM124,barcode\124\ITM124.png
+125,"Hexagonal Bolt 3/4"" x 4"" NC (FT)",ITM125,barcode\125\ITM125.png
+126,"Hexagonal Bolt 3/4"" x 6"" NC (FT)",ITM126,barcode\126\ITM126.png
+127,"Hexagonal Bolt 3/4"" x 6-3/8"" NC (HT)",ITM127,barcode\127\ITM127.png
+128,"Hexagonal Bolt 3/8"" x 1"" NC (FT)",ITM128,barcode\128\ITM128.png
+129,"Hexagonal Bolt 3/8"" x 1-1/2"" NC (FT)",ITM129,barcode\129\ITM129.png
+130,"Hexagonal Bolt 3/8"" x 1-1/2"" NC (HT)",ITM130,barcode\130\ITM130.png
+131,"Hexagonal Bolt 3/8"" x 1-1/4"" NC (FT)",ITM131,barcode\131\ITM131.png
+132,"Hexagonal Bolt 3/8"" x 3"" NC (HT)",ITM132,barcode\132\ITM132.png
+133,"Hexagonal Bolt 3/8"" x 4"" NC (FT)",ITM133,barcode\133\ITM133.png
+134,"Hexagonal Bolt 3/8"" x 4"" NC (HT)",ITM134,barcode\134\ITM134.png
+135,"Hexagonal Bolt 5/8"" x 1"" NC (FT)",ITM135,barcode\135\ITM135.png
+136,"Hexagonal Bolt 5/8"" x 1-1/2"" NC (FT)",ITM136,barcode\136\ITM136.png
+137,"Hexagonal Bolt 5/8"" x 1-1/4"" Nf (FT)",ITM137,barcode\137\ITM137.png
+138,"Hexagonal Bolt 5/8"" x 1-3/4"" NC (FT)",ITM138,barcode\138\ITM138.png
+139,"Hexagonal Bolt 5/8"" x 1-3/4"" NF (FT)",ITM139,barcode\139\ITM139.png
+140,"Hexagonal Bolt 5/8"" x 2"" NC (FT)",ITM140,barcode\140\ITM140.png
+141,"Hexagonal Bolt 5/8"" x 2"" NF (FT)",ITM141,barcode\141\ITM141.png
+142,"Hexagonal Bolt 5/8"" x 2-1/2"" NC (FT)",ITM142,barcode\142\ITM142.png
+143,"Hexagonal Bolt 5/8"" x 2-1/2"" NC (HT)",ITM143,barcode\143\ITM143.png
+144,"Hexagonal Bolt 5/8"" x 2-1/2"" NF (HT)",ITM144,barcode\144\ITM144.png
+145,"Hexagonal Bolt 5/8"" x 3"" NC (HT)",ITM145,barcode\145\ITM145.png
+146,"Hexagonal Bolt 7/16"" x 3"" NC (HT)",ITM146,barcode\146\ITM146.png
+147,"Hexagonal Bolt 7/16"" x 3-1/2"" NC (HT)",ITM147,barcode\147\ITM147.png
+148,Hydraulic Oil VG 150 [20 liters/pail] (UNIVERZAL),ITM148,barcode\148\ITM148.png
+149,Industrial Gear Oil ISO VG 150 [20 liters/pail] (UNIVERZAL),ITM149,barcode\149\ITM149.png
+150,LPG Cutting Tip 1NX (HARRIS),ITM150,barcode\150\ITM150.png
+151,Mounted Stone A38 Straigth (Pink),ITM151,barcode\151\ITM151.png
+152,Mounted Stone A5 Conical (Pink),ITM152,barcode\152\ITM152.png
+153,"N-11 3.2 x 350 mm (1/8"" x 14"") [20 kgs/box] - E6011 3.2 (NIHON)",ITM153,barcode\153\ITM153.png
+154,"N-11 4.0 x 350 mm (5/32"" x 14"") [20 kgs/box] - E6011 4.0 (NIHON)",ITM154,barcode\154\ITM154.png
+155,"N-55 3.2 x 350 mm (1/8"" x 1/4) [20 kgs/box] - E6013 3.2 (NIHON)",ITM155,barcode\155\ITM155.png
+156,"N-55 4.0 x 400 mm (5/32"" x 16"") [20 kgs/box] - E6013 4.0 (NIHON)",ITM156,barcode\156\ITM156.png
+157,"N-7018 2.5 x 350 mm (3/32"" x 14"") [20 kgs/box] - E7018 2.4 (NIHON)",ITM157,barcode\157\ITM157.png
+158,"N-7018 3.2 x 350 mm (1/8"" x 14"") [20 kgs/box] - E7018 3.2 (NIHON)",ITM158,barcode\158\ITM158.png
+159,"N-7018 4.0 x 350 mm (5/32"" x 14"") [20 kgs/box] - E7018 4.0 (NIHON)",ITM159,barcode\159\ITM159.png
+160,"NFG 4.0 x 350 mm (5/32"" x 14"") (Chamfering) [4 kgs/pack] (NIHON)",ITM160,barcode\160\ITM160.png
+161,"NHF-700 4.0 x 350 mm (5/32"" x 14"") (Hardfacing) [5 kgs/pack] (NIHON)",ITM161,barcode\161\ITM161.png
+162,"NSS-308 Stainless 1.6 x 254 mm (1/16"" x 10"") [1 kg/pack] (NIHON)",ITM162,barcode\162\ITM162.png
+163,"NSS-308 Stainless 3.2 x 254 mm (1/8"" x 10"") [1 kg/pack] (NIHON)",ITM163,barcode\163\ITM163.png
+164,"NSS-308 Stainless 4.0 x 350 mm (5/32"" x 14"") [1 kgs/pack] (NIHON)",ITM164,barcode\164\ITM164.png
+165,Paint Thinner (JC UNICORN),ITM165,barcode\165\ITM165.png
+166,"Paintbrush 2"" (CROCO)",ITM166,barcode\166\ITM166.png
+167,"Pillow Block 1-1/2"" PN-P208 (ASAHI)",ITM167,barcode\167\ITM167.png
+168,Plastic (per 100 pcs),ITM168,barcode\168\ITM168.png
+169,"Powersaw Blade AE223R 350 x 1.25 x 10"" (ECLIPSE)",ITM169,barcode\169\ITM169.png
+170,"Powersaw Blade AE343V 350 x 1-1/4"" x 14"" (ECLIPSE)",ITM170,barcode\170\ITM170.png
+171,"Powersaw Blade AE472B 450 x 1-1/2"" x 18"" (ECLIPSE)",ITM171,barcode\171\ITM171.png
+172,Red Oxide Primer (MINESSOTA),ITM172,barcode\172\ITM172.png
+173,Safety Goggles (Blue),ITM173,barcode\173\ITM173.png
+174,Sand Paper BS120,ITM174,barcode\174\ITM174.png
+175,Sand Paper BS220,ITM175,barcode\175\ITM175.png
+176,Sand Paper BS240,ITM176,barcode\176\ITM176.png
+177,"Sanding Disc Gr. 80 4"" x 5/8"" (KLINGSPOR)",ITM177,barcode\177\ITM177.png
+178,Silicone Carbide Stone 12A 150 x 16 x 31.75 Saucer Type (KINIK),ITM178,barcode\178\ITM178.png
+179,Silicone Carbide Stone 1A 180 x 19 x 31.75 Straight Cup (KINIK),ITM179,barcode\179\ITM179.png
+180,Silicone Carbide Stone 5A 180 x 19 x 31.75 (KINIK),ITM180,barcode\180\ITM180.png
+181,Silicone Carbide Stone 6A  125 x 50 x 3 1.75 (KINIK),ITM181,barcode\181\ITM181.png
+182,Silicone Carbide Stone A38 8 x 1 x 1 (Grey) (CRABORONDUM),ITM182,barcode\182\ITM182.png
+183,Silicone Carbide Stone GC80 8 x 1 x 1 (Green) (CARBORONDUM),ITM183,barcode\183\ITM183.png
+184,Silicone Carbide Stone WA46 6 x 2 x 1-1/4 (GICA),ITM184,barcode\184\ITM184.png
+185,Silicone Gasket Marker (Red) (V-TECH),ITM185,barcode\185\ITM185.png
+186,Spark Lightel Stone,ITM186,barcode\186\ITM186.png
+187,Special Electrodes N-6013 2.5 x 325 [10 kgs/box] (NIHON),ITM187,barcode\187\ITM187.png
+188,"Spring Steel Sheet 0.015"" Thick x 7"" Width",ITM188,barcode\188\ITM188.png
+189,"Spring Steel 0.010"" Thick x 7"" Width",ITM189,barcode\189\ITM189.png
+190,"Spring Steel 0.020"" Thick x 8"" Width",ITM190,barcode\190\ITM190.png
+191,"Spring Steel 0.030"" Thick x 7"" Width",ITM191,barcode\191\ITM191.png
+192,Steel Brush w/ Plastic Handle,ITM192,barcode\192\ITM192.png
+193,Teflon Tape,ITM193,barcode\193\ITM193.png
+194,"Tiger Bronze 2""ID x 2-3/4""OD x 13""L",ITM194,barcode\194\ITM194.png
+195,Trouble Light,ITM195,barcode\195\ITM195.png
+196,Welding Apron Maong (Long Sleeves),ITM196,barcode\196\ITM196.png
+197,Welding Electrode Holder 300A (JACKSON),ITM197,barcode\197\ITM197.png
+198,Welding Gloves (Red),ITM198,barcode\198\ITM198.png
+199,Welding Mask w/ Strap,ITM199,barcode\199\ITM199.png
+201,Bearing UCF 208-24 (ASAHI),ITM201,barcode\201\ITM201.png
+202,Bearing UCF 215-48 (ASAHI),ITM202,barcode\202\ITM202.png
+205,Bearing P 213 (ASAHI),ITM205,barcode\205\ITM205.png
+206,Bearing UCF 208-24 (ASAHI),ITM206,barcode\206\ITM206.png
+207,Bearing 57407/320085 (KOYO),ITM207,barcode\207\ITM207.png
+208,Bearing 32207JR,ITM208,barcode\208\ITM208.png
+209,Bearing 32210JR (KOYO),ITM209,barcode\209\ITM209.png
+210,Bearing 62042RSCM (KOYO),ITM210,barcode\210\ITM210.png
+211,Bearing UKF211j (KOYO),ITM211,barcode\211\ITM211.png
+212,Bearing UCF 215-48,ITM212,barcode\212\ITM212.png
+213,Bearing UCF 211-32J (KOYO),ITM213,barcode\213\ITM213.png
+214,Bearing 6212 ZZ (KOYO),ITM214,barcode\214\ITM214.png
+215,Bearing 14276 (TIMKEN),ITM215,barcode\215\ITM215.png
+216,Bearing 938-932 (TIMKEN),ITM216,barcode\216\ITM216.png
+217,Bearing 762-752 (TIMKEN),ITM217,barcode\217\ITM217.png
+218,Bearing 6375-6320 (TIMKEN),ITM218,barcode\218\ITM218.png
+219,Bearing 6008-2ZRC3 (FAG),ITM219,barcode\219\ITM219.png
+220,Bearing 6313-2Z (FAG),ITM220,barcode\220\ITM220.png
+221,Bearing 6212 (FAG),ITM221,barcode\221\ITM221.png
+222,Bearing BWC 13219A (NSK),ITM222,barcode\222\ITM222.png
+223,Bearing 2909-411 (NSK),ITM223,barcode\223\ITM223.png
+224,Bearing 6006 ZZ (NTN),ITM224,barcode\224\ITM224.png
+225,Bearing MA5313 EL (NTN),ITM225,barcode\225\ITM225.png
+226,Bearing 5314 (NTN),ITM226,barcode\226\ITM226.png
+227,Bearing 94700-94113 (TIMKEN),ITM227,barcode\227\ITM227.png
+228,Bearing 29430,ITM228,barcode\228\ITM228.png
+229,Bearing KT 6313ZZC3 (JTE),ITM229,barcode\229\ITM229.png
+230,Bearing 94258819-0 (ISUZU),ITM230,barcode\230\ITM230.png
+231,Bearing HE 2311 (JPS),ITM231,barcode\231\ITM231.png
+232,Bearing 29444M (SKT),ITM232,barcode\232\ITM232.png
+233,Bearing UCF 212-44 (FYH),ITM233,barcode\233\ITM233.png
+234,Bearing P 215 (KSM),ITM234,barcode\234\ITM234.png
+235,Bearing SVT 70L (SKF),ITM235,barcode\235\ITM235.png
+236,Oil Seal 417171 (NATIONAL),ITM236,barcode\236\ITM236.png
+237,Oil Seal 417159 (NATIONAL),ITM237,barcode\237\ITM237.png
+238,Oil Seal 473215 (NATIONAL),ITM238,barcode\238\ITM238.png
+239,Oil Seal 417269 (NATIONAL),ITM239,barcode\239\ITM239.png
+240,Oil Seal 455018 (NATIONAL),ITM240,barcode\240\ITM240.png
+241,Oil Seal 415160 (NATIONAL),ITM241,barcode\241\ITM241.png
+242,Oil Seal 42528 (NATIONAL),ITM242,barcode\242\ITM242.png
+243,Oil Seal 2374 (NATIONAL),ITM243,barcode\243\ITM243.png
+244,Oil Seal 6250 (NATIONAL),ITM244,barcode\244\ITM244.png
+245,Bearing UCF 214-44 (ASAHI),ITM245,barcode\245\ITM245.png
