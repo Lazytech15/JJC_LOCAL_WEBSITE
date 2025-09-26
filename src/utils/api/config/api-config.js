@@ -2,7 +2,7 @@
 // config/api-config.js
 // ============================================================================
 export const API_ENDPOINTS = {
-  public: "msgstr-attribute-bar-enhancement.trycloudflare.com",
+  public: "https://msgstr-attribute-bar-enhancement.trycloudflare.com",
   //public: window.location.origin,
 }
 
