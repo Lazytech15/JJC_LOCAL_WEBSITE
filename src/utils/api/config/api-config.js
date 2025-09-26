@@ -2,8 +2,8 @@
 // config/api-config.js
 // ============================================================================
 export const API_ENDPOINTS = {
-  local: "http://192.168.68.140:3001",
-  public: window.location.origin,
+  public: "msgstr-attribute-bar-enhancement.trycloudflare.com",
+  //public: window.location.origin,
 }
 
 export const DEFAULT_HEADERS = {
