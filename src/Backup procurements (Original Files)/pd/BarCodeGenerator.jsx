@@ -4,21 +4,13 @@ import bwipjs from "bwip-js"
 function BarcodeGenerator({ item, isOpen, onClose }) {
   const canvasRef = useRef(null)
 
-  // Generate formatted barcode ID (ITM + padded item_no)
-  const generateBarcodeId = (itemNo) => {
-    const paddedNo = itemNo.toString().padStart(3, '0')
-    return `ITM${paddedNo}`
-  }
-
   useEffect(() => {
     if (isOpen && item && canvasRef.current) {
-      const barcodeId = generateBarcodeId(item.item_no)
-      
       try {
-        // Generate Code 128 barcode using bwip-js with ITM format
+        // Generate Code 128 barcode using bwip-js
         bwipjs.toCanvas(canvasRef.current, {
-          bcid: 'code128',       // Barcode type (CODE-128)
-          text: barcodeId,       // Text to encode (ITM001, ITM002, etc.)
+          bcid: 'code128',       // Barcode type
+          text: item.item_no.toString(),    // Text to encode
           scale: 3,               // 3x scaling factor
           height: 10,             // Bar height, in millimeters
           includetext: true,      // Show human-readable text
@@ -37,7 +29,7 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
         try {
           bwipjs.toCanvas(canvasRef.current, {
             bcid: 'code128',
-            text: barcodeId,
+            text: item.item_no.toString(),
             scale: 2,
             height: 8,
             includetext: true,
@@ -54,9 +46,8 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
   const downloadBarcode = () => {
     if (canvasRef.current) {
       const canvas = canvasRef.current
-      const barcodeId = generateBarcodeId(item.item_no)
       const link = document.createElement("a")
-      link.download = `${barcodeId}-${item.item_name.replace(/[^a-zA-Z0-9]/g, '_')}.png`
+      link.download = `Barcode-${item.item_no}-${item.item_name.replace(/[^a-zA-Z0-9]/g, '_')}.png`
       link.href = canvas.toDataURL("image/png", 1.0) // Maximum quality
       link.click()
     }
@@ -66,11 +57,10 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
     if (canvasRef.current) {
       const canvas = canvasRef.current
       const printWindow = window.open('', '_blank')
-      const barcodeId = generateBarcodeId(item.item_no)
       printWindow.document.write(`
         <html>
           <head>
-            <title>Print Barcode - ${item.item_name} (${barcodeId})</title>
+            <title>Print Barcode - ${item.item_name}</title>
             <style>
               body { 
                 margin: 0; 
@@ -115,9 +105,8 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
                 <div>Brand: ${item.brand || 'N/A'}</div>
                 <div>Type: ${item.item_type || 'N/A'}</div>
                 <div>Location: ${item.location || 'N/A'}</div>
-                <div><strong>Barcode ID: ${barcodeId}</strong></div>
               </div>
-              <img src="${canvas.toDataURL('image/png', 1.0)}" alt="Barcode for ${item.item_name} (${barcodeId})" />
+              <img src="${canvas.toDataURL('image/png', 1.0)}" alt="Barcode for ${item.item_name}" />
             </div>
             <script>
               window.onload = function() {
@@ -137,11 +126,9 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
   // Generate a test barcode for different formats
   const generateTestBarcode = async (format = 'code128') => {
     if (canvasRef.current && item) {
-      const barcodeId = generateBarcodeId(item.item_no)
-      
       try {
         const options = {
-          text: barcodeId,  // Use ITM format for all barcode types
+          text: item.item_no.toString(),
           includetext: true,
           textxalign: 'center',
           scale: 3,
@@ -162,11 +149,8 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
             break
           case 'ean13':
             // EAN13 requires exactly 12 digits (13th is checksum)
-            // Since ITM format is alphanumeric, we'll use a numeric representation
-            const numericId = item.item_no.toString().padStart(12, '0')
-            if (numericId.length === 12) {
+            if (item.item_no.toString().length === 12) {
               options.bcid = 'ean13'
-              options.text = numericId
               options.height = 8
             } else {
               throw new Error('EAN13 requires 12 digits')
@@ -174,10 +158,8 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
             break
           case 'upca':
             // UPC-A requires exactly 11 digits (12th is checksum)
-            const numericUpcId = item.item_no.toString().padStart(11, '0')
-            if (numericUpcId.length === 11) {
+            if (item.item_no.toString().length === 11) {
               options.bcid = 'upca'
-              options.text = numericUpcId
               options.height = 8
             } else {
               throw new Error('UPC-A requires 11 digits')
@@ -225,9 +207,6 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
               <div>Type: {item?.item_type || 'N/A'}</div>
               <div>Location: {item?.location || 'N/A'}</div>
               <div>Item #: {item?.item_no}</div>
-              <div className="font-bold text-blue-600 dark:text-blue-400">
-                Barcode ID: {item ? generateBarcodeId(item.item_no) : 'N/A'}
-              </div>
             </div>
           </div>
 
@@ -276,7 +255,7 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
           </div>
 
           <div className="text-xs text-gray-500 dark:text-gray-400">
-            High-quality CODE-128 barcode in ITM format - Compatible with all standard scanners
+            High-quality barcode using bwip-js - Compatible with all standard scanners
           </div>
         </div>
 
