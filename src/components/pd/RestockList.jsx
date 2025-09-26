@@ -79,7 +79,8 @@ export default function RestockList() {
     new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(amount || 0)
 
   const exportToExcel = () => {
-    const rows = restockItems.map((i) => ({
+    // Sheet 1: Restock (detailed rows)
+    const restockRows = restockItems.map((i) => ({
       "Item No": i.item_no,
       "Item Name": i.item_name,
       Brand: i.brand || "",
@@ -90,13 +91,197 @@ export default function RestockList() {
       Shortage: i.__shortage,
       "Recommended Order Qty": i.__recommended_order,
       Supplier: i.supplier || "",
+      "Unit": i.unit_of_measure || "",
       "Price/Unit": Number(i.price_per_unit) || 0,
-      "Total Value": (Number(i.balance) || 0) * (Number(i.price_per_unit) || 0),
+      "Estimated Order Value": (Number(i.__recommended_order) || 0) * (Number(i.price_per_unit) || 0),
     }))
+
+    // Aggregates for Stats and Insights
+    const totalInventoryItems = items.length
+    const totalRestockItems = restockItems.length
+    const totalShortageUnits = restockItems.reduce((s, r) => s + (Number(r.__shortage) || 0), 0)
+    const totalRecommendedQty = restockItems.reduce((s, r) => s + (Number(r.__recommended_order) || 0), 0)
+    const totalRecommendedValue = restockItems.reduce(
+      (s, r) => s + (Number(r.__recommended_order) || 0) * (Number(r.price_per_unit) || 0),
+      0
+    )
+    const outOfStockCount = restockItems.filter((r) => r.__status === "Out Of Stock").length
+    const lowInStockCount = restockItems.filter((r) => r.__status === "Low In Stock").length
+
+    // Top items by shortage and by recommended order
+    const topByShortage = [...restockItems]
+      .sort((a, b) => (b.__shortage || 0) - (a.__shortage || 0))
+      .slice(0, 10)
+    const topByRecommended = [...restockItems]
+      .sort((a, b) => (b.__recommended_order || 0) - (a.__recommended_order || 0))
+      .slice(0, 10)
+
+    // Supplier summary
+    const supplierMap = restockItems.reduce((acc, it) => {
+      const sup = it.supplier || "(Unknown)"
+      if (!acc[sup]) acc[sup] = { supplier: sup, count: 0, recommendedQty: 0, value: 0 }
+      acc[sup].count += 1
+      acc[sup].recommendedQty += Number(it.__recommended_order) || 0
+      acc[sup].value += (Number(it.__recommended_order) || 0) * (Number(it.price_per_unit) || 0)
+      return acc
+    }, {})
+    const supplierSummary = Object.values(supplierMap).sort((a, b) => b.recommendedQty - a.recommendedQty)
+
+    // Scheduling projection (simple estimate over 30 days)
+    const projectedDaily = totalRecommendedQty / 30
+    const projectedWeekly = projectedDaily * 7
+    const projectedMonthly = totalRecommendedQty
+
     const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.json_to_sheet(rows)
-    XLSX.utils.book_append_sheet(wb, ws, "Restock")
-    XLSX.writeFile(wb, `Restock_List_${new Date().toISOString().slice(0, 10)}.xlsx`)
+
+    // Restock sheet (detailed)
+    const wsRestock = XLSX.utils.json_to_sheet(restockRows)
+    XLSX.utils.book_append_sheet(wb, wsRestock, "Restock")
+
+    // Stats sheet - build as array of arrays so we can create sections
+    const statsAoA = []
+    const today = new Date().toISOString().slice(0, 10)
+    statsAoA.push(["Metric", "Value"])
+    statsAoA.push(["Report Date", today])
+    statsAoA.push(["Total Inventory Items", totalInventoryItems])
+    statsAoA.push(["Total Restock Items (Low/Out)", totalRestockItems])
+    statsAoA.push(["Total Shortage Units", totalShortageUnits])
+    statsAoA.push(["Total Recommended Order Qty", totalRecommendedQty])
+  statsAoA.push(["Total Estimated Recommended Order Value", totalRecommendedValue])
+    statsAoA.push(["Average Shortage per Restock Item", totalRestockItems ? totalShortageUnits / totalRestockItems : 0])
+    statsAoA.push([])
+    statsAoA.push(["Status Breakdown", "Count"])
+    statsAoA.push(["Out Of Stock", outOfStockCount])
+    statsAoA.push(["Low In Stock", lowInStockCount])
+    statsAoA.push([])
+    statsAoA.push(["Scheduling Projection (next 30 days)", "Estimated Qty"])
+    statsAoA.push(["Daily (avg)", Math.round(projectedDaily)])
+    statsAoA.push(["Weekly (avg)", Math.round(projectedWeekly)])
+    statsAoA.push(["Monthly (total)", Math.round(projectedMonthly)])
+    statsAoA.push([])
+    statsAoA.push(["Top Items by Shortage (top 10)"])
+    statsAoA.push(["Item No", "Item Name", "Shortage", "Recommended", "Price/Unit", "Estimated Order Value"])
+    topByShortage.forEach((it) => {
+        statsAoA.push([
+        it.item_no,
+        it.item_name,
+        it.__shortage,
+        it.__recommended_order,
+        Number(it.price_per_unit) || 0,
+        (Number(it.__recommended_order) || 0) * (Number(it.price_per_unit) || 0),
+      ])
+    })
+    statsAoA.push([])
+    statsAoA.push(["Top Items by Recommended Order (top 10)"])
+    statsAoA.push(["Item No", "Item Name", "Recommended", "Shortage", "Price/Unit", "Estimated Order Value"])
+    topByRecommended.forEach((it) => {
+      statsAoA.push([
+        it.item_no,
+        it.item_name,
+        it.__recommended_order,
+        it.__shortage,
+        Number(it.price_per_unit) || 0,
+        (Number(it.__recommended_order) || 0) * (Number(it.price_per_unit) || 0),
+      ])
+    })
+    statsAoA.push([])
+    statsAoA.push(["Supplier Summary"])
+    statsAoA.push(["Supplier", "Restock Items", "Total Recommended Qty", "Total Estimated Value"])
+    supplierSummary.forEach((s) => {
+      statsAoA.push([s.supplier, s.count, s.recommendedQty, s.value])
+    })
+
+    const wsStats = XLSX.utils.aoa_to_sheet(statsAoA)
+    XLSX.utils.book_append_sheet(wb, wsStats, "Stats")
+
+    // Helper: find header cells and apply PHP currency formatting to numeric cells below
+    const applyCurrencyByHeader = (ws, headerTexts) => {
+      if (!ws || !ws['!ref']) return
+      const range = XLSX.utils.decode_range(ws['!ref'])
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const addr = XLSX.utils.encode_cell({ r: R, c: C })
+          const cell = ws[addr]
+          if (!cell) continue
+          if (typeof cell.v === 'string' && headerTexts.includes(cell.v)) {
+            // apply to every cell below this header in the same column
+            for (let r2 = R + 1; r2 <= range.e.r; ++r2) {
+              const dataAddr = XLSX.utils.encode_cell({ r: r2, c: C })
+              const dataCell = ws[dataAddr]
+                if (dataCell && typeof dataCell.v === 'number') {
+                dataCell.t = 'n'
+                // Excel format code for Philippine Peso (zero decimals)
+                dataCell.z = '[$\u20B1-zh-ph]#,##0'
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Set column widths for better readability (approximate)
+    wsRestock['!cols'] = [
+      { wch: 10 }, // Item No
+      { wch: 30 }, // Item Name
+      { wch: 15 }, // Brand
+      { wch: 15 }, // Location
+      { wch: 12 }, // Status
+      { wch: 8 }, // Balance
+      { wch: 8 }, // Min Stock
+      { wch: 8 }, // Shortage
+      { wch: 12 }, // Recommended Order Qty
+      { wch: 18 }, // Supplier
+      { wch: 8 }, // Unit
+      { wch: 12 }, // Price/Unit
+      { wch: 16 }, // Estimated Order Value
+    ]
+    // Stats sheet column widths (flexible, stats is mixed content)
+    wsStats['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 18 }]
+
+    // Apply currency formatting to the Restock and Stats sheets
+    applyCurrencyByHeader(wsRestock, ['Price/Unit', 'Estimated Order Value'])
+    applyCurrencyByHeader(wsStats, [
+      'Total Estimated Recommended Order Value',
+      'Price/Unit',
+      'Estimated Order Value',
+      'Total Estimated Value',
+    ])
+
+    // Insights sheet - human readable highlights
+    const insightsAoA = []
+    insightsAoA.push(["Insights"])
+    insightsAoA.push([])
+    insightsAoA.push(["Report Date", today])
+    insightsAoA.push([])
+    // Key insights
+    if (totalRestockItems === 0) {
+      insightsAoA.push(["No items currently require restocking."])
+    } else {
+      const highestShortage = topByShortage[0]
+      const highestRecommended = topByRecommended[0]
+      insightsAoA.push([`Total items needing restock: ${totalRestockItems}`])
+      insightsAoA.push([`Total recommended order qty: ${totalRecommendedQty}`])
+      insightsAoA.push([`Estimated recommended order value: ${formatCurrency(totalRecommendedValue)}`])
+      insightsAoA.push([])
+      if (highestShortage) {
+        insightsAoA.push([`Highest shortage: ${highestShortage.item_name} (ID: ${highestShortage.item_no}) — Shortage: ${highestShortage.__shortage}, Recommended: ${highestShortage.__recommended_order}`])
+      }
+      if (highestRecommended) {
+        insightsAoA.push([`Largest single recommended order: ${highestRecommended.item_name} (ID: ${highestRecommended.item_no}) — Recommended: ${highestRecommended.__recommended_order}`])
+      }
+      if (supplierSummary.length) {
+        insightsAoA.push([])
+        insightsAoA.push([`Top supplier by recommended qty: ${supplierSummary[0].supplier} — Qty: ${supplierSummary[0].recommendedQty}`])
+      }
+      insightsAoA.push([])
+      insightsAoA.push([`Projection (avg per period over next 30 days): Daily: ${Math.round(projectedDaily)}, Weekly: ${Math.round(projectedWeekly)}, Monthly: ${Math.round(projectedMonthly)}`])
+    }
+
+    const wsInsights = XLSX.utils.aoa_to_sheet(insightsAoA)
+    XLSX.utils.book_append_sheet(wb, wsInsights, "Insights")
+
+    // Final write
+    XLSX.writeFile(wb, `Restock_Report_${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
   return (
