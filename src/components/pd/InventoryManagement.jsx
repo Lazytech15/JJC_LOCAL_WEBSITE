@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import apiService from "../../utils/api/api-service"
-import * as XLSX from 'xlsx'
+import AddItemForm from './AddItem' // Adjust path as needed
 import Swal from "sweetalert2"
 import ModalPortal from "/src/components/pd/ModalPortal"
 import QRCodeSmall from "/src/components/pd/QRCodeSmall"
@@ -29,20 +29,6 @@ function InventoryManagement() {
     item_status: "",
   })
 
-  // Form state for inventory items
-  const [formData, setFormData] = useState({
-    item_name: "",
-    brand: "",
-    item_type: "",
-    location: "",
-    balance: 0,
-    min_stock: 0,
-    unit_of_measure: "",
-    price_per_unit: 0,
-    item_status: "In Stock",
-    supplier: "",
-  })
-
   // Client-side pagination state for grid view (20 per batch)
   const [visibleCount, setVisibleCount] = useState(20)
 
@@ -54,7 +40,7 @@ function InventoryManagement() {
   const fetchItems = async () => {
     try {
       setLoading(true)
-      
+
       // Filter out empty values before creating query params
       const cleanFilters = Object.entries(filters).reduce((acc, [key, value]) => {
         if (value && value.trim() !== '') {
@@ -62,9 +48,9 @@ function InventoryManagement() {
         }
         return acc
       }, {})
-      
+
       // Use ItemsService instead of direct fetch
-  const result = await apiService.items.getItems({ ...cleanFilters, limit: 1000 })
+      const result = await apiService.items.getItems({ ...cleanFilters, limit: 1000 })
       const fetched = result.data || []
       setItems(fetched)
       // Prefer server-declared total if present (covers soft-deletes or server filters)
@@ -116,15 +102,14 @@ function InventoryManagement() {
   const handleSaveItem = async (itemData) => {
     try {
       if (selectedItem) {
-        await apiService.items.updateItem(selectedItem.item_no, itemData || formData)
+        await apiService.items.updateItem(selectedItem.item_no, itemData)
       } else {
-        await apiService.items.createItem(itemData || formData)
+        await apiService.items.createItem(itemData)
       }
 
       await fetchItems()
       setShowForm(false)
       setSelectedItem(null)
-      resetFormData()
     } catch (err) {
       setError(err.message)
     }
@@ -143,34 +128,7 @@ function InventoryManagement() {
 
   const handleEditItem = (item) => {
     setSelectedItem(item)
-    setFormData({
-      item_name: item.item_name || "",
-      brand: item.brand || "",
-      item_type: item.item_type || "",
-      location: item.location || "",
-      balance: item.balance || 0,
-      min_stock: item.min_stock || 0,
-      unit_of_measure: item.unit_of_measure || "",
-      price_per_unit: item.price_per_unit || 0,
-      item_status: item.item_status || "In Stock",
-      supplier: item.supplier || "",
-    })
     setShowForm(true)
-  }
-
-  const resetFormData = () => {
-    setFormData({
-      item_name: "",
-      brand: "",
-      item_type: "",
-      location: "",
-      balance: 0,
-      min_stock: 0,
-      unit_of_measure: "",
-      price_per_unit: 0,
-      item_status: "In Stock",
-      supplier: "",
-    })
   }
 
   const getStatusColor = (status) => {
@@ -200,7 +158,7 @@ function InventoryManagement() {
 
     try {
       const result = await apiService.items.insertStock(selectedItem.item_no, stockInsertData)
-      
+
       setItems(items.map((item) => (item.item_no === selectedItem.item_no ? result.data : item)))
       setShowStockInsert(false)
       setSelectedItem(null)
@@ -258,15 +216,15 @@ function InventoryManagement() {
 
       // Refresh the items list
       await fetchItems()
-      
+
       setShowStockManager(false)
       setSelectedItem(null)
       setStockManagerData({ stock_in: 0, stock_out: 0, reason: "", current_balance: 0 })
-      
+
       const changeText = []
       if (stockManagerData.stock_in > 0) changeText.push(`+${stockManagerData.stock_in}`)
       if (stockManagerData.stock_out > 0) changeText.push(`-${stockManagerData.stock_out}`)
-      
+
       Swal.fire({
         title: "Success!",
         text: `Stock updated successfully! Changes: ${changeText.join(', ')} units`,
@@ -285,18 +243,18 @@ function InventoryManagement() {
   }
 
   const exportBarcodesToExcel = async () => {
-  if (items.length === 0) {
-    Swal.fire({
-      title: "No Items",
-      text: "No items available to export barcodes.",
-      icon: "warning",
-      confirmButtonText: "OK",
-    })
-    return
-  }
+    if (items.length === 0) {
+      Swal.fire({
+        title: "No Items",
+        text: "No items available to export barcodes.",
+        icon: "warning",
+        confirmButtonText: "OK",
+      })
+      return
+    }
 
-  try {
-    let htmlContent = `
+    try {
+      let htmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -396,12 +354,12 @@ function InventoryManagement() {
         <div class="barcode-grid">
     `
 
-    items.forEach((item, index) => {
-      // Generate ITM format barcode ID (ITM + padded item_no)
-      const paddedNo = item.item_no.toString().padStart(3, '0')
-      const barcodeId = `ITM${paddedNo}`
-      
-      htmlContent += `
+      items.forEach((item, index) => {
+        // Generate ITM format barcode ID (ITM + padded item_no)
+        const paddedNo = item.item_no.toString().padStart(3, '0')
+        const barcodeId = `ITM${paddedNo}`
+
+        htmlContent += `
         <div class="barcode-item">
           <svg id="barcode-${index}" class="barcode-svg"></svg>
           <div class="item-id">ID: ${barcodeId}</div>
@@ -411,9 +369,9 @@ function InventoryManagement() {
           <div class="item-details"><strong>Balance:</strong> ${item.balance || 0}</div>
         </div>
       `
-    })
+      })
 
-    htmlContent += `
+      htmlContent += `
         </div>
         <script>
           window.onload = function() {
@@ -421,12 +379,12 @@ function InventoryManagement() {
             setTimeout(function() {
     `
 
-    items.forEach((item, index) => {
-      // Generate ITM format barcode ID (ITM + padded item_no)
-      const paddedNo = item.item_no.toString().padStart(3, '0')
-      const barcodeId = `ITM${paddedNo}`
-      
-      htmlContent += `
+      items.forEach((item, index) => {
+        // Generate ITM format barcode ID (ITM + padded item_no)
+        const paddedNo = item.item_no.toString().padStart(3, '0')
+        const barcodeId = `ITM${paddedNo}`
+
+        htmlContent += `
               try {
                 JsBarcode("#barcode-${index}", "${barcodeId}", {
                   format: "CODE128",
@@ -447,9 +405,9 @@ function InventoryManagement() {
                   '<div style="border:2px solid red; padding:20px; color:red;">Error generating barcode for ${barcodeId}</div>';
               }
       `
-    })
+      })
 
-    htmlContent += `
+      htmlContent += `
             }, 500);
           };
         </script>
@@ -457,20 +415,20 @@ function InventoryManagement() {
       </html>
     `
 
-    // Create and download
-    const blob = new Blob([htmlContent], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `GOOJPRT_Compatible_Barcodes_${new Date().toISOString().split('T')[0]}.html`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+      // Create and download
+      const blob = new Blob([htmlContent], { type: 'text/html' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `GOOJPRT_Compatible_Barcodes_${new Date().toISOString().split('T')[0]}.html`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
 
-    Swal.fire({
-      title: "GOOJPRT Compatible Barcodes Created!",
-      html: `
+      Swal.fire({
+        title: "GOOJPRT Compatible Barcodes Created!",
+        html: `
         <div style="text-align: left; max-width: 500px;">
           <p><strong>File downloaded successfully!</strong></p>
           <br>
@@ -487,21 +445,21 @@ function InventoryManagement() {
           <p><strong>Still not working?</strong> Try the alternative formats below.</p>
         </div>
       `,
-      icon: "info",
-      confirmButtonText: "Got it!",
-      width: 600
-    })
+        icon: "info",
+        confirmButtonText: "Got it!",
+        width: 600
+      })
 
-  } catch (error) {
-    console.error("Error creating barcodes:", error)
-    Swal.fire({
-      title: "Export Error!",
-      text: "Failed to create barcode file. Please try again.",
-      icon: "error",
-      confirmButtonText: "OK",
-    })
+    } catch (error) {
+      console.error("Error creating barcodes:", error)
+      Swal.fire({
+        title: "Export Error!",
+        text: "Failed to create barcode file. Please try again.",
+        icon: "error",
+        confirmButtonText: "OK",
+      })
+    }
   }
-}
 
   return (
     <div className="p-6 space-y-8">
@@ -524,7 +482,6 @@ function InventoryManagement() {
           <button
             onClick={() => {
               setSelectedItem(null)
-              resetFormData()
               setShowForm(true)
             }}
             className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl"
@@ -655,7 +612,7 @@ function InventoryManagement() {
             className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
           />
         </div>
-        
+
         {/* Show active filters */}
         {(filters.search || filters.item_type || filters.location || filters.item_status) && (
           <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
@@ -756,14 +713,14 @@ function InventoryManagement() {
                 </div>
 
                 <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-blue-700 dark:text-blue-300 block text-sm">Price per Unit</span>
-                      <span className="text-blue-900 dark:text-blue-200 font-bold text-lg">{formatCurrency(item.price_per_unit)}</span>
-                    </div>
-                    <div className="ml-4">
-                      <QRCodeSmall itemNo={item.item_no} size={2} />
-                    </div>
+                  <div>
+                    <span className="font-bold text-blue-700 dark:text-blue-300 block text-sm">Price per Unit</span>
+                    <span className="text-blue-900 dark:text-blue-200 font-bold text-lg">{formatCurrency(item.price_per_unit)}</span>
                   </div>
+                  <div className="ml-4">
+                    <QRCodeSmall itemNo={item.item_no} size={2} />
+                  </div>
+                </div>
               </div>
 
               {/* Action Buttons */}
@@ -870,193 +827,15 @@ function InventoryManagement() {
       )}
 
       {/* Item Form Modal */}
-      {showForm && (
-        <ModalPortal>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
-            <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-                {selectedItem ? "Edit Item" : "Add New Item"}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowForm(false)
-                  setSelectedItem(null)
-                  resetFormData()
-                }}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                handleSaveItem()
-              }}
-              className="space-y-4"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Item Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.item_name}
-                    onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Brand</label>
-                  <input
-                    type="text"
-                    value={formData.brand}
-                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Item Type</label>
-                  <input
-                    type="text"
-                    value={formData.item_type}
-                    onChange={(e) => setFormData({ ...formData, item_type: e.target.value })}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location</label>
-                  <input
-                    type="text"
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Supplier</label>
-                  <input
-                    type="text"
-                    value={formData.supplier}
-                    onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                  />
-                </div>
-                {!selectedItem && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Initial Balance *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      value={formData.balance}
-                      onChange={(e) => setFormData({ ...formData, balance: Number.parseInt(e.target.value) || 0 })}
-                      className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                    />
-                  </div>
-                )}
-                {selectedItem && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Current Balance (Read Only)
-                    </label>
-                    <input
-                      type="text"
-                      value={`${selectedItem.balance}`}
-                      disabled
-                      className="w-full border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 text-gray-600 dark:text-gray-400 cursor-not-allowed"
-                    />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Use "Insert Stock" button to add inventory
-                    </p>
-                  </div>
-                )}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Minimum Stock *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    value={formData.min_stock}
-                    onChange={(e) => setFormData({ ...formData, min_stock: Number.parseInt(e.target.value) || 0 })}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Unit of Measure
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.unit_of_measure}
-                    onChange={(e) => setFormData({ ...formData, unit_of_measure: e.target.value })}
-                    placeholder="e.g., pcs, kg, ltr"
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Price per Unit
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.price_per_unit}
-                    onChange={(e) =>
-                      setFormData({ ...formData, price_per_unit: Number.parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
-                  <select
-                    value={formData.item_status}
-                    onChange={(e) => setFormData({ ...formData, item_status: e.target.value })}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                  >
-                    <option value="In Stock">In Stock</option>
-                    <option value="Low In Stock">Low In Stock</option>
-                    <option value="Out Of Stock">Out Of Stock</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="submit"
-                  className="flex-1 bg-zinc-600 hover:bg-zinc-700 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  {selectedItem ? "Update Item" : "Add Item"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowForm(false)
-                    setSelectedItem(null)
-                    resetFormData()
-                  }}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-            </div>
-          </div>
-        </ModalPortal>
-      )}
+      <AddItemForm
+        isOpen={showForm}
+        onClose={() => {
+          setShowForm(false)
+          setSelectedItem(null)
+        }}
+        onSave={handleSaveItem}
+        selectedItem={selectedItem}
+      />
 
       {/* Stock Manager Modal */}
       {showStockManager && selectedItem && (
@@ -1064,137 +843,137 @@ function InventoryManagement() {
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl p-6 w-full max-w-md">
               <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">
-                Manage Stock - {selectedItem.item_name}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowStockManager(false)
-                  setSelectedItem(null)
-                  setStockManagerData({ stock_in: 0, stock_out: 0, reason: "", current_balance: 0 })
-                }}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">
+                  Manage Stock - {selectedItem.item_name}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowStockManager(false)
+                    setSelectedItem(null)
+                    setStockManagerData({ stock_in: 0, stock_out: 0, reason: "", current_balance: 0 })
+                  }}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
               <div className="space-y-4">
-              <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Current Balance</span>
-                  <span className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-                    {selectedItem.balance || 0} {selectedItem.unit_of_measure || ''}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Stock In (Add) 📈
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={stockManagerData.stock_in}
-                    onChange={(e) =>
-                      setStockManagerData({
-                        ...stockManagerData,
-                        stock_in: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full border-2 border-green-300 dark:border-green-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-green-500/20 focus:border-green-500 font-medium text-lg"
-                    placeholder="Add stock"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Stock Out (Remove) 📉
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max={selectedItem.balance || 0}
-                    value={stockManagerData.stock_out}
-                    onChange={(e) =>
-                      setStockManagerData({
-                        ...stockManagerData,
-                        stock_out: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full border-2 border-red-300 dark:border-red-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-red-500/20 focus:border-red-500 font-medium text-lg"
-                    placeholder="Remove stock"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Reason/Notes
-                </label>
-                <input
-                  type="text"
-                  value={stockManagerData.reason}
-                  onChange={(e) =>
-                    setStockManagerData({
-                      ...stockManagerData,
-                      reason: e.target.value,
-                    })
-                  }
-                  className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
-                  placeholder="e.g., New shipment, Sale, Transfer, etc."
-                />
-              </div>
-
-              {(stockManagerData.stock_in > 0 || stockManagerData.stock_out > 0) && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-blue-700 dark:text-blue-300">New Balance Preview</span>
-                    <span className="text-xl font-bold text-blue-800 dark:text-blue-200">
-                      {(selectedItem.balance || 0) + (stockManagerData.stock_in || 0) - (stockManagerData.stock_out || 0)} {selectedItem.unit_of_measure || ''}
+                <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Current Balance</span>
+                    <span className="text-2xl font-bold text-gray-800 dark:text-gray-200">
+                      {selectedItem.balance || 0} {selectedItem.unit_of_measure || ''}
                     </span>
                   </div>
-                  <div className="text-xs text-blue-600 dark:text-blue-400">
-                    {stockManagerData.stock_in > 0 && `+${stockManagerData.stock_in} `}
-                    {stockManagerData.stock_out > 0 && `-${stockManagerData.stock_out} `}
-                    from current balance
-                  </div>
                 </div>
-              )}
 
-              {stockManagerData.stock_out > (selectedItem.balance || 0) && (
-                <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
-                  <div className="text-sm text-red-700 dark:text-red-300">
-                    ⚠️ Cannot remove more stock than available ({selectedItem.balance || 0} available)
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Stock In (Add) 📈
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={stockManagerData.stock_in}
+                      onChange={(e) =>
+                        setStockManagerData({
+                          ...stockManagerData,
+                          stock_in: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full border-2 border-green-300 dark:border-green-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-green-500/20 focus:border-green-500 font-medium text-lg"
+                      placeholder="Add stock"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Stock Out (Remove) 📉
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={selectedItem.balance || 0}
+                      value={stockManagerData.stock_out}
+                      onChange={(e) =>
+                        setStockManagerData({
+                          ...stockManagerData,
+                          stock_out: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full border-2 border-red-300 dark:border-red-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-red-500/20 focus:border-red-500 font-medium text-lg"
+                      placeholder="Remove stock"
+                    />
                   </div>
                 </div>
-              )}
-            </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Reason/Notes
+                  </label>
+                  <input
+                    type="text"
+                    value={stockManagerData.reason}
+                    onChange={(e) =>
+                      setStockManagerData({
+                        ...stockManagerData,
+                        reason: e.target.value,
+                      })
+                    }
+                    className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+                    placeholder="e.g., New shipment, Sale, Transfer, etc."
+                  />
+                </div>
+
+                {(stockManagerData.stock_in > 0 || stockManagerData.stock_out > 0) && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm text-blue-700 dark:text-blue-300">New Balance Preview</span>
+                      <span className="text-xl font-bold text-blue-800 dark:text-blue-200">
+                        {(selectedItem.balance || 0) + (stockManagerData.stock_in || 0) - (stockManagerData.stock_out || 0)} {selectedItem.unit_of_measure || ''}
+                      </span>
+                    </div>
+                    <div className="text-xs text-blue-600 dark:text-blue-400">
+                      {stockManagerData.stock_in > 0 && `+${stockManagerData.stock_in} `}
+                      {stockManagerData.stock_out > 0 && `-${stockManagerData.stock_out} `}
+                      from current balance
+                    </div>
+                  </div>
+                )}
+
+                {stockManagerData.stock_out > (selectedItem.balance || 0) && (
+                  <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
+                    <div className="text-sm text-red-700 dark:text-red-300">
+                      ⚠️ Cannot remove more stock than available ({selectedItem.balance || 0} available)
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="flex gap-3 mt-6">
-              <button
-                onClick={handleStockManagerSave}
-                disabled={(!stockManagerData.stock_in && !stockManagerData.stock_out) || 
-                         stockManagerData.stock_out > (selectedItem.balance || 0)}
-                className="flex-1 bg-zinc-600 hover:bg-zinc-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl font-semibold transition-all duration-200"
-              >
-                💾 Commit Changes
-              </button>
-              <button
-                onClick={() => {
-                  setShowStockManager(false)
-                  setSelectedItem(null)
-                  setStockManagerData({ stock_in: 0, stock_out: 0, reason: "", current_balance: 0 })
-                }}
-                className="px-4 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-semibold"
-              >
-                Cancel
-              </button>
-            </div>
+                <button
+                  onClick={handleStockManagerSave}
+                  disabled={(!stockManagerData.stock_in && !stockManagerData.stock_out) ||
+                    stockManagerData.stock_out > (selectedItem.balance || 0)}
+                  className="flex-1 bg-zinc-600 hover:bg-zinc-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl font-semibold transition-all duration-200"
+                >
+                  💾 Commit Changes
+                </button>
+                <button
+                  onClick={() => {
+                    setShowStockManager(false)
+                    setSelectedItem(null)
+                    setStockManagerData({ stock_in: 0, stock_out: 0, reason: "", current_balance: 0 })
+                  }}
+                  className="px-4 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </ModalPortal>
