@@ -1,0 +1,661 @@
+import { useState, useEffect } from "react"
+import apiService from "../../utils/api/api-service"
+import ModalPortal from "./ModalPortal"
+
+function PurchaseOrderTracker() {
+  const [purchaseOrders, setPurchaseOrders] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showOrderDetails, setShowOrderDetails] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState(null)
+  const [restockItems, setRestockItems] = useState([])
+
+  // Form states
+  const [orderForm, setOrderForm] = useState({
+    supplier: "",
+    items: [],
+    expected_delivery_date: "",
+    notes: "",
+    priority: "normal"
+  })
+
+  const [statusUpdate, setStatusUpdate] = useState({
+    order_id: "",
+    new_status: "",
+    notes: "",
+    actual_delivery_date: ""
+  })
+
+  useEffect(() => {
+    fetchPurchaseOrders()
+    fetchRestockItems()
+  }, [])
+
+  const fetchPurchaseOrders = async () => {
+    try {
+      setLoading(true)
+      // TODO: Implement API call for purchase orders
+      // For now, using mock data
+      const mockOrders = [
+        {
+          id: "PO-2025-001",
+          supplier: "Office Depot",
+          status: "ordered",
+          order_date: "2025-09-25",
+          expected_delivery_date: "2025-10-05",
+          actual_delivery_date: null,
+          total_items: 5,
+          total_quantity: 25,
+          total_value: 12500,
+          items: [
+            { item_no: "ITM001", item_name: "Printer Paper A4", quantity: 10, unit_price: 150, status: "ordered" },
+            { item_no: "ITM002", item_name: "Ink Cartridges", quantity: 5, unit_price: 800, status: "ordered" }
+          ],
+          notes: "Urgent office supplies",
+          priority: "high",
+          created_by: "John Doe",
+          last_updated: "2025-09-25T10:30:00Z"
+        },
+        {
+          id: "PO-2025-002",
+          supplier: "Tech Solutions Inc",
+          status: "in_transit",
+          order_date: "2025-09-20",
+          expected_delivery_date: "2025-09-30",
+          actual_delivery_date: null,
+          total_items: 3,
+          total_quantity: 8,
+          total_value: 24000,
+          items: [
+            { item_no: "ITM005", item_name: "Laptop Charger", quantity: 5, unit_price: 1200, status: "in_transit" },
+            { item_no: "ITM008", item_name: "USB Cables", quantity: 3, unit_price: 150, status: "in_transit" }
+          ],
+          notes: "IT equipment restock",
+          priority: "normal",
+          created_by: "Jane Smith",
+          last_updated: "2025-09-28T14:15:00Z"
+        }
+      ]
+      setPurchaseOrders(mockOrders)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchRestockItems = async () => {
+    try {
+      const result = await apiService.items.getItems({ limit: 1000 })
+      const items = result.data || []
+
+      // Filter items that need restocking
+      const restockItems = items
+        .map(item => {
+          const balance = Number(item.balance) || 0
+          const minStock = Number(item.min_stock) || 0
+          const shortage = Math.max(minStock - balance, 0)
+          const status = balance === 0 ? "Out Of Stock" : (minStock > 0 && balance < minStock ? "Low In Stock" : "In Stock")
+
+          return {
+            ...item,
+            shortage,
+            recommended_quantity: Math.max(shortage, 1),
+            status
+          }
+        })
+        .filter(item => item.status === "Out Of Stock" || item.status === "Low In Stock")
+        .sort((a, b) => {
+          // Sort by status priority, then by shortage
+          const statusPriority = { "Out Of Stock": 0, "Low In Stock": 1 }
+          if (statusPriority[a.status] !== statusPriority[b.status]) {
+            return statusPriority[a.status] - statusPriority[b.status]
+          }
+          return b.shortage - a.shortage
+        })
+
+      setRestockItems(restockItems)
+    } catch (err) {
+      console.error("Error fetching restock items:", err)
+    }
+  }
+
+  const getStatusColor = (status) => {
+    const colors = {
+      requested: "bg-gray-100 text-gray-800 border-gray-200",
+      ordered: "bg-blue-100 text-blue-800 border-blue-200",
+      in_transit: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      ready_for_pickup: "bg-orange-100 text-orange-800 border-orange-200",
+      received: "bg-green-100 text-green-800 border-green-200",
+      cancelled: "bg-red-100 text-red-800 border-red-200"
+    }
+    return colors[status] || "bg-gray-100 text-gray-800 border-gray-200"
+  }
+
+  const getStatusText = (status) => {
+    const texts = {
+      requested: "Requested",
+      ordered: "Ordered",
+      in_transit: "In Transit",
+      ready_for_pickup: "Ready for Pickup",
+      received: "Received",
+      cancelled: "Cancelled"
+    }
+    return texts[status] || status
+  }
+
+  const getPriorityColor = (priority) => {
+    const colors = {
+      low: "bg-green-100 text-green-800",
+      normal: "bg-blue-100 text-blue-800",
+      high: "bg-red-100 text-red-800",
+      urgent: "bg-purple-100 text-purple-800"
+    }
+    return colors[priority] || "bg-gray-100 text-gray-800"
+  }
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency: "PHP",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount)
+  }
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "-"
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric"
+    })
+  }
+
+  const handleCreateOrder = () => {
+    setOrderForm({
+      supplier: "",
+      items: [],
+      expected_delivery_date: "",
+      notes: "",
+      priority: "normal"
+    })
+    setShowCreateModal(true)
+  }
+
+  const handleAddItemToOrder = (item) => {
+    setOrderForm(prev => ({
+      ...prev,
+      items: [...prev.items, {
+        item_no: item.item_no,
+        item_name: item.item_name,
+        quantity: item.recommended_quantity,
+        unit_price: item.price_per_unit || 0,
+        unit_of_measure: item.unit_of_measure || ""
+      }]
+    }))
+  }
+
+  const handleRemoveItemFromOrder = (itemNo) => {
+    setOrderForm(prev => ({
+      ...prev,
+      items: prev.items.filter(item => item.item_no !== itemNo)
+    }))
+  }
+
+  const handleSubmitOrder = async () => {
+    try {
+      // TODO: Implement API call to create purchase order
+      console.log("Creating purchase order:", orderForm)
+
+      // Mock success
+      alert("Purchase order created successfully!")
+      setShowCreateModal(false)
+      fetchPurchaseOrders()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const handleUpdateStatus = async () => {
+    try {
+      // TODO: Implement API call to update order status
+      console.log("Updating order status:", statusUpdate)
+
+      // Mock success
+      alert("Order status updated successfully!")
+      setShowOrderDetails(false)
+      fetchPurchaseOrders()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const handleViewOrderDetails = (order) => {
+    setSelectedOrder(order)
+    setStatusUpdate({
+      order_id: order.id,
+      new_status: order.status,
+      notes: "",
+      actual_delivery_date: order.actual_delivery_date || ""
+    })
+    setShowOrderDetails(true)
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Purchase Order Tracker</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Track procurement orders from request to delivery
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            {purchaseOrders.length} active orders
+          </div>
+          <button
+            onClick={handleCreateOrder}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Create Order
+          </button>
+        </div>
+      </div>
+
+      {/* Status Overview */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        {["requested", "ordered", "in_transit", "ready_for_pickup", "received", "cancelled"].map(status => {
+          const count = purchaseOrders.filter(order => order.status === status).length
+          return (
+            <div key={status} className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-lg p-4 border border-white/20 dark:border-gray-700/20">
+              <div className="text-2xl font-bold text-gray-800 dark:text-gray-200">{count}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">{getStatusText(status)}</div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Orders Table */}
+      <div className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-xl border border-white/20 dark:border-gray-700/20 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-white/10 dark:bg-black/20">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-gray-800 dark:text-gray-200">Order ID</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-800 dark:text-gray-200">Supplier</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Status</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Priority</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Items</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Total Value</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Expected Delivery</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-300/20 dark:divide-gray-700/20">
+              {purchaseOrders.map((order) => (
+                <tr key={order.id} className="hover:bg-white/5 dark:hover:bg-black/10 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-gray-800 dark:text-gray-200">{order.id}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      {formatDate(order.order_date)}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{order.supplier}</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                      {getStatusText(order.status)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(order.priority)}`}>
+                      {order.priority}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">
+                    {order.total_items} ({order.total_quantity} qty)
+                  </td>
+                  <td className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">
+                    {formatCurrency(order.total_value)}
+                  </td>
+                  <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">
+                    {formatDate(order.expected_delivery_date)}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => handleViewOrderDetails(order)}
+                      className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs font-medium transition-colors"
+                    >
+                      View Details
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {purchaseOrders.length === 0 && !loading && (
+          <div className="text-center py-12">
+            <div className="text-gray-500 dark:text-gray-400">No purchase orders found.</div>
+          </div>
+        )}
+      </div>
+
+      {/* Create Order Modal */}
+      {showCreateModal && (
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
+            <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Create Purchase Order</h3>
+                  <button
+                    onClick={() => setShowCreateModal(false)}
+                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Order Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Supplier</label>
+                      <select
+                        value={orderForm.supplier}
+                        onChange={(e) => setOrderForm({ ...orderForm, supplier: e.target.value })}
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select Supplier</option>
+                        <option value="Office Depot">Office Depot</option>
+                        <option value="Tech Solutions Inc">Tech Solutions Inc</option>
+                        <option value="Supply Chain Co">Supply Chain Co</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Expected Delivery Date</label>
+                      <input
+                        type="date"
+                        value={orderForm.expected_delivery_date}
+                        onChange={(e) => setOrderForm({ ...orderForm, expected_delivery_date: e.target.value })}
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Priority</label>
+                      <select
+                        value={orderForm.priority}
+                        onChange={(e) => setOrderForm({ ...orderForm, priority: e.target.value })}
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="low">Low</option>
+                        <option value="normal">Normal</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Notes</label>
+                    <textarea
+                      value={orderForm.notes}
+                      onChange={(e) => setOrderForm({ ...orderForm, notes: e.target.value })}
+                      rows={3}
+                      className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Additional notes for this order..."
+                    />
+                  </div>
+
+                  {/* Add Items from Restock List */}
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Add Items from Restock List</h4>
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 max-h-60 overflow-y-auto">
+                      {restockItems.length === 0 ? (
+                        <p className="text-gray-500 dark:text-gray-400">No items need restocking</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {restockItems.map((item) => (
+                            <div key={item.item_no} className="flex items-center justify-between bg-white dark:bg-gray-700 rounded p-3">
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-800 dark:text-gray-200">{item.item_name}</div>
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                  ID: {item.item_no} | Shortage: {item.shortage} | Recommended: {item.recommended_quantity}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleAddItemToOrder(item)}
+                                disabled={orderForm.items.some(i => i.item_no === item.item_no)}
+                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-sm transition-colors"
+                              >
+                                {orderForm.items.some(i => i.item_no === item.item_no) ? "Added" : "Add"}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Selected Items */}
+                  {orderForm.items.length > 0 && (
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Selected Items</h4>
+                      <div className="space-y-2">
+                        {orderForm.items.map((item) => (
+                          <div key={item.item_no} className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 rounded p-3">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-800 dark:text-gray-200">{item.item_name}</div>
+                              <div className="text-sm text-gray-600 dark:text-gray-400">
+                                Quantity: {item.quantity} | Price: {formatCurrency(item.unit_price)}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleRemoveItemFromOrder(item.item_no)}
+                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 text-right">
+                        <div className="text-lg font-bold text-gray-800 dark:text-gray-200">
+                          Total: {formatCurrency(orderForm.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      onClick={handleSubmitOrder}
+                      disabled={!orderForm.supplier || orderForm.items.length === 0}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
+                    >
+                      Create Purchase Order
+                    </button>
+                    <button
+                      onClick={() => setShowCreateModal(false)}
+                      className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* Order Details Modal */}
+      {showOrderDetails && selectedOrder && (
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
+            <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Order Details - {selectedOrder.id}</h3>
+                  <button
+                    onClick={() => setShowOrderDetails(false)}
+                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Order Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Supplier</label>
+                      <div className="text-gray-800 dark:text-gray-200 font-medium">{selectedOrder.supplier}</div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Status</label>
+                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.status)}`}>
+                        {getStatusText(selectedOrder.status)}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Order Date</label>
+                      <div className="text-gray-800 dark:text-gray-200">{formatDate(selectedOrder.order_date)}</div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Expected Delivery</label>
+                      <div className="text-gray-800 dark:text-gray-200">{formatDate(selectedOrder.expected_delivery_date)}</div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Priority</label>
+                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(selectedOrder.priority)}`}>
+                        {selectedOrder.priority}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Total Value</label>
+                      <div className="text-gray-800 dark:text-gray-200 font-bold">{formatCurrency(selectedOrder.total_value)}</div>
+                    </div>
+                  </div>
+
+                  {/* Order Items */}
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Order Items</h4>
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-100 dark:bg-gray-700">
+                          <tr>
+                            <th className="px-4 py-2 text-left font-semibold text-gray-800 dark:text-gray-200">Item</th>
+                            <th className="px-4 py-2 text-center font-semibold text-gray-800 dark:text-gray-200">Quantity</th>
+                            <th className="px-4 py-2 text-center font-semibold text-gray-800 dark:text-gray-200">Unit Price</th>
+                            <th className="px-4 py-2 text-center font-semibold text-gray-800 dark:text-gray-200">Total</th>
+                            <th className="px-4 py-2 text-center font-semibold text-gray-800 dark:text-gray-200">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                          {selectedOrder.items.map((item) => (
+                            <tr key={item.item_no}>
+                              <td className="px-4 py-2">
+                                <div className="font-medium text-gray-800 dark:text-gray-200">{item.item_name}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">ID: {item.item_no}</div>
+                              </td>
+                              <td className="px-4 py-2 text-center text-gray-600 dark:text-gray-400">
+                                {item.quantity} {item.unit_of_measure || ''}
+                              </td>
+                              <td className="px-4 py-2 text-center text-gray-600 dark:text-gray-400">
+                                {formatCurrency(item.unit_price)}
+                              </td>
+                              <td className="px-4 py-2 text-center font-semibold text-gray-800 dark:text-gray-200">
+                                {formatCurrency(item.quantity * item.unit_price)}
+                              </td>
+                              <td className="px-4 py-2 text-center">
+                                <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
+                                  {getStatusText(item.status)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Update Status */}
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                    <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Update Order Status</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">New Status</label>
+                        <select
+                          value={statusUpdate.new_status}
+                          onChange={(e) => setStatusUpdate({ ...statusUpdate, new_status: e.target.value })}
+                          className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="requested">Requested</option>
+                          <option value="ordered">Ordered</option>
+                          <option value="in_transit">In Transit</option>
+                          <option value="ready_for_pickup">Ready for Pickup</option>
+                          <option value="received">Received</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      </div>
+                      {statusUpdate.new_status === "received" && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Actual Delivery Date</label>
+                          <input
+                            type="date"
+                            value={statusUpdate.actual_delivery_date}
+                            onChange={(e) => setStatusUpdate({ ...statusUpdate, actual_delivery_date: e.target.value })}
+                            className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Update Notes</label>
+                      <textarea
+                        value={statusUpdate.notes}
+                        onChange={(e) => setStatusUpdate({ ...statusUpdate, notes: e.target.value })}
+                        rows={3}
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Notes about this status update..."
+                      />
+                    </div>
+                    <div className="flex gap-3 mt-4">
+                      <button
+                        onClick={handleUpdateStatus}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
+                      >
+                        Update Status
+                      </button>
+                      <button
+                        onClick={() => setShowOrderDetails(false)}
+                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+    </div>
+  )
+}
+
+export default PurchaseOrderTracker

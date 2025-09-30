@@ -4,6 +4,8 @@ import * as XLSX from 'xlsx'
 import Swal from "sweetalert2"
 import ModalPortal from "/src/components/pd/ModalPortal"
 import QRCodeSmall from "/src/components/pd/QRCodeSmall"
+import { ItemDetailView } from "./ItemDetailView"
+import InventoryListView from "./InventoryListView"
 
 function InventoryManagement() {
   // Inventory Management States
@@ -28,6 +30,11 @@ function InventoryManagement() {
     location: "",
     item_status: "",
   })
+  const [showItemDetail, setShowItemDetail] = useState(false)
+  const [selectedItemForDetail, setSelectedItemForDetail] = useState(null)
+  const [returnToDetailView, setReturnToDetailView] = useState(false)
+  const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
+  const [selectedImage, setSelectedImage] = useState(null)
 
   // Form state for inventory items
   const [formData, setFormData] = useState({
@@ -125,6 +132,16 @@ function InventoryManagement() {
       setShowForm(false)
       setSelectedItem(null)
       resetFormData()
+      if (returnToDetailView) {
+        // Find the updated item to show in detail view
+        const updatedItems = await apiService.items.getItems({ limit: 1000 })
+        const updatedItem = updatedItems.data?.find(item => item.item_no === selectedItem.item_no)
+        if (updatedItem) {
+          setShowItemDetail(true)
+          setSelectedItemForDetail(updatedItem)
+        }
+        setReturnToDetailView(false)
+      }
     } catch (err) {
       setError(err.message)
     }
@@ -171,6 +188,7 @@ function InventoryManagement() {
       item_status: "In Stock",
       supplier: "",
     })
+    setSelectedImage(null)
   }
 
   const getStatusColor = (status) => {
@@ -705,11 +723,50 @@ function InventoryManagement() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        <>
+          {/* View Toggle */}
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">View:</span>
+              <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    viewMode === 'grid'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  📱 Grid
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    viewMode === 'list'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  📋 List
+                </button>
+              </div>
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              {items.length} items • Showing {Math.min(visibleCount, items.length)} of {items.length}
+            </div>
+          </div>
+
+          {/* Items Display */}
+          {viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {items.slice(0, visibleCount).map((item) => (
             <div
               key={item.item_no}
-              className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-200 flex flex-col"
+              onClick={() => {
+                setSelectedItemForDetail(item)
+                setShowItemDetail(true)
+              }}
+              className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-200 flex flex-col cursor-pointer"
             >
               {/* Item Header */}
               <div className="flex justify-between items-start mb-4">
@@ -755,33 +812,28 @@ function InventoryManagement() {
                   </div>
                 </div>
 
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-blue-700 dark:text-blue-300 block text-sm">Price per Unit</span>
-                      <span className="text-blue-900 dark:text-blue-200 font-bold text-lg">{formatCurrency(item.price_per_unit)}</span>
-                    </div>
-                    <div className="ml-4">
-                      <QRCodeSmall itemNo={item.item_no} size={2} />
-                    </div>
-                  </div>
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                  <span className="font-bold text-blue-700 dark:text-blue-300 block text-sm">Price per Unit</span>
+                  <span className="text-blue-900 dark:text-blue-200 font-bold text-lg">{formatCurrency(item.price_per_unit)}</span>
+                </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => handleEditItem(item)}
-                  className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleStockManagement(item)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleStockManagement(item)
+                  }}
                   className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
                 >
                   Stock
                 </button>
                 <button
-                  onClick={() => handleDeleteItem(item.item_no)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteItem(item.item_no)
+                  }}
                   className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
                 >
                   Del
@@ -800,6 +852,21 @@ function InventoryManagement() {
             </div>
           )}
         </div>
+      ) : viewMode === 'list' ? (
+        <InventoryListView
+          items={items}
+          visibleCount={visibleCount}
+          setVisibleCount={setVisibleCount}
+          onItemClick={(item) => {
+            setSelectedItemForDetail(item)
+            setShowItemDetail(true)
+          }}
+          onStockManagement={handleStockManagement}
+          onDeleteItem={handleDeleteItem}
+          formatCurrency={formatCurrency}
+        />
+      ) : null}
+        </>
       )}
 
       {/* Modals */}
@@ -883,6 +950,11 @@ function InventoryManagement() {
                   setShowForm(false)
                   setSelectedItem(null)
                   resetFormData()
+                  if (returnToDetailView) {
+                    setShowItemDetail(true)
+                    setSelectedItemForDetail(selectedItem)
+                    setReturnToDetailView(false)
+                  }
                 }}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
@@ -1031,6 +1103,61 @@ function InventoryManagement() {
                     <option value="Out Of Stock">Out Of Stock</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Image Upload Section */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Item Image (Optional)
+                  </label>
+                  {selectedImage && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedImage(null)}
+                      className="text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files[0]
+                      if (file) {
+                        setSelectedImage(file)
+                      }
+                    }}
+                    className="hidden"
+                    id="image-upload"
+                  />
+                  <label
+                    htmlFor="image-upload"
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg cursor-pointer transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    {selectedItem ? "Replace Image" : "Add Image"}
+                  </label>
+                  {selectedImage && (
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {selectedImage.name}
+                    </span>
+                  )}
+                </div>
+                {selectedImage && (
+                  <div className="mt-3">
+                    <img
+                      src={URL.createObjectURL(selectedImage)}
+                      alt="Preview"
+                      className="max-w-32 max-h-32 object-cover rounded-lg border border-gray-300 dark:border-gray-600"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -1195,6 +1322,29 @@ function InventoryManagement() {
                 Cancel
               </button>
             </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* Item Detail Modal */}
+      {showItemDetail && selectedItemForDetail && (
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
+            <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+              <ItemDetailView
+                item={selectedItemForDetail}
+                onBack={() => {
+                  setShowItemDetail(false)
+                  setSelectedItemForDetail(null)
+                }}
+                onEdit={(item) => {
+                  setShowItemDetail(false)
+                  setSelectedItemForDetail(null)
+                  setReturnToDetailView(true)
+                  handleEditItem(item)
+                }}
+              />
             </div>
           </div>
         </ModalPortal>
