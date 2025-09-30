@@ -40,7 +40,7 @@ export class ItemsService extends BaseAPIService {
 
   // PATCH /api/items/:id/stock - Update item stock (quick stock adjustment)
   async updateItemStock(id, stockData) {
-    return this.request(`/api/items/${id}/stock`, {
+    return this.request(`/api/items/stock/${id}`, {
       method: "PATCH",
       body: JSON.stringify(stockData),
     })
@@ -56,7 +56,7 @@ export class ItemsService extends BaseAPIService {
 
   // POST /api/items/:id/stock-insert - Insert stock for existing item
   async insertStock(id, stockData) {
-    return this.request(`/api/items/${id}/stock-insert`, {
+    return this.request(`/api/items/stock/${id}/insert`, {
       method: "POST",
       body: JSON.stringify(stockData),
     })
@@ -93,7 +93,7 @@ export class ItemsService extends BaseAPIService {
 
   // POST /api/items/:id/out - For recording items going out
   async recordItemOut(id, outData) {
-    return this.request(`/api/items/${id}/out`, {
+    return this.request(`/api/items/stock/${id}/out`, {
       method: "POST",
       body: JSON.stringify(outData),
     })
@@ -101,7 +101,7 @@ export class ItemsService extends BaseAPIService {
 
   // POST /api/checkout - For processing checkout transactions
   async processCheckout(checkoutData) {
-    return this.request("/api/checkout", {
+    return this.request("/api/stock/checkout", {
       method: "POST",
       body: JSON.stringify(checkoutData),
     })
@@ -117,7 +117,7 @@ export class ItemsService extends BaseAPIService {
   // GET /api/items/export/supplier-report/:supplier - Export supplier report
   getSupplierReportUrl(supplier) {
     const encodedSupplier = encodeURIComponent(supplier)
-    return `${this.baseURL}/api/items/export/supplier-report/${encodedSupplier}`
+    return `${this.baseURL}/api/items/stock/export/supplier-report/${encodedSupplier}`
   }
 
   // Helper methods for common operations

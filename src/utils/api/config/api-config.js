@@ -2,8 +2,9 @@
 // config/api-config.js
 // ============================================================================
 export const API_ENDPOINTS = {
-  public: "https://modified-blackberry-pressure-wallace.trycloudflare.com",
-  //public: window.location.origin,
+
+  public: "https://permits-align-introduces-candy.trycloudflare.com",
+
 }
 
 export const DEFAULT_HEADERS = {
