@@ -4,6 +4,8 @@ import AddItemForm from './AddItem' // Adjust path as needed
 import Swal from "sweetalert2"
 import ModalPortal from "/src/components/pd/ModalPortal"
 import QRCodeSmall from "/src/components/pd/QRCodeSmall"
+import { ItemDetailView } from "./ItemDetailView"
+import InventoryListView from "./InventoryListView"
 
 function InventoryManagement() {
   // Inventory Management States
@@ -28,6 +30,11 @@ function InventoryManagement() {
     location: "",
     item_status: "",
   })
+  const [showItemDetail, setShowItemDetail] = useState(false)
+  const [selectedItemForDetail, setSelectedItemForDetail] = useState(null)
+  const [returnToDetailView, setReturnToDetailView] = useState(false)
+  const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
+  const [selectedImage, setSelectedImage] = useState(null)
 
   // Client-side pagination state for grid view (20 per batch)
   const [visibleCount, setVisibleCount] = useState(20)
@@ -110,6 +117,18 @@ function InventoryManagement() {
       await fetchItems()
       setShowForm(false)
       setSelectedItem(null)
+      resetFormData()
+      
+      if (returnToDetailView) {
+        // Find the updated item to show in detail view
+        const updatedItems = await apiService.items.getItems({ limit: 1000 })
+        const updatedItem = updatedItems.data?.find(item => item.item_no === selectedItem.item_no)
+        if (updatedItem) {
+          setShowItemDetail(true)
+          setSelectedItemForDetail(updatedItem)
+        }
+        setReturnToDetailView(false)
+      }
     } catch (err) {
       setError(err.message)
     }
@@ -129,6 +148,10 @@ function InventoryManagement() {
   const handleEditItem = (item) => {
     setSelectedItem(item)
     setShowForm(true)
+  }
+
+  const resetFormData = () => {
+    setSelectedImage(null)
   }
 
   const getStatusColor = (status) => {
@@ -662,11 +685,50 @@ function InventoryManagement() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        <>
+          {/* View Toggle */}
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">View:</span>
+              <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    viewMode === 'grid'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  📱 Grid
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    viewMode === 'list'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  📋 List
+                </button>
+              </div>
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              {items.length} items • Showing {Math.min(visibleCount, items.length)} of {items.length}
+            </div>
+          </div>
+
+          {/* Items Display */}
+          {viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {items.slice(0, visibleCount).map((item) => (
             <div
               key={item.item_no}
-              className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-200 flex flex-col"
+              onClick={() => {
+                setSelectedItemForDetail(item)
+                setShowItemDetail(true)
+              }}
+              className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-200 flex flex-col cursor-pointer"
             >
               {/* Item Header */}
               <div className="flex justify-between items-start mb-4">
@@ -724,21 +786,21 @@ function InventoryManagement() {
               </div>
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => handleEditItem(item)}
-                  className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleStockManagement(item)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleStockManagement(item)
+                  }}
                   className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
                 >
                   Stock
                 </button>
                 <button
-                  onClick={() => handleDeleteItem(item.item_no)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteItem(item.item_no)
+                  }}
                   className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
                 >
                   Del
@@ -757,6 +819,21 @@ function InventoryManagement() {
             </div>
           )}
         </div>
+      ) : viewMode === 'list' ? (
+        <InventoryListView
+          items={items}
+          visibleCount={visibleCount}
+          setVisibleCount={setVisibleCount}
+          onItemClick={(item) => {
+            setSelectedItemForDetail(item)
+            setShowItemDetail(true)
+          }}
+          onStockManagement={handleStockManagement}
+          onDeleteItem={handleDeleteItem}
+          formatCurrency={formatCurrency}
+        />
+      ) : null}
+        </>
       )}
 
       {/* Modals */}
@@ -832,6 +909,12 @@ function InventoryManagement() {
         onClose={() => {
           setShowForm(false)
           setSelectedItem(null)
+          resetFormData()
+          if (returnToDetailView) {
+            setShowItemDetail(true)
+            setSelectedItemForDetail(selectedItem)
+            setReturnToDetailView(false)
+          }
         }}
         onSave={handleSaveItem}
         selectedItem={selectedItem}
@@ -974,6 +1057,29 @@ function InventoryManagement() {
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* Item Detail Modal */}
+      {showItemDetail && selectedItemForDetail && (
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
+            <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+              <ItemDetailView
+                item={selectedItemForDetail}
+                onBack={() => {
+                  setShowItemDetail(false)
+                  setSelectedItemForDetail(null)
+                }}
+                onEdit={(item) => {
+                  setShowItemDetail(false)
+                  setSelectedItemForDetail(null)
+                  setReturnToDetailView(true)
+                  handleEditItem(item)
+                }}
+              />
             </div>
           </div>
         </ModalPortal>

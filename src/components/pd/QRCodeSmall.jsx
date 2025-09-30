@@ -17,13 +17,13 @@ export default function QRCodeSmall({ itemNo, size = 2 }) {
         height: 10,
         includetext: false,
         backgroundcolor: 'ffffff',
-        paddingwidth: 0,
-        paddingheight: 0,
+        paddingwidth: 2,
+        paddingheight: 2,
       })
     } catch (e) {
       console.error('QR small render failed', e)
     }
   }, [itemNo, size])
 
-  return <canvas ref={ref} className="inline-block" />
+  return <canvas ref={ref} className="inline-block ml-2" />
 }
