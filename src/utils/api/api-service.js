@@ -11,6 +11,7 @@ import { SocketManager } from "./websocket/socket-managers.js"
 import { DocumentService } from "./services/document-service.js"
 import { DailySummaryService } from "./services/daily-summary-service.js"
 import { ItemsService } from "./services/items-service.js"
+import { PurchaseOrdersService } from "./services/purchase-orders-service.js"
 
 class APIService {
   constructor() {
@@ -25,6 +26,7 @@ class APIService {
     this.document = new DocumentService()
     this.summary = new DailySummaryService()
     this.items = new ItemsService()
+    this.purchaseOrders = new PurchaseOrdersService()
     
   }
 

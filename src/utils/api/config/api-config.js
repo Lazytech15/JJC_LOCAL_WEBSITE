@@ -3,7 +3,7 @@
 // ============================================================================
 export const API_ENDPOINTS = {
 
-  public: "https://permits-align-introduces-candy.trycloudflare.com",
+  public: "https://jan-enjoyed-streaming-backed.trycloudflare.com",
 
 }
 
