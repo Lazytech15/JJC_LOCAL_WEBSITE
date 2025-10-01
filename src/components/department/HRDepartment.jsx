@@ -41,14 +41,22 @@ function HRDepartment() {
     }
   }, [])
 
-  const fetchHRData = async () => {
+const fetchHRData = async () => {
     try {
       setLoading(true)
 
       const data = await apiService.auth.getHRData()
 
       setEmployees(data.employees || [])
-      setStats(data.stats || { total: 0, newHires: 0, openPositions: 0 })
+      
+      // Map the statistics object from API to the stats format expected by component
+      const mappedStats = {
+        total: data.statistics?.totalEmployees || 0,
+        newHires: data.statistics?.newHiresLast30Days || 0,
+        openPositions: data.statistics?.openPositions || 0
+      }
+      
+      setStats(mappedStats)
     } catch (err) {
       setError(err.message)
       console.error("Employee data fetch error:", err)

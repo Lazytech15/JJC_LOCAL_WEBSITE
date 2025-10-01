@@ -18,6 +18,6 @@ export class AuthService extends BaseAPIService {
   }
 
   async getHRData() {
-    return this.request("/api/tables/emp_list/data")
+    return this.request("/api/employees")
   }
 }

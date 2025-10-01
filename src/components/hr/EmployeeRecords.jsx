@@ -421,49 +421,52 @@ function EmployeeRecords() {
   ]);
 
   const fetchEmployees = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  try {
+    setLoading(true);
+    setError(null);
 
-      const params = {
-        limit: pagination.limit.toString(),
-        offset: ((pagination.currentPage - 1) * pagination.limit).toString(),
-        search: searchTerm,
-        department: filterDepartment,
-        status: filterStatus,
-        sortBy: sortBy,
-        sortOrder: sortOrder,
-      };
+    const params = {
+      limit: pagination.limit.toString(),
+      offset: ((pagination.currentPage - 1) * pagination.limit).toString(),
+      search: searchTerm,
+      department: filterDepartment,
+      status: filterStatus,
+      sortBy: sortBy,
+      sortOrder: sortOrder,
+    };
 
-      console.log("[EmployeeRecords] Fetching employees with params:", params);
+    console.log("[EmployeeRecords] Fetching employees with params:", params);
 
-      const result = await apiService.employees.getEmployees(params);
-      if (result.success) {
-        const employeesData = result.data.employees || [];
-        setEmployees(employeesData);
-        setStatistics(result.data.statistics || {});
-        setDepartments(result.data.departments || []);
-        setPagination((prev) => ({
-          ...prev,
-          total: result.data.pagination.total,
-        }));
+    const result = await apiService.employees.getEmployees(params);
+    console.log("[EmployeeRecords] Fetch result:", result);
+    
+    if (result.success) {
+      // Data is directly in result, not result.data
+      const employeesData = result.employees || [];
+      setEmployees(employeesData);
+      setStatistics(result.statistics || {});
+      setDepartments(result.departments || []);
+      setPagination((prev) => ({
+        ...prev,
+        total: result.pagination.total,
+      }));
 
-        console.log(`[EmployeeRecords] Loaded ${employeesData.length} employees`);
+      console.log(`[EmployeeRecords] Loaded ${employeesData.length} employees`);
 
-        // Load profile pictures using batched approach (NOT individual)
-        if (employeesData.length > 0) {
-          loadProfilePicturesBulkZip(employeesData);
-        }
-      } else {
-        throw new Error(result.error || "Failed to fetch employees");
+      // Load profile pictures using batched approach (NOT individual)
+      if (employeesData.length > 0) {
+        loadProfilePicturesBulkZip(employeesData);
       }
-    } catch (err) {
-      setError(err.message);
-      console.error("Error fetching employees:", err);
-    } finally {
-      setLoading(false);
+    } else {
+      throw new Error(result.error || "Failed to fetch employees");
     }
-  };
+  } catch (err) {
+    setError(err.message);
+    console.error("Error fetching employees:", err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleEditEmployee = async (employee) => {
     setEditingEmployee({
