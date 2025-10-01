@@ -1,7 +1,5 @@
-"use client"
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
-import { useState, createContext, useContext, useEffect } from "react"
+import { AuthProvider, useAuth } from "./contexts/AuthContext"
 import DepartmentSelector from "./components/DepartmentSelector"
 import LoginForm from "./components/LoginForm"
 import HRDepartment from "./components/department/HRDepartment"
@@ -10,100 +8,20 @@ import FinancePayrollDepartment from "./components/department/FinancePayrollDepa
 import ProcurementDepartment from "./components/department/ProcurementDepartment"
 import EngineeringDepartment from "./components/department/EngineeringDepartment"
 import SuperAdminDashboard from "./components/SuperAdminDashboard"
-import { getStoredToken, verifyToken, clearTokens } from "./utils/auth"
-
-// Auth Context
-const AuthContext = createContext()
-
-export const useAuth = () => {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
-  return context
-}
+import EmployeeLanding from "./components/employeeLandingPage/EmployeeLanding"
+import EmployeeLogin from "./components/employeeLandingPage/EmployeeLogin"
+import EmployeeDashboard from "./components/employeeLandingPage/EmployeeDashboard"
 
 function App() {
-  const [user, setUser] = useState(null)
-  const [selectedDepartment, setSelectedDepartment] = useState(null)
-  const [isLoading, setIsLoading] = useState(true) // Add loading state for token verification
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem("darkMode")
-    return saved ? JSON.parse(saved) : false
-  })
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  )
+}
 
-  // Check for existing valid token on app initialization
-  useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        const token = getStoredToken()
-        if (token) {
-          const payload = verifyToken(token)
-          if (payload) {
-            // Token is valid, restore user session
-            setUser({
-              id: payload.id,
-              username: payload.username,
-              name: payload.name,
-              role: payload.role,
-              permissions: payload.permissions || [],
-              access_level: payload.access_level,
-              loginTime: payload.iat ? new Date(payload.iat * 1000).toISOString() : new Date().toISOString(),
-            })
-            setSelectedDepartment(payload.department)
-          } else {
-            // Token is invalid or expired, clear it
-            clearTokens()
-          }
-        }
-      } catch (error) {
-        console.error("Error initializing auth:", error)
-        clearTokens()
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    initializeAuth()
-  }, [])
-
-  useEffect(() => {
-    localStorage.setItem("darkMode", JSON.stringify(isDarkMode))
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark")
-      document.body.classList.add("dark")
-    } else {
-      document.documentElement.classList.remove("dark")
-      document.body.classList.remove("dark")
-    }
-  }, [isDarkMode])
-
-  const login = (userData, department) => {
-    setUser(userData)
-    setSelectedDepartment(department)
-  }
-
-  const logout = () => {
-    setUser(null)
-    setSelectedDepartment(null)
-    clearTokens() // Clear JWT tokens on logout
-  }
-
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode)
-  }
-
-  const authValue = {
-    user,
-    selectedDepartment,
-    login,
-    logout,
-    isAuthenticated: !!user,
-    isDarkMode,
-    toggleDarkMode,
-    isSuperAdmin: user?.role === "super-admin",
-    isLoading,
-  }
+function AppContent() {
+  const { isDarkMode, isLoading } = useAuth()
 
   // Show loading screen while checking authentication
   if (isLoading) {
@@ -124,77 +42,110 @@ function App() {
   }
 
   return (
-    <AuthContext.Provider value={authValue}>
-      <Router>
-        <div
-          className={`min-h-screen transition-all duration-300 ${
-            isDarkMode
-              ? "bg-gradient-to-br from-gray-900 via-slate-900 to-zinc-900 text-gray-100"
-              : "bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50 text-gray-900"
-          }`}
-        >
-          <Routes>
-            <Route path="/" element={<DepartmentSelector />} />
-            <Route path="/login/:department" element={<LoginForm />} />
-            <Route
-              path="/super-admin"
-              element={
-                <ProtectedRoute department="super-admin" requireSuperAdmin={true}>
-                  <SuperAdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/Human Resources"
-              element={
-                <ProtectedRoute department="Human Resources">
-                  <HRDepartment />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/Operation"
-              element={
-                <ProtectedRoute department="Operation">
-                  <OperationsDepartment />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/Finance"
-              element={
-                <ProtectedRoute department="Finance">
-                  <FinancePayrollDepartment />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/Procurement"
-              element={
-                <ProtectedRoute department="Procurement">
-                  <ProcurementDepartment />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/Engineering"
-              element={
-                <ProtectedRoute department="Engineering">
-                  <EngineeringDepartment />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </div>
-      </Router>
-    </AuthContext.Provider>
+    <Router>
+      <div
+        className={`min-h-screen transition-all duration-300 ${
+          isDarkMode
+            ? "bg-gradient-to-br from-gray-900 via-slate-900 to-zinc-900 text-gray-100"
+            : "bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50 text-gray-900"
+        }`}
+      >
+        <Routes>
+          {/* Employee Routes (Main/Public) */}
+          <Route path="/" element={<EmployeeLanding />} />
+          <Route path="/employee/login" element={<EmployeeLogin />} />
+          <Route
+            path="/employee/dashboard"
+            element={
+              <EmployeeProtectedRoute>
+                <EmployeeDashboard />
+              </EmployeeProtectedRoute>
+            }
+          />
+
+          {/* Admin/Department Routes (Protected with special URL) */}
+          <Route path="/jjcewsaccess" element={<DepartmentSelector />} />
+          <Route path="/jjcewsaccess/login/:department" element={<LoginForm />} />
+          <Route
+            path="/jjcewsaccess/super-admin"
+            element={
+              <AdminProtectedRoute department="super-admin" requireSuperAdmin={true}>
+                <SuperAdminDashboard />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewsaccess/hr"
+            element={
+              <AdminProtectedRoute department="Human Resources">
+                <HRDepartment />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewsaccess/operations"
+            element={
+              <AdminProtectedRoute department="Operation">
+                <OperationsDepartment />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewsaccess/finance"
+            element={
+              <AdminProtectedRoute department="Finance">
+                <FinancePayrollDepartment />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewsaccess/procurement"
+            element={
+              <AdminProtectedRoute department="Procurement">
+                <ProcurementDepartment />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewsaccess/engineering"
+            element={
+              <AdminProtectedRoute department="Engineering">
+                <EngineeringDepartment />
+              </AdminProtectedRoute>
+            }
+          />
+
+          {/* Catch all - redirect to employee landing */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    </Router>
   )
 }
 
-function ProtectedRoute({ children, department, requireSuperAdmin = false }) {
+// Protected route for employees
+function EmployeeProtectedRoute({ children }) {
+  const { isEmployeeAuthenticated, isLoading } = useAuth()
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  if (!isEmployeeAuthenticated) {
+    return <Navigate to="/employee/login" replace />
+  }
+
+  return children
+}
+
+// Protected route for admin/department users
+function AdminProtectedRoute({ children, department, requireSuperAdmin = false }) {
   const { isAuthenticated, selectedDepartment, isSuperAdmin, isLoading } = useAuth()
 
-  // Show loading while checking authentication
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -204,15 +155,33 @@ function ProtectedRoute({ children, department, requireSuperAdmin = false }) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to={`/login/${department}`} replace />
+    // Map department names to URL slugs for login redirect
+    const slugMap = {
+      "Human Resources": "hr",
+      "Operation": "operations",
+      "Finance": "finance",
+      "Procurement": "procurement",
+      "Engineering": "engineering",
+      "super-admin": "super-admin"
+    }
+    const slug = slugMap[department] || department.toLowerCase().replace(/\s+/g, '-')
+    return <Navigate to={`/jjcewsaccess/login/${slug}`} replace />
   }
 
   if (requireSuperAdmin && !isSuperAdmin) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/jjcewsaccess" replace />
   }
 
   if (!requireSuperAdmin && selectedDepartment !== department && !isSuperAdmin) {
-    return <Navigate to={`/login/${department}`} replace />
+    const slugMap = {
+      "Human Resources": "hr",
+      "Operation": "operations",
+      "Finance": "finance",
+      "Procurement": "procurement",
+      "Engineering": "engineering"
+    }
+    const slug = slugMap[department] || department.toLowerCase().replace(/\s+/g, '-')
+    return <Navigate to={`/jjcewsaccess/login/${slug}`} replace />
   }
 
   return children

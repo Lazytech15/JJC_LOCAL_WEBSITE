@@ -1,4 +1,4 @@
-import { useAuth } from "../../App"
+import { useAuth } from "../../contexts/AuthContext"
 import { useState, useEffect } from "react"
 import apiService from "../../utils/api/api-service"
 import InventoryManagement from "../pd/InventoryManagement"

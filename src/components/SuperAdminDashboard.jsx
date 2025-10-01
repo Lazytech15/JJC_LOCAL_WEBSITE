@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { useAuth } from "../App"
+import { useAuth } from "../contexts/AuthContext"
 
 const departments = [
   { id: "hr", name: "Human Resource", icon: "👥", color: "slate" },

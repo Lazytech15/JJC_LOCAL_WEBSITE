@@ -1,6 +1,6 @@
 //client attendance.jsx - Enhanced with employee details modal, statistics, and Excel export
 import { useState, useEffect } from "react";
-import { useAuth } from "../../App";
+import { useAuth } from "../../contexts/AuthContext";
 import apiService from "../../utils/api/api-service";
 import JSZip from "jszip";
 import * as XLSX from "xlsx";

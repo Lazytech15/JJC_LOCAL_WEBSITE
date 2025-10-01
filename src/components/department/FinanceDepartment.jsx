@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuth } from "../../App"
+import { useAuth } from "../../contexts/AuthContext"
 
 function FinanceDepartment() {
   const { user, logout } = useAuth()

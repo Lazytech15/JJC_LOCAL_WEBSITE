@@ -1,9 +1,28 @@
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { useAuth } from "../App"
+import { useAuth } from "../contexts/AuthContext"
 import { createToken, storeTokens, getStoredToken, clearTokens, isTokenExpired, verifyToken } from "../utils/auth"
-
 import apiService from "../../src/utils/api/api-service"
+
+// Department slug to name mapping
+const DEPARTMENT_SLUG_TO_NAME = {
+  "hr": "Human Resources",
+  "operations": "Operation",
+  "finance": "Finance",
+  "procurement": "Procurement",
+  "engineering": "Engineering",
+  "super-admin": "super-admin"
+}
+
+// Reverse mapping
+const DEPARTMENT_NAME_TO_SLUG = {
+  "Human Resources": "hr",
+  "Operation": "operations",
+  "Finance": "finance",
+  "Procurement": "procurement",
+  "Engineering": "engineering",
+  "super-admin": "super-admin"
+}
 
 const departmentInfo = {
   "Human Resources": {
@@ -53,7 +72,7 @@ const defaultDepartmentInfo = {
 }
 
 function LoginForm() {
-  const { department } = useParams()
+  const { department: deptSlug } = useParams() // Gets URL slug like "hr", "operations", etc.
   const navigate = useNavigate()
   const { login, isDarkMode, toggleDarkMode } = useAuth()
   const [formData, setFormData] = useState({ username: "", password: "" })
@@ -62,23 +81,28 @@ function LoginForm() {
   const [rememberMe, setRememberMe] = useState(false)
   const [hasValidToken, setHasValidToken] = useState(false)
 
+  // Convert URL slug to department name
+  const departmentName = DEPARTMENT_SLUG_TO_NAME[deptSlug] || deptSlug
+
   // Safe department info retrieval with fallback
-  const deptInfo = department && departmentInfo[department] ? departmentInfo[department] : defaultDepartmentInfo
+  const deptInfo = departmentName && departmentInfo[departmentName] 
+    ? departmentInfo[departmentName] 
+    : defaultDepartmentInfo
 
   // Check if department is valid
-  const isValidDepartment = department && departmentInfo[department]
+  const isValidDepartment = deptSlug && DEPARTMENT_SLUG_TO_NAME[deptSlug]
 
   // If invalid department, show error and redirect
   useEffect(() => {
-    if (department && !isValidDepartment) {
-      console.error(`Invalid department: ${department}`)
-      setError(`Invalid department: ${department}. Please select a valid department.`)
+    if (deptSlug && !isValidDepartment) {
+      console.error(`Invalid department slug: ${deptSlug}`)
+      setError(`Invalid department: ${deptSlug}. Please select a valid department.`)
       // Optional: Redirect to home after a delay
       setTimeout(() => {
-        navigate("/")
+        navigate("/jjcewsaccess")
       }, 3000)
     }
-  }, [department, isValidDepartment, navigate])
+  }, [deptSlug, isValidDepartment, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -103,7 +127,7 @@ function LoginForm() {
       const authData = await apiService.auth.login({
         username: formData.username.trim(),
         password: formData.password,
-        department: department,
+        department: departmentName, // Use the full department name
       })
 
       if (authData.success) {
@@ -112,7 +136,7 @@ function LoginForm() {
           id: authData.user.id,
           username: authData.user.username,
           name: authData.user.name,
-          department: department,
+          department: departmentName, // Use the full department name
           role: authData.user.role,
           permissions: authData.user.permissions || [],
           access_level: authData.user.access_level,
@@ -129,7 +153,7 @@ function LoginForm() {
               id: userData.id,
               username: userData.username,
               name: userData.name,
-              department: department,
+              department: departmentName, // Use the full department name
               role: userData.role,
               permissions: userData.permissions,
               access_level: userData.access_level,
@@ -143,7 +167,7 @@ function LoginForm() {
             {
               id: userData.id,
               type: "refresh",
-              department: department,
+              department: departmentName, // Use the full department name
             },
             refreshTokenExpiry,
           )
@@ -160,10 +184,15 @@ function LoginForm() {
         }
 
         // Login user
-        login(loginData, department)
+        login(loginData, departmentName)
 
-        // Navigate to department dashboard
-        navigate(`/${department}`)
+        // Navigate to department dashboard with URL slug
+        if (departmentName === "super-admin") {
+          navigate("/jjcewsaccess/super-admin")
+        } else {
+          const urlSlug = DEPARTMENT_NAME_TO_SLUG[departmentName] || deptSlug
+          navigate(`/jjcewsaccess/${urlSlug}`)
+        }
 
         // Optional: Show success message
         console.log("Login successful with JWT authentication")
@@ -205,7 +234,7 @@ function LoginForm() {
     const existingToken = getStoredToken()
     if (existingToken) {
       const payload = verifyToken(existingToken)
-      if (payload && payload.department === department) {
+      if (payload && payload.department === departmentName) {
         setHasValidToken(true)
       } else {
         setHasValidToken(false)
@@ -215,10 +244,15 @@ function LoginForm() {
     } else {
       setHasValidToken(false)
     }
-  }, [department, isValidDepartment])
+  }, [departmentName, isValidDepartment])
 
   const handleContinueWithToken = () => {
-    navigate(`/${department}`, { replace: true })
+    if (departmentName === "super-admin") {
+      navigate("/jjcewsaccess/super-admin", { replace: true })
+    } else {
+      const urlSlug = DEPARTMENT_NAME_TO_SLUG[departmentName] || deptSlug
+      navigate(`/jjcewsaccess/${urlSlug}`, { replace: true })
+    }
   }
 
   return (
@@ -234,7 +268,7 @@ function LoginForm() {
         </div>
 
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/jjcewsaccess")}
           className="mb-8 flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors duration-200"
         >
           <span className="mr-2">←</span>
@@ -250,7 +284,7 @@ function LoginForm() {
             </div>
             <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2">{deptInfo.name}</h2>
             <p className="text-gray-600 dark:text-gray-400">
-              {department === "super-admin"
+              {departmentName === "super-admin"
                 ? "Administrator access required"
                 : isValidDepartment
                   ? "Please sign in to access this department"
@@ -265,10 +299,10 @@ function LoginForm() {
                 <span className="text-red-600 dark:text-red-400 text-sm font-medium">Invalid Department</span>
               </div>
               <p className="text-red-600 dark:text-red-400 text-xs mt-1">
-                The department "{department}" is not valid. You will be redirected to the department selection page.
+                The department "{deptSlug}" is not valid. You will be redirected to the department selection page.
               </p>
               <p className="text-red-600 dark:text-red-400 text-xs mt-2">
-                Valid departments: {Object.keys(departmentInfo).join(", ")}
+                Valid departments: {Object.keys(DEPARTMENT_SLUG_TO_NAME).join(", ")}
               </p>
             </div>
           ) : (

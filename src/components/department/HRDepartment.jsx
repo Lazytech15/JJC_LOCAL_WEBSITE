@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuth } from "../../App"
+import { useAuth } from "../../contexts/AuthContext"
 import { useState, useEffect } from "react"
 import EmployeeRecords from "../hr/EmployeeRecords"
 import Recruitment from "../hr/Recruitment"

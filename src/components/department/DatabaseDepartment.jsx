@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useAuth } from "../../App"
+import { useAuth } from "../../contexts/AuthContext"
 import axios from "axios"
 
 function DatabaseDepartment() {

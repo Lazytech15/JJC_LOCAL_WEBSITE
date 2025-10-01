@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { useAuth } from "../../App"
+import { useAuth } from "../../contexts/AuthContext"
 import apiService from "../../utils/api/api-service"
 
 function Recruitment() {

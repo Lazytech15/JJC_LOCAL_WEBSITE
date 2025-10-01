@@ -2,7 +2,17 @@
 
 import { useNavigate } from "react-router-dom"
 import { useState } from "react"
-import { useAuth } from "../App"
+import { useAuth } from "../contexts/AuthContext"
+
+// Map department IDs to URL-safe slugs
+const departmentSlugMap = {
+  "Human Resources": "hr",
+  "Operation": "operations",
+  "Finance": "finance",
+  "Procurement": "procurement",
+  "Engineering": "engineering",
+  "super-admin": "super-admin"
+}
 
 const departments = [
   {
@@ -75,8 +85,9 @@ function DepartmentSelector() {
 
   const handleDepartmentSelect = (departmentId) => {
     setSelectedDept(departmentId)
+    const slug = departmentSlugMap[departmentId] || departmentId.toLowerCase().replace(/\s+/g, '-')
     setTimeout(() => {
-      navigate(`/login/${departmentId}`)
+      navigate(`/jjcewsaccess/login/${slug}`)
     }, 200)
   }
 

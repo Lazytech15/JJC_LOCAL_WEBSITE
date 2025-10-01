@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../../App";
+import { useAuth } from "../../contexts/AuthContext";
 import { X, Eye, Download, FileText, ImageIcon, Trash2 } from "lucide-react";
 import apiService from "../../utils/api/api-service";
 
@@ -15,7 +15,7 @@ function EmployeeRecords() {
   const [pagination, setPagination] = useState({
     total: 0,
     currentPage: 1,
-    limit: 50,
+    limit: 20,
   });
 
   // Modal states
@@ -73,155 +73,47 @@ function EmployeeRecords() {
     };
   }, [profilePictures]);
 
+  const loadProfilePicturesBatched = async (employeeList = employees) => {
+  if (!employeeList || employeeList.length === 0) return;
 
-  const loadProfilePicturesBulkZip = async (employeeList = employees) => {
-    if (!employeeList || employeeList.length === 0) return;
+  try {
+    // Filter employees that don't have cached profile pictures
+    const employeesToLoad = employeeList.filter(employee =>
+      employee.id && !getProfilePictureUrl(employee)
+    );
 
-    try {
-      // Filter employees that don't have cached profile pictures
-      const employeesToLoad = employeeList.filter(employee =>
-        employee.id && !getProfilePictureUrl(employee)
-      );
+    if (employeesToLoad.length === 0) return;
 
-      const uidsToLoad = employeesToLoad.map(employee => employee.id);
+    console.log(`[EmployeeRecords] Loading ${employeesToLoad.length} profile pictures individually`);
 
-      if (uidsToLoad.length === 0) return;
+    // Process in batches of 5 to avoid overwhelming the server
+    const batchSize = 5;
+    for (let i = 0; i < employeesToLoad.length; i += batchSize) {
+      const batch = employeesToLoad.slice(i, i + batchSize);
 
-      console.log(`[EmployeeRecords] Bulk downloading ${uidsToLoad.length} profile pictures as zip`);
-
-      // Use bulk download to get a zip file with all images
-      const result = await apiService.profiles.downloadBulkProfilesPost(uidsToLoad, {
-        include_summary: true,
-        compression_level: 6
-      });
-
-      if (result.success && result.blob) {
-        // Extract and distribute images using employee list for UID mapping
-        const extractedImages = await extractAndDistributeImages(result.blob, uidsToLoad, employeesToLoad);
-
-        if (extractedImages.size > 0) {
-          setProfilePictures(prev => new Map([...prev, ...extractedImages]));
-          console.log(`[EmployeeRecords] Successfully distributed ${extractedImages.size} images to employees`);
-        }
-      }
-    } catch (err) {
-      console.log(`[EmployeeRecords] Zip bulk loading failed, using batched: ${err.message}`);
-      await loadProfilePicturesBatched(uidsToLoad);
-    }
-  };
-
-  // Helper function to extract images from zip and distribute to employees
-  const extractAndDistributeImages = async (zipBlob, expectedUids, employeeList = []) => {
-    const distributedImages = new Map();
-
-    try {
-      const JSZip = (await import('jszip')).default;
-      const zip = await JSZip.loadAsync(zipBlob);
-
-      console.log(`[EmployeeRecords] Processing zip with ${Object.keys(zip.files).length} files`);
-
-      // Create a map of possible identifiers for each employee
-      const employeeIdentifiers = new Map();
-      employeeList.forEach(employee => {
-        const identifiers = [
-          employee.id?.toString(), // Primary ID (like 90)
-          employee.idNumber?.toString(), // Employee ID number (like 25063)
-          employee.idBarcode?.toString(), // Barcode (like 12307584)
-        ].filter(Boolean);
-
-        identifiers.forEach(identifier => {
-          employeeIdentifiers.set(identifier, employee.id);
-        });
-
-        console.log(`[EmployeeRecords] Employee ${employee.fullName} (ID: ${employee.id}) mapped with identifiers:`, identifiers);
-      });
-
-      // Process each file in the zip
-      for (const [filename, file] of Object.entries(zip.files)) {
-        console.log(`[EmployeeRecords] Processing file: ${filename}`);
-
-        // Skip directories and non-image files
-        if (file.dir || !filename.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i)) {
-          console.log(`[EmployeeRecords] Skipping non-image file: ${filename}`);
-          continue;
-        }
-
+      const batchPromises = batch.map(async (employee) => {
         try {
-          let matchedEmployeeId = null;
-
-          // Extract all numbers from filename
-          const numberMatches = filename.match(/\d+/g);
-
-          if (numberMatches) {
-            console.log(`[EmployeeRecords] Found numbers in ${filename}:`, numberMatches);
-
-            // Try each extracted number against our employee identifiers
-            for (const number of numberMatches) {
-              if (employeeIdentifiers.has(number)) {
-                matchedEmployeeId = employeeIdentifiers.get(number);
-                console.log(`[EmployeeRecords] Matched "${filename}" with number "${number}" to employee ID: ${matchedEmployeeId}`);
-                break;
-              }
-            }
-          }
-
-          // If we found a match and it's in our expected UIDs list
-          if (matchedEmployeeId && expectedUids.includes(matchedEmployeeId)) {
-            const imageBlob = await file.async('blob');
-            const imageUrl = URL.createObjectURL(imageBlob);
-
-            distributedImages.set(matchedEmployeeId, imageUrl);
-            console.log(`[EmployeeRecords] Successfully distributed image for employee ID: ${matchedEmployeeId}`);
-          } else if (matchedEmployeeId) {
-            console.log(`[EmployeeRecords] Employee ID ${matchedEmployeeId} not in expected list, skipping`);
-          } else {
-            console.log(`[EmployeeRecords] No matching employee found for file: ${filename}`);
-          }
-
-        } catch (fileError) {
-          console.warn(`[EmployeeRecords] Failed to process file ${filename}:`, fileError);
-        }
-      }
-
-      console.log(`[EmployeeRecords] Final distribution: ${distributedImages.size} images mapped to employees`);
-      distributedImages.forEach((url, employeeId) => {
-        const employee = employeeList.find(e => e.id === employeeId);
-        console.log(`[EmployeeRecords] Employee ID ${employeeId} (${employee?.fullName}) -> ${url.substring(0, 50)}...`);
-      });
-
-    } catch (error) {
-      console.error('[EmployeeRecords] Error extracting images from zip:', error);
-    }
-
-    return distributedImages;
-  };
-  const loadProfilePicturesBatched = async (uidsToLoad) => {
-    const batchSize = 5; // Process 5 at a time instead of all at once
-
-    for (let i = 0; i < uidsToLoad.length; i += batchSize) {
-      const batch = uidsToLoad.slice(i, i + batchSize);
-
-      const batchPromises = batch.map(async (uid) => {
-        try {
-          const result = await apiService.profiles.getProfileByUid(uid);
+          const result = await apiService.profiles.getProfileByUid(employee.id);
           if (result.success && result.url) {
-            setProfilePictures(prev => new Map(prev.set(uid, result.url)));
-            console.log(`[EmployeeRecords] Loaded profile for UID: ${uid}`);
+            setProfilePictures(prev => new Map(prev.set(employee.id, result.url)));
+            console.log(`[EmployeeRecords] Loaded profile for employee ID: ${employee.id}`);
           }
         } catch (err) {
-          // Silently handle missing profiles - this is normal
-          console.log(`[EmployeeRecords] No profile for UID ${uid}: ${err.message}`);
+          console.log(`[EmployeeRecords] No profile for employee ID ${employee.id}: ${err.message}`);
         }
       });
 
       await Promise.allSettled(batchPromises);
 
       // Small delay between batches
-      if (i + batchSize < uidsToLoad.length) {
+      if (i + batchSize < employeesToLoad.length) {
         await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
-  };
+  } catch (err) {
+    console.error(`[EmployeeRecords] Profile loading error: ${err.message}`);
+  }
+};
 
   const fetchEmployeeDocuments = async (id) => {
     if (!id) {
@@ -455,7 +347,7 @@ function EmployeeRecords() {
 
       // Load profile pictures using batched approach (NOT individual)
       if (employeesData.length > 0) {
-        loadProfilePicturesBulkZip(employeesData);
+        loadProfilePicturesBatched(employeesData);
       }
     } else {
       throw new Error(result.error || "Failed to fetch employees");
