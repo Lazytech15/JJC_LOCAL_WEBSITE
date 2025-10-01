@@ -162,13 +162,6 @@ export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
             </span>
           </div>
 
-          {/* Barcode Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4">
-            <div className="flex items-center justify-between">
-              <span className="font-medium text-slate-900 dark:text-slate-100">Barcode:</span>
-              <QRCodeSmall itemNo={item.item_no} size={3} />
-            </div>
-          </div>
 
           {/* Quantity Selection */}
           {status !== "Out Of Stock" && onAddToCart && (

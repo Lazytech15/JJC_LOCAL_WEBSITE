@@ -10,6 +10,7 @@ function PurchaseOrderTracker() {
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [restockItems, setRestockItems] = useState([])
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" })
 
   // Form states
   const [orderForm, setOrderForm] = useState({
@@ -35,51 +36,14 @@ function PurchaseOrderTracker() {
   const fetchPurchaseOrders = async () => {
     try {
       setLoading(true)
-      // TODO: Implement API call for purchase orders
-      // For now, using mock data
-      const mockOrders = [
-        {
-          id: "PO-2025-001",
-          supplier: "Office Depot",
-          status: "ordered",
-          order_date: "2025-09-25",
-          expected_delivery_date: "2025-10-05",
-          actual_delivery_date: null,
-          total_items: 5,
-          total_quantity: 25,
-          total_value: 12500,
-          items: [
-            { item_no: "ITM001", item_name: "Printer Paper A4", quantity: 10, unit_price: 150, status: "ordered" },
-            { item_no: "ITM002", item_name: "Ink Cartridges", quantity: 5, unit_price: 800, status: "ordered" }
-          ],
-          notes: "Urgent office supplies",
-          priority: "high",
-          created_by: "John Doe",
-          last_updated: "2025-09-25T10:30:00Z"
-        },
-        {
-          id: "PO-2025-002",
-          supplier: "Tech Solutions Inc",
-          status: "in_transit",
-          order_date: "2025-09-20",
-          expected_delivery_date: "2025-09-30",
-          actual_delivery_date: null,
-          total_items: 3,
-          total_quantity: 8,
-          total_value: 24000,
-          items: [
-            { item_no: "ITM005", item_name: "Laptop Charger", quantity: 5, unit_price: 1200, status: "in_transit" },
-            { item_no: "ITM008", item_name: "USB Cables", quantity: 3, unit_price: 150, status: "in_transit" }
-          ],
-          notes: "IT equipment restock",
-          priority: "normal",
-          created_by: "Jane Smith",
-          last_updated: "2025-09-28T14:15:00Z"
-        }
-      ]
-      setPurchaseOrders(mockOrders)
+      const result = await apiService.purchaseOrders.getPurchaseOrders()
+      if (result.success) {
+        setPurchaseOrders(result.data || [])
+      } else {
+        setError(result.message || "Failed to fetch purchase orders")
+      }
     } catch (err) {
-      setError(err.message)
+      setError(err.message || "Failed to fetch purchase orders")
     } finally {
       setLoading(false)
     }
@@ -173,6 +137,13 @@ function PurchaseOrderTracker() {
     })
   }
 
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type })
+    setTimeout(() => {
+      setToast({ show: false, message: "", type: "success" })
+    }, 3000)
+  }
+
   const handleCreateOrder = () => {
     setOrderForm({
       supplier: "",
@@ -185,50 +156,116 @@ function PurchaseOrderTracker() {
   }
 
   const handleAddItemToOrder = (item) => {
-    setOrderForm(prev => ({
-      ...prev,
-      items: [...prev.items, {
+    setOrderForm(prev => {
+      const newItems = [...prev.items, {
         item_no: item.item_no,
         item_name: item.item_name,
         quantity: item.recommended_quantity,
         unit_price: item.price_per_unit || 0,
-        unit_of_measure: item.unit_of_measure || ""
+        unit_of_measure: item.unit_of_measure || "",
+        supplier: item.supplier || ""
       }]
-    }))
+
+      // Auto-set supplier based on selected items
+      let newSupplier = prev.supplier
+      if (newItems.length === 1) {
+        // First item added - set supplier from this item
+        newSupplier = item.supplier || ""
+      } else {
+        // Check if all items have the same supplier
+        const suppliers = newItems.map(i => i.supplier || "").filter(s => s)
+        const uniqueSuppliers = [...new Set(suppliers)]
+        if (uniqueSuppliers.length === 1) {
+          newSupplier = uniqueSuppliers[0]
+        }
+        // If multiple suppliers, keep current supplier or use the most common one
+      }
+
+      return {
+        ...prev,
+        items: newItems,
+        supplier: newSupplier
+      }
+    })
   }
 
   const handleRemoveItemFromOrder = (itemNo) => {
-    setOrderForm(prev => ({
-      ...prev,
-      items: prev.items.filter(item => item.item_no !== itemNo)
-    }))
+    setOrderForm(prev => {
+      const newItems = prev.items.filter(item => item.item_no !== itemNo)
+
+      // Reset supplier if no items remain
+      let newSupplier = prev.supplier
+      if (newItems.length === 0) {
+        newSupplier = ""
+      } else {
+        // Check if remaining items have the same supplier
+        const suppliers = newItems.map(i => i.supplier || "").filter(s => s)
+        const uniqueSuppliers = [...new Set(suppliers)]
+        if (uniqueSuppliers.length === 1) {
+          newSupplier = uniqueSuppliers[0]
+        }
+        // If multiple suppliers, keep current supplier
+      }
+
+      return {
+        ...prev,
+        items: newItems,
+        supplier: newSupplier
+      }
+    })
   }
 
   const handleSubmitOrder = async () => {
     try {
-      // TODO: Implement API call to create purchase order
-      console.log("Creating purchase order:", orderForm)
+      const orderData = {
+        supplier: orderForm.supplier,
+        items: orderForm.items,
+        expected_delivery_date: orderForm.expected_delivery_date,
+        notes: orderForm.notes,
+        priority: orderForm.priority,
+        created_by: "Current User" // TODO: Get from auth context
+      }
 
-      // Mock success
-      alert("Purchase order created successfully!")
-      setShowCreateModal(false)
-      fetchPurchaseOrders()
+      const result = await apiService.purchaseOrders.createPurchaseOrder(orderData)
+
+      if (result.success) {
+        showToast("Purchase order created successfully!")
+        setShowCreateModal(false)
+        setOrderForm({
+          supplier: "",
+          items: [],
+          expected_delivery_date: "",
+          notes: "",
+          priority: "normal"
+        })
+        fetchPurchaseOrders()
+      } else {
+        showToast(result.message || "Failed to create purchase order", "error")
+      }
     } catch (err) {
-      setError(err.message)
+      setError(err.message || "Failed to create purchase order")
     }
   }
 
   const handleUpdateStatus = async () => {
     try {
-      // TODO: Implement API call to update order status
-      console.log("Updating order status:", statusUpdate)
+      const statusData = {
+        new_status: statusUpdate.new_status,
+        notes: statusUpdate.notes,
+        actual_delivery_date: statusUpdate.actual_delivery_date || undefined
+      }
 
-      // Mock success
-      alert("Order status updated successfully!")
-      setShowOrderDetails(false)
-      fetchPurchaseOrders()
+      const result = await apiService.purchaseOrders.updatePurchaseOrderStatus(statusUpdate.order_id, statusData)
+
+      if (result.success) {
+        showToast("Order status updated successfully!")
+        setShowOrderDetails(false)
+        fetchPurchaseOrders()
+      } else {
+        showToast(result.message || "Failed to update order status", "error")
+      }
     } catch (err) {
-      setError(err.message)
+      setError(err.message || "Failed to update order status")
     }
   }
 
@@ -241,6 +278,23 @@ function PurchaseOrderTracker() {
       actual_delivery_date: order.actual_delivery_date || ""
     })
     setShowOrderDetails(true)
+  }
+
+  const handleDeleteOrder = async (orderId) => {
+    if (window.confirm("Are you sure you want to delete this purchase order? This action cannot be undone.")) {
+      try {
+        const result = await apiService.purchaseOrders.deletePurchaseOrder(orderId)
+
+        if (result.success) {
+          showToast("Purchase order deleted successfully!")
+          fetchPurchaseOrders()
+        } else {
+          showToast(result.message || "Failed to delete purchase order", "error")
+        }
+      } catch (err) {
+        showToast(err.message || "Failed to delete purchase order", "error")
+      }
+    }
   }
 
   return (
@@ -328,12 +382,20 @@ function PurchaseOrderTracker() {
                     {formatDate(order.expected_delivery_date)}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => handleViewOrderDetails(order)}
-                      className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs font-medium transition-colors"
-                    >
-                      View Details
-                    </button>
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => handleViewOrderDetails(order)}
+                        className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs font-medium transition-colors"
+                      >
+                        View Details
+                      </button>
+                      <button
+                        onClick={() => handleDeleteOrder(order.id)}
+                        className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -371,16 +433,9 @@ function PurchaseOrderTracker() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Supplier</label>
-                      <select
-                        value={orderForm.supplier}
-                        onChange={(e) => setOrderForm({ ...orderForm, supplier: e.target.value })}
-                        className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Select Supplier</option>
-                        <option value="Office Depot">Office Depot</option>
-                        <option value="Tech Solutions Inc">Tech Solutions Inc</option>
-                        <option value="Supply Chain Co">Supply Chain Co</option>
-                      </select>
+                      <div className="w-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200">
+                        {orderForm.supplier || "Select items to auto-set supplier"}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Expected Delivery Date</label>
@@ -653,6 +708,30 @@ function PurchaseOrderTracker() {
             </div>
           </div>
         </ModalPortal>
+      )}
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className="fixed top-4 right-4 z-[10000] animate-fade-in">
+          <div className={`px-4 py-3 rounded-lg shadow-lg border backdrop-blur-md transform transition-all duration-300 ease-in-out ${
+            toast.type === "success"
+              ? "bg-green-500/90 border-green-400 text-white"
+              : "bg-red-500/90 border-red-400 text-white"
+          }`}>
+            <div className="flex items-center gap-2">
+              {toast.type === "success" ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              )}
+              <span className="font-medium">{toast.message}</span>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
