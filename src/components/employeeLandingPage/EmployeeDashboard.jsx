@@ -26,6 +26,7 @@ import { Badge } from "../ui/UiComponents"
 import { useAuth } from "../../contexts/AuthContext"
 import { useOnlineStatus } from "../../hooks/use-online-status"
 import { useServiceWorker } from "../../hooks/use-service-worker"
+import { clearTokens } from "../../utils/auth"
 
 export default function EmployeeDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -44,8 +45,19 @@ export default function EmployeeDashboard() {
   const unreadCount = announcements.filter((a) => !a.read).length
 
   const handleLogout = () => {
-    employeeLogout()
-    navigate("/employee/login")
+    // Clear all stored tokens
+    clearTokens()
+    
+    // Clear session storage
+    sessionStorage.clear()
+    
+    // Update context state
+    if (employeeLogout) {
+      employeeLogout()
+    }
+    
+    // Navigate to login (replace prevents going back)
+    navigate("/employee/login", { replace: true })
   }
 
   const menuItems = [

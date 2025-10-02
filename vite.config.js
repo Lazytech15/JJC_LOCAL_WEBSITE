@@ -7,11 +7,13 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-  ],
-  server: {
-    host: "localhost",
-    cors: true,
-  },
+  ]
+  // ,
+  // server: {
+  //   host: "localhost",
+  //   cors: true,
+  // },
+  ,
   build: {
     outDir: "dist",
   },

@@ -89,7 +89,7 @@ export class EmployeeService extends BaseAPIService {
    * @returns {Promise} List of departments
    */
   async getDepartments() {
-    return this.request("/api/departments", {
+    return this.request("/api/employees", {
       method: "GET",
     })
   }
