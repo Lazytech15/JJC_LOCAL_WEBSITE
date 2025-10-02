@@ -8,6 +8,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+
   server: {
     host: "localhost",
     cors: true,

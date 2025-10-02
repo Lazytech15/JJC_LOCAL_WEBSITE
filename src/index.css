@@ -1,2 +1,125 @@
 @import "tailwindcss";
 
+/* Base styles for smooth theme transitions */
+* {
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  transition: color 0.3s ease, background-color 0.3s ease;
+}
+
+/* Ensure proper dark mode transitions */
+.dark {
+  color-scheme: dark;
+}
+
+/* Custom scrollbar for better dark mode experience */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(243 244 246);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: rgb(31 41 55);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(209 213 219);
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgb(75 85 99);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(156 163 175);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgb(107 114 128);
+}
+
+/* Custom utility classes for consistent theming */
+.theme-transition {
+  transition: all 0.3s ease-in-out;
+}
+
+.glass-effect {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass-effect {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.button-primary {
+  background: rgb(37 99 235);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.button-primary:hover {
+  background: rgb(29 78 216);
+}
+
+.dark .button-primary {
+  background: rgb(29 78 216);
+}
+
+.dark .button-primary:hover {
+  background: rgb(37 99 235);
+}
+
+.text-primary {
+  color: rgb(17 24 39);
+}
+
+.dark .text-primary {
+  color: rgb(243 244 246);
+}
+
+.text-secondary {
+  color: rgb(75 85 99);
+}
+
+.dark .text-secondary {
+  color: rgb(156 163 175);
+}
+
+.bg-primary {
+  background: white;
+}
+
+.dark .bg-primary {
+  background: rgb(17 24 39);
+}
+
+.bg-secondary {
+  background: rgb(249 250 251);
+}
+
+.dark .bg-secondary {
+  background: rgb(31 41 55);
+}
+
+.border-primary {
+  border-color: rgb(229 231 235);
+}
+
+.dark .border-primary {
+  border-color: rgb(55 65 81);
+}
