@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   Home,
@@ -6,35 +6,43 @@ import {
   User,
   Clock,
   BarChart3,
-  Settings,
-  LogOut,
-  Wifi,
-  WifiOff,
-  Calendar,
-  TrendingUp,
-  Users,
-  CheckCircle2,
   Moon,
   Sun,
+  ArrowLeft,
+  Loader2
 } from "lucide-react"
 import { Button } from "../ui/UiComponents"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/UiComponents"
 import { Avatar, AvatarFallback } from "../ui/UiComponents"
 import { Badge } from "../ui/UiComponents"
 import { useAuth } from "../../contexts/AuthContext"
 import { useOnlineStatus } from "../../hooks/use-online-status"
 import { useServiceWorker } from "../../hooks/use-service-worker"
-import { clearTokens } from "../../utils/auth"
+import { getStoredToken, verifyToken, clearTokens } from "../../utils/auth"
 import logo from "../../assets/companyLogo.jpg"
+import apiService from "../../utils/api/api-service"
+
+// Import the components
+import DashboardHome from "./DashboardComponents/DashboardHome"
+import Announcements from "./DashboardComponents/Announcements"
+import TimeAttendance from "./DashboardComponents/TimeAttendance"
+import Performance from "./DashboardComponents/Performance"
+import Profile from "./DashboardComponents/Profile"
 
 export default function EmployeeDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard")
   const [showProfileMenu, setShowProfileMenu] = useState(false)
-  const [announcements, setAnnouncements] = useState([
-    { id: 1, title: "Safety Training Tomorrow", time: "2 hours ago", read: false },
-    { id: 2, title: "New Project Assignment", time: "5 hours ago", read: false },
-    { id: 3, title: "Monthly Meeting Schedule", time: "1 day ago", read: true },
-  ])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  
+  // Data states
+  const [announcements, setAnnouncements] = useState([])
+  const [attendanceData, setAttendanceData] = useState(null)
+  const [performanceData, setPerformanceData] = useState(null)
+  const [profileData, setProfileData] = useState(null)
+  const [documentData, setDocumentData] = useState(null)
+  const [employeeData, setEmployeeData] = useState(null)
+
+  const profileMenuRef = useRef(null)
 
   const navigate = useNavigate()
   const { employee, employeeLogout, isDarkMode, toggleDarkMode } = useAuth()
@@ -42,6 +50,146 @@ export default function EmployeeDashboard() {
   const { updateAvailable, updateServiceWorker } = useServiceWorker()
 
   const unreadCount = announcements.filter((a) => !a.read).length
+// Replace the entire fetchDashboardData function (lines 56-161) with this:
+
+useEffect(() => {
+  const fetchDashboardData = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Get token and decode to find employee
+      const token = getStoredToken()
+      if (!token) {
+        console.warn('No token found')
+        setLoading(false)
+        setError('Please log in to continue')
+        return
+      }
+
+      const payload = verifyToken(token)
+      console.log('Token payload:', payload)
+
+      if (!payload || !payload.username) {
+        console.warn('Invalid token payload')
+        clearTokens()
+        setLoading(false)
+        setError('Session expired. Please log in again.')
+        return
+      }
+
+      // First, fetch employee data by username to get the ID
+      console.log('Fetching employee by username:', payload.username)
+      const employeesResponse = await apiService.employees.getEmployees({
+        search: payload.username,
+        limit: 1
+      })
+
+      console.log('Employees search response:', employeesResponse)
+
+      // Check for employees in the response (API returns employees directly, not nested under data)
+      if (!employeesResponse?.employees || employeesResponse.employees.length === 0) {
+        setLoading(false)
+        setError('Employee not found')
+        return
+      }
+
+      const foundEmployee = employeesResponse.employees[0]
+      // Use 'id' as UID since that's what the API returns
+      const uid = foundEmployee.id
+      
+      console.log('Found employee ID:', uid)
+      setEmployeeData(foundEmployee)
+
+      // Now fetch all related data using the ID
+      const [
+        summaryResponse,
+        attendanceResponse,
+        profileResponse,
+        documentsResponse
+      ] = await 
+      Promise.allSettled([
+        // apiService.summary.getEmployeeSummaries({
+        //   uid: uid,
+        //   limit: 10
+        // }),
+        apiService.attendance.getEmployeeAttendance(uid, {
+          limit: 30
+        }),
+        apiService.profiles.getProfileByUid(uid),
+        apiService.document.getEmployeeDocuments(uid)
+      ])
+
+      console.log('API Responses:', {
+        // summary: summaryResponse,
+        attendance: attendanceResponse,
+        profile: profileResponse,
+        documents: documentsResponse
+      })
+
+      // Process summaries/announcements
+      // if (summaryResponse.status === 'fulfilled') {
+      //   const summaries = summaryResponse.value?.data || []
+      //   setAnnouncements(summaries.map((s, idx) => ({
+      //     id: s.summary_id || idx,
+      //     title: s.task_description || s.notes || 'Daily Summary',
+      //     time: new Date(s.date).toLocaleDateString(),
+      //     read: false,
+      //     fullData: s
+      //   })))
+      // } else {
+      //   console.error('Summary fetch failed:', summaryResponse.reason)
+      // }
+
+      // Process attendance
+      if (attendanceResponse.status === 'fulfilled') {
+        setAttendanceData(attendanceResponse.value)
+      } else {
+        console.error('Attendance fetch failed:', attendanceResponse.reason)
+      }
+
+      // Process profile
+      if (profileResponse.status === 'fulfilled') {
+        setProfileData(profileResponse.value)
+      } else {
+        console.error('Profile fetch failed:', profileResponse.reason)
+      }
+
+      // Process documents
+      // if (documentsResponse.status === 'fulfilled') {
+      //   setDocumentData(documentsResponse.value)
+      // } else {
+      //   console.error('Documents fetch failed:', documentsResponse.reason)
+      // }
+
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err)
+      setError('Failed to load dashboard data')
+    } finally {
+      console.log('Finished loading dashboard data')
+      setLoading(false)
+    }
+  }
+
+  fetchDashboardData()
+}, []) // Run once on mount
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setShowProfileMenu(false)
+      }
+    }
+
+    if (showProfileMenu) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [showProfileMenu])
 
   const handleLogout = () => {
     clearTokens()
@@ -60,21 +208,17 @@ export default function EmployeeDashboard() {
     { id: "profile", icon: User, label: "Profile" },
   ]
 
-  const stats = [
-    { label: "Attendance Rate", value: "98%", icon: CheckCircle2, color: "emerald" },
-    { label: "Tasks Completed", value: "24", icon: TrendingUp, color: "blue" },
-    { label: "Team Members", value: "12", icon: Users, color: "violet" },
-    { label: "Days Active", value: "156", icon: Calendar, color: "amber" },
-  ]
-
-  const getStatColor = (color) => {
-    const colors = {
-      emerald: isDarkMode ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-50 text-emerald-600",
-      blue: isDarkMode ? "bg-blue-500/20 text-blue-400" : "bg-blue-50 text-blue-600",
-      violet: isDarkMode ? "bg-violet-500/20 text-violet-400" : "bg-violet-50 text-violet-600",
-      amber: isDarkMode ? "bg-amber-500/20 text-amber-400" : "bg-amber-50 text-amber-600",
-    }
-    return colors[color] || colors.emerald
+  if (loading) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-zinc-950" : "bg-zinc-50"}`}>
+        <div className="text-center">
+          <Loader2 className={`w-8 h-8 animate-spin mx-auto mb-4 ${isDarkMode ? "text-white" : "text-zinc-900"}`} />
+          <p className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+            Loading dashboard...
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -86,6 +230,13 @@ export default function EmployeeDashboard() {
           <button onClick={updateServiceWorker} className="underline font-semibold">
             Update now
           </button>
+        </div>
+      )}
+
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-500 text-white px-4 py-3 text-center text-sm">
+          {error}
         </div>
       )}
 
@@ -168,7 +319,7 @@ export default function EmployeeDashboard() {
               </Button>
 
               {/* Profile Dropdown */}
-              <div className="relative">
+              <div className="relative" ref={profileMenuRef}>
                 <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
                   className="focus:outline-none"
@@ -185,59 +336,53 @@ export default function EmployeeDashboard() {
 
                 {/* Dropdown Menu */}
                 {showProfileMenu && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => setShowProfileMenu(false)}
-                    />
-                    <div className={`absolute right-0 mt-2 w-64 rounded-xl shadow-xl border z-50 ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
-                      }`}>
-                      <div className={`p-4 border-b ${isDarkMode ? 'border-zinc-800' : 'border-zinc-200'}`}>
-                        <div className="flex items-center gap-3">
-                          <Avatar className={`w-12 h-12 ring-2 ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}>
-                            <AvatarFallback className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-sm font-semibold`}>
-                              {employee?.name
-                                ?.split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className={`font-semibold truncate ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                              {employee?.name}
-                            </p>
-                            <p className={`text-xs truncate ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                              {employee?.position}
-                            </p>
-                          </div>
+                  <div className={`absolute right-0 mt-2 w-64 rounded-xl shadow-xl border z-50 ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                    }`}>
+                    <div className={`p-4 border-b ${isDarkMode ? 'border-zinc-800' : 'border-zinc-200'}`}>
+                      <div className="flex items-center gap-3">
+                        <Avatar className={`w-12 h-12 ring-2 ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}>
+                          <AvatarFallback className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-sm font-semibold`}>
+                            {employee?.name
+                              ?.split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-semibold truncate ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                            {employee?.name}
+                          </p>
+                          <p className={`text-xs truncate ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                            {employee?.position}
+                          </p>
                         </div>
                       </div>
-                      <div className="p-2">
-                        <button
-                          onClick={() => {
-                            setShowProfileMenu(false)
-                            setActiveTab("profile")
-                          }}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
-                            }`}
-                        >
-                          <User className="w-4 h-4" />
-                          <span className="text-sm font-medium">View Profile</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowProfileMenu(false)
-                            handleLogout()
-                          }}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-red-400" : "hover:bg-zinc-100 text-red-600"
-                            }`}
-                        >
-                          <LogOut className="w-4 h-4" />
-                          <span className="text-sm font-medium">Logout</span>
-                        </button>
-                      </div>
                     </div>
-                  </>
+                    <div className="p-2">
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false)
+                          setActiveTab("profile")
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
+                          }`}
+                      >
+                        <User className="w-4 h-4" />
+                        <span className="text-sm font-medium">View Profile</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false)
+                          handleLogout()
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-red-400" : "hover:bg-zinc-100 text-red-600"
+                          }`}
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                        <span className="text-sm font-medium">Logout</span>
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -248,210 +393,50 @@ export default function EmployeeDashboard() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === "dashboard" && (
-          <div className="space-y-8">
-            {/* Welcome Section */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className={`text-3xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                  Welcome back, {employee?.name?.split(" ")[0]}!
-                </h2>
-                <p className={`text-sm mt-2 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                  {new Date().toLocaleDateString("en-US", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
-            </div>
-
-            {/* Stats Grid */}
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {stats.map((stat, index) => {
-                const Icon = stat.icon
-                return (
-                  <Card
-                    key={index}
-                    className={`border transition-all hover:scale-105 ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
-                      }`}
-                  >
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <p className={`text-xs font-medium uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"
-                            }`}>
-                            {stat.label}
-                          </p>
-                          <p className={`text-3xl font-bold mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                            {stat.value}
-                          </p>
-                        </div>
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${getStatColor(stat.color)}`}>
-                          <Icon className="w-6 h-6" />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-
-            {/* Recent Announcements */}
-            <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-              <CardHeader>
-                <CardTitle className={isDarkMode ? "text-white" : "text-zinc-900"}>Recent Announcements</CardTitle>
-                <CardDescription className={isDarkMode ? "text-zinc-400" : "text-zinc-600"}>
-                  Stay updated with the latest company news
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {announcements.slice(0, 3).map((announcement) => (
-                  <div
-                    key={announcement.id}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer ${isDarkMode
-                        ? "border-zinc-800 hover:bg-zinc-800/50"
-                        : "border-zinc-200 hover:bg-zinc-50"
-                      }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className={`font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                            {announcement.title}
-                          </p>
-                          {!announcement.read && (
-                            <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-                          )}
-                        </div>
-                        <p className={`text-sm mt-1 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                          {announcement.time}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+          <DashboardHome 
+            employee={employee}
+            employeeData={employeeData}
+            announcements={announcements}
+            attendanceData={attendanceData}
+            isDarkMode={isDarkMode}
+          />
         )}
 
         {activeTab === "announcements" && (
-          <div className="space-y-6">
-            <h2 className={`text-3xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>Announcements</h2>
-            <div className="space-y-4">
-              {announcements.map((announcement) => (
-                <Card
-                  key={announcement.id}
-                  className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <p className={`font-semibold text-lg ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                            {announcement.title}
-                          </p>
-                          {!announcement.read && (
-                            <Badge className="bg-red-500 text-white">New</Badge>
-                          )}
-                        </div>
-                        <p className={`text-sm mt-2 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                          {announcement.time}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
+          <Announcements 
+            announcements={announcements}
+            setAnnouncements={setAnnouncements}
+            isDarkMode={isDarkMode}
+          />
         )}
 
         {activeTab === "profile" && (
-          <div className="space-y-6">
-            <h2 className={`text-3xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>My Profile</h2>
-            <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-              <CardContent className="p-8">
-                <div className="flex flex-col items-center text-center mb-8">
-                  <Avatar className={`w-24 h-24 ring-4 mb-4 ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}>
-                    <AvatarFallback className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-3xl font-bold`}>
-                      {employee?.name
-                        ?.split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <h3 className={`text-2xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                    {employee?.name}
-                  </h3>
-                  <p className={`text-sm mt-1 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                    {employee?.position}
-                  </p>
-                </div>
-
-                <div className="grid gap-6 sm:grid-cols-2">
-                  <div className={`p-4 rounded-xl ${isDarkMode ? "bg-zinc-800/50" : "bg-zinc-50"}`}>
-                    <label className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"
-                      }`}>
-                      Employee ID
-                    </label>
-                    <p className={`mt-2 text-lg font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                      {employee?.employeeId}
-                    </p>
-                  </div>
-                  <div className={`p-4 rounded-xl ${isDarkMode ? "bg-zinc-800/50" : "bg-zinc-50"}`}>
-                    <label className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"
-                      }`}>
-                      Department
-                    </label>
-                    <p className={`mt-2 text-lg font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                      {employee?.department}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <Button
-                    variant="outline"
-                    onClick={handleLogout}
-                    className={`w-full sm:w-auto lg:hidden ${isDarkMode ? "border-zinc-800 text-zinc-400 hover:text-white" : ""}`}
-                  >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Logout
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Profile 
+            employee={employee}
+            employeeData={employeeData}
+            profileData={profileData}
+            documentData={documentData}
+            handleLogout={handleLogout}
+            isDarkMode={isDarkMode}
+          />
         )}
 
         {activeTab === "attendance" && (
-          <div className="space-y-6">
-            <h2 className={`text-3xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>Time & Attendance</h2>
-            <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-              <CardContent className="p-8 text-center">
-                <Clock className={`w-16 h-16 mx-auto mb-4 ${isDarkMode ? "text-zinc-700" : "text-zinc-300"}`} />
-                <p className={`text-lg ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                  Attendance tracking coming soon
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+          <TimeAttendance 
+            employee={employee}
+            employeeData={employeeData}
+            attendanceData={attendanceData}
+            isDarkMode={isDarkMode} 
+          />
         )}
 
         {activeTab === "performance" && (
-          <div className="space-y-6">
-            <h2 className={`text-3xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>Performance</h2>
-            <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-              <CardContent className="p-8 text-center">
-                <BarChart3 className={`w-16 h-16 mx-auto mb-4 ${isDarkMode ? "text-zinc-700" : "text-zinc-300"}`} />
-                <p className={`text-lg ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                  Performance metrics coming soon
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+          <Performance 
+            employee={employee}
+            employeeData={employeeData}
+            performanceData={performanceData}
+            isDarkMode={isDarkMode} 
+          />
         )}
       </main>
 
