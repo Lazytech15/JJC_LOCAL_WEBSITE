@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Factory, Loader2, Wifi, WifiOff, ArrowLeft } from "lucide-react"
-import { createToken, storeTokens, getStoredToken, clearTokens, isTokenExpired } from "../../utils/auth"
+import { createToken, storeTokens, getStoredToken, clearTokens, isTokenExpired, verifyToken } from "../../utils/auth"
 import { AuthService } from "../../utils/api/services/auth-service"
 import { useAuth } from "../../contexts/AuthContext"
+import logo from "../../assets/companyLogo.jpg"
 
 const Button = ({ children, className = "", disabled = false, type = "button", onClick, ...props }) => (
   <button
@@ -79,6 +80,7 @@ export default function EmployeeLogin() {
   const [error, setError] = useState("")
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [currentSlide, setCurrentSlide] = useState(0)
+  const [hasValidToken, setHasValidToken] = useState(false)
 
   const navigate = useNavigate()
   const { employeeLogin, isEmployeeAuthenticated } = useAuth()
@@ -127,10 +129,10 @@ export default function EmployeeLogin() {
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
     const handleOffline = () => setIsOnline(false)
-    
+
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
-    
+
     return () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
@@ -138,11 +140,49 @@ export default function EmployeeLogin() {
   }, [])
 
   useEffect(() => {
-    // Check if user is already logged in
     if (isEmployeeAuthenticated) {
       navigate("/employee/dashboard", { replace: true })
     }
   }, [isEmployeeAuthenticated, navigate])
+
+  // Check for existing valid token
+  useEffect(() => {
+    const existingToken = getStoredToken()
+    if (existingToken && !isTokenExpired(existingToken)) {
+      const payload = verifyToken(existingToken)
+      if (payload) {
+        setHasValidToken(true)
+      }
+    } else {
+      setHasValidToken(false)
+      clearTokens()
+    }
+  }, [])
+
+  const handleContinueWithToken = () => {
+    const existingToken = getStoredToken()
+    if (existingToken) {
+      const payload = verifyToken(existingToken)
+      if (payload && payload.role) {
+        // Navigate based on stored role
+        if (payload.role === 'super-admin') {
+          navigate("/jjcewsaccess/super-admin", { replace: true })
+        } else if (payload.role === 'admin' || payload.role === 'manager') {
+          const deptRoutes = {
+            'Human Resources': '/jjcewsaccess/hr',
+            'Operation': '/jjcewsaccess/operations',
+            'Finance': '/jjcewsaccess/finance',
+            'Procurement': '/jjcewsaccess/procurement',
+            'Engineering': '/jjcewsaccess/engineering'
+          }
+          const route = deptRoutes[payload.department] || '/jjcewsaccess'
+          navigate(route, { replace: true })
+        } else {
+          navigate("/employee/dashboard", { replace: true })
+        }
+      }
+    }
+  }
 
   const handleSubmit = async () => {
     setError("")
@@ -150,7 +190,7 @@ export default function EmployeeLogin() {
 
     try {
       // Validate fields
-      if (!username || !password || !department) {
+      if (!username.trim() || !password.trim() || !department) {
         setError("Please fill in all fields.")
         setIsLoading(false)
         return
@@ -158,7 +198,7 @@ export default function EmployeeLogin() {
 
       // Call login API
       const response = await authService.login({
-        username,
+        username: username.trim(),
         password,
         department
       })
@@ -168,8 +208,11 @@ export default function EmployeeLogin() {
       if (response.success && response.user) {
         const userData = response.user
 
-        // Create token with user data
-        const token = createToken({
+        // Create JWT tokens
+        const accessTokenExpiry = rememberMe ? "24h" : "1h"
+        const refreshTokenExpiry = rememberMe ? "7d" : "24h"
+
+        const accessToken = response.accessToken || createToken({
           userId: userData.id,
           username: userData.username,
           name: userData.name,
@@ -177,10 +220,16 @@ export default function EmployeeLogin() {
           accessLevel: userData.access_level,
           role: userData.role,
           permissions: userData.permissions
-        })
+        }, accessTokenExpiry)
+
+        const refreshToken = response.refreshToken || createToken({
+          id: userData.id,
+          type: "refresh",
+          department: userData.department
+        }, refreshTokenExpiry)
 
         // Store tokens
-        storeTokens(token, rememberMe)
+        storeTokens(accessToken, refreshToken)
 
         // Update AuthContext with employee data
         if (employeeLogin) {
@@ -193,20 +242,18 @@ export default function EmployeeLogin() {
             position: userData.access_level,
             role: userData.role,
             permissions: userData.permissions,
-            loginTime: new Date().toISOString()
+            loginTime: new Date().toISOString(),
+            tokenExpiry: rememberMe ? "24 hours" : "1 hour",
+            hasValidToken: true
           })
         }
 
-        console.log("Login successful:", {
-          user: userData,
-          token: token.substring(0, 20) + "..."
-        })
+        console.log("Login successful with JWT authentication")
 
         // Navigate based on role
         if (userData.role === 'super-admin') {
           navigate("/jjcewsaccess/super-admin", { replace: true })
         } else if (userData.role === 'admin' || userData.role === 'manager') {
-          // Map department to route
           const deptRoutes = {
             'Human Resources': '/jjcewsaccess/hr',
             'Operation': '/jjcewsaccess/operations',
@@ -220,23 +267,37 @@ export default function EmployeeLogin() {
           navigate("/employee/dashboard", { replace: true })
         }
       } else {
-        setError("Login failed. Please try again.")
+        clearTokens()
+        setError(response.message || response.error || "Authentication failed")
       }
     } catch (err) {
       console.error("Login error:", err)
-      
-      if (err.message.includes("404")) {
+      clearTokens()
+
+      // Network error handling
+      if (err.name === "NetworkError" || !navigator.onLine) {
+        setError("Network connection error. Please check your internet connection.")
+      } else if (err.message.includes("404")) {
         setError("User not found or not authorized for this department.")
       } else if (err.message.includes("401")) {
         setError("Invalid credentials. Please check your password.")
       } else if (err.message.includes("400")) {
         setError("Invalid request. Please check all fields.")
       } else {
-        setError("Login failed. Please try again later.")
+        setError(err.message || "Unable to connect to server. Please try again later.")
       }
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleInputChange = (field, value) => {
+    if (field === 'username') setUsername(value)
+    if (field === 'password') setPassword(value)
+    if (field === 'department') setDepartment(value)
+
+    // Clear error when user starts typing
+    if (error) setError("")
   }
 
   const handleBackToHome = () => {
@@ -244,16 +305,15 @@ export default function EmployeeLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex">
+    <div className="min-h-screen bg-zinc-50 overflow-hidden flex">
       {/* Left Side - Carousel */}
       <div className="hidden lg:flex lg:w-[58%] relative overflow-hidden">
         <div className="absolute inset-0">
           {carouselImages.map((item, index) => (
             <div
               key={index}
-              className={`absolute inset-0 transition-opacity duration-1000 ${
-                index === currentSlide ? "opacity-100" : "opacity-0"
-              }`}
+              className={`absolute inset-0 transition-opacity duration-1000 ${index === currentSlide ? "opacity-100" : "opacity-0"
+                }`}
             >
               <img
                 src={item.url}
@@ -261,7 +321,7 @@ export default function EmployeeLogin() {
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-br from-zinc-900/60 via-zinc-900/40 to-zinc-900/60" />
-              
+
               <div className="absolute inset-0 flex flex-col justify-end p-12">
                 <div className="max-w-2xl">
                   <h2 className="text-5xl font-bold text-white mb-4 drop-shadow-lg">
@@ -281,20 +341,23 @@ export default function EmployeeLogin() {
             <button
               key={index}
               onClick={() => setCurrentSlide(index)}
-              className={`h-2 rounded-full transition-all ${
-                index === currentSlide ? "w-8 bg-white" : "w-2 bg-white/50 hover:bg-white/75"
-              }`}
+              className={`h-2 rounded-full transition-all ${index === currentSlide ? "w-8 bg-white" : "w-2 bg-white/50 hover:bg-white/75"
+                }`}
             />
           ))}
         </div>
 
         <div className="absolute top-8 left-8 z-30 flex items-center gap-3">
           <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg border border-white/20">
-            <Factory className="w-7 h-7 text-white" />
+            <img
+                              src={logo}
+                              alt="JJC Engineering Works Logo"
+                              className="w-12 h-12 rounded-xl object-cover shadow-md bg-primary"
+                            />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white drop-shadow-lg">JJC Engineering Works</h1>
-            <p className="text-xs text-white/90 drop-shadow">Since 1996</p>
+            <h1 className="text-lg font-bold text-white drop-shadow-lg">JJCEWGS</h1>
+            <p className="text-xs text-white/90 drop-shadow">JJC Engineering Works & General Services</p>
           </div>
         </div>
       </div>
@@ -312,35 +375,55 @@ export default function EmployeeLogin() {
         <div className="w-full max-w-md">
           <div className="lg:hidden text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-zinc-900 rounded-3xl mb-4 shadow-xl">
-              <Factory className="w-8 h-8 text-white" />
+              <img
+                              src={logo}
+                              alt="JJC Engineering Works Logo"
+                              className="w-12 h-12 rounded-xl object-cover shadow-md bg-primary"
+                            />
             </div>
-            <h1 className="text-2xl font-bold text-zinc-900 mb-1">JJC Engineering Works</h1>
+            <h1 className="text-2xl font-bold text-zinc-900 mb-1">JJC Engineering Works & General Services</h1>
             <p className="text-zinc-600">Employee Portal</p>
           </div>
 
-          <div className="mb-6">
-            <div
-              className={`flex items-center gap-2 px-4 py-3 rounded-xl backdrop-blur-sm shadow-sm transition-all ${
-                isOnline 
-                  ? "bg-green-100 text-green-700 border border-green-200" 
-                  : "bg-zinc-100 text-zinc-600 border border-zinc-200"
-              }`}
-            >
-              {isOnline ? <Wifi className="w-5 h-5" /> : <WifiOff className="w-5 h-5" />}
-              <span className="text-sm font-medium">{isOnline ? "Connected" : "Offline Mode"}</span>
-            </div>
-          </div>
 
-          <Card className="shadow-xl border border-zinc-200">
-            <CardHeader className="space-y-1 pb-4">
+
+          <Card className="shadow-xl border border-zinc-200 mt-5">
+            <CardHeader className="relative space-y-1 pb-4">
+              <div className="absolute top-6 right-6 flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`}></span>
+              </div>
               <CardTitle className="text-2xl text-zinc-900">Welcome Back</CardTitle>
               <CardDescription className="text-base">Sign in to access your dashboard</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-5">
+                {hasValidToken && (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        <span className="text-green-600 mr-2">✓</span>
+                        <span className="text-green-600 text-sm font-medium">Active session found</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleContinueWithToken}
+                        className="px-3 py-1 bg-green-600 text-white text-xs rounded-md hover:bg-green-700 transition-colors"
+                      >
+                        Continue
+                      </button>
+                    </div>
+                    <p className="text-green-600 text-xs">
+                      You're already signed in. Continue to dashboard or sign in with different credentials.
+                    </p>
+                  </div>
+                )}
+
                 {error && (
                   <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-                    <p className="text-sm text-red-600 font-medium">{error}</p>
+                    <div className="flex items-center">
+                      <span className="text-red-600 mr-2">⚠️</span>
+                      <p className="text-sm text-red-600 font-medium">{error}</p>
+                    </div>
                   </div>
                 )}
 
@@ -351,7 +434,7 @@ export default function EmployeeLogin() {
                   <Select
                     id="department"
                     value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
+                    onChange={(e) => handleInputChange('department', e.target.value)}
                     disabled={isLoading}
                     className="h-12 text-base"
                   >
@@ -372,9 +455,10 @@ export default function EmployeeLogin() {
                     type="text"
                     placeholder="Enter your username"
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => handleInputChange('username', e.target.value)}
                     disabled={isLoading}
                     className="h-12 text-base"
+                    autoComplete="username"
                   />
                 </div>
 
@@ -387,7 +471,7 @@ export default function EmployeeLogin() {
                     type="password"
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => handleInputChange('password', e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !isLoading) {
                         handleSubmit()
@@ -395,22 +479,23 @@ export default function EmployeeLogin() {
                     }}
                     disabled={isLoading}
                     className="h-12 text-base"
+                    autoComplete="current-password"
                   />
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="remember" 
-                      checked={rememberMe} 
-                      onCheckedChange={setRememberMe} 
-                      disabled={isLoading} 
+                    <Checkbox
+                      id="remember"
+                      checked={rememberMe}
+                      onCheckedChange={setRememberMe}
+                      disabled={isLoading}
                     />
                     <label
                       htmlFor="remember"
                       className="text-sm font-medium leading-none text-zinc-700 cursor-pointer select-none"
                     >
-                      Keep me signed in
+                      Keep me signed in (24 hours)
                     </label>
                   </div>
                   <a href="#" className="text-sm text-zinc-600 hover:text-zinc-900 font-medium transition-colors">
@@ -425,21 +510,34 @@ export default function EmployeeLogin() {
                   disabled={isLoading}
                 >
                   {isLoading ? (
-                    <>
+                    <span className="flex items-center justify-center">
                       <Loader2 className="mr-2 h-5 w-5 animate-spin inline" />
                       Signing in...
-                    </>
+                    </span>
                   ) : (
-                    "Sign In"
+                    <span className="flex items-center justify-center">
+                      <span className="mr-2">🔒</span>
+                      Sign In Securely
+                    </span>
                   )}
                 </Button>
               </div>
             </CardContent>
           </Card>
 
-          <div className="mt-8 text-center">
+          <div className="mt-6 p-4 bg-white rounded-xl border border-zinc-200 shadow-sm">
+            <div className="flex items-center mb-2">
+              <span className="text-green-500 mr-2">🔐</span>
+              <p className="text-xs text-zinc-600 font-medium">Secure JWT Authentication</p>
+            </div>
+            <p className="text-xs text-zinc-500">
+              Your session is protected with JSON Web Tokens and automatic expiration.
+            </p>
+          </div>
+
+          <div className="mt-6 text-center">
             <p className="text-sm text-zinc-500">
-              © {new Date().getFullYear()} JJC Engineering Works. All rights reserved.
+              © {new Date().getFullYear()} JJCEWGS. All rights reserved.
             </p>
           </div>
         </div>

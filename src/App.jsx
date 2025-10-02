@@ -64,10 +64,10 @@ function AppContent() {
           />
 
           {/* Admin/Department Routes (Protected with special URL) */}
-          <Route path="/jjcewsaccess" element={<DepartmentSelector />} />
-          <Route path="/jjcewsaccess/login/:department" element={<LoginForm />} />
+          <Route path="/jjcewgsaccess" element={<DepartmentSelector />} />
+          <Route path="/jjcewgsaccess/login/:department" element={<LoginForm />} />
           <Route
-            path="/jjcewsaccess/super-admin"
+            path="/jjcewgsaccess/super-admin"
             element={
               <AdminProtectedRoute department="super-admin" requireSuperAdmin={true}>
                 <SuperAdminDashboard />
@@ -75,7 +75,7 @@ function AppContent() {
             }
           />
           <Route
-            path="/jjcewsaccess/hr"
+            path="/jjcewgsaccess/hr"
             element={
               <AdminProtectedRoute department="Human Resources">
                 <HRDepartment />
@@ -83,7 +83,7 @@ function AppContent() {
             }
           />
           <Route
-            path="/jjcewsaccess/operations"
+            path="/jjcewgsaccess/operations"
             element={
               <AdminProtectedRoute department="Operation">
                 <OperationsDepartment />
@@ -91,7 +91,7 @@ function AppContent() {
             }
           />
           <Route
-            path="/jjcewsaccess/finance"
+            path="/jjcewgsaccess/finance"
             element={
               <AdminProtectedRoute department="Finance">
                 <FinancePayrollDepartment />
@@ -99,7 +99,7 @@ function AppContent() {
             }
           />
           <Route
-            path="/jjcewsaccess/procurement"
+            path="/jjcewgsaccess/procurement"
             element={
               <AdminProtectedRoute department="Procurement">
                 <ProcurementDepartment />
@@ -107,7 +107,7 @@ function AppContent() {
             }
           />
           <Route
-            path="/jjcewsaccess/engineering"
+            path="/jjcewgsaccess/engineering"
             element={
               <AdminProtectedRoute department="Engineering">
                 <EngineeringDepartment />
@@ -165,11 +165,11 @@ function AdminProtectedRoute({ children, department, requireSuperAdmin = false }
       "super-admin": "super-admin"
     }
     const slug = slugMap[department] || department.toLowerCase().replace(/\s+/g, '-')
-    return <Navigate to={`/jjcewsaccess/login/${slug}`} replace />
+    return <Navigate to={`/jjcewgsaccess/login/${slug}`} replace />
   }
 
   if (requireSuperAdmin && !isSuperAdmin) {
-    return <Navigate to="/jjcewsaccess" replace />
+    return <Navigate to="/jjcewgsaccess" replace />
   }
 
   if (!requireSuperAdmin && selectedDepartment !== department && !isSuperAdmin) {
@@ -181,7 +181,7 @@ function AdminProtectedRoute({ children, department, requireSuperAdmin = false }
       "Engineering": "engineering"
     }
     const slug = slugMap[department] || department.toLowerCase().replace(/\s+/g, '-')
-    return <Navigate to={`/jjcewsaccess/login/${slug}`} replace />
+    return <Navigate to={`/jjcewgsaccess/login/${slug}`} replace />
   }
 
   return children

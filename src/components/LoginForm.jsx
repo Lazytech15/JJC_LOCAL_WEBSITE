@@ -99,7 +99,7 @@ function LoginForm() {
       setError(`Invalid department: ${deptSlug}. Please select a valid department.`)
       // Optional: Redirect to home after a delay
       setTimeout(() => {
-        navigate("/jjcewsaccess")
+        navigate("/jjcewgsaccess")
       }, 3000)
     }
   }, [deptSlug, isValidDepartment, navigate])
@@ -188,10 +188,10 @@ function LoginForm() {
 
         // Navigate to department dashboard with URL slug
         if (departmentName === "super-admin") {
-          navigate("/jjcewsaccess/super-admin")
+          navigate("/jjcewgsaccess/super-admin")
         } else {
           const urlSlug = DEPARTMENT_NAME_TO_SLUG[departmentName] || deptSlug
-          navigate(`/jjcewsaccess/${urlSlug}`)
+          navigate(`/jjcewgsaccess/${urlSlug}`)
         }
 
         // Optional: Show success message
@@ -248,10 +248,10 @@ function LoginForm() {
 
   const handleContinueWithToken = () => {
     if (departmentName === "super-admin") {
-      navigate("/jjcewsaccess/super-admin", { replace: true })
+      navigate("/jjcewgsaccess/super-admin", { replace: true })
     } else {
       const urlSlug = DEPARTMENT_NAME_TO_SLUG[departmentName] || deptSlug
-      navigate(`/jjcewsaccess/${urlSlug}`, { replace: true })
+      navigate(`/jjcewgsaccess/${urlSlug}`, { replace: true })
     }
   }
 
@@ -268,7 +268,7 @@ function LoginForm() {
         </div>
 
         <button
-          onClick={() => navigate("/jjcewsaccess")}
+          onClick={() => navigate("/jjcewgsaccess")}
           className="mb-8 flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors duration-200"
         >
           <span className="mr-2">←</span>
