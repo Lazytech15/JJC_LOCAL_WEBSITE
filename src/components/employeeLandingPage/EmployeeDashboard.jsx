@@ -1,6 +1,4 @@
-"use client"
-
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   Home,
@@ -8,33 +6,43 @@ import {
   User,
   Clock,
   BarChart3,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  Wifi,
-  WifiOff,
-  Calendar,
-  TrendingUp,
-  Users,
-  CheckCircle2,
+  Moon,
+  Sun,
+  ArrowLeft,
+  Loader2
 } from "lucide-react"
 import { Button } from "../ui/UiComponents"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/UiComponents"
 import { Avatar, AvatarFallback } from "../ui/UiComponents"
 import { Badge } from "../ui/UiComponents"
 import { useAuth } from "../../contexts/AuthContext"
 import { useOnlineStatus } from "../../hooks/use-online-status"
 import { useServiceWorker } from "../../hooks/use-service-worker"
+import { getStoredToken, verifyToken, clearTokens } from "../../utils/auth"
+import logo from "../../assets/companyLogo.jpg"
+import apiService from "../../utils/api/api-service"
+
+// Import the components
+import DashboardHome from "./DashboardComponents/DashboardHome"
+import Announcements from "./DashboardComponents/Announcements"
+import TimeAttendance from "./DashboardComponents/TimeAttendance"
+import Performance from "./DashboardComponents/Performance"
+import Profile from "./DashboardComponents/Profile"
 
 export default function EmployeeDashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("dashboard")
-  const [announcements, setAnnouncements] = useState([
-    { id: 1, title: "Safety Training Tomorrow", time: "2 hours ago", read: false },
-    { id: 2, title: "New Project Assignment", time: "5 hours ago", read: false },
-    { id: 3, title: "Monthly Meeting Schedule", time: "1 day ago", read: true },
-  ])
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  
+  // Data states
+  const [announcements, setAnnouncements] = useState([])
+  const [attendanceData, setAttendanceData] = useState(null)
+  const [performanceData, setPerformanceData] = useState(null)
+  const [profileData, setProfileData] = useState(null)
+  const [documentData, setDocumentData] = useState(null)
+  const [employeeData, setEmployeeData] = useState(null)
+
+  const profileMenuRef = useRef(null)
 
   const navigate = useNavigate()
   const { employee, employeeLogout, isDarkMode, toggleDarkMode } = useAuth()
@@ -42,329 +50,441 @@ export default function EmployeeDashboard() {
   const { updateAvailable, updateServiceWorker } = useServiceWorker()
 
   const unreadCount = announcements.filter((a) => !a.read).length
+// Replace the entire fetchDashboardData function (lines 56-161) with this:
+
+useEffect(() => {
+  const fetchDashboardData = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Get token and decode to find employee
+      const token = getStoredToken()
+      if (!token) {
+        console.warn('No token found')
+        setLoading(false)
+        setError('Please log in to continue')
+        return
+      }
+
+      const payload = verifyToken(token)
+      console.log('Token payload:', payload)
+
+      if (!payload || !payload.username) {
+        console.warn('Invalid token payload')
+        clearTokens()
+        setLoading(false)
+        setError('Session expired. Please log in again.')
+        return
+      }
+
+      // First, fetch employee data by username to get the ID
+      console.log('Fetching employee by username:', payload.username)
+      const employeesResponse = await apiService.employees.getEmployees({
+        search: payload.username,
+        limit: 1
+      })
+
+      console.log('Employees search response:', employeesResponse)
+
+      // Check for employees in the response (API returns employees directly, not nested under data)
+      if (!employeesResponse?.employees || employeesResponse.employees.length === 0) {
+        setLoading(false)
+        setError('Employee not found')
+        return
+      }
+
+      const foundEmployee = employeesResponse.employees[0]
+      // Use 'id' as UID since that's what the API returns
+      const uid = foundEmployee.id
+      
+      console.log('Found employee ID:', uid)
+      setEmployeeData(foundEmployee)
+
+      // Now fetch all related data using the ID
+      const [
+        summaryResponse,
+        attendanceResponse,
+        profileResponse,
+        documentsResponse
+      ] = await 
+      Promise.allSettled([
+        // apiService.summary.getEmployeeSummaries({
+        //   uid: uid,
+        //   limit: 10
+        // }),
+        apiService.attendance.getEmployeeAttendance(uid, {
+          limit: 30
+        }),
+        apiService.profiles.getProfileByUid(uid),
+        apiService.document.getEmployeeDocuments(uid)
+      ])
+
+      console.log('API Responses:', {
+        // summary: summaryResponse,
+        attendance: attendanceResponse,
+        profile: profileResponse,
+        documents: documentsResponse
+      })
+
+      // Process summaries/announcements
+      // if (summaryResponse.status === 'fulfilled') {
+      //   const summaries = summaryResponse.value?.data || []
+      //   setAnnouncements(summaries.map((s, idx) => ({
+      //     id: s.summary_id || idx,
+      //     title: s.task_description || s.notes || 'Daily Summary',
+      //     time: new Date(s.date).toLocaleDateString(),
+      //     read: false,
+      //     fullData: s
+      //   })))
+      // } else {
+      //   console.error('Summary fetch failed:', summaryResponse.reason)
+      // }
+
+      // Process attendance
+      if (attendanceResponse.status === 'fulfilled') {
+        setAttendanceData(attendanceResponse.value)
+      } else {
+        console.error('Attendance fetch failed:', attendanceResponse.reason)
+      }
+
+      // Process profile
+      if (profileResponse.status === 'fulfilled') {
+        setProfileData(profileResponse.value)
+      } else {
+        console.error('Profile fetch failed:', profileResponse.reason)
+      }
+
+      // Process documents
+      // if (documentsResponse.status === 'fulfilled') {
+      //   setDocumentData(documentsResponse.value)
+      // } else {
+      //   console.error('Documents fetch failed:', documentsResponse.reason)
+      // }
+
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err)
+      setError('Failed to load dashboard data')
+    } finally {
+      console.log('Finished loading dashboard data')
+      setLoading(false)
+    }
+  }
+
+  fetchDashboardData()
+}, []) // Run once on mount
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setShowProfileMenu(false)
+      }
+    }
+
+    if (showProfileMenu) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [showProfileMenu])
 
   const handleLogout = () => {
-    employeeLogout()
-    navigate("/employee/login")
+    clearTokens()
+    sessionStorage.clear()
+    if (employeeLogout) {
+      employeeLogout()
+    }
+    navigate("/employee/login", { replace: true })
   }
 
   const menuItems = [
     { id: "dashboard", icon: Home, label: "Dashboard" },
     { id: "announcements", icon: Bell, label: "Announcements", badge: unreadCount },
-    { id: "profile", icon: User, label: "My Profile" },
-    { id: "attendance", icon: Clock, label: "Time & Attendance" },
+    { id: "attendance", icon: Clock, label: "Attendance" },
     { id: "performance", icon: BarChart3, label: "Performance" },
-    { id: "settings", icon: Settings, label: "Settings" },
+    { id: "profile", icon: User, label: "Profile" },
   ]
 
-  const stats = [
-    { label: "Attendance Rate", value: "98%", icon: CheckCircle2, color: "primary" },
-    { label: "Tasks Completed", value: "24", icon: TrendingUp, color: "secondary" },
-    { label: "Team Members", value: "12", icon: Users, color: "primary" },
-    { label: "Days Active", value: "156", icon: Calendar, color: "secondary" },
-  ]
+  if (loading) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-zinc-950" : "bg-zinc-50"}`}>
+        <div className="text-center">
+          <Loader2 className={`w-8 h-8 animate-spin mx-auto mb-4 ${isDarkMode ? "text-white" : "text-zinc-900"}`} />
+          <p className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+            Loading dashboard...
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? "dark bg-gray-900" : "bg-white"}`}>
+    <div className={`min-h-screen pb-20 lg:pb-0 ${isDarkMode ? "bg-zinc-950" : "bg-zinc-50"}`}>
       {/* Update Available Banner */}
       {updateAvailable && (
-        <div className="bg-primary text-primary-foreground px-4 py-3 text-center">
-          <span className="text-sm font-medium">A new version is available. </span>
+        <div className="bg-zinc-900 text-white px-4 py-3 text-center text-sm">
+          <span>A new version is available. </span>
           <button onClick={updateServiceWorker} className="underline font-semibold">
             Update now
           </button>
         </div>
       )}
 
-      <header
-        className={`sticky top-0 z-40 border-b shadow-sm ${
-          isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-border"
-        }`}
-      >
-        <div className="flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(!sidebarOpen)}>
-              {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </Button>
-            <h1 className={`text-xl font-bold ${isDarkMode ? "text-white" : "text-foreground"}`}>
-              JJC Employee Portal
-            </h1>
-          </div>
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-500 text-white px-4 py-3 text-center text-sm">
+          {error}
+        </div>
+      )}
 
-          <div className="flex items-center gap-3">
-            <div
-              className={`hidden sm:flex items-center gap-2 px-3 py-2 rounded-full text-xs font-semibold ${
-                isOnline
-                  ? connectionQuality === "good"
-                    ? "bg-primary/10 text-primary-foreground"
-                    : "bg-secondary/10 text-secondary-foreground"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-              {isOnline ? (connectionQuality === "good" ? "Online" : "Slow") : "Offline"}
+      {/* Top Header */}
+      <header
+        className={`sticky top-0 z-40 backdrop-blur-lg ${isDarkMode ? "bg-zinc-900/80 border-zinc-800" : "bg-white/80 border-zinc-200"
+          }`}
+      >
+        <div className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
+            <div className="flex items-center gap-3">
+              <img
+                src={logo}
+                alt="JJC Engineering Works Logo"
+                className="w-12 h-12 rounded-xl object-cover shadow-md bg-primary"
+              />
+              <h1 className={`text-lg font-bold hidden sm:block ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                JJC Portal
+              </h1>
             </div>
 
-            {/* Notifications */}
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="w-5 h-5" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-5 h-5 bg-secondary text-secondary-foreground text-xs rounded-full flex items-center justify-center font-bold">
-                  {unreadCount}
-                </span>
-              )}
-            </Button>
+            {/* Centered Desktop Navigation */}
+            <div className="hidden lg:block border-t ${isDarkMode ? 'border-zinc-800' : 'border-zinc-200'}">
+              <div className="flex items-center justify-center py-3">
+                <nav className={`inline-flex items-center gap-1 p-1 rounded-xl ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-200'}`}>
+                  {menuItems.map((item) => {
+                    const Icon = item.icon
+                    const isActive = activeTab === item.id
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setActiveTab(item.id)}
+                        className={`relative flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-medium text-sm ${isActive
+                            ? "bg-white text-zinc-900 shadow-md"
+                            : isDarkMode
+                              ? "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
+                              : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-300/50"
+                          }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {isActive && <span>{item.label}</span>}
+                        {isActive && item.badge > 0 && (
+                          <Badge className="ml-1 bg-red-500 text-white">{item.badge}</Badge>
+                        )}
+                      </button>
+                    )
+                  })}
+                </nav>
+              </div>
+            </div>
 
-            <Avatar className="w-9 h-9">
-              <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
-                {employee?.name
-                  ?.split(" ")
-                  .map((n) => n[0])
-                  .join("")}
-              </AvatarFallback>
-            </Avatar>
+            {/* Right Side Actions */}
+            <div className="flex items-center gap-3">
+              <div className="absolute top-7 flex items-center right-44 lg:right-36">
+                <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? "bg-green-600" : "bg-red-500"}`}></span>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleDarkMode}
+                className={isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}
+              >
+                {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`relative lg:hidden ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`}
+                onClick={() => setActiveTab("announcements")}
+              >
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                    {unreadCount}
+                  </span>
+                )}
+              </Button>
+
+              {/* Profile Dropdown */}
+              <div className="relative" ref={profileMenuRef}>
+                <button
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="focus:outline-none"
+                >
+                  <Avatar className={`w-9 h-9 ring-2 cursor-pointer hover:ring-4 transition-all ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}>
+                    <AvatarFallback className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-sm font-semibold`}>
+                      {employee?.name
+                        ?.split(" ")
+                        .map((n) => n[0])
+                        .join("")}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
+
+                {/* Dropdown Menu */}
+                {showProfileMenu && (
+                  <div className={`absolute right-0 mt-2 w-64 rounded-xl shadow-xl border z-50 ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                    }`}>
+                    <div className={`p-4 border-b ${isDarkMode ? 'border-zinc-800' : 'border-zinc-200'}`}>
+                      <div className="flex items-center gap-3">
+                        <Avatar className={`w-12 h-12 ring-2 ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}>
+                          <AvatarFallback className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-sm font-semibold`}>
+                            {employee?.name
+                              ?.split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-semibold truncate ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                            {employee?.name}
+                          </p>
+                          <p className={`text-xs truncate ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                            {employee?.position}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-2">
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false)
+                          setActiveTab("profile")
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
+                          }`}
+                      >
+                        <User className="w-4 h-4" />
+                        <span className="text-sm font-medium">View Profile</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false)
+                          handleLogout()
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-red-400" : "hover:bg-zinc-100 text-red-600"
+                          }`}
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                        <span className="text-sm font-medium">Logout</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="flex">
-        <aside
-          className={`fixed lg:sticky top-0 left-0 z-30 h-screen w-64 border-r transition-transform duration-300 ${
-            isDarkMode ? "bg-gray-800 border-gray-700" : "bg-muted/30 border-border"
-          } ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
-        >
-          <div className="flex flex-col h-full">
-            <div className={`p-6 border-b ${isDarkMode ? "border-gray-700" : "border-border"}`}>
-              <div className="flex items-center gap-3">
-                <Avatar className="w-14 h-14">
-                  <AvatarFallback className="bg-primary text-primary-foreground font-bold text-base">
-                    {employee?.name
-                      ?.split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className={`font-bold truncate text-base ${isDarkMode ? "text-white" : "text-foreground"}`}>
-                    {employee?.name}
-                  </p>
-                  <p className={`text-sm truncate ${isDarkMode ? "text-gray-400" : "text-muted-foreground"}`}>
-                    {employee?.position}
-                  </p>
-                </div>
-              </div>
-            </div>
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === "dashboard" && (
+          <DashboardHome 
+            employee={employee}
+            employeeData={employeeData}
+            announcements={announcements}
+            attendanceData={attendanceData}
+            isDarkMode={isDarkMode}
+          />
+        )}
 
-            <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-              {menuItems.map((item) => {
-                const Icon = item.icon
-                const isActive = activeTab === item.id
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setActiveTab(item.id)
-                      setSidebarOpen(false)
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${
-                      isActive
-                        ? isDarkMode
-                          ? "bg-primary text-primary-foreground shadow-md"
-                          : "bg-primary text-primary-foreground shadow-md"
-                        : isDarkMode
-                          ? "text-gray-300 hover:bg-gray-700"
-                          : "text-foreground hover:bg-muted"
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span className="flex-1 text-left">{item.label}</span>
-                    {item.badge > 0 && (
-                      <Badge className="ml-auto bg-secondary text-secondary-foreground">{item.badge}</Badge>
-                    )}
-                  </button>
-                )
-              })}
-            </nav>
+        {activeTab === "announcements" && (
+          <Announcements 
+            announcements={announcements}
+            setAnnouncements={setAnnouncements}
+            isDarkMode={isDarkMode}
+          />
+        )}
 
-            <div className={`p-4 border-t space-y-2 ${isDarkMode ? "border-gray-700" : "border-border"}`}>
-              <Button variant="ghost" className="w-full justify-start font-medium" onClick={toggleDarkMode}>
-                <Settings className="w-5 h-5 mr-3" />
-                {isDarkMode ? "Light Mode" : "Dark Mode"}
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-secondary hover:text-secondary hover:bg-secondary/10 font-medium"
-                onClick={handleLogout}
+        {activeTab === "profile" && (
+          <Profile 
+            employee={employee}
+            employeeData={employeeData}
+            profileData={profileData}
+            documentData={documentData}
+            handleLogout={handleLogout}
+            isDarkMode={isDarkMode}
+          />
+        )}
+
+        {activeTab === "attendance" && (
+          <TimeAttendance 
+            employee={employee}
+            employeeData={employeeData}
+            attendanceData={attendanceData}
+            isDarkMode={isDarkMode} 
+          />
+        )}
+
+        {activeTab === "performance" && (
+          <Performance 
+            employee={employee}
+            employeeData={employeeData}
+            performanceData={performanceData}
+            isDarkMode={isDarkMode} 
+          />
+        )}
+      </main>
+
+      {/* Bottom Navigation - Mobile */}
+      <nav
+        className={`fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t backdrop-blur-lg ${isDarkMode ? "bg-zinc-900/95 border-zinc-800" : "bg-white/95 border-zinc-200"
+          }`}
+      >
+        <div className="flex items-center justify-around px-2 py-3 safe-area-inset-bottom">
+          {menuItems.map((item) => {
+            const Icon = item.icon
+            const isActive = activeTab === item.id
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className="relative flex flex-col items-center gap-1 px-3 py-2 min-w-0 flex-1"
               >
-                <LogOut className="w-5 h-5 mr-3" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </aside>
-
-        <main className="flex-1 p-6 lg:p-10">
-          {activeTab === "dashboard" && (
-            <div className="space-y-8">
-              {/* Welcome Section */}
-              <div>
-                <h2 className={`text-3xl font-bold ${isDarkMode ? "text-white" : "text-foreground"}`}>
-                  Welcome back, {employee?.name?.split(" ")[0]}!
-                </h2>
-                <p className={`text-base mt-1 ${isDarkMode ? "text-gray-400" : "text-muted-foreground"}`}>
-                  {new Date().toLocaleDateString("en-US", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              </div>
-
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {stats.map((stat, index) => {
-                  const Icon = stat.icon
-                  const isGreen = stat.color === "primary"
-                  return (
-                    <Card key={index} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p
-                              className={`text-sm font-medium ${isDarkMode ? "text-gray-400" : "text-muted-foreground"}`}
-                            >
-                              {stat.label}
-                            </p>
-                            <p className={`text-3xl font-bold mt-2 ${isDarkMode ? "text-white" : "text-foreground"}`}>
-                              {stat.value}
-                            </p>
-                          </div>
-                          <div
-                            className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-md ${
-                              isGreen ? "bg-primary" : "bg-secondary"
-                            }`}
-                          >
-                            <Icon
-                              className={`w-7 h-7 ${isGreen ? "text-primary-foreground" : "text-secondary-foreground"}`}
-                            />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-
-              <Card className="border-0 shadow-lg">
-                <CardHeader>
-                  <CardTitle className="text-2xl">Recent Announcements</CardTitle>
-                  <CardDescription className="text-base">Stay updated with the latest company news</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {announcements.slice(0, 3).map((announcement) => (
-                      <div
-                        key={announcement.id}
-                        className={`p-5 rounded-xl border transition-all cursor-pointer ${
-                          isDarkMode ? "border-gray-700 hover:bg-gray-800" : "border-border hover:bg-muted/50"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className={`font-semibold ${isDarkMode ? "text-white" : "text-foreground"}`}>
-                                {announcement.title}
-                              </p>
-                              {!announcement.read && <span className="w-2 h-2 bg-primary rounded-full"></span>}
-                            </div>
-                            <p className={`text-sm mt-1 ${isDarkMode ? "text-gray-400" : "text-muted-foreground"}`}>
-                              {announcement.time}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {activeTab === "announcements" && (
-            <div className="space-y-6">
-              <h2 className={`text-3xl font-bold ${isDarkMode ? "text-white" : "text-foreground"}`}>Announcements</h2>
-              <div className="space-y-4">
-                {announcements.map((announcement) => (
-                  <Card key={announcement.id} className="border-0 shadow-lg">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <p className={`font-semibold text-lg ${isDarkMode ? "text-white" : "text-foreground"}`}>
-                              {announcement.title}
-                            </p>
-                            {!announcement.read && <Badge className="bg-primary text-primary-foreground">New</Badge>}
-                          </div>
-                          <p className={`text-sm mt-2 ${isDarkMode ? "text-gray-400" : "text-muted-foreground"}`}>
-                            {announcement.time}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === "profile" && (
-            <div className="space-y-6">
-              <h2 className={`text-3xl font-bold ${isDarkMode ? "text-white" : "text-foreground"}`}>My Profile</h2>
-              <Card className="border-0 shadow-lg">
-                <CardContent className="p-8">
-                  <div className="space-y-6">
-                    <div>
-                      <label
-                        className={`text-sm font-semibold ${isDarkMode ? "text-gray-400" : "text-muted-foreground"}`}
-                      >
-                        Employee ID
-                      </label>
-                      <p className={`mt-2 text-lg ${isDarkMode ? "text-white" : "text-foreground"}`}>
-                        {employee?.employeeId}
-                      </p>
-                    </div>
-                    <div>
-                      <label
-                        className={`text-sm font-semibold ${isDarkMode ? "text-gray-400" : "text-muted-foreground"}`}
-                      >
-                        Department
-                      </label>
-                      <p className={`mt-2 text-lg ${isDarkMode ? "text-white" : "text-foreground"}`}>
-                        {employee?.department}
-                      </p>
-                    </div>
-                    <div>
-                      <label
-                        className={`text-sm font-semibold ${isDarkMode ? "text-gray-400" : "text-muted-foreground"}`}
-                      >
-                        Position
-                      </label>
-                      <p className={`mt-2 text-lg ${isDarkMode ? "text-white" : "text-foreground"}`}>
-                        {employee?.position}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </main>
-      </div>
-
-      {/* Mobile Sidebar Overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
+                <div className="relative">
+                  <Icon
+                    className={`w-6 h-6 transition-colors ${isActive
+                        ? isDarkMode ? "text-white" : "text-zinc-900"
+                        : isDarkMode ? "text-zinc-500" : "text-zinc-400"
+                      }`}
+                  />
+                  {item.badge > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                      {item.badge}
+                    </span>
+                  )}
+                </div>
+                <span
+                  className={`text-xs font-medium truncate w-full text-center ${isActive
+                      ? isDarkMode ? "text-white" : "text-zinc-900"
+                      : isDarkMode ? "text-zinc-500" : "text-zinc-400"
+                    }`}
+                >
+                  {item.label}
+                </span>
+                {isActive && (
+                  <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-1 rounded-t-full ${isDarkMode ? "bg-white" : "bg-zinc-900"
+                    }`} />
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </nav>
     </div>
   )
 }

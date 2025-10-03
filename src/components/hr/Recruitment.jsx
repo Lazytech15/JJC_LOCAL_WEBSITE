@@ -77,7 +77,7 @@ function Recruitment() {
   const fetchDepartments = async () => {
     setLoadingDepartments(true)
     try {
-      const data = await apiService.employees.getDepartment()
+      const data = await apiService.employees.getDepartments()
 
       if (data.success) {
         setDepartments(data.data || [])
@@ -116,145 +116,120 @@ function Recruitment() {
   }
 
   // Only email format validation for basic email structure
-  const isValidEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(email)
+const isValidEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
+// Debounced validation function
+const validationTimeouts = {}
+
+const validateField = async (fieldName, value, delay = 800) => {
+  // Clear existing timeout for this field
+  if (validationTimeouts[fieldName]) {
+    clearTimeout(validationTimeouts[fieldName])
   }
 
-  // Debounced validation function
-  const validationTimeouts = {}
+  // Clear previous error for immediate feedback
+  setValidationErrors((prev) => ({
+    ...prev,
+    [fieldName]: null,
+  }))
 
-  const validateField = async (fieldName, value, delay = 800) => {
-    // Clear existing timeout for this field
-    if (validationTimeouts[fieldName]) {
-      clearTimeout(validationTimeouts[fieldName])
-    }
+  // Reset validation completion status when user starts typing
+  setHasBeenValidated((prev) => ({
+    ...prev,
+    [fieldName]: false,
+  }))
 
-    // Clear previous error for immediate feedback
+  if (!value || !value.trim()) return
+
+  // Only format validation for email
+  if (fieldName === "email" && !isValidEmail(value)) {
     setValidationErrors((prev) => ({
       ...prev,
-      [fieldName]: null,
+      [fieldName]: "Please enter a valid email address",
     }))
+    return
+  }
 
-    // Reset validation completion status when user starts typing
-    setHasBeenValidated((prev) => ({
-      ...prev,
-      [fieldName]: false,
-    }))
+  // Set loading state for this field
+  setValidationLoading((prev) => ({
+    ...prev,
+    [fieldName]: true,
+  }))
 
-    if (!value || !value.trim()) return
+  validationTimeouts[fieldName] = setTimeout(async () => {
+    try {
+      const params = { [fieldName]: value.trim() }
+      
+      const response = await apiService.employees.validateEmployee(params)
+      console.log("Full validation response:", response)
 
-    // Only format validation for email
-    if (fieldName === "email" && !isValidEmail(value)) {
+      // Check if response is successful
+      if (!response || !response.success) {
+        console.error("Validation failed:", response)
+        throw new Error(response?.message || "Validation failed")
+      }
+
+      // The validation data is directly on the response object, not nested in .data
+      const validationData = response.data || response
+      console.log("Validation data:", validationData)
+
+      // Set validation error if field is not available
       setValidationErrors((prev) => ({
         ...prev,
-        [fieldName]: "Please enter a valid email address",
+        [fieldName]: getValidationMessage(fieldName, validationData),
       }))
-      return
+
+      // Mark field as validated after successful API response
+      setHasBeenValidated((prev) => ({
+        ...prev,
+        [fieldName]: true,
+      }))
+
+    } catch (err) {
+      console.error(`Error validating ${fieldName}:`, err)
+      setValidationErrors((prev) => ({
+        ...prev,
+        [fieldName]: `Error checking ${fieldName} availability`,
+      }))
+      setHasBeenValidated((prev) => ({
+        ...prev,
+        [fieldName]: true,
+      }))
+    } finally {
+      setValidationLoading((prev) => ({
+        ...prev,
+        [fieldName]: false,
+      }))
     }
+  }, delay)
+}
 
-    // Set loading state for this field
-    setValidationLoading((prev) => ({
-      ...prev,
-      [fieldName]: true,
-    }))
-
-    validationTimeouts[fieldName] = setTimeout(async () => {
-      try {
-        const queryParams = new URLSearchParams()
-        queryParams.append(fieldName, value.trim())
-
-        const response = await apiService.employees.getValidate(queryParams)
-        console.log("Validation response status:", response.status)
-
-        if (!response.success) {
-          const errorDetails = response.error || response.message || "Unknown error"
-          console.error("Validation error response:", errorDetails)
-
-          // Special case: backend reports invalid ID number format
-          if (errorDetails === "Invalid ID number" && fieldName === "idNumber") {
-            console.warn("Backend reported invalid ID number format, but proceeding with form submission")
-
-            setValidationErrors((prev) => ({
-              ...prev,
-              [fieldName]: null,
-            }))
-
-            setHasBeenValidated((prev) => ({
-              ...prev,
-              [fieldName]: true,
-            }))
-
-            return
-          }
-
-          throw new Error(`Validation failed: ${errorDetails}`)
-        }
-
-        if (response.success) {
-          setValidationErrors((prev) => ({
-            ...prev,
-            [fieldName]: getValidationMessage(fieldName, response.data),
-          }))
-
-          // Mark field as validated after successful API response
-          setHasBeenValidated((prev) => ({
-            ...prev,
-            [fieldName]: true,
-          }))
-        } else {
-          throw new Error(data.error || "Validation failed")
-        }
-      } catch (err) {
-        console.error(`Error validating ${fieldName}:`, err)
-
-        if (fieldName === "idNumber" && err.message.includes("Invalid ID number")) {
-          console.warn("ID number format validation failed on backend, but allowing form submission")
-          setValidationErrors((prev) => ({
-            ...prev,
-            [fieldName]: null,
-          }))
-          setHasBeenValidated((prev) => ({
-            ...prev,
-            [fieldName]: true,
-          }))
-        } else {
-          setValidationErrors((prev) => ({
-            ...prev,
-            [fieldName]: `Error checking ${fieldName} availability`,
-          }))
-          setHasBeenValidated((prev) => ({
-            ...prev,
-            [fieldName]: true,
-          }))
-        }
-      } finally {
-        setValidationLoading((prev) => ({
-          ...prev,
-          [fieldName]: false,
-        }))
-      }
-    }, delay)
+// Get validation message based on field and result
+const getValidationMessage = (fieldName, validationData) => {
+  console.log("Getting validation message for:", fieldName, validationData)
+  
+  // Safety check
+  if (!validationData) {
+    console.error("No validation data received")
+    return null
   }
 
-  // Get validation message based on field and result
-  const getValidationMessage = (fieldName, validationData) => {
-    console.log(fieldName, validationData)
-    switch (fieldName) {
-      case "email":
-        return !validationData.emailAvailable ? "Email already exists" : null
-      case "username":
-        return !validationData.usernameAvailable ? "Username already exists" : null
-      case "idNumber":
-        return !validationData.idNumberAvailable && !validationData.employeeIdAvailable
-          ? "ID Number already exists"
-          : null
-      case "idBarcode":
-        return !validationData.idBarcodeAvailable ? "ID Barcode already exists" : null
-      default:
-        return null
-    }
+  switch (fieldName) {
+    case "email":
+      return validationData.emailAvailable === false ? "Email already exists" : null
+    case "username":
+      return validationData.usernameAvailable === false ? "Username already exists" : null
+    case "idNumber":
+      return validationData.employeeIdAvailable === false ? "ID Number already exists" : null
+    case "idBarcode":
+      return validationData.idBarcodeAvailable === false ? "ID Barcode already exists" : null
+    default:
+      return null
   }
+}
 
   // Updated profile picture change handler using ProfileService validation
   const handleProfilePictureChange = async (e) => {
@@ -1242,31 +1217,3 @@ function Recruitment() {
 }
 
 export default Recruitment
-
-
-
-              //   {renderValidationStatus("idNumber")}
-              //   {validationErrors.idNumber && (
-              //     <p className="text-red-500 dark:text-red-400 text-sm mt-1">{validationErrors.idNumber}</p>
-              //   )}
-              // </div>
-
-              // <div className="relative">
-              //   <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">ID Barcode</label>
-              //   <input
-              //     type="text"
-              //     name="idBarcode"
-              //     value={formData.idBarcode}
-              //     onChange={handleInputChange}
-              //     placeholder="Enter barcode (e.g., *EMP001* or 123456789)"
-              //     className={`w-full px-4 py-3 pr-12 rounded-lg bg-white/10 dark:bg-black/20 border ${validationErrors.idBarcode
-              //         ? "border-red-500 dark:border-red-400"
-              //         : "border-gray-300/20 dark:border-gray-700/20"
-              //       } text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500`}
-              //   />
-              //   {renderValidationStatus("idBarcode")}
-              //   {validationErrors.idBarcode && (
-              //     <p className="text-red-500 dark:text-red-400 text-sm mt-1">{validationErrors.idBarcode}</p>
-              //   )}
-              //   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Optional: For ID card barcode printing</p>
-              // </div>

@@ -137,7 +137,7 @@ export default function EmployeeLanding() {
     <div className="min-h-screen bg-white">
       {/* Transparent Navigation */}
       <nav className="absolute top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/60 to-transparent">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg border border-white/20">
@@ -149,7 +149,7 @@ export default function EmployeeLanding() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white drop-shadow-lg">JJCEWS</h1>
-                <p className="text-xs text-white/90 font-medium drop-shadow">Since 1996</p>
+                <p className="text-xs text-white/90 font-medium drop-shadow">JJC Engineering Works & General Services</p>
               </div>
             </div>
 
@@ -216,7 +216,7 @@ export default function EmployeeLanding() {
                 className="w-full h-full object-cover"
               />
               {/* Darker overlay with blur for text readability backdrop-blur-sm*/}
-              <div className="absolute inset-0 bg-gradient-to-b from-black/100 via-black/90 to-black/110 " />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80 " />
             </div>
           ))}
         </div>

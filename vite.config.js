@@ -13,6 +13,7 @@ export default defineConfig({
     host: "localhost",
     cors: true,
   },
+  
   build: {
     outDir: "dist",
   },

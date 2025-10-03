@@ -87,7 +87,7 @@ function DepartmentSelector() {
     setSelectedDept(departmentId)
     const slug = departmentSlugMap[departmentId] || departmentId.toLowerCase().replace(/\s+/g, '-')
     setTimeout(() => {
-      navigate(`/jjcewsaccess/login/${slug}`)
+      navigate(`/jjcewgsaccess/login/${slug}`)
     }, 200)
   }
 
