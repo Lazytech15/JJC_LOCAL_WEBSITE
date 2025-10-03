@@ -71,71 +71,100 @@ export default function EmployeeDashboard() {
           return
         }
 
-        // First, fetch employee data by username to get the ID
-        console.log("Fetching employee by username:", payload.username)
-        const employeesResponse = await apiService.employees.getEmployees({
-          search: payload.username,
-        })
+        const uid = payload.userId
+console.log("[v0] Using UID from token:", uid)
 
-        console.log("Employees search response:", employeesResponse)
+if (!uid) {
+  setLoading(false)
+  setError("Invalid session: No user ID found")
+  return
+}
 
-        // Check for employees in the response (API returns employees directly, not nested under data)
-        if (!employeesResponse?.employees || employeesResponse.employees.length === 0) {
-          setLoading(false)
-          setError("Employee not found")
-          return
-        }
+let foundEmployee = null
+try {
+  const res = await apiService.employees.getEmployees({ limit: 1000 })
+  if (res?.employees) {
+    foundEmployee = res.employees.find(e => 
+      e.id === uid || e.employee_uid === uid || e.uid === uid
+    )
+  }
+} catch (err) {
+  console.error("Fetch employee failed:", err)
+}
 
-        const foundEmployee = employeesResponse.employees[0]
-        // Use 'id' as UID since that's what the API returns
-        const uid = foundEmployee.id
+if (!foundEmployee) {
+  foundEmployee = {
+    id: uid,
+    employee_uid: uid,
+    username: payload.username,
+    name: payload.name,
+    department: payload.department,
+    role: payload.role,
+  }
+}
 
-        console.log("[v0] Found employee ID:", uid)
+console.log("[v0] Found employee ID:", uid)
         setEmployeeData(foundEmployee)
 
-        // Now fetch all related data using the ID
-        const [summaryResponse, attendanceResponse, profilePictureResponse, documentsResponse] =
-          await Promise.allSettled([
-            apiService.summary.getDailySummaryById({
-              uid: uid,
-            }),
-            apiService.attendance.getEmployeeAttendance(uid, {}),
-            apiService.profiles.getProfileByUid(uid),
-            apiService.document.getEmployeeDocuments(uid),
-          ])
+        // Fetch all records and filter by current user
+const [summaryResponse, attendanceResponse, profilePictureResponse, documentsResponse] =
+  await Promise.allSettled([
+    apiService.summary.getDailySummaryRecords({ 
+      limit: 1000,
+      offset: 0 
+    }),
+    apiService.attendance.getAttendanceRecords({ 
+      limit: 1000,
+      offset: 0 
+    }),
+    apiService.profiles.getProfileByUid(uid),
+    apiService.document.getEmployeeDocuments(uid),
+  ])
 
         console.log("API Responses:", {
           summary: summaryResponse,
           attendance: attendanceResponse,
           profilePicture: profilePictureResponse,
           documents: documentsResponse,
+          employee: foundEmployee,
         })
 
-        // Process summaries/announcements
-        if (summaryResponse.status === "fulfilled") {
-          const summaries = summaryResponse.value?.data || []
-          const userSummaries = summaries.filter((s) => s.employee_uid === uid)
-          console.log("[v0] Filtered summaries for user:", userSummaries.length, "out of", summaries.length)
-          setDailySummaries(userSummaries)
-          setAnnouncements(
-            userSummaries.map((s, idx) => ({
-              id: s.summary_id || idx,
-              title: s.task_description || s.notes || "Daily Summary",
-              time: new Date(s.date).toLocaleDateString(),
-              read: false,
-              fullData: s,
-            })),
-          )
-        } else {
-          console.error("Summary fetch failed:", summaryResponse.reason)
-        }
+        // Process summaries - filter by current user's UID
+if (summaryResponse.status === "fulfilled") {
+  const allSummaries = summaryResponse.value?.data || []
+  const userSummaries = allSummaries.filter(s => s.employee_uid === uid)
+  
+  console.log("[v0] Filtered summaries for user:", userSummaries.length, "out of", allSummaries.length)
+  setDailySummaries(userSummaries)
+  
+  setAnnouncements(
+    userSummaries.map((s, idx) => ({
+      id: s.id || s.summary_id || idx,
+      title: s.task_description || s.notes || "Daily Summary",
+      time: new Date(s.date).toLocaleDateString(),
+      read: false,
+      fullData: s,
+    })),
+  )
+} else {
+  console.error("Summary fetch failed:", summaryResponse.reason)
+  setDailySummaries([])
+  setAnnouncements([])
+}
 
-        // Process attendance
-        if (attendanceResponse.status === "fulfilled") {
-          setAttendanceData(attendanceResponse.value)
-        } else {
-          console.error("Attendance fetch failed:", attendanceResponse.reason)
-        }
+// Process attendance - filter by current user's UID
+if (attendanceResponse.status === "fulfilled") {
+  const allAttendance = attendanceResponse.value?.data || []
+  const userAttendance = allAttendance.filter(record => record.employee_uid === uid)
+  
+  console.log("[v0] Filtered attendance for user:", userAttendance.length, "out of", allAttendance.length)
+  setAttendanceData({
+    ...attendanceResponse.value,
+    data: userAttendance
+  })
+} else {
+  console.error("Attendance fetch failed:", attendanceResponse.reason)
+}
 
         // Process profile picture - THIS IS THE KEY CHANGE
         if (profilePictureResponse.status === "fulfilled") {
@@ -230,9 +259,8 @@ export default function EmployeeDashboard() {
 
       {/* Top Header */}
       <header
-        className={`sticky top-0 z-40 backdrop-blur-lg ${
-          isDarkMode ? "bg-zinc-900/80 border-zinc-800" : "bg-white/80 border-zinc-200"
-        }`}
+        className={`sticky top-0 z-40 backdrop-blur-lg ${isDarkMode ? "bg-zinc-900/80 border-zinc-800" : "bg-white/80 border-zinc-200"
+          }`}
       >
         <div className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -261,13 +289,12 @@ export default function EmployeeDashboard() {
                       <button
                         key={item.id}
                         onClick={() => setActiveTab(item.id)}
-                        className={`relative flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-medium text-sm ${
-                          isActive
+                        className={`relative flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-medium text-sm ${isActive
                             ? "bg-white text-zinc-900 shadow-md"
                             : isDarkMode
                               ? "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
                               : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-300/50"
-                        }`}
+                          }`}
                       >
                         <Icon className="w-4 h-4" />
                         {isActive && <span>{item.label}</span>}
@@ -338,9 +365,8 @@ export default function EmployeeDashboard() {
                 {/* Dropdown Menu */}
                 {showProfileMenu && (
                   <div
-                    className={`absolute right-0 mt-2 w-64 rounded-xl shadow-xl border z-50 ${
-                      isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
-                    }`}
+                    className={`absolute right-0 mt-2 w-64 rounded-xl shadow-xl border z-50 ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                      }`}
                   >
                     <div className={`p-4 border-b ${isDarkMode ? "border-zinc-800" : "border-zinc-200"}`}>
                       <div className="flex items-center gap-3">
@@ -378,9 +404,8 @@ export default function EmployeeDashboard() {
                           setShowProfileMenu(false)
                           setActiveTab("profile")
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
-                          isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
-                        }`}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
+                          }`}
                       >
                         <User className="w-4 h-4" />
                         <span className="text-sm font-medium">View Profile</span>
@@ -390,9 +415,8 @@ export default function EmployeeDashboard() {
                           setShowProfileMenu(false)
                           handleLogout()
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
-                          isDarkMode ? "hover:bg-zinc-800 text-red-400" : "hover:bg-zinc-100 text-red-600"
-                        }`}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-red-400" : "hover:bg-zinc-100 text-red-600"
+                          }`}
                       >
                         <ArrowLeft className="w-4 h-4" />
                         <span className="text-sm font-medium">Logout</span>
@@ -425,15 +449,16 @@ export default function EmployeeDashboard() {
         )}
 
         {activeTab === "profile" && (
-          <Profile
-            employee={employee}
-            employeeData={employeeData}
-            profileData={profileData}
-            documentData={documentData}
-            handleLogout={handleLogout}
-            isDarkMode={isDarkMode}
-          />
-        )}
+  <Profile
+    employee={employee}
+    employeeData={employeeData}
+    profileData={profileData}
+    profileImage={profileImage}  // ✅ Add this line
+    documentData={documentData}
+    handleLogout={handleLogout}
+    isDarkMode={isDarkMode}
+  />
+)}
 
         {activeTab === "attendance" && <TimeAttendance dailySummaries={dailySummaries} isDarkMode={isDarkMode} />}
 
@@ -450,9 +475,8 @@ export default function EmployeeDashboard() {
 
       {/* Bottom Navigation - Mobile */}
       <nav
-        className={`fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t backdrop-blur-lg ${
-          isDarkMode ? "bg-zinc-900/95 border-zinc-800" : "bg-white/95 border-zinc-200"
-        }`}
+        className={`fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t backdrop-blur-lg ${isDarkMode ? "bg-zinc-900/95 border-zinc-800" : "bg-white/95 border-zinc-200"
+          }`}
       >
         <div className="flex items-center justify-around px-2 py-3 safe-area-inset-bottom">
           {menuItems.map((item) => {
@@ -466,15 +490,14 @@ export default function EmployeeDashboard() {
               >
                 <div className="relative">
                   <Icon
-                    className={`w-6 h-6 transition-colors ${
-                      isActive
+                    className={`w-6 h-6 transition-colors ${isActive
                         ? isDarkMode
                           ? "text-white"
                           : "text-zinc-900"
                         : isDarkMode
                           ? "text-zinc-500"
                           : "text-zinc-400"
-                    }`}
+                      }`}
                   />
                   {item.badge > 0 && (
                     <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
@@ -483,23 +506,21 @@ export default function EmployeeDashboard() {
                   )}
                 </div>
                 <span
-                  className={`text-xs font-medium truncate w-full text-center ${
-                    isActive
+                  className={`text-xs font-medium truncate w-full text-center ${isActive
                       ? isDarkMode
                         ? "text-white"
                         : "text-zinc-900"
                       : isDarkMode
                         ? "text-zinc-500"
                         : "text-zinc-400"
-                  }`}
+                    }`}
                 >
                   {item.label}
                 </span>
                 {isActive && (
                   <div
-                    className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-1 rounded-t-full ${
-                      isDarkMode ? "bg-white" : "bg-zinc-900"
-                    }`}
+                    className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-1 rounded-t-full ${isDarkMode ? "bg-white" : "bg-zinc-900"
+                      }`}
                   />
                 )}
               </button>

@@ -350,10 +350,10 @@ export default function EmployeeLogin() {
         <div className="absolute top-8 left-8 z-30 flex items-center gap-3">
           <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg border border-white/20">
             <img
-                              src={logo}
-                              alt="JJC Engineering Works Logo"
-                              className="w-12 h-12 rounded-xl object-cover shadow-md bg-primary"
-                            />
+              src={logo}
+              alt="JJC Engineering Works Logo"
+              className="w-12 h-12 rounded-xl object-cover shadow-md bg-primary"
+            />
           </div>
           <div>
             <h1 className="text-lg font-bold text-white drop-shadow-lg">JJCEWGS</h1>
@@ -376,10 +376,10 @@ export default function EmployeeLogin() {
           <div className="lg:hidden text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-zinc-900 rounded-3xl mb-4 shadow-xl">
               <img
-                              src={logo}
-                              alt="JJC Engineering Works Logo"
-                              className="w-12 h-12 rounded-xl object-cover shadow-md bg-primary"
-                            />
+                src={logo}
+                alt="JJC Engineering Works Logo"
+                className="w-12 h-12 rounded-xl object-cover shadow-md bg-primary"
+              />
             </div>
             <h1 className="text-2xl font-bold text-zinc-900 mb-1">JJC Engineering Works & General Services</h1>
             <p className="text-zinc-600">Employee Portal</p>
@@ -483,7 +483,7 @@ export default function EmployeeLogin() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-center h-full w-full">
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="remember"
@@ -498,10 +498,13 @@ export default function EmployeeLogin() {
                       Keep me signed in (24 hours)
                     </label>
                   </div>
-                  <a href="#" className="text-sm text-zinc-600 hover:text-zinc-900 font-medium transition-colors">
+                  {/* <a href="#" className="text-sm text-zinc-600 hover:text-zinc-900 font-medium transition-colors">
                     Forgot password?
-                  </a>
+                  </a> */}
                 </div>
+
+
+
 
                 <Button
                   type="button"

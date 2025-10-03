@@ -9,21 +9,16 @@ export default function DashboardHome({
   documentData,
   isDarkMode,
 }) {
-  const userSummaries = dailySummaries.filter((day) => (employeeData?.id ? day.employee_uid === employeeData.id : true))
+  const userSummaries = Array.isArray(dailySummaries)
+    ? dailySummaries.filter((day) => (employeeData?.id ? day.employee_uid === employeeData.id : true))
+    : []
 
   // Calculate Days Active from daily summaries (unique dates)
   const daysActive = userSummaries.length
-
-  // Calculate Attendance Rate from daily summaries
-  // Attendance rate = (days with complete sessions / total days) * 100
   const calculateAttendanceRate = () => {
     if (!userSummaries || userSummaries.length === 0) return "0%"
 
     const completeDays = userSummaries.filter((day) => {
-      // Consider a day complete if:
-      // 1. is_incomplete is false/0
-      // OR
-      // 2. completed_sessions equals total_sessions and both are > 0
       return (
         day.is_incomplete === 0 ||
         day.is_incomplete === false ||
@@ -104,17 +99,15 @@ export default function DashboardHome({
           return (
             <Card
               key={index}
-              className={`border transition-all hover:scale-105 ${
-                isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
-              }`}
+              className={`border transition-all hover:scale-105 ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                }`}
             >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <p
-                      className={`text-xs font-medium uppercase tracking-wider ${
-                        isDarkMode ? "text-zinc-400" : "text-zinc-600"
-                      }`}
+                      className={`text-xs font-medium uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"
+                        }`}
                     >
                       {stat.label}
                     </p>
@@ -166,9 +159,8 @@ export default function DashboardHome({
           {announcements.slice(0, 3).map((announcement) => (
             <div
               key={announcement.id}
-              className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                isDarkMode ? "border-zinc-800 hover:bg-zinc-800/50" : "border-zinc-200 hover:bg-zinc-50"
-              }`}
+              className={`p-4 rounded-xl border transition-all cursor-pointer ${isDarkMode ? "border-zinc-800 hover:bg-zinc-800/50" : "border-zinc-200 hover:bg-zinc-50"
+                }`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
