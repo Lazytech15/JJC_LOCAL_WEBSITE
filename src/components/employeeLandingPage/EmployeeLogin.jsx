@@ -89,7 +89,7 @@ export default function EmployeeLogin() {
   const departments = [
     { value: "", label: "Select Department" },
     { value: "Human Resources", label: "Human Resources" },
-    { value: "Operation", label: "Operation" },
+    { value: "Operations", label: "Operation" },
     { value: "Finance", label: "Finance" },
     { value: "Procurement", label: "Procurement" },
     { value: "Engineering", label: "Engineering" },
@@ -170,7 +170,7 @@ export default function EmployeeLogin() {
         } else if (payload.role === 'admin' || payload.role === 'manager') {
           const deptRoutes = {
             'Human Resources': '/jjcewsaccess/hr',
-            'Operation': '/jjcewsaccess/operations',
+            'Operations': '/jjcewsaccess/operations',
             'Finance': '/jjcewsaccess/finance',
             'Procurement': '/jjcewsaccess/procurement',
             'Engineering': '/jjcewsaccess/engineering'
@@ -256,7 +256,7 @@ export default function EmployeeLogin() {
         } else if (userData.role === 'admin' || userData.role === 'manager') {
           const deptRoutes = {
             'Human Resources': '/jjcewsaccess/hr',
-            'Operation': '/jjcewsaccess/operations',
+            'Operations': '/jjcewsaccess/operations',
             'Finance': '/jjcewsaccess/finance',
             'Procurement': '/jjcewsaccess/procurement',
             'Engineering': '/jjcewsaccess/engineering'

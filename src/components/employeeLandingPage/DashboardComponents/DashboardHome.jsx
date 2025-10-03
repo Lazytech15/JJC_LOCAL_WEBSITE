@@ -1,17 +1,71 @@
-import {
-  Calendar,
-  TrendingUp,
-  Users,
-  CheckCircle2,
-} from "lucide-react"
+import { Calendar, CheckCircle2, FileText, Clock, TrendingUp } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/UiComponents"
 
-export default function DashboardHome({ employee, announcements, isDarkMode }) {
+export default function DashboardHome({
+  employee,
+  employeeData,
+  announcements,
+  dailySummaries = [],
+  documentData,
+  isDarkMode,
+}) {
+  const userSummaries = dailySummaries.filter((day) => (employeeData?.id ? day.employee_uid === employeeData.id : true))
+
+  // Calculate Days Active from daily summaries (unique dates)
+  const daysActive = userSummaries.length
+
+  // Calculate Attendance Rate from daily summaries
+  // Attendance rate = (days with complete sessions / total days) * 100
+  const calculateAttendanceRate = () => {
+    if (!userSummaries || userSummaries.length === 0) return "0%"
+
+    const completeDays = userSummaries.filter((day) => {
+      // Consider a day complete if:
+      // 1. is_incomplete is false/0
+      // OR
+      // 2. completed_sessions equals total_sessions and both are > 0
+      return (
+        day.is_incomplete === 0 ||
+        day.is_incomplete === false ||
+        (day.completed_sessions > 0 && day.completed_sessions === day.total_sessions)
+      )
+    }).length
+
+    const rate = Math.round((completeDays / userSummaries.length) * 100)
+    return `${rate}%`
+  }
+
+  // Count documents
+  const documentCount = documentData?.documents?.length || documentData?.length || 0
+
+  const totalHours = userSummaries.reduce((sum, day) => sum + (day.total_hours || 0), 0)
+  const overtimeHours = userSummaries.reduce((sum, day) => sum + (day.overtime_hours || 0), 0)
+
   const stats = [
-    { label: "Attendance Rate", value: "98%", icon: CheckCircle2, color: "emerald" },
-    { label: "Tasks Completed", value: "24", icon: TrendingUp, color: "blue" },
-    { label: "Team Members", value: "12", icon: Users, color: "violet" },
-    { label: "Days Active", value: "156", icon: Calendar, color: "amber" },
+    {
+      label: "Attendance Rate",
+      value: calculateAttendanceRate(),
+      icon: CheckCircle2,
+      color: "emerald",
+    },
+    {
+      label: "Days Active",
+      value: daysActive.toString(),
+      icon: Calendar,
+      color: "amber",
+    },
+    {
+      label: "Documents",
+      value: documentCount.toString(),
+      icon: FileText,
+      color: "blue",
+    },
+    {
+      label: "Total Hours",
+      value: totalHours.toFixed(1),
+      icon: Clock,
+      color: "violet",
+    },
   ]
 
   const getStatColor = (color) => {
@@ -50,14 +104,18 @@ export default function DashboardHome({ employee, announcements, isDarkMode }) {
           return (
             <Card
               key={index}
-              className={`border transition-all hover:scale-105 ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
-                }`}
+              className={`border transition-all hover:scale-105 ${
+                isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+              }`}
             >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className={`text-xs font-medium uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"
-                      }`}>
+                    <p
+                      className={`text-xs font-medium uppercase tracking-wider ${
+                        isDarkMode ? "text-zinc-400" : "text-zinc-600"
+                      }`}
+                    >
                       {stat.label}
                     </p>
                     <p className={`text-3xl font-bold mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
@@ -74,6 +132,28 @@ export default function DashboardHome({ employee, announcements, isDarkMode }) {
         })}
       </div>
 
+      {overtimeHours > 0 && (
+        <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div
+                className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDarkMode ? "bg-blue-500/20 text-blue-400" : "bg-blue-50 text-blue-600"}`}
+              >
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <div>
+                <p className={`text-sm font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                  Overtime Hours This Period
+                </p>
+                <p className={`text-2xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                  {overtimeHours.toFixed(1)} hours
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Recent Announcements */}
       <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
         <CardHeader>
@@ -86,10 +166,9 @@ export default function DashboardHome({ employee, announcements, isDarkMode }) {
           {announcements.slice(0, 3).map((announcement) => (
             <div
               key={announcement.id}
-              className={`p-4 rounded-xl border transition-all cursor-pointer ${isDarkMode
-                  ? "border-zinc-800 hover:bg-zinc-800/50"
-                  : "border-zinc-200 hover:bg-zinc-50"
-                }`}
+              className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                isDarkMode ? "border-zinc-800 hover:bg-zinc-800/50" : "border-zinc-200 hover:bg-zinc-50"
+              }`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -97,9 +176,7 @@ export default function DashboardHome({ employee, announcements, isDarkMode }) {
                     <p className={`font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                       {announcement.title}
                     </p>
-                    {!announcement.read && (
-                      <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-                    )}
+                    {!announcement.read && <span className="w-2 h-2 bg-red-500 rounded-full"></span>}
                   </div>
                   <p className={`text-sm mt-1 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                     {announcement.time}

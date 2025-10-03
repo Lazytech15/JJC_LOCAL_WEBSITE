@@ -1,16 +1,8 @@
+"use client"
+
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import {
-  Home,
-  Bell,
-  User,
-  Clock,
-  BarChart3,
-  Moon,
-  Sun,
-  ArrowLeft,
-  Loader2
-} from "lucide-react"
+import { Home, Bell, User, Clock, BarChart3, Moon, Sun, ArrowLeft, Loader2 } from "lucide-react"
 import { Button } from "../ui/UiComponents"
 import { Avatar, AvatarFallback } from "../ui/UiComponents"
 import { Badge } from "../ui/UiComponents"
@@ -33,7 +25,7 @@ export default function EmployeeDashboard() {
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  
+
   // Data states
   const [announcements, setAnnouncements] = useState([])
   const [attendanceData, setAttendanceData] = useState(null)
@@ -41,6 +33,8 @@ export default function EmployeeDashboard() {
   const [profileData, setProfileData] = useState(null)
   const [documentData, setDocumentData] = useState(null)
   const [employeeData, setEmployeeData] = useState(null)
+  const [dailySummaries, setDailySummaries] = useState([])
+  const [profileImage, setProfileImage] = useState(null)
 
   const profileMenuRef = useRef(null)
 
@@ -50,129 +44,129 @@ export default function EmployeeDashboard() {
   const { updateAvailable, updateServiceWorker } = useServiceWorker()
 
   const unreadCount = announcements.filter((a) => !a.read).length
-// Replace the entire fetchDashboardData function (lines 56-161) with this:
 
-useEffect(() => {
-  const fetchDashboardData = async () => {
-    setLoading(true)
-    setError(null)
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      setLoading(true)
+      setError(null)
 
-    try {
-      // Get token and decode to find employee
-      const token = getStoredToken()
-      if (!token) {
-        console.warn('No token found')
+      try {
+        // Get token and decode to find employee
+        const token = getStoredToken()
+        if (!token) {
+          console.warn("No token found")
+          setLoading(false)
+          setError("Please log in to continue")
+          return
+        }
+
+        const payload = verifyToken(token)
+        console.log("[v0] Token payload:", payload)
+
+        if (!payload || !payload.username) {
+          console.warn("Invalid token payload")
+          clearTokens()
+          setLoading(false)
+          setError("Session expired. Please log in again.")
+          return
+        }
+
+        // First, fetch employee data by username to get the ID
+        console.log("Fetching employee by username:", payload.username)
+        const employeesResponse = await apiService.employees.getEmployees({
+          search: payload.username,
+        })
+
+        console.log("Employees search response:", employeesResponse)
+
+        // Check for employees in the response (API returns employees directly, not nested under data)
+        if (!employeesResponse?.employees || employeesResponse.employees.length === 0) {
+          setLoading(false)
+          setError("Employee not found")
+          return
+        }
+
+        const foundEmployee = employeesResponse.employees[0]
+        // Use 'id' as UID since that's what the API returns
+        const uid = foundEmployee.id
+
+        console.log("[v0] Found employee ID:", uid)
+        setEmployeeData(foundEmployee)
+
+        // Now fetch all related data using the ID
+        const [summaryResponse, attendanceResponse, profilePictureResponse, documentsResponse] =
+          await Promise.allSettled([
+            apiService.summary.getDailySummaryById({
+              uid: uid,
+            }),
+            apiService.attendance.getEmployeeAttendance(uid, {}),
+            apiService.profiles.getProfileByUid(uid),
+            apiService.document.getEmployeeDocuments(uid),
+          ])
+
+        console.log("API Responses:", {
+          summary: summaryResponse,
+          attendance: attendanceResponse,
+          profilePicture: profilePictureResponse,
+          documents: documentsResponse,
+        })
+
+        // Process summaries/announcements
+        if (summaryResponse.status === "fulfilled") {
+          const summaries = summaryResponse.value?.data || []
+          const userSummaries = summaries.filter((s) => s.employee_uid === uid)
+          console.log("[v0] Filtered summaries for user:", userSummaries.length, "out of", summaries.length)
+          setDailySummaries(userSummaries)
+          setAnnouncements(
+            userSummaries.map((s, idx) => ({
+              id: s.summary_id || idx,
+              title: s.task_description || s.notes || "Daily Summary",
+              time: new Date(s.date).toLocaleDateString(),
+              read: false,
+              fullData: s,
+            })),
+          )
+        } else {
+          console.error("Summary fetch failed:", summaryResponse.reason)
+        }
+
+        // Process attendance
+        if (attendanceResponse.status === "fulfilled") {
+          setAttendanceData(attendanceResponse.value)
+        } else {
+          console.error("Attendance fetch failed:", attendanceResponse.reason)
+        }
+
+        // Process profile picture - THIS IS THE KEY CHANGE
+        if (profilePictureResponse.status === "fulfilled") {
+          const profileResult = profilePictureResponse.value
+          if (profileResult.success && profileResult.url) {
+            setProfileImage(profileResult.url)
+            console.log("Profile picture loaded:", profileResult.url)
+          } else {
+            console.log("No profile picture available")
+          }
+        } else {
+          console.error("Profile picture fetch failed:", profilePictureResponse.reason)
+        }
+
+        // Process documents
+        if (documentsResponse.status === "fulfilled") {
+          setDocumentData(documentsResponse.value)
+        } else {
+          console.error("Documents fetch failed:", documentsResponse.reason)
+        }
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err)
+        setError("Failed to load dashboard data")
+      } finally {
+        console.log("Finished loading dashboard data")
         setLoading(false)
-        setError('Please log in to continue')
-        return
       }
-
-      const payload = verifyToken(token)
-      console.log('Token payload:', payload)
-
-      if (!payload || !payload.username) {
-        console.warn('Invalid token payload')
-        clearTokens()
-        setLoading(false)
-        setError('Session expired. Please log in again.')
-        return
-      }
-
-      // First, fetch employee data by username to get the ID
-      console.log('Fetching employee by username:', payload.username)
-      const employeesResponse = await apiService.employees.getEmployees({
-        search: payload.username,
-        limit: 1
-      })
-
-      console.log('Employees search response:', employeesResponse)
-
-      // Check for employees in the response (API returns employees directly, not nested under data)
-      if (!employeesResponse?.employees || employeesResponse.employees.length === 0) {
-        setLoading(false)
-        setError('Employee not found')
-        return
-      }
-
-      const foundEmployee = employeesResponse.employees[0]
-      // Use 'id' as UID since that's what the API returns
-      const uid = foundEmployee.id
-      
-      console.log('Found employee ID:', uid)
-      setEmployeeData(foundEmployee)
-
-      // Now fetch all related data using the ID
-      const [
-        summaryResponse,
-        attendanceResponse,
-        profileResponse,
-        documentsResponse
-      ] = await 
-      Promise.allSettled([
-        // apiService.summary.getEmployeeSummaries({
-        //   uid: uid,
-        //   limit: 10
-        // }),
-        apiService.attendance.getEmployeeAttendance(uid, {
-          limit: 30
-        }),
-        apiService.profiles.getProfileByUid(uid),
-        apiService.document.getEmployeeDocuments(uid)
-      ])
-
-      console.log('API Responses:', {
-        // summary: summaryResponse,
-        attendance: attendanceResponse,
-        profile: profileResponse,
-        documents: documentsResponse
-      })
-
-      // Process summaries/announcements
-      // if (summaryResponse.status === 'fulfilled') {
-      //   const summaries = summaryResponse.value?.data || []
-      //   setAnnouncements(summaries.map((s, idx) => ({
-      //     id: s.summary_id || idx,
-      //     title: s.task_description || s.notes || 'Daily Summary',
-      //     time: new Date(s.date).toLocaleDateString(),
-      //     read: false,
-      //     fullData: s
-      //   })))
-      // } else {
-      //   console.error('Summary fetch failed:', summaryResponse.reason)
-      // }
-
-      // Process attendance
-      if (attendanceResponse.status === 'fulfilled') {
-        setAttendanceData(attendanceResponse.value)
-      } else {
-        console.error('Attendance fetch failed:', attendanceResponse.reason)
-      }
-
-      // Process profile
-      if (profileResponse.status === 'fulfilled') {
-        setProfileData(profileResponse.value)
-      } else {
-        console.error('Profile fetch failed:', profileResponse.reason)
-      }
-
-      // Process documents
-      // if (documentsResponse.status === 'fulfilled') {
-      //   setDocumentData(documentsResponse.value)
-      // } else {
-      //   console.error('Documents fetch failed:', documentsResponse.reason)
-      // }
-
-    } catch (err) {
-      console.error('Error fetching dashboard data:', err)
-      setError('Failed to load dashboard data')
-    } finally {
-      console.log('Finished loading dashboard data')
-      setLoading(false)
     }
-  }
 
-  fetchDashboardData()
-}, []) // Run once on mount
+    fetchDashboardData()
+  }, []) // Run once on mount
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -213,9 +207,7 @@ useEffect(() => {
       <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-zinc-950" : "bg-zinc-50"}`}>
         <div className="text-center">
           <Loader2 className={`w-8 h-8 animate-spin mx-auto mb-4 ${isDarkMode ? "text-white" : "text-zinc-900"}`} />
-          <p className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-            Loading dashboard...
-          </p>
+          <p className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>Loading dashboard...</p>
         </div>
       </div>
     )
@@ -234,23 +226,20 @@ useEffect(() => {
       )}
 
       {/* Error Banner */}
-      {error && (
-        <div className="bg-red-500 text-white px-4 py-3 text-center text-sm">
-          {error}
-        </div>
-      )}
+      {error && <div className="bg-red-500 text-white px-4 py-3 text-center text-sm">{error}</div>}
 
       {/* Top Header */}
       <header
-        className={`sticky top-0 z-40 backdrop-blur-lg ${isDarkMode ? "bg-zinc-900/80 border-zinc-800" : "bg-white/80 border-zinc-200"
-          }`}
+        className={`sticky top-0 z-40 backdrop-blur-lg ${
+          isDarkMode ? "bg-zinc-900/80 border-zinc-800" : "bg-white/80 border-zinc-200"
+        }`}
       >
         <div className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <div className="flex items-center gap-3">
               <img
-                src={logo}
+                src={logo || "/placeholder.svg"}
                 alt="JJC Engineering Works Logo"
                 className="w-12 h-12 rounded-xl object-cover shadow-md bg-primary"
               />
@@ -262,7 +251,9 @@ useEffect(() => {
             {/* Centered Desktop Navigation */}
             <div className="hidden lg:block border-t ${isDarkMode ? 'border-zinc-800' : 'border-zinc-200'}">
               <div className="flex items-center justify-center py-3">
-                <nav className={`inline-flex items-center gap-1 p-1 rounded-xl ${isDarkMode ? 'bg-zinc-800' : 'bg-zinc-200'}`}>
+                <nav
+                  className={`inline-flex items-center gap-1 p-1 rounded-xl ${isDarkMode ? "bg-zinc-800" : "bg-zinc-200"}`}
+                >
                   {menuItems.map((item) => {
                     const Icon = item.icon
                     const isActive = activeTab === item.id
@@ -270,12 +261,13 @@ useEffect(() => {
                       <button
                         key={item.id}
                         onClick={() => setActiveTab(item.id)}
-                        className={`relative flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-medium text-sm ${isActive
+                        className={`relative flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-medium text-sm ${
+                          isActive
                             ? "bg-white text-zinc-900 shadow-md"
                             : isDarkMode
                               ? "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
                               : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-300/50"
-                          }`}
+                        }`}
                       >
                         <Icon className="w-4 h-4" />
                         {isActive && <span>{item.label}</span>}
@@ -320,33 +312,55 @@ useEffect(() => {
 
               {/* Profile Dropdown */}
               <div className="relative" ref={profileMenuRef}>
-                <button
-                  onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="focus:outline-none"
-                >
-                  <Avatar className={`w-9 h-9 ring-2 cursor-pointer hover:ring-4 transition-all ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}>
-                    <AvatarFallback className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-sm font-semibold`}>
-                      {employee?.name
-                        ?.split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
+                <button onClick={() => setShowProfileMenu(!showProfileMenu)} className="focus:outline-none">
+                  <Avatar
+                    className={`w-9 h-9 ring-2 cursor-pointer hover:ring-4 transition-all ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}
+                  >
+                    {profileImage ? (
+                      <img
+                        src={profileImage || "/placeholder.svg"}
+                        alt={employee?.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <AvatarFallback
+                        className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-sm font-semibold`}
+                      >
+                        {employee?.name
+                          ?.split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    )}
                   </Avatar>
                 </button>
 
                 {/* Dropdown Menu */}
                 {showProfileMenu && (
-                  <div className={`absolute right-0 mt-2 w-64 rounded-xl shadow-xl border z-50 ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
-                    }`}>
-                    <div className={`p-4 border-b ${isDarkMode ? 'border-zinc-800' : 'border-zinc-200'}`}>
+                  <div
+                    className={`absolute right-0 mt-2 w-64 rounded-xl shadow-xl border z-50 ${
+                      isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                    }`}
+                  >
+                    <div className={`p-4 border-b ${isDarkMode ? "border-zinc-800" : "border-zinc-200"}`}>
                       <div className="flex items-center gap-3">
                         <Avatar className={`w-12 h-12 ring-2 ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}>
-                          <AvatarFallback className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-sm font-semibold`}>
-                            {employee?.name
-                              ?.split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
+                          {profileImage ? (
+                            <img
+                              src={profileImage || "/placeholder.svg"}
+                              alt={employee?.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <AvatarFallback
+                              className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-sm font-semibold`}
+                            >
+                              {employee?.name
+                                ?.split(" ")
+                                .map((n) => n[0])
+                                .join("")}
+                            </AvatarFallback>
+                          )}
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <p className={`font-semibold truncate ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
@@ -364,8 +378,9 @@ useEffect(() => {
                           setShowProfileMenu(false)
                           setActiveTab("profile")
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
-                          }`}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
+                          isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
+                        }`}
                       >
                         <User className="w-4 h-4" />
                         <span className="text-sm font-medium">View Profile</span>
@@ -375,8 +390,9 @@ useEffect(() => {
                           setShowProfileMenu(false)
                           handleLogout()
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-red-400" : "hover:bg-zinc-100 text-red-600"
-                          }`}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
+                          isDarkMode ? "hover:bg-zinc-800 text-red-400" : "hover:bg-zinc-100 text-red-600"
+                        }`}
                       >
                         <ArrowLeft className="w-4 h-4" />
                         <span className="text-sm font-medium">Logout</span>
@@ -393,25 +409,23 @@ useEffect(() => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === "dashboard" && (
-          <DashboardHome 
+          <DashboardHome
             employee={employee}
             employeeData={employeeData}
             announcements={announcements}
             attendanceData={attendanceData}
+            dailySummaries={dailySummaries}
+            documentData={documentData}
             isDarkMode={isDarkMode}
           />
         )}
 
         {activeTab === "announcements" && (
-          <Announcements 
-            announcements={announcements}
-            setAnnouncements={setAnnouncements}
-            isDarkMode={isDarkMode}
-          />
+          <Announcements announcements={announcements} setAnnouncements={setAnnouncements} isDarkMode={isDarkMode} />
         )}
 
         {activeTab === "profile" && (
-          <Profile 
+          <Profile
             employee={employee}
             employeeData={employeeData}
             profileData={profileData}
@@ -421,29 +435,24 @@ useEffect(() => {
           />
         )}
 
-        {activeTab === "attendance" && (
-          <TimeAttendance 
-            employee={employee}
-            employeeData={employeeData}
-            attendanceData={attendanceData}
-            isDarkMode={isDarkMode} 
-          />
-        )}
+        {activeTab === "attendance" && <TimeAttendance dailySummaries={dailySummaries} isDarkMode={isDarkMode} />}
 
         {activeTab === "performance" && (
-          <Performance 
+          <Performance
+            dailySummaries={dailySummaries}
             employee={employee}
             employeeData={employeeData}
             performanceData={performanceData}
-            isDarkMode={isDarkMode} 
+            isDarkMode={isDarkMode}
           />
         )}
       </main>
 
       {/* Bottom Navigation - Mobile */}
       <nav
-        className={`fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t backdrop-blur-lg ${isDarkMode ? "bg-zinc-900/95 border-zinc-800" : "bg-white/95 border-zinc-200"
-          }`}
+        className={`fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t backdrop-blur-lg ${
+          isDarkMode ? "bg-zinc-900/95 border-zinc-800" : "bg-white/95 border-zinc-200"
+        }`}
       >
         <div className="flex items-center justify-around px-2 py-3 safe-area-inset-bottom">
           {menuItems.map((item) => {
@@ -457,10 +466,15 @@ useEffect(() => {
               >
                 <div className="relative">
                   <Icon
-                    className={`w-6 h-6 transition-colors ${isActive
-                        ? isDarkMode ? "text-white" : "text-zinc-900"
-                        : isDarkMode ? "text-zinc-500" : "text-zinc-400"
-                      }`}
+                    className={`w-6 h-6 transition-colors ${
+                      isActive
+                        ? isDarkMode
+                          ? "text-white"
+                          : "text-zinc-900"
+                        : isDarkMode
+                          ? "text-zinc-500"
+                          : "text-zinc-400"
+                    }`}
                   />
                   {item.badge > 0 && (
                     <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
@@ -469,16 +483,24 @@ useEffect(() => {
                   )}
                 </div>
                 <span
-                  className={`text-xs font-medium truncate w-full text-center ${isActive
-                      ? isDarkMode ? "text-white" : "text-zinc-900"
-                      : isDarkMode ? "text-zinc-500" : "text-zinc-400"
-                    }`}
+                  className={`text-xs font-medium truncate w-full text-center ${
+                    isActive
+                      ? isDarkMode
+                        ? "text-white"
+                        : "text-zinc-900"
+                      : isDarkMode
+                        ? "text-zinc-500"
+                        : "text-zinc-400"
+                  }`}
                 >
                   {item.label}
                 </span>
                 {isActive && (
-                  <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-1 rounded-t-full ${isDarkMode ? "bg-white" : "bg-zinc-900"
-                    }`} />
+                  <div
+                    className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-1 rounded-t-full ${
+                      isDarkMode ? "bg-white" : "bg-zinc-900"
+                    }`}
+                  />
                 )}
               </button>
             )
