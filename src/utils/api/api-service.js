@@ -71,5 +71,6 @@ export const {
   document,
   summary,
   items,
+  purchaseOrders,
   employeeLogs,
 } = apiService

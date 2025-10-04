@@ -1,11 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeft, Plus, Minus } from "lucide-react"
-import QRCodeSmall from "./QRCodeSmall"
+import { items as itemsService } from "../../utils/api/api-service.js"
 
 export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
   const [quantity, setQuantity] = useState(1)
+  const [imageUrl, setImageUrl] = useState(null)
+  const [imageError, setImageError] = useState(false)
+  const [images, setImages] = useState([])
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const rotationTimer = useRef(null)
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -77,6 +82,62 @@ export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
 
   const status = deriveStatus(item)
 
+  useEffect(() => {
+    setImageError(false)
+    if (!item?.item_no) {
+      setImageUrl(null)
+      return
+    }
+    // Load images list
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await itemsService.getItemImages(item.item_no)
+        if (!res?.success) throw new Error('Failed to load images')
+        const list = (res.data || []).map(img => ({
+          ...img,
+          url: `${itemsService.getItemImageUrl(item.item_no, img.filename)}?t=${Date.now()}`,
+        }))
+        if (!cancelled) {
+          setImages(list)
+          setCurrentIndex(0)
+          setImageUrl(list[0]?.url || null)
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setImages([])
+          // Fallback to latest endpoint if listing fails
+          const url = itemsService.getItemLatestImageUrl(item.item_no)
+          setImageUrl(`${url}?t=${Date.now()}`)
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [item?.item_no])
+
+  // Auto-rotate when multiple images
+  useEffect(() => {
+    if (rotationTimer.current) {
+      clearInterval(rotationTimer.current)
+      rotationTimer.current = null
+    }
+    if (images.length > 1) {
+      rotationTimer.current = setInterval(() => {
+        setCurrentIndex((idx) => (idx + 1) % images.length)
+      }, 4000) // 4s rotation
+    }
+    return () => {
+      if (rotationTimer.current) clearInterval(rotationTimer.current)
+    }
+  }, [images.length])
+
+  useEffect(() => {
+    if (images.length > 0) {
+      setImageUrl(images[currentIndex]?.url || null)
+      setImageError(false)
+    }
+  }, [currentIndex, images])
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       {/* Back Button */}
@@ -102,14 +163,33 @@ export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Image Section */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-8">
-          <div className="aspect-square bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 text-lg">
-            {/* Placeholder for item photo - can be enhanced later */}
-            <div className="text-center">
-              <div className="text-6xl mb-2">📦</div>
-              <div>Item Photo</div>
-              <div className="text-sm mt-2">Coming Soon</div>
-            </div>
+          <div className="aspect-square bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 text-lg overflow-hidden">
+            {imageUrl && !imageError ? (
+              <img
+                src={imageUrl}
+                alt={item.item_name}
+                className="w-full h-full object-contain"
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <div className="text-center">
+                <div className="text-6xl mb-2">📦</div>
+                <div>No Image</div>
+              </div>
+            )}
           </div>
+          {images.length > 1 && (
+            <div className="flex justify-center gap-2 mt-3">
+              {images.map((_, i) => (
+                <button
+                  key={i}
+                  aria-label={`Image ${i+1}`}
+                  onClick={() => setCurrentIndex(i)}
+                  className={`w-2.5 h-2.5 rounded-full ${i===currentIndex ? 'bg-slate-600 dark:bg-slate-300' : 'bg-slate-300 dark:bg-slate-600'}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Product Information */}

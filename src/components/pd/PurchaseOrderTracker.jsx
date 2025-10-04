@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import apiService from "../../utils/api/api-service"
 import ModalPortal from "./ModalPortal"
+import CreatePurchaseOrderWizard from "./CreatePurchaseOrderWizard"
 
 function PurchaseOrderTracker() {
   const [purchaseOrders, setPurchaseOrders] = useState([])
@@ -18,8 +19,11 @@ function PurchaseOrderTracker() {
     items: [],
     expected_delivery_date: "",
     notes: "",
-    priority: "normal"
+    priority: "normal",
+    multi_supplier_mode: false // New field for handling multiple suppliers
   })
+  
+  const [orderSplitMode, setOrderSplitMode] = useState("single") // "single", "split", "mixed"
 
   const [statusUpdate, setStatusUpdate] = useState({
     order_id: "",
@@ -38,7 +42,7 @@ function PurchaseOrderTracker() {
       setLoading(true)
       const result = await apiService.purchaseOrders.getPurchaseOrders()
       if (result.success) {
-        setPurchaseOrders(result.data || [])
+        setPurchaseOrders(result.orders || [])
       } else {
         setError(result.message || "Failed to fetch purchase orders")
       }
@@ -128,6 +132,23 @@ function PurchaseOrderTracker() {
     }).format(amount)
   }
 
+  // Helper function to group items by supplier
+  const groupItemsBySupplier = (items) => {
+    return items.reduce((groups, item) => {
+      const supplier = item.supplier || "Unknown Supplier"
+      if (!groups[supplier]) {
+        groups[supplier] = []
+      }
+      groups[supplier].push(item)
+      return groups
+    }, {})
+  }
+
+  // Get unique suppliers from selected items
+  const getUniqueSuppliers = (items) => {
+    return [...new Set(items.map(item => item.supplier || "Unknown Supplier"))]
+  }
+
   const formatDate = (dateString) => {
     if (!dateString) return "-"
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -142,6 +163,11 @@ function PurchaseOrderTracker() {
     setTimeout(() => {
       setToast({ show: false, message: "", type: "success" })
     }, 3000)
+  }
+
+  const handleWizardSuccess = (message) => {
+    showToast(message)
+    fetchPurchaseOrders()
   }
 
   const handleCreateOrder = () => {
@@ -160,33 +186,63 @@ function PurchaseOrderTracker() {
       const newItems = [...prev.items, {
         item_no: item.item_no,
         item_name: item.item_name,
-        quantity: item.recommended_quantity,
+        quantity: item.recommended_quantity, // This will be editable in UI
+        custom_quantity: item.recommended_quantity, // User can override this
+        recommended_quantity: item.recommended_quantity,
         unit_price: item.price_per_unit || 0,
         unit_of_measure: item.unit_of_measure || "",
-        supplier: item.supplier || ""
+        supplier: item.supplier || "",
+        supplier_specific: item.supplier || "",
+        delivery_method: "delivery" // Default delivery method
       }]
 
-      // Auto-set supplier based on selected items
+      // Smart supplier handling for multiple suppliers
+      const uniqueSuppliers = getUniqueSuppliers(newItems)
+      
       let newSupplier = prev.supplier
+      let multiSupplierMode = false
+      
       if (newItems.length === 1) {
         // First item added - set supplier from this item
         newSupplier = item.supplier || ""
+      } else if (uniqueSuppliers.length === 1) {
+        // All items from same supplier
+        newSupplier = uniqueSuppliers[0]
       } else {
-        // Check if all items have the same supplier
-        const suppliers = newItems.map(i => i.supplier || "").filter(s => s)
-        const uniqueSuppliers = [...new Set(suppliers)]
-        if (uniqueSuppliers.length === 1) {
-          newSupplier = uniqueSuppliers[0]
-        }
-        // If multiple suppliers, keep current supplier or use the most common one
+        // Multiple suppliers detected
+        multiSupplierMode = true
+        newSupplier = "Multiple Suppliers"
       }
 
       return {
         ...prev,
         items: newItems,
-        supplier: newSupplier
+        supplier: newSupplier,
+        multi_supplier_mode: multiSupplierMode
       }
     })
+  }
+
+  const handleUpdateItemQuantity = (itemNo, newQuantity) => {
+    setOrderForm(prev => ({
+      ...prev,
+      items: prev.items.map(item => 
+        item.item_no === itemNo 
+          ? { ...item, custom_quantity: newQuantity, quantity: newQuantity }
+          : item
+      )
+    }))
+  }
+
+  const handleUpdateItemDeliveryMethod = (itemNo, deliveryMethod) => {
+    setOrderForm(prev => ({
+      ...prev,
+      items: prev.items.map(item => 
+        item.item_no === itemNo 
+          ? { ...item, delivery_method: deliveryMethod }
+          : item
+      )
+    }))
   }
 
   const handleRemoveItemFromOrder = (itemNo) => {
@@ -217,30 +273,102 @@ function PurchaseOrderTracker() {
 
   const handleSubmitOrder = async () => {
     try {
-      const orderData = {
-        supplier: orderForm.supplier,
-        items: orderForm.items,
-        expected_delivery_date: orderForm.expected_delivery_date,
-        notes: orderForm.notes,
-        priority: orderForm.priority,
-        created_by: "Current User" // TODO: Get from auth context
-      }
-
-      const result = await apiService.purchaseOrders.createPurchaseOrder(orderData)
-
-      if (result.success) {
-        showToast("Purchase order created successfully!")
-        setShowCreateModal(false)
-        setOrderForm({
-          supplier: "",
-          items: [],
-          expected_delivery_date: "",
-          notes: "",
-          priority: "normal"
-        })
-        fetchPurchaseOrders()
+      // Handle multiple suppliers based on user selection
+      if (orderForm.multi_supplier_mode && orderSplitMode === "split") {
+        // Split into separate orders by supplier
+        const supplierGroups = groupItemsBySupplier(orderForm.items)
+        const createPromises = []
+        
+        for (const [supplier, items] of Object.entries(supplierGroups)) {
+          const orderData = {
+            supplier: supplier,
+            items: items,
+            expected_delivery_date: orderForm.expected_delivery_date || null,
+            notes: `${orderForm.notes}${orderForm.notes ? ' | ' : ''}Multi-supplier order - Part of batch`,
+            priority: orderForm.priority,
+            created_by: "Current User" // TODO: Get from auth context
+          }
+          
+          // Wrap each API call to catch individual errors
+          // Disable deduplication for multiple orders to same endpoint
+          const orderPromise = apiService.purchaseOrders.createPurchaseOrder(orderData, { deduplicate: false })
+            .then(result => {
+              return result
+            })
+            .catch(error => {
+              console.error(`Error creating order for supplier ${supplier}:`, error)
+              return { success: false, error: error.message }
+            })
+          
+          createPromises.push(orderPromise)
+        }
+        
+        // Execute all order creation promises
+        const results = await Promise.all(createPromises)
+        const successCount = results.filter(r => r && r.success).length
+        const failCount = results.length - successCount
+        
+        if (successCount > 0) {
+          const successfulSuppliers = results
+            .map((result, index) => result && result.success ? Object.keys(supplierGroups)[index] : null)
+            .filter(Boolean)
+          const failedSuppliers = results
+            .map((result, index) => (!result || !result.success) ? Object.keys(supplierGroups)[index] : null)
+            .filter(Boolean)
+          
+          let message = `Successfully created ${successCount} purchase order(s)`
+          if (successfulSuppliers.length > 0) {
+            message += ` for: ${successfulSuppliers.join(', ')}`
+          }
+          if (failCount > 0) {
+            message += `. Failed for: ${failedSuppliers.join(', ')}`
+          }
+          
+          showToast(message)
+          setShowCreateModal(false)
+          setOrderForm({
+            supplier: "",
+            items: [],
+            expected_delivery_date: "",
+            notes: "",
+            priority: "normal",
+            multi_supplier_mode: false
+          })
+          setOrderSplitMode("single")
+          fetchPurchaseOrders()
+        } else {
+          const failedSuppliers = Object.keys(supplierGroups)
+          showToast(`Failed to create any purchase orders. Attempted suppliers: ${failedSuppliers.join(', ')}`, "error")
+        }
       } else {
-        showToast(result.message || "Failed to create purchase order", "error")
+        // Single order (traditional or mixed supplier)
+        const orderData = {
+          supplier: orderForm.multi_supplier_mode ? "Multiple Suppliers" : orderForm.supplier,
+          items: orderForm.items,
+          expected_delivery_date: orderForm.expected_delivery_date || null,
+          notes: orderForm.notes,
+          priority: orderForm.priority,
+          created_by: "Current User" // TODO: Get from auth context
+        }
+
+        const result = await apiService.purchaseOrders.createPurchaseOrder(orderData)
+
+        if (result.success) {
+          showToast("Purchase order created successfully!")
+          setShowCreateModal(false)
+          setOrderForm({
+            supplier: "",
+            items: [],
+            expected_delivery_date: "",
+            notes: "",
+            priority: "normal",
+            multi_supplier_mode: false
+          })
+          setOrderSplitMode("single")
+          fetchPurchaseOrders()
+        } else {
+          showToast(result.message || "Failed to create purchase order", "error")
+        }
       }
     } catch (err) {
       setError(err.message || "Failed to create purchase order")
@@ -410,149 +538,12 @@ function PurchaseOrderTracker() {
         )}
       </div>
 
-      {/* Create Order Modal */}
-      {showCreateModal && (
-        <ModalPortal>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
-            <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Create Purchase Order</h3>
-                  <button
-                    onClick={() => setShowCreateModal(false)}
-                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="space-y-6">
-                  {/* Order Details */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Supplier</label>
-                      <div className="w-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200">
-                        {orderForm.supplier || "Select items to auto-set supplier"}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Expected Delivery Date</label>
-                      <input
-                        type="date"
-                        value={orderForm.expected_delivery_date}
-                        onChange={(e) => setOrderForm({ ...orderForm, expected_delivery_date: e.target.value })}
-                        className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Priority</label>
-                      <select
-                        value={orderForm.priority}
-                        onChange={(e) => setOrderForm({ ...orderForm, priority: e.target.value })}
-                        className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="low">Low</option>
-                        <option value="normal">Normal</option>
-                        <option value="high">High</option>
-                        <option value="urgent">Urgent</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Notes</label>
-                    <textarea
-                      value={orderForm.notes}
-                      onChange={(e) => setOrderForm({ ...orderForm, notes: e.target.value })}
-                      rows={3}
-                      className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Additional notes for this order..."
-                    />
-                  </div>
-
-                  {/* Add Items from Restock List */}
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Add Items from Restock List</h4>
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 max-h-60 overflow-y-auto">
-                      {restockItems.length === 0 ? (
-                        <p className="text-gray-500 dark:text-gray-400">No items need restocking</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {restockItems.map((item) => (
-                            <div key={item.item_no} className="flex items-center justify-between bg-white dark:bg-gray-700 rounded p-3">
-                              <div className="flex-1">
-                                <div className="font-medium text-gray-800 dark:text-gray-200">{item.item_name}</div>
-                                <div className="text-sm text-gray-600 dark:text-gray-400">
-                                  ID: {item.item_no} | Shortage: {item.shortage} | Recommended: {item.recommended_quantity}
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => handleAddItemToOrder(item)}
-                                disabled={orderForm.items.some(i => i.item_no === item.item_no)}
-                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-sm transition-colors"
-                              >
-                                {orderForm.items.some(i => i.item_no === item.item_no) ? "Added" : "Add"}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Selected Items */}
-                  {orderForm.items.length > 0 && (
-                    <div>
-                      <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Selected Items</h4>
-                      <div className="space-y-2">
-                        {orderForm.items.map((item) => (
-                          <div key={item.item_no} className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 rounded p-3">
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-800 dark:text-gray-200">{item.item_name}</div>
-                              <div className="text-sm text-gray-600 dark:text-gray-400">
-                                Quantity: {item.quantity} | Price: {formatCurrency(item.unit_price)}
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => handleRemoveItemFromOrder(item.item_no)}
-                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="mt-4 text-right">
-                        <div className="text-lg font-bold text-gray-800 dark:text-gray-200">
-                          Total: {formatCurrency(orderForm.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3 pt-4">
-                    <button
-                      onClick={handleSubmitOrder}
-                      disabled={!orderForm.supplier || orderForm.items.length === 0}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
-                    >
-                      Create Purchase Order
-                    </button>
-                    <button
-                      onClick={() => setShowCreateModal(false)}
-                      className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
-      )}
+      {/* Create Order Wizard */}
+      <CreatePurchaseOrderWizard 
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={handleWizardSuccess}
+      />
 
       {/* Order Details Modal */}
       {showOrderDetails && selectedOrder && (

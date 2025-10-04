@@ -21,8 +21,18 @@ function AdminDashboard({ onNavigate }) {
     total_orders: 0,
     pending_orders: 0,
     completed_orders: 0,
+    cancelled_orders: 0,
     total_value: 0,
-    pending_value: 0
+    pending_value: 0,
+    completed_value: 0,
+    status_breakdown: {
+      requested: 0,
+      ordered: 0,
+      in_transit: 0,
+      ready_for_pickup: 0,
+      received: 0,
+      cancelled: 0
+    }
   })
   const [employeeLogsSummary, setEmployeeLogsSummary] = useState([])
 
@@ -124,25 +134,42 @@ function AdminDashboard({ onNavigate }) {
     try {
       const result = await apiService.purchaseOrders.getPurchaseOrders()
       if (result.success) {
-        const orders = result.data || []
+        const orders = result.orders || []
         
         const totalOrders = orders.length
         const pendingOrders = orders.filter(order => 
           ['requested', 'ordered', 'in_transit', 'ready_for_pickup'].includes(order.status)
         ).length
         const completedOrders = orders.filter(order => order.status === 'received').length
+        const cancelledOrders = orders.filter(order => order.status === 'cancelled').length
         
-        const totalValue = orders.reduce((sum, order) => sum + (order.total_value || 0), 0)
+        const totalValue = orders.reduce((sum, order) => sum + (parseFloat(order.total_value) || 0), 0)
         const pendingValue = orders
           .filter(order => ['requested', 'ordered', 'in_transit', 'ready_for_pickup'].includes(order.status))
-          .reduce((sum, order) => sum + (order.total_value || 0), 0)
+          .reduce((sum, order) => sum + (parseFloat(order.total_value) || 0), 0)
+        const completedValue = orders
+          .filter(order => order.status === 'received')
+          .reduce((sum, order) => sum + (parseFloat(order.total_value) || 0), 0)
+
+        // Status breakdown
+        const statusBreakdown = {
+          requested: orders.filter(order => order.status === 'requested').length,
+          ordered: orders.filter(order => order.status === 'ordered').length,
+          in_transit: orders.filter(order => order.status === 'in_transit').length,
+          ready_for_pickup: orders.filter(order => order.status === 'ready_for_pickup').length,
+          received: completedOrders,
+          cancelled: cancelledOrders
+        }
 
         setPurchaseOrderSummary({
           total_orders: totalOrders,
           pending_orders: pendingOrders,
           completed_orders: completedOrders,
+          cancelled_orders: cancelledOrders,
           total_value: totalValue,
-          pending_value: pendingValue
+          pending_value: pendingValue,
+          completed_value: completedValue,
+          status_breakdown: statusBreakdown
         })
       }
     } catch (err) {
@@ -278,8 +305,17 @@ function AdminDashboard({ onNavigate }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Purchase Orders Overview */}
         <div className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">📋 Purchase Orders Summary</h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">📋 Purchase Orders Summary</h3>
+            <button
+              onClick={() => onNavigate && onNavigate("orders")}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+            >
+              View All →
+            </button>
+          </div>
           <div className="space-y-4">
+            {/* Main metrics */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
                 <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{purchaseOrderSummary.total_orders}</div>
@@ -287,17 +323,68 @@ function AdminDashboard({ onNavigate }) {
               </div>
               <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
                 <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{purchaseOrderSummary.pending_orders}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Pending</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Active Orders</div>
               </div>
             </div>
+            
+            {/* Financial overview */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
-                <div className="text-lg font-bold text-green-600 dark:text-green-400">{purchaseOrderSummary.completed_orders}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Completed</div>
+                <div className="text-lg font-bold text-gray-700 dark:text-gray-300">{formatCurrency(purchaseOrderSummary.total_value)}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Total Value</div>
               </div>
               <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
-                <div className="text-lg font-bold text-gray-700 dark:text-gray-300">{formatCurrency(purchaseOrderSummary.pending_value)}</div>
+                <div className="text-lg font-bold text-orange-600 dark:text-orange-400">{formatCurrency(purchaseOrderSummary.pending_value)}</div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">Pending Value</div>
+              </div>
+            </div>
+
+            {/* Status breakdown */}
+            <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Order Status Breakdown</div>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="text-center">
+                  <div className="text-lg font-bold text-gray-600 dark:text-gray-400">{purchaseOrderSummary.status_breakdown.requested}</div>
+                  <div className="text-gray-500 dark:text-gray-500">Requested</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{purchaseOrderSummary.status_breakdown.ordered}</div>
+                  <div className="text-gray-500 dark:text-gray-500">Ordered</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{purchaseOrderSummary.status_breakdown.in_transit}</div>
+                  <div className="text-gray-500 dark:text-gray-500">In Transit</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-orange-600 dark:text-orange-400">{purchaseOrderSummary.status_breakdown.ready_for_pickup}</div>
+                  <div className="text-gray-500 dark:text-gray-500">Ready</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-green-600 dark:text-green-400">{purchaseOrderSummary.status_breakdown.received}</div>
+                  <div className="text-gray-500 dark:text-gray-500">Received</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-red-600 dark:text-red-400">{purchaseOrderSummary.status_breakdown.cancelled}</div>
+                  <div className="text-gray-500 dark:text-gray-500">Cancelled</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Performance metrics */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
+                <div className="text-lg font-bold text-green-600 dark:text-green-400">
+                  {purchaseOrderSummary.total_orders > 0 ? 
+                    Math.round((purchaseOrderSummary.completed_orders / purchaseOrderSummary.total_orders) * 100) : 0}%
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Completion Rate</div>
+              </div>
+              <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
+                <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                  {formatCurrency(purchaseOrderSummary.total_orders > 0 ? 
+                    purchaseOrderSummary.total_value / purchaseOrderSummary.total_orders : 0)}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</div>
               </div>
             </div>
           </div>
