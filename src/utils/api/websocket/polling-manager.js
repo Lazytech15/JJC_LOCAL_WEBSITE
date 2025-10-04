@@ -93,7 +93,7 @@ export class PollingManager {
     try {
       // Build URL with rooms filter if any rooms are joined
       const room = this.rooms.size > 0 ? Array.from(this.rooms)[0] : null
-      const url = new URL(`${API_ENDPOINTS.public}/events/poll`)
+      const url = new URL(`${API_ENDPOINTS.public}/api/events/poll`)
       url.searchParams.append('since', this.lastTimestamp)
       if (room) {
         url.searchParams.append('room', room)
