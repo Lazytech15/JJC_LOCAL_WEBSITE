@@ -29,8 +29,4 @@ export class BaseEventHandler {
   get isPolling() {
     return this.manager.constructor.name === 'PollingManager'
   }
-
-  get isSocketIO() {
-    return this.manager.constructor.name === 'SocketManager'
-  }
 }
