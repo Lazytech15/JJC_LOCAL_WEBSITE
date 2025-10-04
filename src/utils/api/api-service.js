@@ -7,11 +7,12 @@ import { FileService } from "./services/file-service.js"
 import { ProfileService } from "./services/profile-service.js"
 import { AttendanceService } from "./services/attendance-service.js"
 import { RecruitmentService } from "./services/recruitment-service.js"
-import { SocketManager } from "./websocket/polling-manager.js"
+import { PollingManager } from "./websocket/polling-manager.js"
 import { DocumentService } from "./services/document-service.js"
 import { DailySummaryService } from "./services/daily-summary-service.js"
 import { ItemsService } from "./services/items-service.js"
 import { PurchaseOrdersService } from "./services/purchase-orders-service.js"
+import { EmployeeLogsService } from "./services/employee-logs-service.js"
 
 class APIService {
   constructor() {
@@ -22,11 +23,12 @@ class APIService {
     this.profiles = new ProfileService()
     this.attendance = new AttendanceService()
     this.recruitment = new RecruitmentService()
-    this.socket = new SocketManager()
+    this.socket = new PollingManager()
     this.document = new DocumentService()
     this.summary = new DailySummaryService()
     this.items = new ItemsService()
     this.purchaseOrders = new PurchaseOrdersService()
+    this.employeeLogs = new EmployeeLogsService()
     
   }
 
@@ -69,4 +71,5 @@ export const {
   document,
   summary,
   items,
+  employeeLogs,
 } = apiService
