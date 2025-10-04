@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import apiService from "../../utils/api/api-service"
-import AddItemForm from './AddItem' // Adjust path as needed
+import AddEditItemWizard from './AddEditItemWizard' // Updated to wizard
 import Swal from "sweetalert2"
 import ModalPortal from "/src/components/pd/ModalPortal"
 import QRCodeSmall from "/src/components/pd/QRCodeSmall"
@@ -1021,8 +1021,8 @@ function InventoryManagement() {
         </ModalPortal>
       )}
 
-      {/* Item Form Modal */}
-      <AddItemForm
+      {/* Item Form Modal - Now using Wizard! */}
+      <AddEditItemWizard
         isOpen={showForm}
         onClose={() => {
           setShowForm(false)

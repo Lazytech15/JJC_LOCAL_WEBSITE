@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import apiService from "../../utils/api/api-service"
 import ModalPortal from "./ModalPortal"
+import CreatePurchaseOrderWizard from "./CreatePurchaseOrderWizard"
 
 function PurchaseOrderTracker() {
   const [purchaseOrders, setPurchaseOrders] = useState([])
@@ -162,6 +163,11 @@ function PurchaseOrderTracker() {
     setTimeout(() => {
       setToast({ show: false, message: "", type: "success" })
     }, 3000)
+  }
+
+  const handleWizardSuccess = (message) => {
+    showToast(message)
+    fetchPurchaseOrders()
   }
 
   const handleCreateOrder = () => {
@@ -532,280 +538,12 @@ function PurchaseOrderTracker() {
         )}
       </div>
 
-      {/* Create Order Modal */}
-      {showCreateModal && (
-        <ModalPortal>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
-            <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Create Purchase Order</h3>
-                  <button
-                    onClick={() => setShowCreateModal(false)}
-                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="space-y-6">
-                  {/* Order Details */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Supplier</label>
-                      <div className="w-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200">
-                        {orderForm.supplier || "Select items to auto-set supplier"}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Expected Delivery Date <span className="text-xs text-gray-400">(Optional)</span></label>
-                      <input
-                        type="date"
-                        value={orderForm.expected_delivery_date}
-                        onChange={(e) => setOrderForm({ ...orderForm, expected_delivery_date: e.target.value })}
-                        className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Priority</label>
-                      <select
-                        value={orderForm.priority}
-                        onChange={(e) => setOrderForm({ ...orderForm, priority: e.target.value })}
-                        className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="low">Low</option>
-                        <option value="normal">Normal</option>
-                        <option value="high">High</option>
-                        <option value="urgent">Urgent</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Notes</label>
-                    <textarea
-                      value={orderForm.notes}
-                      onChange={(e) => setOrderForm({ ...orderForm, notes: e.target.value })}
-                      rows={3}
-                      className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Additional notes for this order..."
-                    />
-                  </div>
-
-                  {/* Add Items from Restock List */}
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Add Items from Restock List</h4>
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 max-h-60 overflow-y-auto">
-                      {restockItems.length === 0 ? (
-                        <p className="text-gray-500 dark:text-gray-400">No items need restocking</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {restockItems.map((item) => (
-                            <div key={item.item_no} className="flex items-center justify-between bg-white dark:bg-gray-700 rounded p-3">
-                              <div className="flex-1">
-                                <div className="font-medium text-gray-800 dark:text-gray-200">{item.item_name}</div>
-                                <div className="text-sm text-gray-600 dark:text-gray-400">
-                                  ID: {item.item_no} | Shortage: {item.shortage} | Recommended: {item.recommended_quantity}
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => handleAddItemToOrder(item)}
-                                disabled={orderForm.items.some(i => i.item_no === item.item_no)}
-                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded text-sm transition-colors"
-                              >
-                                {orderForm.items.some(i => i.item_no === item.item_no) ? "Added" : "Add"}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Multiple Supplier Handling Options */}
-                  {orderForm.multi_supplier_mode && (
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4 mb-4">
-                      <h4 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-3">Multiple Suppliers Detected</h4>
-                      <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-3">
-                        You have selected items from {getUniqueSuppliers(orderForm.items).length} different suppliers. Choose how to handle this:
-                      </p>
-                      <div className="space-y-2">
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name="supplierMode"
-                            value="split"
-                            checked={orderSplitMode === "split"}
-                            onChange={(e) => setOrderSplitMode(e.target.value)}
-                            className="text-yellow-600"
-                          />
-                          <span className="text-sm text-yellow-800 dark:text-yellow-200">
-                            <strong>Split into separate orders</strong> - Create one order per supplier (Recommended)
-                          </span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name="supplierMode"
-                            value="mixed"
-                            checked={orderSplitMode === "mixed"}
-                            onChange={(e) => setOrderSplitMode(e.target.value)}
-                            className="text-yellow-600"
-                          />
-                          <span className="text-sm text-yellow-800 dark:text-yellow-200">
-                            <strong>Keep as mixed order</strong> - Single order with multiple suppliers
-                          </span>
-                        </label>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Selected Items - Grouped by Supplier */}
-                  {orderForm.items.length > 0 && (
-                    <div>
-                      <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
-                        Selected Items ({orderForm.items.length})
-                        {orderForm.multi_supplier_mode && (
-                          <span className="ml-2 text-sm text-yellow-600 dark:text-yellow-400">
-                            from {getUniqueSuppliers(orderForm.items).length} suppliers
-                          </span>
-                        )}
-                      </h4>
-                      
-                      {/* Group items by supplier */}
-                      <div className="space-y-4">
-                        {Object.entries(groupItemsBySupplier(orderForm.items)).map(([supplier, supplierItems]) => (
-                          <div key={supplier} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                            <div className="flex items-center justify-between mb-3">
-                              <h5 className="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                                <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
-                                {supplier}
-                              </h5>
-                              <div className="text-sm text-gray-600 dark:text-gray-400">
-                                {supplierItems.length} items • {formatCurrency(supplierItems.reduce((sum, item) => sum + ((item.custom_quantity || item.quantity) * item.unit_price), 0))}
-                              </div>
-                            </div>
-                            
-                            <div className="space-y-3">
-                              {supplierItems.map((item, index) => (
-                                <div key={`${item.item_no}-${index}`} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-                                  <div className="flex justify-between items-start gap-4">
-                                    <div className="flex-1">
-                                      <div className="font-medium text-gray-800 dark:text-gray-200">{item.item_name}</div>
-                                      <div className="text-sm text-gray-600 dark:text-gray-400">ID: {item.item_no}</div>
-                                      <div className="text-sm text-blue-600 dark:text-blue-400">Recommended: {item.recommended_quantity} {item.unit_of_measure}</div>
-                                    </div>
-                                    
-                                    <div className="flex items-center gap-3">
-                                      {/* Quantity Input */}
-                                      <div className="flex flex-col">
-                                        <label className="text-xs text-gray-600 dark:text-gray-400 mb-1">Order Qty</label>
-                                        <input
-                                          type="number"
-                                          min="1"
-                                          value={item.custom_quantity || item.quantity}
-                                          onChange={(e) => handleUpdateItemQuantity(item.item_no, parseInt(e.target.value) || 1)}
-                                          className="w-20 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded px-2 py-1 text-sm text-gray-800 dark:text-gray-200"
-                                        />
-                                      </div>
-                                      
-                                      {/* Delivery Method */}
-                                      <div className="flex flex-col">
-                                        <label className="text-xs text-gray-600 dark:text-gray-400 mb-1">Method</label>
-                                        <select
-                                          value={item.delivery_method || "delivery"}
-                                          onChange={(e) => handleUpdateItemDeliveryMethod(item.item_no, e.target.value)}
-                                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded px-2 py-1 text-sm text-gray-800 dark:text-gray-200"
-                                        >
-                                          <option value="delivery">Delivery</option>
-                                          <option value="pickup">Pickup</option>
-                                        </select>
-                                      </div>
-                                      
-                                      {/* Price Info */}
-                                      <div className="flex flex-col text-right">
-                                        <div className="text-sm text-gray-600 dark:text-gray-400">{formatCurrency(item.unit_price)}/unit</div>
-                                        <div className="text-sm font-medium text-green-600 dark:text-green-400">{formatCurrency((item.custom_quantity || item.quantity) * item.unit_price)}</div>
-                                      </div>
-                                      
-                                      {/* Remove Button */}
-                                      <button
-                                        onClick={() => handleRemoveItemFromOrder(item.item_no)}
-                                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1"
-                                      >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      
-                      {/* Order Summary */}
-                      <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                        <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">Order Summary</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                          <div className="text-center">
-                            <div className="text-gray-600 dark:text-gray-400">Suppliers</div>
-                            <div className="font-bold text-gray-800 dark:text-gray-200">{getUniqueSuppliers(orderForm.items).length}</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-gray-600 dark:text-gray-400">Total Items</div>
-                            <div className="font-bold text-gray-800 dark:text-gray-200">{orderForm.items.length}</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-gray-600 dark:text-gray-400">Total Qty</div>
-                            <div className="font-bold text-gray-800 dark:text-gray-200">{orderForm.items.reduce((sum, item) => sum + (item.custom_quantity || item.quantity), 0)}</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-gray-600 dark:text-gray-400">Delivery</div>
-                            <div className="font-bold text-gray-800 dark:text-gray-200">{orderForm.items.filter(item => (item.delivery_method || "delivery") === "delivery").length}</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-gray-600 dark:text-gray-400">Pickup</div>
-                            <div className="font-bold text-gray-800 dark:text-gray-200">{orderForm.items.filter(item => item.delivery_method === "pickup").length}</div>
-                          </div>
-                        </div>
-                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 text-right">
-                          <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                            Total Value: {formatCurrency(orderForm.items.reduce((sum, item) => sum + ((item.custom_quantity || item.quantity) * item.unit_price), 0))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3 pt-4">
-                    <button
-                      onClick={handleSubmitOrder}
-                      disabled={orderForm.items.length === 0}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
-                    >
-                      {orderForm.multi_supplier_mode && orderSplitMode === "split" 
-                        ? `Create ${getUniqueSuppliers(orderForm.items).length} Purchase Orders`
-                        : "Create Purchase Order"
-                      }
-                    </button>
-                    <button
-                      onClick={() => setShowCreateModal(false)}
-                      className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
-      )}
+      {/* Create Order Wizard */}
+      <CreatePurchaseOrderWizard 
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={handleWizardSuccess}
+      />
 
       {/* Order Details Modal */}
       {showOrderDetails && selectedOrder && (

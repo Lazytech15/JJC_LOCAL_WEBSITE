@@ -47,7 +47,7 @@ function ItemForm({ item, onSave, onCancel }) {
         ;(async () => {
           try {
             const res = await itemsService.getItemImages(item.item_no)
-            const list = (res?.data || []).map(img => ({...img, url: `${img.url}?t=${Date.now()}`}))
+            const list = (res?.data || []).map(img => ({...img, url: `${itemsService.getItemImageUrl(item.item_no, img.filename)}?t=${Date.now()}`}))
             setExistingImages(list)
             const url = itemsService.getItemLatestImageUrl(item.item_no)
             setCurrentImageUrl(`${url}?t=${Date.now()}`)
@@ -158,7 +158,7 @@ function ItemForm({ item, onSave, onCancel }) {
       // Refresh gallery
       try {
         const fres = await itemsService.getItemImages(item.item_no)
-        const list = (fres?.data || []).map(img => ({...img, url: `${img.url}?t=${Date.now()}`}))
+        const list = (fres?.data || []).map(img => ({...img, url: `${itemsService.getItemImageUrl(item.item_no, img.filename)}?t=${Date.now()}`}))
         setExistingImages(list)
       } catch {}
       setSelectedImage(null)
