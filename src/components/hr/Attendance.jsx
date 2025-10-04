@@ -1,6 +1,7 @@
 //client attendance.jsx - Enhanced with employee details modal, statistics, and Excel export
 import { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
+import { pollingManager } from "../../utils/api/websocket/polling-manager";
 import apiService from "../../utils/api/api-service";
 import JSZip from "jszip";
 import * as XLSX from "xlsx";
@@ -40,16 +41,16 @@ function Attendance() {
   const [error, setError] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
   const [lastUpdate, setLastUpdate] = useState(null);
-  const [filters, setFilters] = useState({
-    date: new Date().toISOString().split("T")[0],
-    startDate: "", // New field for range start
-    endDate: "", // New field for range end
-    useRange: false, // Toggle for range mode
+const [filters, setFilters] = useState({
+    date: "", // Changed from new Date().toISOString().split("T")[0] to empty string
+    startDate: "",
+    endDate: "",
+    useRange: false,
     employee_uid: "",
     clock_type: "",
     limit: 20,
     offset: 0,
-  });
+});
   const [newRecordIds, setNewRecordIds] = useState(new Set());
 
   // Employee Details Modal State
@@ -1398,125 +1399,144 @@ const exportToExcel = async () => {
     }
   };
 
-  useEffect(() => {
-    fetchAttendanceData();
-    fetchAttendanceStats();
+useEffect(() => {
+  // Initialize polling manager if not already running
+  if (!pollingManager.isPolling) {
+    pollingManager.initialize();
+    pollingManager.joinAllRooms(); // Or joinRoom('attendance')
+  }
 
-    setConnectionStatus("connecting");
+  fetchAttendanceData();
+  fetchAttendanceStats();
 
-    const unsubscribeAttendanceCreated = apiService.socket.subscribeToUpdates(
-      "attendance_created",
-      (data) => {
-        console.log("[Attendance] New attendance record:", data);
-        setConnectionStatus("connected");
-        setLastUpdate(new Date());
+  setConnectionStatus("connecting");
 
-        if (!filters.date || data.date === filters.date) {
-          setAttendanceData((prev) => {
-            const exists = prev.some((record) => record.id === data.id);
-            if (!exists) {
-              setNewRecordIds((prev) => new Set([...prev, data.id]));
-              setTimeout(() => {
-                setNewRecordIds((prev) => {
-                  const updated = new Set(prev);
-                  updated.delete(data.id);
-                  return updated;
-                });
-              }, 5000);
+  // Subscribe to attendance events
+  const unsubscribeAttendanceCreated = pollingManager.subscribeToUpdates(
+    "attendance_created",
+    (data) => {
+      console.log("[Attendance] New attendance record:", data);
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
 
-              // Load profile picture for new record individually (real-time update)
-              if (data.employee_uid) {
-                loadNewProfilePicture(data.employee_uid);
-              }
+      if (!filters.date || data.date === filters.date) {
+        setAttendanceData((prev) => {
+          const exists = prev.some((record) => record.id === data.id);
+          if (!exists) {
+            setNewRecordIds((prev) => new Set([...prev, data.id]));
+            setTimeout(() => {
+              setNewRecordIds((prev) => {
+                const updated = new Set(prev);
+                updated.delete(data.id);
+                return updated;
+              });
+            }, 5000);
 
-              return [data, ...prev.slice(0, filters.limit - 1)];
+            if (data.employee_uid) {
+              loadNewProfilePicture(data.employee_uid);
             }
-            return prev;
-          });
-        }
-        fetchAttendanceStats();
+
+            return [data, ...prev.slice(0, filters.limit - 1)];
+          }
+          return prev;
+        });
       }
-    );
+      fetchAttendanceStats();
+    }
+  );
 
-    const unsubscribeAttendanceUpdated = apiService.socket.subscribeToUpdates(
-      "attendance_updated",
-      (data) => {
-        console.log("[Attendance] Attendance record updated:", data);
-        setConnectionStatus("connected");
-        setLastUpdate(new Date());
+  const unsubscribeAttendanceUpdated = pollingManager.subscribeToUpdates(
+    "attendance_updated",
+    (data) => {
+      console.log("[Attendance] Attendance record updated:", data);
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
 
-        setAttendanceData((prev) =>
-          prev.map((record) =>
-            record.id === data.id ? { ...record, ...data } : record
-          )
-        );
-        fetchAttendanceStats();
+      setAttendanceData((prev) =>
+        prev.map((record) =>
+          record.id === data.id ? { ...record, ...data } : record
+        )
+      );
+      fetchAttendanceStats();
+    }
+  );
+
+  const unsubscribeAttendanceDeleted = pollingManager.subscribeToUpdates(
+    "attendance_deleted",
+    (data) => {
+      console.log("[Attendance] Attendance record deleted:", data);
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
+
+      setAttendanceData((prev) =>
+        prev.filter((record) => record.id !== data.id)
+      );
+      fetchAttendanceStats();
+    }
+  );
+
+  const unsubscribeAttendanceSynced = pollingManager.subscribeToUpdates(
+    "attendance_synced",
+    (data) => {
+      console.log("[Attendance] Attendance records synced:", data);
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
+
+      fetchAttendanceData();
+      fetchAttendanceStats();
+    }
+  );
+
+  const unsubscribeEmployeeUpdated = pollingManager.subscribeToUpdates(
+    "employee_updated",
+    (data) => {
+      console.log("[Attendance] Employee updated, refreshing attendance data");
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
+
+      fetchAttendanceData();
+    }
+  );
+
+  // Monitor connection status
+  const unsubscribeConnection = pollingManager.subscribeToUpdates(
+    "connection",
+    (data) => {
+      console.log("[Attendance] Connection status:", data.status);
+      setConnectionStatus(data.status);
+    }
+  );
+
+  // Remove this timeout - let the connection event handle it
+  // The pollingManager will notify when actually connected
+  // setTimeout(() => {
+  //   if (connectionStatus === "connecting") {
+  //     setConnectionStatus("connected");
+  //   }
+  // }, 2000);
+
+  return () => {
+    // Unsubscribe from all events
+    unsubscribeAttendanceCreated();
+    unsubscribeAttendanceUpdated();
+    unsubscribeAttendanceDeleted();
+    unsubscribeAttendanceSynced();
+    unsubscribeEmployeeUpdated();
+    unsubscribeConnection();
+    
+    // Correct: Don't disconnect polling manager - other components use it
+    setConnectionStatus("disconnected");
+
+    // Clean up profile picture URLs
+    Object.values(profilePictures).forEach((url) => {
+      if (url && url.startsWith("blob:")) {
+        URL.revokeObjectURL(url);
       }
-    );
+    });
+  };
+}, [filters]); // Keep filters as the only dependency
 
-    const unsubscribeAttendanceDeleted = apiService.socket.subscribeToUpdates(
-      "attendance_deleted",
-      (data) => {
-        console.log("[Attendance] Attendance record deleted:", data);
-        setConnectionStatus("connected");
-        setLastUpdate(new Date());
-
-        setAttendanceData((prev) =>
-          prev.filter((record) => record.id !== data.id)
-        );
-        fetchAttendanceStats();
-      }
-    );
-
-    const unsubscribeAttendanceSynced = apiService.socket.subscribeToUpdates(
-      "attendance_synced",
-      (data) => {
-        console.log("[Attendance] Attendance records synced:", data);
-        setConnectionStatus("connected");
-        setLastUpdate(new Date());
-
-        fetchAttendanceData();
-        fetchAttendanceStats();
-      }
-    );
-
-    const unsubscribeEmployeeUpdated = apiService.socket.subscribeToUpdates(
-      "employee_updated",
-      (data) => {
-        console.log(
-          "[Attendance] Employee updated, refreshing attendance data"
-        );
-        setConnectionStatus("connected");
-        setLastUpdate(new Date());
-
-        fetchAttendanceData();
-      }
-    );
-
-    setTimeout(() => {
-      if (connectionStatus === "connecting") {
-        setConnectionStatus("connected");
-      }
-    }, 2000);
-
-    return () => {
-      unsubscribeAttendanceCreated();
-      unsubscribeAttendanceUpdated();
-      unsubscribeAttendanceDeleted();
-      unsubscribeAttendanceSynced();
-      unsubscribeEmployeeUpdated();
-      setConnectionStatus("disconnected");
-
-      // Clean up profile picture URLs to prevent memory leaks
-      Object.values(profilePictures).forEach((url) => {
-        if (url && url.startsWith("blob:")) {
-          URL.revokeObjectURL(url);
-        }
-      });
-    };
-  }, [filters]);
-
-  const fetchAttendanceData = async () => {
+const fetchAttendanceData = async () => {
     try {
       setLoading(true);
       const params = {
@@ -1528,7 +1548,7 @@ const exportToExcel = async () => {
 
       if (filters.employee_uid) params.employee_uid = filters.employee_uid;
       if (filters.clock_type) params.clock_type = filters.clock_type;
-      if (filters.date) params.date = filters.date;
+      if (filters.date) params.date = filters.date; // Only add if date is set
 
       const result = await apiService.attendance.getAttendanceRecords(params);
 
