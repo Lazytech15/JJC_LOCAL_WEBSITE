@@ -1393,6 +1393,65 @@ class APIService {
       throw error
     }
   }
+
+  // ============================================================================
+  // PROCUREMENT: ITEM IMAGES (upload, replace, list, serve)
+  // ============================================================================
+
+  // Get list of images for an item
+  async getItemImages(itemId) {
+    return this.request(`/api/items/images/${itemId}`, { method: "GET" })
+  }
+
+  // Build URL for latest image (directly usable in <img src>)
+  getItemLatestImageUrl(itemId) {
+    return `${this.baseURL}/api/items/images/${itemId}/latest`
+  }
+
+  // Build URL for a specific image filename
+  getItemImageUrl(itemId, filename) {
+    return `${this.baseURL}/api/items/images/${itemId}/file/${encodeURIComponent(filename)}`
+  }
+
+  // Upload new image (append)
+  async uploadItemImage(itemId, file) {
+    const formData = new FormData()
+    formData.append("image", file)
+
+    const response = await fetch(`${this.baseURL}/api/items/images/${itemId}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.error || `HTTP ${response.status}`)
+    }
+    return response.json()
+  }
+
+  // Upload and replace existing images
+  async replaceItemImage(itemId, file) {
+    const formData = new FormData()
+    formData.append("image", file)
+
+    const response = await fetch(`${this.baseURL}/api/items/images/${itemId}/replace`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.error || `HTTP ${response.status}`)
+    }
+    return response.json()
+  }
 }
 
 // Create singleton instance

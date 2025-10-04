@@ -1,11 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ArrowLeft, Plus, Minus } from "lucide-react"
 import QRCodeSmall from "./QRCodeSmall"
+import api from "../../utils/public_api.jsx"
 
 export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
   const [quantity, setQuantity] = useState(1)
+  const [imageUrl, setImageUrl] = useState(null)
+  const [imageError, setImageError] = useState(false)
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -77,6 +80,19 @@ export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
 
   const status = deriveStatus(item)
 
+  useEffect(() => {
+    setImageError(false)
+    if (!item?.item_no) {
+      setImageUrl(null)
+      return
+    }
+    // Try to load the latest image URL; if 404, we'll show placeholder
+    const url = api.getItemLatestImageUrl(item.item_no)
+    // Append cache-buster so replacements show immediately
+    const cacheBusted = `${url}?t=${Date.now()}`
+    setImageUrl(cacheBusted)
+  }, [item?.item_no])
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       {/* Back Button */}
@@ -102,13 +118,20 @@ export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Image Section */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-8">
-          <div className="aspect-square bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 text-lg">
-            {/* Placeholder for item photo - can be enhanced later */}
-            <div className="text-center">
-              <div className="text-6xl mb-2">📦</div>
-              <div>Item Photo</div>
-              <div className="text-sm mt-2">Coming Soon</div>
-            </div>
+          <div className="aspect-square bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 text-lg overflow-hidden">
+            {imageUrl && !imageError ? (
+              <img
+                src={imageUrl}
+                alt={item.item_name}
+                className="object-contain w-full h-full"
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <div className="text-center">
+                <div className="text-6xl mb-2">📦</div>
+                <div>No Image</div>
+              </div>
+            )}
           </div>
         </div>
 

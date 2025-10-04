@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import api from "../../utils/public_api.jsx"
 
 function ItemForm({ item, onSave, onCancel }) {
   const [formData, setFormData] = useState({
@@ -18,6 +19,11 @@ function ItemForm({ item, onSave, onCancel }) {
   })
   const [errors, setErrors] = useState({})
   const [stockWarning, setStockWarning] = useState("")
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState("")
+  const [currentImageUrl, setCurrentImageUrl] = useState("")
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState("")
 
   useEffect(() => {
     if (item) {
@@ -34,6 +40,13 @@ function ItemForm({ item, onSave, onCancel }) {
         last_po: item.last_po || "",
         supplier: item.supplier || "",
       })
+      // Load current image
+      if (item.item_no) {
+        const url = api.getItemLatestImageUrl(item.item_no)
+        setCurrentImageUrl(`${url}?t=${Date.now()}`)
+      } else {
+        setCurrentImageUrl("")
+      }
     }
   }, [item])
 
@@ -91,6 +104,52 @@ function ItemForm({ item, onSave, onCancel }) {
     }))
   }
 
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0]
+    setUploadError("")
+    setSelectedImage(null)
+    setPreviewUrl("")
+    if (!file) return
+
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp"]
+    if (!allowed.includes(file.type)) {
+      setUploadError("Invalid file type. Use JPG, PNG, GIF, WEBP, or BMP.")
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError("File too large (max 10MB).")
+      return
+    }
+    setSelectedImage(file)
+    const reader = new FileReader()
+    reader.onload = () => setPreviewUrl(reader.result)
+    reader.readAsDataURL(file)
+  }
+
+  const uploadSelected = async (replace = false) => {
+    if (!selectedImage) return
+    if (!item?.item_no) {
+      setUploadError("Save the item first to upload an image.")
+      return
+    }
+    try {
+      setUploading(true)
+      setUploadError("")
+      const res = replace
+        ? await api.replaceItemImage(item.item_no, selectedImage)
+        : await api.uploadItemImage(item.item_no, selectedImage)
+      // Refresh current image
+      const url = api.getItemLatestImageUrl(item.item_no)
+      setCurrentImageUrl(`${url}?t=${Date.now()}`)
+      setSelectedImage(null)
+      setPreviewUrl("")
+    } catch (err) {
+      setUploadError(err.message || "Upload failed")
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -105,6 +164,46 @@ function ItemForm({ item, onSave, onCancel }) {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Image section */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Item Image</label>
+                <div className="flex flex-col sm:flex-row gap-4 items-start">
+                  <div className="w-40 h-40 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center border">
+                    {previewUrl ? (
+                      <img src={previewUrl} alt="Preview" className="object-contain w-full h-full" />
+                    ) : currentImageUrl ? (
+                      <img src={currentImageUrl} alt="Current" className="object-contain w-full h-full" onError={() => setCurrentImageUrl("")} />
+                    ) : (
+                      <span className="text-gray-400">No Image</span>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <input type="file" accept="image/*" onChange={handleImageChange} />
+                    {uploadError && <p className="text-red-500 text-sm mt-1">{uploadError}</p>}
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        type="button"
+                        disabled={!selectedImage || uploading || !item}
+                        onClick={() => uploadSelected(false)}
+                        className="px-3 py-2 bg-emerald-600 disabled:bg-gray-400 text-white rounded"
+                      >
+                        {uploading ? "Uploading..." : "Upload (Add)"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!selectedImage || uploading || !item}
+                        onClick={() => uploadSelected(true)}
+                        className="px-3 py-2 bg-blue-600 disabled:bg-gray-400 text-white rounded"
+                      >
+                        {uploading ? "Uploading..." : "Replace Existing"}
+                      </button>
+                    </div>
+                    {!item && (
+                      <p className="text-xs text-gray-500 mt-1">Create the item first before uploading an image.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Item Name *</label>
                 <input
