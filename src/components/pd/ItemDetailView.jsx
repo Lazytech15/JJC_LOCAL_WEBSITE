@@ -96,7 +96,7 @@ export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
         if (!res?.success) throw new Error('Failed to load images')
         const list = (res.data || []).map(img => ({
           ...img,
-          url: `${img.url}?t=${Date.now()}`,
+          url: `${itemsService.getItemImageUrl(item.item_no, img.filename)}?t=${Date.now()}`,
         }))
         if (!cancelled) {
           setImages(list)

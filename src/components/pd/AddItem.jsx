@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import ModalPortal from "/src/components/pd/ModalPortal"
+import { items as itemsService } from "../../utils/api/api-service.js"
 
 function AddItemForm({ isOpen, onClose, onSave, selectedItem = null }) {
   const [formData, setFormData] = useState({
@@ -16,6 +17,56 @@ function AddItemForm({ isOpen, onClose, onSave, selectedItem = null }) {
   })
 
   const [errors, setErrors] = useState({})
+  // Images state
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState("")
+  const [currentImageUrl, setCurrentImageUrl] = useState("")
+  const [existingImages, setExistingImages] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState("")
+
+  // Keep form in sync when switching between add/edit
+  useEffect(() => {
+    setFormData({
+      item_name: selectedItem?.item_name || "",
+      brand: selectedItem?.brand || "",
+      item_type: selectedItem?.item_type || "",
+      location: selectedItem?.location || "",
+      balance: selectedItem?.balance || 0,
+      min_stock: selectedItem?.min_stock || 0,
+      unit_of_measure: selectedItem?.unit_of_measure || "",
+      price_per_unit: selectedItem?.price_per_unit || 0,
+      item_status: selectedItem?.item_status || "In Stock",
+      supplier: selectedItem?.supplier || "",
+    })
+
+    // Load images only in edit mode (must have an item_no)
+    if (selectedItem?.item_no) {
+      ;(async () => {
+        try {
+          const res = await itemsService.getItemImages(selectedItem.item_no)
+          const list = (res?.data || []).map(img => ({
+            ...img,
+            url: `${itemsService.getItemImageUrl(selectedItem.item_no, img.filename)}?t=${Date.now()}`,
+          }))
+          setExistingImages(list)
+          const latest = itemsService.getItemLatestImageUrl(selectedItem.item_no)
+          setCurrentImageUrl(`${latest}?t=${Date.now()}`)
+        } catch {
+          setExistingImages([])
+          const latest = itemsService.getItemLatestImageUrl(selectedItem.item_no)
+          setCurrentImageUrl(`${latest}?t=${Date.now()}`)
+        }
+      })()
+    } else {
+      setExistingImages([])
+      setCurrentImageUrl("")
+    }
+    // reset local image selection when switching context
+    setSelectedImage(null)
+    setPreviewUrl("")
+    setUploadError("")
+  }, [selectedItem])
 
   const validateForm = () => {
     const newErrors = {}
@@ -48,7 +99,7 @@ function AddItemForm({ isOpen, onClose, onSave, selectedItem = null }) {
     }
 
     onSave(formData)
-    resetForm()
+    // Do not reset immediately; parent controls modal lifecycle
   }
 
   const resetForm = () => {
@@ -65,6 +116,12 @@ function AddItemForm({ isOpen, onClose, onSave, selectedItem = null }) {
       supplier: "",
     })
     setErrors({})
+    setSelectedImage(null)
+    setPreviewUrl("")
+    setCurrentImageUrl("")
+    setExistingImages([])
+    setUploading(false)
+    setUploadError("")
   }
 
   const handleClose = () => {
@@ -101,6 +158,159 @@ function AddItemForm({ isOpen, onClose, onSave, selectedItem = null }) {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Images section */}
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Item Images</label>
+              <div className="flex flex-col sm:flex-row gap-4 items-start">
+                <div className="w-40 h-40 bg-white dark:bg-black/40 rounded-lg overflow-hidden flex items-center justify-center border border-gray-300 dark:border-gray-700">
+                  {previewUrl ? (
+                    <img src={previewUrl} alt="Preview" className="object-contain w-full h-full" />
+                  ) : currentImageUrl ? (
+                    <img
+                      src={currentImageUrl}
+                      alt="Current"
+                      className="object-contain w-full h-full"
+                      onError={() => setCurrentImageUrl("")}
+                    />
+                  ) : (
+                    <span className="text-gray-400 text-sm">No Image</span>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      setUploadError("")
+                      setSelectedImage(null)
+                      setPreviewUrl("")
+                      if (!file) return
+                      const allowed = [
+                        "image/jpeg",
+                        "image/jpg",
+                        "image/png",
+                        "image/gif",
+                        "image/webp",
+                        "image/bmp",
+                      ]
+                      if (!allowed.includes(file.type)) {
+                        setUploadError("Invalid file type. Use JPG, PNG, GIF, WEBP, or BMP.")
+                        return
+                      }
+                      if (file.size > 10 * 1024 * 1024) {
+                        setUploadError("File too large (max 10MB).")
+                        return
+                      }
+                      setSelectedImage(file)
+                      const reader = new FileReader()
+                      reader.onload = () => setPreviewUrl(reader.result)
+                      reader.readAsDataURL(file)
+                    }}
+                  />
+                  {uploadError && <p className="text-red-500 text-xs mt-1">{uploadError}</p>}
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      type="button"
+                      disabled={!selectedImage || uploading || !selectedItem}
+                      onClick={async () => {
+                        if (!selectedItem?.item_no || !selectedImage) return
+                        try {
+                          setUploading(true)
+                          await itemsService.uploadItemImage(selectedItem.item_no, selectedImage)
+                          const latest = itemsService.getItemLatestImageUrl(selectedItem.item_no)
+                          setCurrentImageUrl(`${latest}?t=${Date.now()}`)
+                          const fres = await itemsService.getItemImages(selectedItem.item_no)
+                          const list = (fres?.data || []).map(img => ({
+                            ...img,
+                            url: `${itemsService.getItemImageUrl(selectedItem.item_no, img.filename)}?t=${Date.now()}`,
+                          }))
+                          setExistingImages(list)
+                          setSelectedImage(null)
+                          setPreviewUrl("")
+                        } catch (e) {
+                          setUploadError(e.message || "Upload failed")
+                        } finally {
+                          setUploading(false)
+                        }
+                      }}
+                      className="px-3 py-2 bg-emerald-600 disabled:bg-gray-400 text-white rounded-lg text-sm"
+                    >
+                      {uploading ? "Uploading..." : "Upload (Add)"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!selectedImage || uploading || !selectedItem}
+                      onClick={async () => {
+                        if (!selectedItem?.item_no || !selectedImage) return
+                        try {
+                          setUploading(true)
+                          await itemsService.replaceItemImage(selectedItem.item_no, selectedImage)
+                          const latest = itemsService.getItemLatestImageUrl(selectedItem.item_no)
+                          setCurrentImageUrl(`${latest}?t=${Date.now()}`)
+                          const fres = await itemsService.getItemImages(selectedItem.item_no)
+                          const list = (fres?.data || []).map(img => ({
+                            ...img,
+                            url: `${itemsService.getItemImageUrl(selectedItem.item_no, img.filename)}?t=${Date.now()}`,
+                          }))
+                          setExistingImages(list)
+                          setSelectedImage(null)
+                          setPreviewUrl("")
+                        } catch (e) {
+                          setUploadError(e.message || "Upload failed")
+                        } finally {
+                          setUploading(false)
+                        }
+                      }}
+                      className="px-3 py-2 bg-blue-600 disabled:bg-gray-400 text-white rounded-lg text-sm"
+                    >
+                      {uploading ? "Uploading..." : "Replace Existing"}
+                    </button>
+                  </div>
+                  {!selectedItem && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Create the item first, then reopen to upload images.
+                    </p>
+                  )}
+                </div>
+              </div>
+              {existingImages.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Existing Images</p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                    {existingImages.map((img) => (
+                      <div key={img.filename} className="relative group border rounded-md overflow-hidden bg-white dark:bg-black/30">
+                        <img src={img.url} alt={img.filename} className="w-full h-24 object-cover" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end justify-center p-1">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!selectedItem?.item_no) return
+                              const confirmed = window.confirm(`Delete ${img.filename}?`)
+                              if (!confirmed) return
+                              try {
+                                await itemsService.deleteItemImage(selectedItem.item_no, img.filename)
+                                setExistingImages(prev => prev.filter(i => i.filename !== img.filename))
+                                // refresh main image if we deleted the displayed one
+                                if (currentImageUrl.includes(encodeURIComponent(img.filename))) {
+                                  const latest = itemsService.getItemLatestImageUrl(selectedItem.item_no)
+                                  setCurrentImageUrl(`${latest}?t=${Date.now()}`)
+                                }
+                              } catch (e) {
+                                alert(e.message || 'Failed to delete image')
+                              }
+                            }}
+                            className="opacity-0 group-hover:opacity-100 text-xs bg-red-600 text-white px-2 py-1 rounded"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Item Name */}
               <div>
