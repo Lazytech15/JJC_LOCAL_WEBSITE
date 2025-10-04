@@ -24,6 +24,7 @@ function ItemForm({ item, onSave, onCancel }) {
   const [currentImageUrl, setCurrentImageUrl] = useState("")
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState("")
+  const [existingImages, setExistingImages] = useState([])
 
   useEffect(() => {
     if (item) {
@@ -42,10 +43,23 @@ function ItemForm({ item, onSave, onCancel }) {
       })
       // Load current image
       if (item.item_no) {
-  const url = itemsService.getItemLatestImageUrl(item.item_no)
-        setCurrentImageUrl(`${url}?t=${Date.now()}`)
+        // Load gallery
+        ;(async () => {
+          try {
+            const res = await itemsService.getItemImages(item.item_no)
+            const list = (res?.data || []).map(img => ({...img, url: `${img.url}?t=${Date.now()}`}))
+            setExistingImages(list)
+            const url = itemsService.getItemLatestImageUrl(item.item_no)
+            setCurrentImageUrl(`${url}?t=${Date.now()}`)
+          } catch {
+            setExistingImages([])
+            const url = itemsService.getItemLatestImageUrl(item.item_no)
+            setCurrentImageUrl(`${url}?t=${Date.now()}`)
+          }
+        })()
       } else {
         setCurrentImageUrl("")
+        setExistingImages([])
       }
     }
   }, [item])
@@ -139,8 +153,14 @@ function ItemForm({ item, onSave, onCancel }) {
         ? await itemsService.replaceItemImage(item.item_no, selectedImage)
         : await itemsService.uploadItemImage(item.item_no, selectedImage)
       // Refresh current image
-  const url = itemsService.getItemLatestImageUrl(item.item_no)
+      const url = itemsService.getItemLatestImageUrl(item.item_no)
       setCurrentImageUrl(`${url}?t=${Date.now()}`)
+      // Refresh gallery
+      try {
+        const fres = await itemsService.getItemImages(item.item_no)
+        const list = (fres?.data || []).map(img => ({...img, url: `${img.url}?t=${Date.now()}`}))
+        setExistingImages(list)
+      } catch {}
       setSelectedImage(null)
       setPreviewUrl("")
     } catch (err) {
@@ -203,6 +223,42 @@ function ItemForm({ item, onSave, onCancel }) {
                     )}
                   </div>
                 </div>
+                {existingImages.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-600 mb-2">Existing Images</p>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                      {existingImages.map((img) => (
+                        <div key={img.filename} className="relative group border rounded-md overflow-hidden bg-white">
+                          <img src={img.url} alt={img.filename} className="w-full h-24 object-cover" />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end justify-center p-1">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!item?.item_no) return
+                                const confirmed = window.confirm(`Delete ${img.filename}?`)
+                                if (!confirmed) return
+                                try {
+                                  await itemsService.deleteItemImage(item.item_no, img.filename)
+                                  setExistingImages(prev => prev.filter(i => i.filename !== img.filename))
+                                  // refresh main image if we deleted the displayed one
+                                  if (currentImageUrl.includes(encodeURIComponent(img.filename))) {
+                                    const url = itemsService.getItemLatestImageUrl(item.item_no)
+                                    setCurrentImageUrl(`${url}?t=${Date.now()}`)
+                                  }
+                                } catch (e) {
+                                  alert(e.message || 'Failed to delete image')
+                                }
+                              }}
+                              className="opacity-0 group-hover:opacity-100 text-xs bg-red-600 text-white px-2 py-1 rounded"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Item Name *</label>

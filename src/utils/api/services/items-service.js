@@ -2,6 +2,7 @@
 // services/items-service.js
 // ============================================================================
 import { BaseAPIService } from "../core/base-api.js"
+import { getStoredToken } from "../../auth.js"
 
 export class ItemsService extends BaseAPIService {
   // GET /api/items - Retrieve all items with optional filtering and pagination
@@ -316,6 +317,7 @@ export class ItemsService extends BaseAPIService {
       method: "POST",
       headers: {
         // Do not set Content-Type for FormData
+        Authorization: `Bearer ${getStoredToken()}`,
       },
       body: formData,
     })
@@ -336,6 +338,7 @@ export class ItemsService extends BaseAPIService {
       method: "POST",
       headers: {
         // Do not set Content-Type for FormData
+        Authorization: `Bearer ${getStoredToken()}`,
       },
       body: formData,
     })
@@ -345,5 +348,12 @@ export class ItemsService extends BaseAPIService {
       throw new Error(err.error || `HTTP ${response.status}`)
     }
     return response.json()
+  }
+
+  // Delete a specific image by filename
+  async deleteItemImage(itemId, filename) {
+    return this.request(`/api/items/images/${itemId}/file/${encodeURIComponent(filename)}`, {
+      method: "DELETE",
+    })
   }
 }
