@@ -12,6 +12,7 @@ import { DocumentService } from "./services/document-service.js"
 import { DailySummaryService } from "./services/daily-summary-service.js"
 import { ItemsService } from "./services/items-service.js"
 import { PurchaseOrdersService } from "./services/purchase-orders-service.js"
+import { EmployeeLogsService } from "./services/employee-logs-service.js"
 
 class APIService {
   constructor() {
@@ -27,6 +28,7 @@ class APIService {
     this.summary = new DailySummaryService()
     this.items = new ItemsService()
     this.purchaseOrders = new PurchaseOrdersService()
+    this.employeeLogs = new EmployeeLogsService()
     
   }
 
@@ -69,4 +71,5 @@ export const {
   document,
   summary,
   items,
+  employeeLogs,
 } = apiService

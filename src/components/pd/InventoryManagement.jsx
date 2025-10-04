@@ -26,10 +26,12 @@ function InventoryManagement() {
   const [statistics, setStatistics] = useState({})
   const [filters, setFilters] = useState({
     search: "",
-    item_type: "",
-    location: "",
     item_status: "",
+    location: "",
   })
+  const [sortBy, setSortBy] = useState("")
+  const [sortedItems, setSortedItems] = useState([])
+  const [uniqueLocations, setUniqueLocations] = useState([])
   const [showItemDetail, setShowItemDetail] = useState(false)
   const [selectedItemForDetail, setSelectedItemForDetail] = useState(null)
   const [returnToDetailView, setReturnToDetailView] = useState(false)
@@ -105,6 +107,56 @@ function InventoryManagement() {
       out_of_stock,
     }))
   }, [items])
+
+  // Extract unique locations from items data and group them
+  useEffect(() => {
+    const locations = [...new Set(items
+      .map(item => item.location)
+      .filter(location => location && location.trim() !== "")
+    )].sort()
+    
+    // Group locations by first part (e.g., Z1, Z2, OFFC, etc.)
+    const groupedLocations = locations.reduce((groups, location) => {
+      // Extract the prefix (everything before the first dash or the whole string if no dash)
+      const prefix = location.includes('-') ? location.split('-')[0] : location
+      if (!groups[prefix]) {
+        groups[prefix] = []
+      }
+      groups[prefix].push(location)
+      return groups
+    }, {})
+    
+    setUniqueLocations(groupedLocations)
+  }, [items])
+
+  // Sort and filter items whenever items or sorting criteria change
+  useEffect(() => {
+    let filtered = [...items]
+
+    // Apply sorting
+    if (sortBy) {
+      filtered.sort((a, b) => {
+        switch (sortBy) {
+          case "name-asc":
+            return (a.item_name || "").localeCompare(b.item_name || "")
+          case "name-desc":
+            return (b.item_name || "").localeCompare(a.item_name || "")
+          case "stock-high":
+            return (Number(b.balance) || 0) - (Number(a.balance) || 0)
+          case "stock-low":
+            return (Number(a.balance) || 0) - (Number(b.balance) || 0)
+          case "id-asc":
+            return (Number(a.item_no) || 0) - (Number(b.item_no) || 0)
+          case "id-desc":
+            return (Number(b.item_no) || 0) - (Number(a.item_no) || 0)
+          default:
+            return 0
+        }
+      })
+    }
+
+    setSortedItems(filtered)
+  }, [items, sortBy])
 
   const handleSaveItem = async (itemData) => {
     try {
@@ -580,85 +632,151 @@ function InventoryManagement() {
 
       {/* Filters Section */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+        <style jsx>{`
+          select {
+            max-height: 200px !important;
+            overflow-y: auto !important;
+          }
+          select option {
+            padding: 8px 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+        `}</style>
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white">Filter & Search</h3>
           <button
             onClick={() => {
               setFilters({
                 search: "",
-                item_type: "",
-                location: "",
                 item_status: "",
+                location: "",
               })
+              setSortBy("")
             }}
-            className="text-sm bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded-lg transition-colors"
+            className="text-sm bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
           >
-            Clear Filters
+            Clear All
           </button>
         </div>
+        
+        {/* Single Row - All Filters and Search */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="relative">
             <input
               type="text"
-              placeholder="Search items..."
+              placeholder="🔍 Search items..."
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+              className="w-full border-2 border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 pr-10 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 font-medium shadow-sm"
             />
-            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-400">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
           </div>
 
-          <select
-            value={filters.item_status}
-            onChange={(e) => setFilters({ ...filters, item_status: e.target.value })}
-            className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
-          >
-            <option value="">All Status</option>
-            <option value="In Stock">In Stock</option>
-            <option value="Low In Stock">Low In Stock</option>
-            <option value="Out Of Stock">Out Of Stock</option>
-          </select>
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="w-full border-2 border-purple-300 dark:border-purple-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 pr-10 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 font-medium appearance-none cursor-pointer shadow-sm"
+            >
+              <option value="">🔀 Sort By</option>
+              <option value="name-asc">📝 Name (A-Z)</option>
+              <option value="name-desc">📝 Name (Z-A)</option>
+              <option value="stock-high">📊 Stock (High to Low)</option>
+              <option value="stock-low">📊 Stock (Low to High)</option>
+              <option value="id-asc">🔢 ID Number (1-999)</option>
+              <option value="id-desc">🔢 ID Number (999-1)</option>
+            </select>
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-400 pointer-events-none">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
 
-          <input
-            type="text"
-            placeholder="Filter by type..."
-            value={filters.item_type}
-            onChange={(e) => setFilters({ ...filters, item_type: e.target.value })}
-            className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
-          />
+          <div className="relative">
+            <select
+              value={filters.item_status}
+              onChange={(e) => setFilters({ ...filters, item_status: e.target.value })}
+              className="w-full border-2 border-green-300 dark:border-green-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 pr-10 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-green-500/20 focus:border-green-500 font-medium appearance-none cursor-pointer shadow-sm"
+            >
+              <option value="">📦 All Status</option>
+              <option value="In Stock">✅ In Stock</option>
+              <option value="Low In Stock">⚠️ Low In Stock</option>
+              <option value="Out Of Stock">❌ Out Of Stock</option>
+            </select>
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-400 pointer-events-none">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
 
-          <input
-            type="text"
-            placeholder="Filter by location..."
-            value={filters.location}
-            onChange={(e) => setFilters({ ...filters, location: e.target.value })}
-            className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
-          />
+          <div className="relative">
+            <select
+              value={filters.location}
+              onChange={(e) => setFilters({ ...filters, location: e.target.value })}
+              className="w-full border-2 border-orange-300 dark:border-orange-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 pr-10 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 font-medium appearance-none cursor-pointer shadow-sm"
+              size="1"
+              style={{
+                maxHeight: '200px',
+                overflowY: 'auto'
+              }}
+            >
+              <option value="">📍 All Locations ({Object.values(uniqueLocations).flat().length})</option>
+              {Object.entries(uniqueLocations).map(([group, locations]) => (
+                <optgroup key={group} label={`📁 ${group} Zone (${locations.length} locations)`}>
+                  {locations.map((location) => (
+                <option key={location} value={location}>
+                  � {location}
+                </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-orange-400 pointer-events-none">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
         </div>
 
         {/* Show active filters */}
-        {(filters.search || filters.item_type || filters.location || filters.item_status) && (
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Active filters:</p>
-            <div className="flex flex-wrap gap-2">
+        {(filters.search || filters.item_status || filters.location || sortBy) && (
+          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 font-medium">Active filters & sorting:</p>
+            <div className="flex flex-wrap gap-3">
               {filters.search && (
-                <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-1 rounded-full text-xs font-medium">
-                  Search: "{filters.search}"
+                <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-3 py-2 rounded-lg text-sm font-medium shadow-sm border border-blue-200 dark:border-blue-800">
+                  🔍 Search: "{filters.search}"
+                </span>
+              )}
+              {sortBy && (
+                <span className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 px-3 py-2 rounded-lg text-sm font-medium shadow-sm border border-purple-200 dark:border-purple-800">
+                  🔀 Sort: {
+                    sortBy === "name-asc" ? "Name (A-Z)" :
+                    sortBy === "name-desc" ? "Name (Z-A)" :
+                    sortBy === "stock-high" ? "Stock (High-Low)" :
+                    sortBy === "stock-low" ? "Stock (Low-High)" :
+                    sortBy === "id-asc" ? "ID (1-999)" :
+                    sortBy === "id-desc" ? "ID (999-1)" : sortBy
+                  }
                 </span>
               )}
               {filters.item_status && (
-                <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-1 rounded-full text-xs font-medium">
-                  Status: {filters.item_status}
-                </span>
-              )}
-              {filters.item_type && (
-                <span className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 px-2 py-1 rounded-full text-xs font-medium">
-                  Type: {filters.item_type}
+                <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-3 py-2 rounded-lg text-sm font-medium shadow-sm border border-green-200 dark:border-green-800">
+                  📦 Status: {filters.item_status}
                 </span>
               )}
               {filters.location && (
-                <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 px-2 py-1 rounded-full text-xs font-medium">
-                  Location: {filters.location}
+                <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 px-3 py-2 rounded-lg text-sm font-medium shadow-sm border border-orange-200 dark:border-orange-800">
+                  📍 Location: {filters.location}
                 </span>
               )}
             </div>
@@ -672,7 +790,7 @@ function InventoryManagement() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-zinc-600 dark:border-zinc-400 mx-auto"></div>
           <p className="text-gray-600 dark:text-gray-400 mt-4">Loading inventory...</p>
         </div>
-      ) : items.length === 0 ? (
+      ) : sortedItems.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-12 shadow-lg border border-gray-200 dark:border-gray-700">
           <div className="text-center">
             <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -714,14 +832,14 @@ function InventoryManagement() {
               </div>
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              {items.length} items • Showing {Math.min(visibleCount, items.length)} of {items.length}
+              {sortedItems.length} items • Showing {Math.min(visibleCount, sortedItems.length)} of {sortedItems.length}
             </div>
           </div>
 
           {/* Items Display */}
           {viewMode === 'grid' ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {items.slice(0, visibleCount).map((item) => (
+          {sortedItems.slice(0, visibleCount).map((item) => (
             <div
               key={item.item_no}
               onClick={() => {
@@ -808,20 +926,20 @@ function InventoryManagement() {
               </div>
             </div>
           ))}
-          {items.length > visibleCount && (
+          {sortedItems.length > visibleCount && (
             <div className="col-span-full flex justify-center">
               <button
-                onClick={() => setVisibleCount((c) => Math.min(c + 20, items.length))}
+                onClick={() => setVisibleCount((c) => Math.min(c + 20, sortedItems.length))}
                 className="mt-2 px-5 py-2 bg-zinc-600 hover:bg-zinc-700 text-white rounded-lg"
               >
-                Load more ({Math.min(20, items.length - visibleCount)})
+                Load more ({Math.min(20, sortedItems.length - visibleCount)})
               </button>
             </div>
           )}
         </div>
       ) : viewMode === 'list' ? (
         <InventoryListView
-          items={items}
+          items={sortedItems}
           visibleCount={visibleCount}
           setVisibleCount={setVisibleCount}
           onItemClick={(item) => {
