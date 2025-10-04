@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import api from "../../utils/public_api.jsx"
+import { items as itemsService } from "../../utils/api/api-service.js"
 
 function ItemForm({ item, onSave, onCancel }) {
   const [formData, setFormData] = useState({
@@ -42,7 +42,7 @@ function ItemForm({ item, onSave, onCancel }) {
       })
       // Load current image
       if (item.item_no) {
-        const url = api.getItemLatestImageUrl(item.item_no)
+  const url = itemsService.getItemLatestImageUrl(item.item_no)
         setCurrentImageUrl(`${url}?t=${Date.now()}`)
       } else {
         setCurrentImageUrl("")
@@ -136,10 +136,10 @@ function ItemForm({ item, onSave, onCancel }) {
       setUploading(true)
       setUploadError("")
       const res = replace
-        ? await api.replaceItemImage(item.item_no, selectedImage)
-        : await api.uploadItemImage(item.item_no, selectedImage)
+        ? await itemsService.replaceItemImage(item.item_no, selectedImage)
+        : await itemsService.uploadItemImage(item.item_no, selectedImage)
       // Refresh current image
-      const url = api.getItemLatestImageUrl(item.item_no)
+  const url = itemsService.getItemLatestImageUrl(item.item_no)
       setCurrentImageUrl(`${url}?t=${Date.now()}`)
       setSelectedImage(null)
       setPreviewUrl("")

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { ArrowLeft, Plus, Minus } from "lucide-react"
 import QRCodeSmall from "./QRCodeSmall"
-import api from "../../utils/public_api.jsx"
+import { items as itemsService } from "../../utils/api/api-service.js"
 
 export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
   const [quantity, setQuantity] = useState(1)
@@ -87,7 +87,7 @@ export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
       return
     }
     // Try to load the latest image URL; if 404, we'll show placeholder
-    const url = api.getItemLatestImageUrl(item.item_no)
+  const url = itemsService.getItemLatestImageUrl(item.item_no)
     // Append cache-buster so replacements show immediately
     const cacheBusted = `${url}?t=${Date.now()}`
     setImageUrl(cacheBusted)
