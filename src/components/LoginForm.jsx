@@ -7,7 +7,7 @@ import apiService from "../../src/utils/api/api-service"
 // Department slug to name mapping
 const DEPARTMENT_SLUG_TO_NAME = {
   "hr": "Human Resources",
-  "operations": "Operation",
+  "operations": "Operations",
   "finance": "Finance",
   "procurement": "Procurement",
   "engineering": "Engineering",
@@ -17,7 +17,7 @@ const DEPARTMENT_SLUG_TO_NAME = {
 // Reverse mapping
 const DEPARTMENT_NAME_TO_SLUG = {
   "Human Resources": "hr",
-  "Operation": "operations",
+  "Operations": "operations",
   "Finance": "finance",
   "Procurement": "procurement",
   "Engineering": "engineering",
@@ -32,7 +32,7 @@ const departmentInfo = {
     darkColor: "dark:from-slate-700 dark:to-slate-800",
   },
   Operation: {
-    name: "Operation",
+    name: "Operatios",
     icon: "⚙️",
     color: "from-gray-600 to-gray-700",
     darkColor: "dark:from-gray-700 dark:to-gray-800",

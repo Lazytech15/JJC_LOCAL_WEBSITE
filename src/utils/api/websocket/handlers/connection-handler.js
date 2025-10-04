@@ -8,7 +8,7 @@ export class ConnectionEventHandler extends BaseEventHandler {
   setupHandlers(socket) {
     socket.on(SOCKET_EVENTS.CONNECT, () => {
       this.log(`Socket connected: ${socket.id}`)
-      this.socketManager.joinRooms()
+      this.PollingManager.joinRooms()
     })
 
     socket.on(SOCKET_EVENTS.DISCONNECT, () => {
