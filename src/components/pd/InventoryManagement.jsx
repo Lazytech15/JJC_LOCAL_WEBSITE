@@ -632,7 +632,7 @@ function InventoryManagement() {
 
       {/* Filters Section */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
-        <style jsx>{`
+        <style>{`
           select {
             max-height: 200px !important;
             overflow-y: auto !important;
