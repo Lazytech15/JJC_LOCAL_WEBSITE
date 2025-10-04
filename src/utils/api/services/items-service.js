@@ -2,6 +2,7 @@
 // services/items-service.js
 // ============================================================================
 import { BaseAPIService } from "../core/base-api.js"
+import { getStoredToken } from "../../auth.js"
 
 export class ItemsService extends BaseAPIService {
   // GET /api/items - Retrieve all items with optional filtering and pagination
@@ -286,5 +287,73 @@ export class ItemsService extends BaseAPIService {
     const blob = await this.downloadSupplierReport(supplier)
     const defaultFilename = `supplier_report_${supplier.replace(/[^a-zA-Z0-9]/g, "_")}_${new Date().toISOString().split('T')[0]}.csv`
     this.triggerDownload(blob, filename || defaultFilename)
+  }
+
+  // ============================================================================
+  // ITEM IMAGES (upload, replace, list, serve)
+  // ============================================================================
+
+  // Get list of images for an item
+  async getItemImages(itemId) {
+    return this.request(`/api/items/images/${itemId}`, { method: "GET" })
+  }
+
+  // Build URL for latest image (direct <img src>)
+  getItemLatestImageUrl(itemId) {
+    return `${this.baseURL}/api/items/images/${itemId}/latest`
+  }
+
+  // Build URL for a specific image filename
+  getItemImageUrl(itemId, filename) {
+    return `${this.baseURL}/api/items/images/${itemId}/file/${encodeURIComponent(filename)}`
+  }
+
+  // Upload new image (append)
+  async uploadItemImage(itemId, file) {
+    const formData = new FormData()
+    formData.append("image", file)
+
+    const response = await fetch(`${this.baseURL}/api/items/images/${itemId}`, {
+      method: "POST",
+      headers: {
+        // Do not set Content-Type for FormData
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.error || `HTTP ${response.status}`)
+    }
+    return response.json()
+  }
+
+  // Upload and replace existing images
+  async replaceItemImage(itemId, file) {
+    const formData = new FormData()
+    formData.append("image", file)
+
+    const response = await fetch(`${this.baseURL}/api/items/images/${itemId}/replace`, {
+      method: "POST",
+      headers: {
+        // Do not set Content-Type for FormData
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.error || `HTTP ${response.status}`)
+    }
+    return response.json()
+  }
+
+  // Delete a specific image by filename
+  async deleteItemImage(itemId, filename) {
+    return this.request(`/api/items/images/${itemId}/file/${encodeURIComponent(filename)}`, {
+      method: "DELETE",
+    })
   }
 }

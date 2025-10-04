@@ -1393,6 +1393,7 @@ class APIService {
       throw error
     }
   }
+
 }
 
 // Create singleton instance
