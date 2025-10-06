@@ -7,30 +7,30 @@
   --font-mono: var(--font-geist-mono);
   
   /* Light mode colors */
-  --color-background: #ffffff;
-  --color-foreground: #1f2937;
-  --color-card: #f1f5f9;
-  --color-card-foreground: #1f2937;
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
   --color-popover: #ffffff;
-  --color-popover-foreground: #1f2937;
-  --color-primary: #1f2937;
+  --color-popover-foreground: #0f172a;
+  --color-primary: #0f172a;
   --color-primary-foreground: #ffffff;
   --color-secondary: #8b5cf6;
   --color-secondary-foreground: #ffffff;
   --color-muted: #f1f5f9;
-  --color-muted-foreground: #6b7280;
+  --color-muted-foreground: #64748b;
   --color-accent: #8b5cf6;
   --color-accent-foreground: #ffffff;
-  --color-destructive: #ea580c;
+  --color-destructive: #dc2626;
   --color-destructive-foreground: #ffffff;
-  --color-border: #e5e7eb;
-  --color-input: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-input: #ffffff;
   --color-ring: #8b5cf6;
   --color-chart-1: #8b5cf6;
   --color-chart-2: #ea580c;
   --color-chart-3: #15803d;
   --color-chart-4: #f97316;
-  --color-chart-5: #1f2937;
+  --color-chart-5: #0f172a;
   
   --radius-sm: calc(0.5rem - 4px);
   --radius-md: calc(0.5rem - 2px);
@@ -41,24 +41,24 @@
 .dark {
   @theme {
     /* Dark mode colors */
-    --color-background: #0f172a;
+    --color-background: #020617;
     --color-foreground: #f1f5f9;
-    --color-card: #1e293b;
+    --color-card: #0f172a;
     --color-card-foreground: #f1f5f9;
-    --color-popover: #1e293b;
+    --color-popover: #0f172a;
     --color-popover-foreground: #f1f5f9;
     --color-primary: #f1f5f9;
     --color-primary-foreground: #0f172a;
     --color-secondary: #8b5cf6;
     --color-secondary-foreground: #ffffff;
-    --color-muted: #334155;
+    --color-muted: #1e293b;
     --color-muted-foreground: #94a3b8;
     --color-accent: #8b5cf6;
     --color-accent-foreground: #ffffff;
-    --color-destructive: #ea580c;
+    --color-destructive: #dc2626;
     --color-destructive-foreground: #ffffff;
-    --color-border: #334155;
-    --color-input: #1e293b;
+    --color-border: #1e293b;
+    --color-input: #0f172a;
     --color-ring: #8b5cf6;
     --color-chart-1: #8b5cf6;
     --color-chart-2: #ea580c;
@@ -72,8 +72,132 @@
   * {
     @apply border-border;
   }
+  
+  html {
+    @apply antialiased;
+  }
+  
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground transition-colors duration-300;
+  }
+  
+  /* Smooth theme transitions */
+  .dark,
+  .light {
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
 
+/* Custom animations for splash screen */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Custom Scrollbar Styles */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+.dark .custom-scrollbar {
+  scrollbar-color: rgba(71, 85, 105, 0.4) transparent;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.4);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 85, 105, 0.6);
+}
+
+/* Main content area scrollbar */
+.content-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) rgba(248, 250, 252, 0.5);
+}
+
+.content-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.content-scrollbar::-webkit-scrollbar-track {
+  background: rgba(248, 250, 252, 0.5);
+  border-radius: 4px;
+}
+
+.content-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 4px;
+  border: 2px solid rgba(248, 250, 252, 0.5);
+  transition: background 0.2s ease;
+}
+
+.content-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}
+
+.dark .content-scrollbar {
+  scrollbar-color: rgba(71, 85, 105, 0.5) rgba(15, 23, 42, 0.5);
+}
+
+.dark .content-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.dark .content-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.5);
+  border-color: rgba(15, 23, 42, 0.5);
+}
+
+.dark .content-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 85, 105, 0.7);
+}
