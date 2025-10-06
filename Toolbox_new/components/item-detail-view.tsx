@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { ArrowLeft, Plus, Minus, Package, Briefcase, Cog, Wrench } from "lucide-react"
 import { Button } from "./ui/button"
 import { Card, CardContent } from "./ui/card"
 import { Badge } from "./ui/badge"
 import type { Product } from "../lib/barcode-scanner"
+import { apiService } from "../lib/api_service"
 
 interface ItemDetailViewProps {
   product: Product
@@ -15,11 +16,12 @@ interface ItemDetailViewProps {
 
 export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewProps) {
   const [quantity, setQuantity] = useState(1)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
-  
-  // Construct image URL from API
-  const imageUrl = `https://qxw.2ee.mytemp.website/api/items/images/${product.id}/`
+  const [images, setImages] = useState<any[]>([])
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const rotationTimer = useRef<NodeJS.Timeout | null>(null)
 
   const getStatusColor = (status: Product["status"]) => {
     switch (status) {
@@ -64,6 +66,76 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
     }
   }
 
+  // Load images when component mounts or product changes
+  useEffect(() => {
+    setImageError(false)
+    setImageLoaded(false)
+    if (!product?.id) {
+      setImageUrl(null)
+      return
+    }
+    
+    const itemId = typeof product.id === 'number' ? product.id : parseInt(product.id, 10)
+    if (isNaN(itemId)) {
+      setImageUrl(null)
+      return
+    }
+    
+    // Load images list
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await apiService.getItemImages(itemId)
+        if (!res?.success) throw new Error('Failed to load images')
+        
+        const list = (res.data || []).map((img: any) => ({
+          ...img,
+          url: `${apiService.getItemImageUrl(itemId, img.filename)}?t=${Date.now()}`,
+        }))
+        
+        if (!cancelled) {
+          setImages(list)
+          setCurrentIndex(0)
+          setImageUrl(list[0]?.url || null)
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setImages([])
+          // Fallback to latest endpoint if listing fails
+          const url = apiService.getItemLatestImageUrl(itemId)
+          setImageUrl(`${url}?t=${Date.now()}`)
+        }
+      }
+    })()
+    
+    return () => { cancelled = true }
+  }, [product?.id])
+
+  // Auto-rotate when multiple images
+  useEffect(() => {
+    if (rotationTimer.current) {
+      clearInterval(rotationTimer.current)
+      rotationTimer.current = null
+    }
+    
+    if (images.length > 1) {
+      rotationTimer.current = setInterval(() => {
+        setCurrentIndex((prev) => {
+          const next = (prev + 1) % images.length
+          setImageUrl(images[next]?.url || null)
+          return next
+        })
+      }, 5000) // Change image every 5 seconds
+    }
+    
+    return () => {
+      if (rotationTimer.current) {
+        clearInterval(rotationTimer.current)
+        rotationTimer.current = null
+      }
+    }
+  }, [images])
+
   return (
     <div className="max-w-4xl mx-auto p-6 relative">
       {/* Industrial background pattern */}
@@ -105,14 +177,14 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
               
               {!imageError && (
                 <img 
-                  src={imageUrl} 
+                  src={imageUrl || undefined} 
                   alt={product.name}
                   className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                   onLoad={() => setImageLoaded(true)}
                   onError={() => setImageError(true)}
                 />
               )}
-              {(!imageLoaded || imageError) && (
+              {(!imageUrl || !imageLoaded || imageError) && (
                 <Package className="w-24 h-24 text-slate-400" />
               )}
             </div>
@@ -251,3 +323,4 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
     </div>
   )
 }
+
