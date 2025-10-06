@@ -187,6 +187,13 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
               {(!imageUrl || !imageLoaded || imageError) && (
                 <Package className="w-24 h-24 text-slate-400" />
               )}
+              
+              {/* Image Counter */}
+              {images.length > 1 && (
+                <div className="absolute bottom-4 right-4 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-medium">
+                  {currentIndex + 1} / {images.length}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
