@@ -379,11 +379,20 @@ export function StartPage({
           </div>
 
           {/* Footer Info */}
-          <div className="text-center pt-2 border-t border-slate-700">
+          <div className="text-center pt-2 border-t border-slate-700 space-y-2">
             <p className="text-xs text-slate-500 font-mono space-y-1">
               <span className="block">TOOLBOX v2.0 • INDUSTRIAL GRADE</span>
               <span className="block text-slate-600">Built for Heavy-Duty Operations</span>
             </p>
+            
+            {/* Copyright Notice */}
+            <div className="text-xs text-slate-600 border-t border-slate-800 pt-2 mt-2">
+              <p className="font-medium text-slate-500">© {new Date().getFullYear()} JJC Engineering</p>
+              <p className="text-slate-700 mt-1">
+                Developed by <span className="text-slate-500 font-semibold">KEIYK</span> & <span className="text-slate-500 font-semibold">Lazytech15</span>
+              </p>
+              <p className="text-slate-700 mt-0.5 italic">All Rights Reserved</p>
+            </div>
           </div>
         </CardContent>
       </Card>

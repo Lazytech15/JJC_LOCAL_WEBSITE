@@ -13,6 +13,10 @@ function PurchaseOrderTracker() {
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [restockItems, setRestockItems] = useState([])
+  
+  // Sorting state
+  const [sortField, setSortField] = useState("po_date") // Default sort by date
+  const [sortDirection, setSortDirection] = useState("desc") // desc = latest first
 
   // Form states
   const [orderForm, setOrderForm] = useState({
@@ -43,7 +47,10 @@ function PurchaseOrderTracker() {
       setLoading(true)
       const result = await apiService.purchaseOrders.getPurchaseOrders()
       if (result.success) {
-        setPurchaseOrders(result.orders || [])
+        const orders = result.orders || []
+        // Sort orders - latest first by default
+        const sortedOrders = sortOrders(orders, sortField, sortDirection)
+        setPurchaseOrders(sortedOrders)
       } else {
         setError(result.message || "Failed to fetch purchase orders")
       }
@@ -53,6 +60,66 @@ function PurchaseOrderTracker() {
       setLoading(false)
     }
   }
+
+  // Sorting function
+  const sortOrders = (orders, field, direction) => {
+    const sorted = [...orders].sort((a, b) => {
+      let aVal, bVal
+
+      switch(field) {
+        case "po_number":
+          aVal = parseInt(a.po_number) || 0
+          bVal = parseInt(b.po_number) || 0
+          break
+        case "supplier":
+          aVal = (a.supplier || "").toLowerCase()
+          bVal = (b.supplier || "").toLowerCase()
+          break
+        case "po_date":
+          aVal = new Date(a.po_date || 0)
+          bVal = new Date(b.po_date || 0)
+          break
+        case "total_amount":
+          aVal = parseFloat(a.total_amount) || 0
+          bVal = parseFloat(b.total_amount) || 0
+          break
+        case "order_status":
+          aVal = (a.order_status || "").toLowerCase()
+          bVal = (b.order_status || "").toLowerCase()
+          break
+        default:
+          return 0
+      }
+
+      if (direction === "asc") {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0
+      }
+    })
+    
+    return sorted
+  }
+
+  // Handle column header click for sorting
+  const handleSort = (field) => {
+    if (sortField === field) {
+      // Toggle direction if same field
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
+    } else {
+      // New field, default to descending
+      setSortField(field)
+      setSortDirection("desc")
+    }
+  }
+
+  // Re-sort when sort parameters change
+  useEffect(() => {
+    if (purchaseOrders.length > 0) {
+      const sorted = sortOrders(purchaseOrders, sortField, sortDirection)
+      setPurchaseOrders(sorted)
+    }
+  }, [sortField, sortDirection])
 
   const fetchRestockItems = async () => {
     try {
@@ -464,13 +531,88 @@ function PurchaseOrderTracker() {
           <table className="w-full text-sm">
             <thead className="bg-white/10 dark:bg-black/20">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-800 dark:text-gray-200">Order ID</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-800 dark:text-gray-200">Supplier</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Status</th>
+                <th 
+                  onClick={() => handleSort("po_number")}
+                  className="px-4 py-3 text-left font-semibold text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-white/20 dark:hover:bg-black/30 transition-colors group"
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Order ID</span>
+                    <div className="flex flex-col">
+                      <svg className={`w-3 h-3 ${sortField === "po_number" && sortDirection === "asc" ? "text-amber-500" : "text-gray-400"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"/>
+                      </svg>
+                      <svg className={`w-3 h-3 -mt-2 ${sortField === "po_number" && sortDirection === "desc" ? "text-amber-500" : "text-gray-400"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z"/>
+                      </svg>
+                    </div>
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort("supplier")}
+                  className="px-4 py-3 text-left font-semibold text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-white/20 dark:hover:bg-black/30 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span>Supplier</span>
+                    <div className="flex flex-col">
+                      <svg className={`w-3 h-3 ${sortField === "supplier" && sortDirection === "asc" ? "text-amber-500" : "text-gray-400"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"/>
+                      </svg>
+                      <svg className={`w-3 h-3 -mt-2 ${sortField === "supplier" && sortDirection === "desc" ? "text-amber-500" : "text-gray-400"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z"/>
+                      </svg>
+                    </div>
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort("order_status")}
+                  className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-white/20 dark:hover:bg-black/30 transition-colors"
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <span>Status</span>
+                    <div className="flex flex-col">
+                      <svg className={`w-3 h-3 ${sortField === "order_status" && sortDirection === "asc" ? "text-amber-500" : "text-gray-400"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"/>
+                      </svg>
+                      <svg className={`w-3 h-3 -mt-2 ${sortField === "order_status" && sortDirection === "desc" ? "text-amber-500" : "text-gray-400"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z"/>
+                      </svg>
+                    </div>
+                  </div>
+                </th>
                 <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Priority</th>
                 <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Items</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Total Value</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Expected Delivery</th>
+                <th 
+                  onClick={() => handleSort("total_amount")}
+                  className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-white/20 dark:hover:bg-black/30 transition-colors"
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <span>Total Value</span>
+                    <div className="flex flex-col">
+                      <svg className={`w-3 h-3 ${sortField === "total_amount" && sortDirection === "asc" ? "text-amber-500" : "text-gray-400"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"/>
+                      </svg>
+                      <svg className={`w-3 h-3 -mt-2 ${sortField === "total_amount" && sortDirection === "desc" ? "text-amber-500" : "text-gray-400"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z"/>
+                      </svg>
+                    </div>
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort("po_date")}
+                  className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-white/20 dark:hover:bg-black/30 transition-colors"
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <span>Expected Delivery</span>
+                    <div className="flex flex-col">
+                      <svg className={`w-3 h-3 ${sortField === "po_date" && sortDirection === "asc" ? "text-amber-500" : "text-gray-400"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"/>
+                      </svg>
+                      <svg className={`w-3 h-3 -mt-2 ${sortField === "po_date" && sortDirection === "desc" ? "text-amber-500" : "text-gray-400"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z"/>
+                      </svg>
+                    </div>
+                  </div>
+                </th>
                 <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Actions</th>
               </tr>
             </thead>
