@@ -99,7 +99,7 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-slate-900/95 via-slate-800/95 to-slate-900/95 dark:from-slate-950/95 dark:via-slate-900/95 dark:to-slate-950/95 backdrop-blur-md border-b border-slate-700/50 dark:border-slate-600/30 shadow-xl">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-slate-900 dark:bg-slate-950 border-b border-slate-700 dark:border-slate-800 shadow-lg">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-8 py-3 sm:py-4 gap-3 sm:gap-0">
         {/* Logo */}
         <div className="flex items-center space-x-3">
@@ -110,8 +110,8 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
             <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full animate-pulse"></div>
           </div>
           <div>
-            <span className="text-xl font-bold tracking-wide bg-gradient-to-r from-white via-slate-100 to-white bg-clip-text text-transparent">TOOLBOX</span>
-            <div className="text-xs text-slate-400 font-medium">Inventory System</div>
+            <span className="text-xl font-bold tracking-wide text-white">TOOLBOX</span>
+            <div className="text-xs text-slate-300 font-medium">Inventory System</div>
           </div>
         </div>
 
@@ -127,7 +127,7 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
               onChange={(e) => handleSearchChange(e.target.value)}
               onFocus={() => setShowSuggestions(searchQuery.length > 0)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              className="pl-12 pr-12 h-12 bg-white/10 border border-slate-600/50 dark:border-slate-500/30 text-white placeholder:text-slate-400 focus:bg-white/15 dark:bg-white/5 dark:focus:bg-white/10 rounded-xl backdrop-blur-sm focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
+              className="pl-12 pr-12 h-12 bg-slate-800/50 dark:bg-slate-900/50 border border-slate-600 dark:border-slate-700 text-white placeholder:text-slate-400 focus:bg-slate-800/70 dark:focus:bg-slate-900/70 rounded-xl backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/30 transition-all duration-200"
             />
             {searchQuery && (
               <Button

@@ -7,30 +7,30 @@
   --font-mono: var(--font-geist-mono);
   
   /* Light mode colors */
-  --color-background: #ffffff;
-  --color-foreground: #1f2937;
-  --color-card: #f1f5f9;
-  --color-card-foreground: #1f2937;
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
   --color-popover: #ffffff;
-  --color-popover-foreground: #1f2937;
-  --color-primary: #1f2937;
+  --color-popover-foreground: #0f172a;
+  --color-primary: #0f172a;
   --color-primary-foreground: #ffffff;
   --color-secondary: #8b5cf6;
   --color-secondary-foreground: #ffffff;
   --color-muted: #f1f5f9;
-  --color-muted-foreground: #6b7280;
+  --color-muted-foreground: #64748b;
   --color-accent: #8b5cf6;
   --color-accent-foreground: #ffffff;
-  --color-destructive: #ea580c;
+  --color-destructive: #dc2626;
   --color-destructive-foreground: #ffffff;
-  --color-border: #e5e7eb;
-  --color-input: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-input: #ffffff;
   --color-ring: #8b5cf6;
   --color-chart-1: #8b5cf6;
   --color-chart-2: #ea580c;
   --color-chart-3: #15803d;
   --color-chart-4: #f97316;
-  --color-chart-5: #1f2937;
+  --color-chart-5: #0f172a;
   
   --radius-sm: calc(0.5rem - 4px);
   --radius-md: calc(0.5rem - 2px);
@@ -41,24 +41,24 @@
 .dark {
   @theme {
     /* Dark mode colors */
-    --color-background: #0f172a;
+    --color-background: #020617;
     --color-foreground: #f1f5f9;
-    --color-card: #1e293b;
+    --color-card: #0f172a;
     --color-card-foreground: #f1f5f9;
-    --color-popover: #1e293b;
+    --color-popover: #0f172a;
     --color-popover-foreground: #f1f5f9;
     --color-primary: #f1f5f9;
     --color-primary-foreground: #0f172a;
     --color-secondary: #8b5cf6;
     --color-secondary-foreground: #ffffff;
-    --color-muted: #334155;
+    --color-muted: #1e293b;
     --color-muted-foreground: #94a3b8;
     --color-accent: #8b5cf6;
     --color-accent-foreground: #ffffff;
-    --color-destructive: #ea580c;
+    --color-destructive: #dc2626;
     --color-destructive-foreground: #ffffff;
-    --color-border: #334155;
-    --color-input: #1e293b;
+    --color-border: #1e293b;
+    --color-input: #0f172a;
     --color-ring: #8b5cf6;
     --color-chart-1: #8b5cf6;
     --color-chart-2: #ea580c;
@@ -72,8 +72,19 @@
   * {
     @apply border-border;
   }
+  
+  html {
+    @apply antialiased;
+  }
+  
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground transition-colors duration-300;
+  }
+  
+  /* Smooth theme transitions */
+  .dark,
+  .light {
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
 

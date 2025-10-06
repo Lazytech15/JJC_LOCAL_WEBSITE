@@ -254,12 +254,12 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white dark:bg-slate-900 min-h-screen">
+    <div className="max-w-4xl mx-auto p-6 bg-background min-h-screen">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Toolbox</h1>
-          <Badge variant="secondary" className="dark:bg-slate-700 dark:text-slate-100">
+          <h1 className="text-2xl font-bold text-foreground">Toolbox</h1>
+          <Badge variant="secondary">
             {items.length} items
           </Badge>
           <CartStatusIndicator />
@@ -276,7 +276,7 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
           />
           
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-40 dark:text-slate-100">
+            <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -292,8 +292,8 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
         {sortedItems.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
-              <p className="text-slate-500 dark:text-slate-400 text-lg">Your toolbox is empty</p>
-              <p className="text-slate-400 dark:text-slate-500 text-sm mt-2">
+              <p className="text-muted-foreground text-lg">Your toolbox is empty</p>
+              <p className="text-muted-foreground text-sm mt-2">
                 Add items from the dashboard to get started
               </p>
             </CardContent>
@@ -310,14 +310,14 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
                   />
 
                   {/* Image */}
-                  <div className="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 text-xs">
+                  <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-xs">
                     image here
                   </div>
 
                   {/* Item Details */}
                   <div className="flex-1">
-                    <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-1">{item.name}</h3>
-                    <div className="text-sm text-slate-600 dark:text-slate-400 space-y-1">
+                    <h3 className="font-medium text-foreground mb-1">{item.name}</h3>
+                    <div className="text-sm text-muted-foreground space-y-1">
                       <p>Brand: {item.brand}</p>
                       <p>Item Type: {item.itemType}</p>
                       <p>Location: {item.location}</p>
@@ -326,10 +326,10 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
 
                   {/* Balance Display */}
                   <div className="text-center">
-                    <div className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-1">
+                    <div className="text-lg font-bold text-foreground mb-1">
                       BAL: {item.balance.toString().padStart(2, "0")}
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Available</p>
+                    <p className="text-xs text-muted-foreground">Available</p>
                   </div>
 
                   {/* Quantity Controls */}
@@ -344,7 +344,7 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
                       <Minus className="w-4 h-4" />
                     </Button>
 
-                    <div className="w-12 text-center font-medium dark:text-slate-100">
+                    <div className="w-12 text-center font-medium text-foreground">
                       {item.quantity.toString().padStart(2, "0")}
                     </div>
 
