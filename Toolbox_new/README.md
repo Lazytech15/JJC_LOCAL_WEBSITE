@@ -5,6 +5,7 @@ A professional point-of-sale (POS) system built with Next.js, designed for retai
 ## 🚀 Features
 
 ### Core Functionality
+
 - **Animated Start Screen** - Professional splash page with API configuration
 - **Dynamic API Integration** - Configurable endpoints that change daily
 - **Real-time Inventory Management** - Live product data fetching and updates
@@ -14,6 +15,7 @@ A professional point-of-sale (POS) system built with Next.js, designed for retai
 - **API Commit System** - Automatic inventory updates upon checkout
 
 ### Technical Features
+
 - **Responsive Design** - Works on desktop, tablet, and mobile devices
 - **Dark/Light Mode** - Automatic theme switching
 - **Real-time Data Sync** - Live API connection monitoring
