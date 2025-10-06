@@ -99,7 +99,7 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-slate-900 dark:bg-slate-950 border-b border-slate-700 dark:border-slate-800 shadow-lg">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-slate-900 dark:bg-slate-950 border-b border-border shadow-lg">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-8 py-3 sm:py-4 gap-3 sm:gap-0">
         {/* Logo */}
         <div className="flex items-center space-x-3">
@@ -127,7 +127,7 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
               onChange={(e) => handleSearchChange(e.target.value)}
               onFocus={() => setShowSuggestions(searchQuery.length > 0)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              className="pl-12 pr-12 h-12 bg-slate-800/50 dark:bg-slate-900/50 border border-slate-600 dark:border-slate-700 text-white placeholder:text-slate-400 focus:bg-slate-800/70 dark:focus:bg-slate-900/70 rounded-xl backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/30 transition-all duration-200"
+              className="pl-12 pr-12 h-12 bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400 focus:bg-slate-800/70 rounded-xl backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/30 transition-all duration-200"
             />
             {searchQuery && (
               <Button
