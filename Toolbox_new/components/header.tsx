@@ -1,5 +1,3 @@
-"use client"
-
 import React, { useState, useEffect } from "react"
 import { Search, Home, ShoppingCart, X } from "lucide-react"
 import { Button } from "./ui/button"
@@ -101,26 +99,27 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-slate-900/95 via-slate-800/95 to-slate-900/95 dark:from-slate-950/95 dark:via-slate-900/95 dark:to-slate-950/95 backdrop-blur-md border-b border-slate-700/50 dark:border-slate-600/30 shadow-xl">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-slate-900 dark:bg-slate-950 border-b border-border shadow-lg">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-8 py-3 sm:py-4 gap-3 sm:gap-0">
         {/* Logo */}
         <div className="flex items-center space-x-3">
           <div className="relative">
-            <div className="w-10 h-10 bg-gradient-to-br from-teal-400 via-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-              <div className="w-5 h-5 bg-white/90 rounded-md shadow-sm"></div>
-            </div>
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full animate-pulse"></div>
+            <img 
+              src="/ToolBoxlogo.png" 
+              alt="Toolbox Logo" 
+              className="w-10 h-10 object-contain"
+            />
           </div>
           <div>
-            <span className="text-xl font-bold tracking-wide bg-gradient-to-r from-white via-slate-100 to-white bg-clip-text text-transparent">TOOLBOX</span>
-            <div className="text-xs text-slate-400 font-medium">Inventory System</div>
+            <span className="text-xl font-bold tracking-wide text-white">TOOLBOX</span>
+            <div className="text-xs text-slate-300 font-medium">Inventory System</div>
           </div>
         </div>
 
         {/* Search Bar */}
         <div className="flex-1 max-w-full sm:max-w-3xl sm:mx-10 mx-0 relative order-2 sm:order-none">
           <div className="relative">
-            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400">
+            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-600 dark:text-slate-400">
               <Search className="w-5 h-5" />
             </div>
             <Input
@@ -129,7 +128,7 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
               onChange={(e) => handleSearchChange(e.target.value)}
               onFocus={() => setShowSuggestions(searchQuery.length > 0)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              className="pl-12 pr-12 h-12 bg-white/10 border border-slate-600/50 dark:border-slate-500/30 text-white placeholder:text-slate-400 focus:bg-white/15 dark:bg-white/5 dark:focus:bg-white/10 rounded-xl backdrop-blur-sm focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/20 transition-all duration-200"
+              className="pl-12 pr-12 h-12 bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400 focus:bg-slate-800/70 rounded-xl backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/30 transition-all duration-200"
             />
             {searchQuery && (
               <Button

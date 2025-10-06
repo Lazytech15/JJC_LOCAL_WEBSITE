@@ -13,9 +13,9 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/placeholder-logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/ToolBoxlogo.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
@@ -32,9 +32,9 @@
       "url": "/?action=scan",
       "icons": [
         {
-          "src": "/placeholder-logo.svg",
+          "src": "/ToolBoxlogo.png",
           "sizes": "96x96",
-          "type": "image/svg+xml"
+          "type": "image/png"
         }
       ]
     },
@@ -45,9 +45,9 @@
       "url": "/?action=cart",
       "icons": [
         {
-          "src": "/placeholder-logo.svg",
+          "src": "/ToolBoxlogo.png",
           "sizes": "96x96", 
-          "type": "image/svg+xml"
+          "type": "image/png"
         }
       ]
     },
@@ -58,9 +58,9 @@
       "url": "/?action=search",
       "icons": [
         {
-          "src": "/placeholder-logo.svg",
+          "src": "/ToolBoxlogo.png",
           "sizes": "96x96",
-          "type": "image/svg+xml"
+          "type": "image/png"
         }
       ]
     }

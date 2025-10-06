@@ -5,7 +5,7 @@ import {
   processBarcodeInput,
   type Product
 } from "../lib/barcode-scanner"
-import { Filter, Grid, List, Scan, ChevronDown, RefreshCw, Settings, Wifi, Download, FileText, FileSpreadsheet, Code, Plus, Package } from "lucide-react"
+import { Filter, Grid, List, Scan, ChevronDown, RefreshCw, Settings, Wifi, Download, FileText, FileSpreadsheet, Code, Plus, Package, Menu, X } from "lucide-react"
 import { useLoading } from "./loading-context"
 import { SearchLoader } from "./enhanced-loaders"
 import { OfflineStatusPanel } from "./offline-status"
@@ -113,6 +113,7 @@ export function DashboardView({
   const [hasLoadedLogs, setHasLoadedLogs] = useState(false)
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? navigator.onLine : true)
   const [isCategoriesCollapsed, setIsCategoriesCollapsed] = useState(false)
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const { toast } = useToast()
   const { setSearchLoading } = useLoading()
 
@@ -773,19 +774,199 @@ export function DashboardView({
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Modern Sidebar */}
-      <div className="w-72 bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 border-r border-slate-200/60 dark:border-slate-700/60 backdrop-blur-sm sticky top-0 h-screen overflow-y-auto custom-scrollbar">
+    <div className="flex h-screen bg-background">
+      {/* Mobile Sidebar Overlay */}
+      {isMobileSidebarOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300"
+            onClick={() => setIsMobileSidebarOpen(false)}
+            aria-hidden="true"
+          />
+          {/* Mobile Drawer */}
+          <div className="fixed inset-y-0 left-0 w-72 bg-card border-r border-border z-50 lg:hidden overflow-y-auto custom-scrollbar transform transition-transform duration-300 ease-in-out">
+            {/* Mobile Sidebar Header with Close Button */}
+            <div className="p-6 border-b border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
+                    <Filter className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-foreground">Controls</h2>
+                    <p className="text-xs text-muted-foreground">Filter & manage items</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsMobileSidebarOpen(false)}
+                  className="w-8 h-8 p-0 hover:bg-muted rounded-lg transition-all duration-200"
+                  aria-label="Close sidebar"
+                >
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Mobile Sidebar Content (same as desktop) */}
+            <div className="p-6 space-y-8">
+              {/* System Status Card */}
+              <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <div className="w-5 h-5 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
+                      <Wifi className="w-3 h-3 text-white" />
+                    </div>
+                    System Status
+                  </h3>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-success' : 'bg-orange-500'}`}></div>
+                        <span className="text-xs text-muted-foreground">API</span>
+                      </div>
+                      <Badge 
+                        variant={isConnected ? "default" : "outline"} 
+                        className="text-xs px-2 py-0.5 rounded-full"
+                      >
+                        {isConnected ? "Connected" : "Disconnected"}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-success' : 'bg-red-500'}`}></div>
+                        <span className="text-xs text-muted-foreground">Network</span>
+                      </div>
+                      <Badge 
+                        variant={isOnline ? "default" : "outline"} 
+                        className="text-xs px-2 py-0.5 rounded-full"
+                      >
+                        {isOnline ? "Online" : "Offline"}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Source</span>
+                      <Badge 
+                        variant={dataSource === "api" ? "default" : "outline"} 
+                        className="text-xs px-2 py-0.5 rounded-full"
+                      >
+                        {dataSource === "api" ? "Live" : "Cache"}
+                      </Badge>
+                    </div>
+                    
+                    {lastFetchTime && (
+                      <div className="text-xs text-muted-foreground pt-1 border-t border-border">
+                        Updated {lastFetchTime.toLocaleTimeString()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Categories Section */}
+              <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
+                <button
+                  onClick={() => setIsCategoriesCollapsed(!isCategoriesCollapsed)}
+                  className="w-full flex items-center justify-between mb-3 group"
+                >
+                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <div className="w-5 h-5 bg-gradient-to-br from-purple-400 to-pink-500 rounded-md flex items-center justify-center">
+                      <Filter className="w-3 h-3 text-white" />
+                    </div>
+                    Categories
+                  </h3>
+                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isCategoriesCollapsed ? "-rotate-90" : ""}`} />
+                </button>
+                
+                {!isCategoriesCollapsed && (
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setSelectedCategory("all")}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
+                        selectedCategory === "all"
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <span className="text-sm font-medium">All Items</span>
+                      <span className="text-xs ml-2 opacity-70">({products.length})</span>
+                    </button>
+                    {categories.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
+                          selectedCategory === cat
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <span className="text-sm font-medium">{cat === "all" ? "All Items" : cat}</span>
+                        <span className="text-xs ml-2 opacity-70">
+                          ({cat === "all" ? products.length : products.filter((p) => p.itemType === cat).length})
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Availability Filters */}
+              <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
+                <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                  <div className="w-5 h-5 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-md flex items-center justify-center">
+                    <Package className="w-3 h-3 text-white" />
+                  </div>
+                  Availability
+                </h3>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <Checkbox 
+                      id="mobile-available" 
+                      checked={showAvailable} 
+                      onCheckedChange={(checked) => setShowAvailable(checked === true)}
+                      className="border-border data-[state=checked]:bg-success data-[state=checked]:border-success"
+                    />
+                    <span className="text-sm text-foreground group-hover:text-foreground transition-colors">
+                      In Stock
+                    </span>
+                  </label>
+                  
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <Checkbox 
+                      id="mobile-unavailable" 
+                      checked={showUnavailable} 
+                      onCheckedChange={(checked) => setShowUnavailable(checked === true)}
+                      className="border-border data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                    />
+                    <span className="text-sm text-foreground group-hover:text-foreground transition-colors">
+                      Out of Stock
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Desktop Sidebar - Hidden on mobile, visible on lg+ */}
+      <div className="hidden lg:block w-72 bg-card border-r border-border backdrop-blur-sm sticky top-0 h-screen overflow-y-auto custom-scrollbar">
         {/* Sidebar Header */}
-        <div className="p-6 border-b border-slate-200/60 dark:border-slate-700/60">
+        <div className="p-6 border-b border-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
                 <Filter className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h2 className="font-semibold text-slate-900 dark:text-slate-100">Controls</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Filter & manage items</p>
+                <h2 className="font-semibold text-foreground">Controls</h2>
+                <p className="text-xs text-muted-foreground">Filter & manage items</p>
               </div>
             </div>
             <div className="flex space-x-1">
@@ -793,18 +974,18 @@ export function DashboardView({
                 variant="ghost" 
                 size="sm" 
                 onClick={() => setIsSettingsOpen(true)} 
-                className="w-8 h-8 p-0 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 rounded-lg transition-all duration-200"
+                className="w-8 h-8 p-0 hover:bg-muted rounded-lg transition-all duration-200"
               >
-                <Settings className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                <Settings className="w-4 h-4 text-muted-foreground" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={handleRefreshData} 
                 disabled={isLoadingData} 
-                className="w-8 h-8 p-0 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 rounded-lg transition-all duration-200"
+                className="w-8 h-8 p-0 hover:bg-muted rounded-lg transition-all duration-200"
               >
-                <RefreshCw className={`w-4 h-4 text-slate-600 dark:text-slate-400 ${isLoadingData ? "animate-spin" : ""}`} />
+                <RefreshCw className={`w-4 h-4 text-muted-foreground ${isLoadingData ? "animate-spin" : ""}`} />
               </Button>
             </div>
           </div>
@@ -814,9 +995,9 @@ export function DashboardView({
         <div className="p-6 space-y-8">
 
           {/* System Status Card */}
-          <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-slate-200/60 dark:border-slate-700/60 rounded-xl p-4 shadow-sm">
+          <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
             <div className="space-y-3">
-              <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
                 <div className="w-5 h-5 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
                   <Wifi className="w-3 h-3 text-white" />
                 </div>
@@ -827,7 +1008,7 @@ export function DashboardView({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-orange-500'}`}></div>
-                    <span className="text-xs text-slate-600 dark:text-slate-400">API</span>
+                    <span className="text-xs text-muted-foreground">API</span>
                   </div>
                   <Badge 
                     variant={isConnected ? "default" : "outline"} 
@@ -840,7 +1021,7 @@ export function DashboardView({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
-                    <span className="text-xs text-slate-600 dark:text-slate-400">Network</span>
+                    <span className="text-xs text-muted-foreground">Network</span>
                   </div>
                   <Badge 
                     variant={isOnline ? "default" : "outline"} 
@@ -851,7 +1032,7 @@ export function DashboardView({
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-600 dark:text-slate-400">Source</span>
+                  <span className="text-xs text-muted-foreground">Source</span>
                   <Badge 
                     variant={dataSource === "api" ? "default" : "outline"} 
                     className="text-xs px-2 py-0.5 rounded-full"
@@ -861,7 +1042,7 @@ export function DashboardView({
                 </div>
                 
                 {lastFetchTime && (
-                  <div className="text-xs text-slate-500 dark:text-slate-500 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                  <div className="text-xs text-muted-foreground pt-1 border-t border-border">
                     Updated {lastFetchTime.toLocaleTimeString()}
                   </div>
                 )}
@@ -1096,9 +1277,9 @@ export function DashboardView({
         </Dialog>
 
           {/* Barcode Scanner Card */}
-          <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-slate-200/60 dark:border-slate-700/60 rounded-xl p-4 shadow-sm">
+          <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
             <div className="space-y-3">
-              <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
                 <div className="w-5 h-5 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-md flex items-center justify-center">
                   <Scan className="w-3 h-3 text-white" />
                 </div>
@@ -1106,7 +1287,7 @@ export function DashboardView({
               </h3>
               
               <div className="space-y-3">
-                <div className="text-xs text-slate-600 dark:text-slate-400 bg-blue-50/80 dark:bg-blue-900/20 px-3 py-2 rounded-lg">
+                <div className="text-xs text-slate-700 dark:text-slate-300 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg">
                   📱 Click input field first, then scan Code-128 barcode (ITM001, ITM004, etc.)
                 </div>
                 
@@ -1116,7 +1297,7 @@ export function DashboardView({
                   value={barcodeInput}
                   onChange={handleBarcodeInputChange}
                   onKeyPress={handleBarcodeKeyPress}
-                  className="font-mono text-sm bg-white/80 dark:bg-slate-700/80 border-slate-200 dark:border-slate-600 rounded-lg transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/50"
+                  className="font-mono text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 border-border rounded-lg transition-all duration-200 hover:border-muted-foreground focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/50"
                 />
                 
                 <Button
@@ -1135,24 +1316,24 @@ export function DashboardView({
           </div>
 
           {/* Categories Card - Collapsible */}
-          <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-slate-200/60 dark:border-slate-700/60 rounded-xl p-4 shadow-sm">
+          <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
             <div className="space-y-3">
               <button 
                 onClick={() => setIsCategoriesCollapsed(!isCategoriesCollapsed)}
-                className="w-full flex items-center justify-between group hover:bg-slate-100/50 dark:hover:bg-slate-700/30 -mx-2 -my-1 px-2 py-1 rounded-lg transition-all duration-200"
+                className="w-full flex items-center justify-between group hover:bg-muted -mx-2 -my-1 px-2 py-1 rounded-lg transition-all duration-200"
               >
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 bg-gradient-to-br from-purple-400 to-pink-500 rounded-md flex items-center justify-center">
                     <Package className="w-3 h-3 text-white" />
                   </div>
-                  <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                  <h3 className="text-sm font-medium text-foreground">
                     Categories
                   </h3>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full">
+                  <div className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                     {categories.length}
                   </div>
                 </div>
-                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
                   isCategoriesCollapsed ? 'rotate-180' : ''
                 }`} />
               </button>
@@ -1167,7 +1348,7 @@ export function DashboardView({
                       className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
                         selectedCategory === category
                           ? "bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-100 dark:to-slate-200 text-white dark:text-slate-900 shadow-sm"
-                          : "text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-100"
+                          : "text-foreground hover:bg-muted"
                       }`}
                       onClick={() => setSelectedCategory(category)}
                     >
@@ -1187,9 +1368,9 @@ export function DashboardView({
           </div>
 
           {/* Availability Filter Card */}
-          <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-slate-200/60 dark:border-slate-700/60 rounded-xl p-4 shadow-sm">
+          <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
             <div className="space-y-3">
-              <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
                 <div className="w-5 h-5 bg-gradient-to-br from-emerald-400 to-green-500 rounded-md flex items-center justify-center">
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
@@ -1202,9 +1383,9 @@ export function DashboardView({
                     id="available" 
                     checked={showAvailable} 
                     onCheckedChange={(checked) => setShowAvailable(checked === true)}
-                    className="border-slate-300 dark:border-slate-600 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                    className="border-border data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
                   />
-                  <span className="text-sm text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors">
+                  <span className="text-sm text-foreground group-hover:text-foreground transition-colors">
                     Available Items
                   </span>
                 </label>
@@ -1214,9 +1395,9 @@ export function DashboardView({
                     id="unavailable" 
                     checked={showUnavailable} 
                     onCheckedChange={(checked) => setShowUnavailable(checked === true)}
-                    className="border-slate-300 dark:border-slate-600 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                    className="border-border data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
                   />
-                  <span className="text-sm text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors">
+                  <span className="text-sm text-foreground group-hover:text-foreground transition-colors">
                     Out of Stock
                   </span>
                 </label>
@@ -1227,58 +1408,68 @@ export function DashboardView({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 overflow-y-auto content-scrollbar">
+      <div className="flex-1 bg-background overflow-y-auto content-scrollbar">
         <div className="p-6">
           {/* Top Controls */}
-          <div className="bg-slate-50 dark:bg-slate-900 relative z-10 mb-6">
+          <div className="bg-background relative z-10 mb-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4 bg-slate-50 dark:bg-slate-900 px-2 py-1 rounded">
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">All Items</h1>
+              <div className="flex items-center space-x-4 px-2 py-1 rounded">
+                {/* Mobile Menu Button - Hidden on desktop (lg+) */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="lg:hidden"
+                  onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+                  title="Toggle filters"
+                >
+                  <Menu className="w-5 h-5" />
+                </Button>
+                <h1 className="text-2xl font-bold text-foreground">All Items</h1>
                 <Badge
                   variant="secondary"
-                  className="bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100"
+                  className="bg-muted text-foreground"
                 >
                   {paginatedProducts.length} of {totalFilteredCount} items
                 </Badge>
                 {(searchQuery || localSearchQuery) && (
                   <Badge
                     variant="outline"
-                    className="border-slate-300 text-slate-700 dark:border-slate-600 dark:text-slate-200"
+                    className="border-border text-muted-foreground"
                   >
                     Searching: "{searchQuery || localSearchQuery}"
                   </Badge>
                 )}
               </div>
 
-              <div className="flex items-center space-x-4 bg-slate-50 dark:bg-slate-900 px-2 py-1 rounded">
+              <div className="flex items-center space-x-4 px-2 py-1 rounded">
                 <Input
                   placeholder="Search items..."
                   value={localSearchQuery}
                   onChange={(e) => setLocalSearchQuery(e.target.value)}
-                  className="w-64 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+                  className="w-64 bg-card border-border"
                 />
 
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-40 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600">
+                  <SelectTrigger className="w-40 text-foreground bg-card border-border">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600">
-                    <SelectItem value="name-asc" className="text-slate-900 dark:text-slate-100">
+                  <SelectContent className="bg-card border-border">
+                    <SelectItem value="name-asc" className="text-foreground">
                       Name A-Z
                     </SelectItem>
-                    <SelectItem value="name-desc" className="text-slate-900 dark:text-slate-100">
+                    <SelectItem value="name-desc" className="text-foreground">
                       Name Z-A
                     </SelectItem>
-                    <SelectItem value="stock-high" className="text-slate-900 dark:text-slate-100">
+                    <SelectItem value="stock-high" className="text-foreground">
                       Stock High-Low
                     </SelectItem>
-                    <SelectItem value="stock-low" className="text-slate-900 dark:text-slate-100">
+                    <SelectItem value="stock-low" className="text-foreground">
                       Stock Low-High
                     </SelectItem>
                   </SelectContent>
                 </Select>
 
-                <div className="flex border rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+                <div className="flex border rounded-lg border-border bg-card">
                   <Button
                     variant={viewMode === "grid" ? "default" : "ghost"}
                     size="sm"
@@ -1286,7 +1477,7 @@ export function DashboardView({
                     className={`${
                       viewMode === "grid"
                         ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
-                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-200 dark:hover:text-slate-100 dark:hover:bg-slate-700"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
                     }`}
                   >
                     <Grid className="w-4 h-4" />
@@ -1362,8 +1553,8 @@ export function DashboardView({
           ) : paginatedProducts.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center">
-                <p className="text-slate-500 dark:text-slate-400 text-lg">No items found</p>
-                <p className="text-slate-400 dark:text-slate-500 text-sm mt-2">
+                <p className="text-muted-foreground text-lg">No items found</p>
+                <p className="text-muted-foreground text-sm mt-2">
                   {searchQuery || localSearchQuery
                     ? "Try adjusting your search or filters"
                     : "Try adjusting your filters"}

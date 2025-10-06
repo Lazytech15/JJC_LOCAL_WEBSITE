@@ -1,18 +1,38 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/public/placeholder-logo.svg" />
+    <link rel="icon" type="image/png" href="/ToolBoxlogo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#1e293b" />
+    <script>
+      // Prevent flash of unstyled content by setting theme before page renders
+      // Default to dark mode
+      (function() {
+        try {
+          const theme = localStorage.getItem('toolbox-theme') || 'dark';
+          const root = document.documentElement;
+          
+          if (theme === 'system') {
+            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            root.classList.add(systemTheme);
+          } else {
+            root.classList.remove('light', 'dark');
+            root.classList.add(theme);
+          }
+        } catch (e) {
+          root.classList.add('dark');
+        }
+      })();
+    </script>
+    <meta name="theme-color" content="#0f172a" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Toolbox Inventory" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="application-name" content="Toolbox Inventory" />
     <meta name="description" content="Professional warehouse inventory management system with offline capability for employees" />
-    <link rel="manifest" href="/public/manifest.json" />
-    <link rel="apple-touch-icon" href="/public/placeholder-logo.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/ToolBoxlogo.png" />
     <title>Toolbox Inventory - Warehouse Management</title>
   </head>
   <body>

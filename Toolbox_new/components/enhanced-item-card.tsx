@@ -30,17 +30,17 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
 
   if (viewMode === 'list') {
     return (
-      <Card className="group hover:shadow-lg transition-all duration-200 hover:scale-[1.01] border-l-4 border-l-primary/20 hover:border-l-primary">
+      <Card className="group hover:shadow-lg transition-all duration-200 hover:scale-[1.01] border border-border hover:border-primary/50 bg-card">
         <CardContent className="p-4">
           <div className="flex items-center space-x-4">
             {/* Image */}
-            <div className="relative w-16 h-16 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-lg flex items-center justify-center overflow-hidden group-hover:shadow-inner transition-all">
+            <div className="relative w-16 h-16 bg-muted rounded-lg flex items-center justify-center overflow-hidden group-hover:shadow-inner transition-all">
               <Package className="w-8 h-8 text-muted-foreground group-hover:text-primary transition-colors" />
             </div>
 
             {/* Product Info */}
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
+              <h3 className="font-semibold text-sm truncate text-card-foreground group-hover:text-primary transition-colors">
                 {product.name}
               </h3>
               <p className="text-xs text-muted-foreground truncate">
@@ -93,10 +93,10 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
 
   // Grid view
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer border-2 border-transparent hover:border-primary/20">
+    <Card className="group hover:shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer border border-border hover:border-primary/50 bg-card">
       <CardContent className="p-4">
         {/* Image Container */}
-        <div className="relative aspect-square mb-3 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-lg overflow-hidden group-hover:shadow-inner">
+        <div className="relative aspect-square mb-3 bg-muted rounded-lg overflow-hidden group-hover:shadow-inner">
           <div className="w-full h-full flex items-center justify-center">
             <Package className="w-12 h-12 text-muted-foreground group-hover:text-primary transition-colors" />
           </div>

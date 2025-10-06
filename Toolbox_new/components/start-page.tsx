@@ -47,9 +47,11 @@ export function StartPage({
       <Card className="w-full max-w-md relative z-10 shadow-2xl border-0 bg-card/80 backdrop-blur-sm">
         <CardHeader className="text-center pb-2">
           <div className="mx-auto mb-4 animate-float">
-            <div className="w-20 h-20 bg-primary rounded-2xl flex items-center justify-center shadow-lg">
-              <ShoppingCart className="w-10 h-10 text-primary-foreground" />
-            </div>
+            <img 
+              src="/ToolBoxlogo.png" 
+              alt="Toolbox Logo" 
+              className="w-20 h-20 object-contain"
+            />
           </div>
           <CardTitle className="text-3xl font-bold text-primary mb-2">TOOLBOX</CardTitle>
           <p className="text-muted-foreground text-sm">Professional Point of Sale System</p>

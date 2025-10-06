@@ -47,6 +47,12 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        // If we're on toolbox route, don't interfere with its theme
+        if (window.location.pathname === "/jjctoolbox") {
+          setIsLoading(false)
+          return
+        }
+
         // Check for admin/department token
         const adminToken = getStoredToken(false)
         if (adminToken) {
@@ -99,6 +105,12 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     localStorage.setItem("darkMode", JSON.stringify(isDarkMode))
+    
+    // Don't manage dark mode class for toolbox route - it has its own theme system
+    if (window.location.pathname === "/jjctoolbox") {
+      return
+    }
+    
     if (isDarkMode) {
       document.documentElement.classList.add("dark")
       document.body.classList.add("dark")

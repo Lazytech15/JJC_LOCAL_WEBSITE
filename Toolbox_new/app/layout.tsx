@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   description: "Professional warehouse inventory management system with offline capability for employees",
   generator: "Next.js + PWA",
   manifest: "/manifest.json",
-  themeColor: "#1e293b",
+  themeColor: "#0f172a",
   viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
   appleWebApp: {
     capable: true,
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     title: "Toolbox Inventory"
   },
   icons: {
-    apple: "/placeholder-logo.svg",
+    apple: "/ToolBoxlogo.png",
   },
   other: {
     "mobile-web-app-capable": "yes",
@@ -40,26 +40,29 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#1e293b" />
+        <meta name="theme-color" content="#0f172a" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Toolbox Inventory" />
-        <link rel="apple-touch-icon" href="/placeholder-logo.svg" />
+        <link rel="apple-touch-icon" href="/ToolBoxlogo.png" />
         <meta name="mobile-web-app-capable" content="yes" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                const theme = localStorage.getItem('toolbox-theme') || 'system';
+                const theme = localStorage.getItem('toolbox-theme') || 'dark';
                 const root = document.documentElement;
                 
                 if (theme === 'system') {
                   const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
                   root.classList.add(systemTheme);
                 } else {
+                  root.classList.remove('light', 'dark');
                   root.classList.add(theme);
                 }
-              } catch (e) {}
+              } catch (e) {
+                root.classList.add('dark');
+              }
             `,
           }}
         />
@@ -67,7 +70,7 @@ export default function RootLayout({
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} bg-background text-foreground`}>
         <ErrorBoundary>
           <Suspense fallback={null}>
-            <ThemeProvider defaultTheme="system" storageKey="toolbox-theme">
+            <ThemeProvider defaultTheme="dark" storageKey="toolbox-theme">
               <LoadingProvider>
                 <KeyboardShortcuts />
                 {children}
