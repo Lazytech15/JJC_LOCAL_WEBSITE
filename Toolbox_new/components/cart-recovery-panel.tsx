@@ -6,7 +6,7 @@ import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog'
 import { useCartPersistence } from '../hooks/use-cart-persistence'
-import { Clock, Download, Upload, History, ShoppingCart, RefreshCw, Trash2 } from 'lucide-react'
+import { Clock, Download, Upload, History, Briefcase, RefreshCw, Trash2 } from 'lucide-react'
 import { useToast } from '../hooks/use-toast'
 
 interface CartRecoveryPanelProps {
@@ -118,7 +118,7 @@ export function CartRecoveryPanel({ trigger }: CartRecoveryPanelProps) {
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5" />
+            <Briefcase className="w-5 h-5" />
             Cart Persistence & Recovery
           </DialogTitle>
         </DialogHeader>
@@ -128,7 +128,7 @@ export function CartRecoveryPanel({ trigger }: CartRecoveryPanelProps) {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5" />
+                <Briefcase className="w-5 h-5" />
                 Current Cart
               </CardTitle>
             </CardHeader>
@@ -346,7 +346,7 @@ export function CartStatusIndicator() {
   
   return (
     <Badge variant="secondary" className="flex items-center gap-1">
-      <ShoppingCart className="w-3 h-3" />
+      <Briefcase className="w-3 h-3" />
       {cartState.totalItems} item{cartState.totalItems !== 1 ? 's' : ''} saved
     </Badge>
   )

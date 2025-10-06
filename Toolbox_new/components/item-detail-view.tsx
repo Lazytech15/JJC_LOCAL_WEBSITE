@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, Plus, Minus } from "lucide-react"
+import { ArrowLeft, Plus, Minus, Package, Briefcase, Cog, Wrench } from "lucide-react"
 import { Button } from "./ui/button"
 import { Card, CardContent } from "./ui/card"
 import { Badge } from "./ui/badge"
@@ -15,6 +15,11 @@ interface ItemDetailViewProps {
 
 export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewProps) {
   const [quantity, setQuantity] = useState(1)
+  const [imageError, setImageError] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
+  
+  // Construct image URL from API
+  const imageUrl = `https://qxw.2ee.mytemp.website/api/items/images/${product.id}/`
 
   const getStatusColor = (status: Product["status"]) => {
     switch (status) {
@@ -60,27 +65,78 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* Back Button */}
-      <Button variant="ghost" onClick={onBack} className="mb-6">
+    <div className="max-w-4xl mx-auto p-6 relative">
+      {/* Industrial background pattern */}
+      <div className="absolute inset-0 opacity-5 pointer-events-none">
+        <div className="absolute top-10 right-10">
+          <Cog className="w-32 h-32 text-slate-400 animate-spin-slow" />
+        </div>
+        <div className="absolute bottom-10 left-10">
+          <Wrench className="w-24 h-24 text-slate-400 rotate-45" />
+        </div>
+      </div>
+
+      {/* Back Button - Industrial Style */}
+      <Button 
+        variant="ghost" 
+        onClick={onBack} 
+        className="mb-6 border-2 border-slate-700 hover:bg-slate-800 hover:border-slate-600 transition-all"
+      >
         <ArrowLeft className="w-4 h-4 mr-2" />
         Back to Dashboard
       </Button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Image Section */}
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative">
+        {/* Image Section - Industrial Frame */}
+        <Card className="border-2 border-slate-700 bg-card/50 backdrop-blur-sm relative overflow-hidden">
+          {/* Corner bolts */}
+          <div className="absolute top-3 left-3 w-2 h-2 bg-slate-500 rounded-full z-10"></div>
+          <div className="absolute top-3 right-3 w-2 h-2 bg-slate-500 rounded-full z-10"></div>
+          <div className="absolute bottom-3 left-3 w-2 h-2 bg-slate-500 rounded-full z-10"></div>
+          <div className="absolute bottom-3 right-3 w-2 h-2 bg-slate-500 rounded-full z-10"></div>
+          
           <CardContent className="p-8">
-            <div className="aspect-square bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-lg">
-              image here
+            <div className="aspect-square bg-slate-900/50 rounded-lg flex items-center justify-center overflow-hidden border-2 border-slate-700 relative">
+              {/* Industrial frame corners */}
+              <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-slate-500"></div>
+              <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-slate-500"></div>
+              <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-slate-500"></div>
+              <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-slate-500"></div>
+              
+              {!imageError && (
+                <img 
+                  src={imageUrl} 
+                  alt={product.name}
+                  className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  onLoad={() => setImageLoaded(true)}
+                  onError={() => setImageError(true)}
+                />
+              )}
+              {(!imageLoaded || imageError) && (
+                <Package className="w-24 h-24 text-slate-400" />
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Product Information */}
+        {/* Product Information - Industrial Style */}
         <div className="space-y-6">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-4">{product.name}</h1>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="relative">
+                <div className="absolute -inset-0.5 border border-slate-600 rounded"></div>
+                <div className="relative bg-slate-800 p-2 rounded border border-slate-600">
+                  <Briefcase className="w-5 h-5 text-slate-300" />
+                  <div className="absolute top-0 left-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+                  <div className="absolute top-0 right-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+                  <div className="absolute bottom-0 left-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+                  <div className="absolute bottom-0 right-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+                </div>
+              </div>
+              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-200 via-slate-100 to-slate-300">
+                {product.name}
+              </h1>
+            </div>
 
             <div className="space-y-3 text-muted-foreground">
               <div className="flex justify-between">

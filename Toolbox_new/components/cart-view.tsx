@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Minus, Plus, Trash2, History } from "lucide-react"
+import { Minus, Plus, Trash2, History, Package, Briefcase, Cog, Wrench } from "lucide-react"
 import { Button } from "../components/ui/button"
 import { Card, CardContent } from "../components/ui/card"
 import { Badge } from "../components/ui/badge"
@@ -14,6 +14,36 @@ import { apiService } from "../lib/api_service"
 import { useToast } from "../hooks/use-toast"
 import type { CartItem } from "../app/page"
 import type { Employee } from "../lib/Services/employees.service"
+
+// Image component with error handling - Industrial styled
+function CartItemImage({ itemId, itemName }: { itemId: string; itemName: string }) {
+  const [imageError, setImageError] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const imageUrl = `https://qxw.2ee.mytemp.website/api/items/images/${itemId}/`
+
+  return (
+    <div className="w-16 h-16 bg-slate-900/50 rounded-lg flex items-center justify-center overflow-hidden border-2 border-slate-700 relative">
+      {/* Corner bolts */}
+      <div className="absolute top-0.5 left-0.5 w-1 h-1 bg-slate-500 rounded-full"></div>
+      <div className="absolute top-0.5 right-0.5 w-1 h-1 bg-slate-500 rounded-full"></div>
+      <div className="absolute bottom-0.5 left-0.5 w-1 h-1 bg-slate-500 rounded-full"></div>
+      <div className="absolute bottom-0.5 right-0.5 w-1 h-1 bg-slate-500 rounded-full"></div>
+      
+      {!imageError && (
+        <img 
+          src={imageUrl} 
+          alt={itemName}
+          className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+          onLoad={() => setImageLoaded(true)}
+          onError={() => setImageError(true)}
+        />
+      )}
+      {(!imageLoaded || imageError) && (
+        <Package className="w-8 h-8 text-slate-400" />
+      )}
+    </div>
+  )
+}
 
 interface CartViewProps {
   items: CartItem[]
@@ -75,7 +105,9 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
         title: "Cart Empty",
         description: "Your cart is empty. Add items to proceed with checkout.",
         variant: "destructive",
-      })
+        toastType: 'warning',
+        duration: 3000
+      } as any)
       return
     }
     setIsCheckoutOpen(true)
@@ -168,7 +200,9 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
           toast({
             title: "Checkout Successful! ✅",
             description: `${totalItems} items processed. API updated successfully.`,
-          })
+            toastType: 'success',
+            duration: 4000
+          } as any)
 
           // Trigger data refresh to update inventory
           if (onRefreshData) {
@@ -186,8 +220,10 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
           toast({
             title: "Checkout Completed (Local Only) ⚠️",
             description: `${errorMessage} User: ${employee.id.toString()}`,
-            variant: "default", // Changed from destructive since it's not really an error
-          })
+            variant: "default",
+            toastType: 'warning',
+            duration: 5000
+          } as any)
 
           // Still trigger refresh in case API has some data
           if (onRefreshData) {
@@ -201,7 +237,9 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
         toast({
           title: "Checkout Completed (Local Only) 📝",
           description: `API not connected. User: ${employee.id.toString()}, Total: ${totalItems} items`,
-        })
+          toastType: 'info',
+          duration: 4000
+        } as any)
       }
 
       const checkoutSummary = {
@@ -234,7 +272,9 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
         title: "Checkout Failed",
         description: "An error occurred during checkout. Please try again.",
         variant: "destructive",
-      })
+        toastType: 'error',
+        duration: 5000
+      } as any)
     } finally {
       setIsCommitting(false)
     }
@@ -255,11 +295,34 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-background min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      {/* Industrial Header */}
+      <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-slate-700 relative">
+        {/* Decorative accent line */}
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-blue-500/50 to-transparent"></div>
+        
         <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-foreground">Toolbox</h1>
-          <Badge variant="secondary">
+          <div className="flex items-center gap-3">
+            {/* Industrial toolbox icon */}
+            <div className="relative">
+              <div className="absolute -inset-0.5 border border-slate-600 rounded"></div>
+              <div className="relative bg-slate-800 p-2 rounded border border-slate-600">
+                <Briefcase className="w-6 h-6 text-slate-300" />
+                {/* Corner bolts */}
+                <div className="absolute top-0 left-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+                <div className="absolute top-0 right-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+                <div className="absolute bottom-0 left-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+                <div className="absolute bottom-0 right-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+              </div>
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-200 via-slate-100 to-slate-300">
+                CART
+              </h1>
+              <div className="text-xs text-slate-500 font-mono">Work Order Items</div>
+            </div>
+          </div>
+          <Badge variant="secondary" className="bg-slate-800 text-slate-300 border border-slate-600">
+            <Cog className="w-3 h-3 mr-1" />
             {items.length} items
           </Badge>
           <CartStatusIndicator />
@@ -268,15 +331,15 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
         <div className="flex items-center gap-2">
           <CartRecoveryPanel 
             trigger={
-              <Button variant="outline" size="sm" className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="flex items-center gap-2 border-slate-600 hover:bg-slate-800">
                 <History className="w-4 h-4" />
-                Cart Memory
+                Memory
               </Button>
             }
           />
           
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-40 border-slate-600">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -287,36 +350,51 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
         </div>
       </div>
 
-      {/* Cart Items */}
+      {/* Cart Items - Industrial Style */}
       <div className="space-y-4 mb-6">
         {sortedItems.length === 0 ? (
-          <Card>
+          <Card className="border-2 border-slate-700 bg-slate-900/30">
             <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground text-lg">Your toolbox is empty</p>
-              <p className="text-muted-foreground text-sm mt-2">
-                Add items from the dashboard to get started
-              </p>
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  <Wrench className="w-16 h-16 text-slate-600" />
+                  <div className="absolute -bottom-2 -right-2">
+                    <Cog className="w-8 h-8 text-slate-600 animate-spin-slow" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-slate-400 text-lg font-semibold">Your cart is empty</p>
+                  <p className="text-slate-500 text-sm mt-2">
+                    Add items from the dashboard to get started
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         ) : (
           sortedItems.map((item) => (
-            <Card key={item.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
+            <Card key={item.id} className="hover:shadow-lg transition-all duration-200 border-2 border-slate-700 bg-card/50 backdrop-blur-sm hover:border-slate-600">
+              <CardContent className="p-4 relative">
+                {/* Industrial corner accents */}
+                <div className="absolute top-2 left-2 w-3 h-3 border-l-2 border-t-2 border-slate-600"></div>
+                <div className="absolute top-2 right-2 w-3 h-3 border-r-2 border-t-2 border-slate-600"></div>
+                <div className="absolute bottom-2 left-2 w-3 h-3 border-l-2 border-b-2 border-slate-600"></div>
+                <div className="absolute bottom-2 right-2 w-3 h-3 border-r-2 border-b-2 border-slate-600"></div>
+                
                 <div className="flex items-center space-x-4">
                   {/* Checkbox */}
                   <Checkbox
                     checked={selectedItems.has(item.id)}
                     onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
+                    className="border-slate-600"
                   />
 
                   {/* Image */}
-                  <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-xs">
-                    image here
-                  </div>
+                  <CartItemImage itemId={item.id} itemName={item.name} />
 
                   {/* Item Details */}
                   <div className="flex-1">
-                    <h3 className="font-medium text-foreground mb-1">{item.name}</h3>
+                    <h3 className="font-semibold text-foreground mb-1">{item.name}</h3>
                     <div className="text-sm text-muted-foreground space-y-1">
                       <p>Brand: {item.brand}</p>
                       <p>Item Type: {item.itemType}</p>

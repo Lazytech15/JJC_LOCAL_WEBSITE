@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react"
 import apiService from "../../utils/api/api-service"
 import AddEditItemWizard from './AddEditItemWizard' // Updated to wizard
-import Swal from "sweetalert2"
 import ModalPortal from "/src/components/pd/ModalPortal"
 import QRCodeSmall from "/src/components/pd/QRCodeSmall"
 import { ItemDetailView } from "./ItemDetailView"
 import InventoryListView from "./InventoryListView"
+import { useToast } from "./ToastNotification"
 
 function InventoryManagement() {
+  const { success, error: showError, warning } = useToast()
   // Inventory Management States
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -238,20 +239,10 @@ function InventoryManagement() {
       setShowStockInsert(false)
       setSelectedItem(null)
       setStockInsertData({ quantity: 0, reason: "" })
-      Swal.fire({
-        title: "Success!",
-        text: `Stock inserted successfully! Added ${stockInsertData.quantity} units.`,
-        icon: "success",
-        confirmButtonText: "OK",
-      })
+      success("Success!", `Stock inserted successfully! Added ${stockInsertData.quantity} units.`)
     } catch (error) {
       console.error("Error inserting stock:", error)
-      Swal.fire({
-        title: "Error!",
-        text: `Error: ${error.message}`,
-        icon: "error",
-        confirmButtonText: "OK",
-      })
+      showError("Error!", error.message)
     }
   }
 
@@ -300,31 +291,16 @@ function InventoryManagement() {
       if (stockManagerData.stock_in > 0) changeText.push(`+${stockManagerData.stock_in}`)
       if (stockManagerData.stock_out > 0) changeText.push(`-${stockManagerData.stock_out}`)
 
-      Swal.fire({
-        title: "Success!",
-        text: `Stock updated successfully! Changes: ${changeText.join(', ')} units`,
-        icon: "success",
-        confirmButtonText: "OK",
-      })
+      success("Success!", `Stock updated successfully! Changes: ${changeText.join(', ')} units`)
     } catch (error) {
       console.error("Error updating stock:", error)
-      Swal.fire({
-        title: "Error!",
-        text: `Error: ${error.message}`,
-        icon: "error",
-        confirmButtonText: "OK",
-      })
+      showError("Error!", error.message)
     }
   }
 
   const exportBarcodesToExcel = async () => {
     if (items.length === 0) {
-      Swal.fire({
-        title: "No Items",
-        text: "No items available to export barcodes.",
-        icon: "warning",
-        confirmButtonText: "OK",
-      })
+      warning("No Items", "No items available to export barcodes.")
       return
     }
 
@@ -501,38 +477,11 @@ function InventoryManagement() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
-      Swal.fire({
-        title: "GOOJPRT Compatible Barcodes Created!",
-        html: `
-        <div style="text-align: left; max-width: 500px;">
-          <p><strong>File downloaded successfully!</strong></p>
-          <br>
-          <h4>Troubleshooting Steps:</h4>
-          <ol>
-            <li><strong>Scanner Settings:</strong> Check if CODE128 is enabled on your GOOJPRT scanner</li>
-            <li><strong>Print Quality:</strong> Use 600 DPI or higher</li>
-            <li><strong>Paper:</strong> Use bright white paper</li>
-            <li><strong>Size:</strong> Print at 100% scale</li>
-            <li><strong>Clean Scanner:</strong> Clean the scanner lens</li>
-            <li><strong>Test:</strong> Try scanning with a phone app first</li>
-          </ol>
-          <br>
-          <p><strong>Still not working?</strong> Try the alternative formats below.</p>
-        </div>
-      `,
-        icon: "info",
-        confirmButtonText: "Got it!",
-        width: 600
-      })
+      success("GOOJPRT Compatible Barcodes Created!", "File downloaded successfully! Check the troubleshooting guide if needed.")
 
     } catch (error) {
       console.error("Error creating barcodes:", error)
-      Swal.fire({
-        title: "Export Error!",
-        text: "Failed to create barcode file. Please try again.",
-        icon: "error",
-        confirmButtonText: "OK",
-      })
+      showError("Export Error!", "Failed to create barcode file. Please try again.")
     }
   }
 

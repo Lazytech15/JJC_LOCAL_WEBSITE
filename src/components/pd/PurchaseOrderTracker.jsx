@@ -2,8 +2,10 @@ import { useState, useEffect } from "react"
 import apiService from "../../utils/api/api-service"
 import ModalPortal from "./ModalPortal"
 import CreatePurchaseOrderWizard from "./CreatePurchaseOrderWizard"
+import { useToast } from "./ToastNotification"
 
 function PurchaseOrderTracker() {
+  const { success, error: showError } = useToast()
   const [purchaseOrders, setPurchaseOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -11,7 +13,6 @@ function PurchaseOrderTracker() {
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [restockItems, setRestockItems] = useState([])
-  const [toast, setToast] = useState({ show: false, message: "", type: "success" })
 
   // Form states
   const [orderForm, setOrderForm] = useState({
@@ -158,15 +159,8 @@ function PurchaseOrderTracker() {
     })
   }
 
-  const showToast = (message, type = "success") => {
-    setToast({ show: true, message, type })
-    setTimeout(() => {
-      setToast({ show: false, message: "", type: "success" })
-    }, 3000)
-  }
-
   const handleWizardSuccess = (message) => {
-    showToast(message)
+    success("Success", message)
     fetchPurchaseOrders()
   }
 
@@ -324,7 +318,7 @@ function PurchaseOrderTracker() {
             message += `. Failed for: ${failedSuppliers.join(', ')}`
           }
           
-          showToast(message)
+          success("Purchase Orders Created", message)
           setShowCreateModal(false)
           setOrderForm({
             supplier: "",
@@ -338,7 +332,7 @@ function PurchaseOrderTracker() {
           fetchPurchaseOrders()
         } else {
           const failedSuppliers = Object.keys(supplierGroups)
-          showToast(`Failed to create any purchase orders. Attempted suppliers: ${failedSuppliers.join(', ')}`, "error")
+          showError("Failed to Create Orders", `Attempted suppliers: ${failedSuppliers.join(', ')}`)
         }
       } else {
         // Single order (traditional or mixed supplier)
@@ -354,7 +348,7 @@ function PurchaseOrderTracker() {
         const result = await apiService.purchaseOrders.createPurchaseOrder(orderData)
 
         if (result.success) {
-          showToast("Purchase order created successfully!")
+          success("Success", "Purchase order created successfully!")
           setShowCreateModal(false)
           setOrderForm({
             supplier: "",
@@ -367,7 +361,7 @@ function PurchaseOrderTracker() {
           setOrderSplitMode("single")
           fetchPurchaseOrders()
         } else {
-          showToast(result.message || "Failed to create purchase order", "error")
+          showError("Failed", result.message || "Failed to create purchase order")
         }
       }
     } catch (err) {
@@ -386,11 +380,11 @@ function PurchaseOrderTracker() {
       const result = await apiService.purchaseOrders.updatePurchaseOrderStatus(statusUpdate.order_id, statusData)
 
       if (result.success) {
-        showToast("Order status updated successfully!")
+        success("Success", "Order status updated successfully!")
         setShowOrderDetails(false)
         fetchPurchaseOrders()
       } else {
-        showToast(result.message || "Failed to update order status", "error")
+        showError("Failed", result.message || "Failed to update order status")
       }
     } catch (err) {
       setError(err.message || "Failed to update order status")
@@ -414,13 +408,13 @@ function PurchaseOrderTracker() {
         const result = await apiService.purchaseOrders.deletePurchaseOrder(orderId)
 
         if (result.success) {
-          showToast("Purchase order deleted successfully!")
+          success("Deleted", "Purchase order deleted successfully!")
           fetchPurchaseOrders()
         } else {
-          showToast(result.message || "Failed to delete purchase order", "error")
+          showError("Failed", result.message || "Failed to delete purchase order")
         }
       } catch (err) {
-        showToast(err.message || "Failed to delete purchase order", "error")
+        showError("Error", err.message || "Failed to delete purchase order")
       }
     }
   }
@@ -699,30 +693,6 @@ function PurchaseOrderTracker() {
             </div>
           </div>
         </ModalPortal>
-      )}
-
-      {/* Toast Notification */}
-      {toast.show && (
-        <div className="fixed top-4 right-4 z-[10000] animate-fade-in">
-          <div className={`px-4 py-3 rounded-lg shadow-lg border backdrop-blur-md transform transition-all duration-300 ease-in-out ${
-            toast.type === "success"
-              ? "bg-green-500/90 border-green-400 text-white"
-              : "bg-red-500/90 border-red-400 text-white"
-          }`}>
-            <div className="flex items-center gap-2">
-              {toast.type === "success" ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              )}
-              <span className="font-medium">{toast.message}</span>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )

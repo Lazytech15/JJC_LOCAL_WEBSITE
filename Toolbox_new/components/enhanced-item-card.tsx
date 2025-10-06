@@ -1,8 +1,8 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent } from './ui/card'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
-import { ShoppingCart, Eye, Package, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react'
+import { Briefcase, Eye, Package, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react'
 import type { Product } from '../lib/barcode-scanner'
 
 interface EnhancedItemCardProps {
@@ -18,6 +18,12 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
   onViewItem, 
   viewMode = 'grid' 
 }) => {
+  const [imageError, setImageError] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
+  
+  // Construct image URL from API
+  const imageUrl = `https://qxw.2ee.mytemp.website/api/items/images/${product.id}/`
+  
   const getStockStatus = (balance: number) => {
     if (balance <= 0) return { label: 'Out of Stock', color: 'destructive', icon: AlertTriangle }
     if (balance <= 10) return { label: 'Low Stock', color: 'secondary', icon: TrendingDown }
@@ -35,7 +41,18 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
           <div className="flex items-center space-x-4">
             {/* Image */}
             <div className="relative w-16 h-16 bg-muted rounded-lg flex items-center justify-center overflow-hidden group-hover:shadow-inner transition-all">
-              <Package className="w-8 h-8 text-muted-foreground group-hover:text-primary transition-colors" />
+              {!imageError && (
+                <img 
+                  src={imageUrl} 
+                  alt={product.name}
+                  className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  onLoad={() => setImageLoaded(true)}
+                  onError={() => setImageError(true)}
+                />
+              )}
+              {(!imageLoaded || imageError) && (
+                <Package className="w-8 h-8 text-muted-foreground group-hover:text-primary transition-colors" />
+              )}
             </div>
 
             {/* Product Info */}
@@ -81,7 +98,7 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
                   disabled={product.status === 'out-of-stock'}
                   className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                 >
-                  <ShoppingCart className="w-4 h-4" />
+                  <Briefcase className="w-4 h-4" />
                 </Button>
               </div>
             </div>
@@ -98,7 +115,18 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
         {/* Image Container */}
         <div className="relative aspect-square mb-3 bg-muted rounded-lg overflow-hidden group-hover:shadow-inner">
           <div className="w-full h-full flex items-center justify-center">
-            <Package className="w-12 h-12 text-muted-foreground group-hover:text-primary transition-colors" />
+            {!imageError && (
+              <img 
+                src={imageUrl} 
+                alt={product.name}
+                className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageError(true)}
+              />
+            )}
+            {(!imageLoaded || imageError) && (
+              <Package className="w-12 h-12 text-muted-foreground group-hover:text-primary transition-colors" />
+            )}
           </div>
           
           {/* Overlay Actions */}
@@ -124,7 +152,7 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
               disabled={product.status === 'out-of-stock'}
               className="backdrop-blur-sm"
             >
-              <ShoppingCart className="w-4 h-4 mr-1" />
+              <Briefcase className="w-4 h-4 mr-1" />
               Add
             </Button>
           </div>
@@ -168,7 +196,7 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
               disabled={product.status === 'out-of-stock'}
               className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
             >
-              <ShoppingCart className="w-4 h-4" />
+              <Briefcase className="w-4 h-4" />
             </Button>
           </div>
         </div>

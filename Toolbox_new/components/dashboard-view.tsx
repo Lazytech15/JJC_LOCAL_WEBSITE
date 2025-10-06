@@ -264,7 +264,9 @@ export function DashboardView({
           toast({
             title: "Data Loaded",
             description: `Successfully loaded ${transformedProducts.length} items from API`,
-          })
+            toastType: 'success',
+            duration: 4000
+          } as any)
         }
       } else {
         console.log("[v0] API returned same data, no update needed");
@@ -272,7 +274,9 @@ export function DashboardView({
           toast({
             title: "Data Up to Date",
             description: `${transformedProducts.length} items are already current`,
-          })
+            toastType: 'info',
+            duration: 3000
+          } as any)
         }
       }
     } catch (error) {
@@ -334,14 +338,18 @@ export function DashboardView({
       toast({
         title: "Export Successful",
         description: `Inventory data exported to ${filename}.csv`,
-      })
+        toastType: 'success',
+        duration: 4000
+      } as any)
     } catch (error) {
       console.error('Export to CSV failed:', error)
       toast({
         title: "Export Failed",
         description: "Failed to export data to CSV. Please try again.",
         variant: "destructive",
-      })
+        toastType: 'error',
+        duration: 5000
+      } as any)
     } finally {
       setIsExporting(false)
     }
@@ -363,14 +371,18 @@ export function DashboardView({
       toast({
         title: "Export Successful",
         description: `Inventory data exported to ${filename}.xlsx`,
-      })
+        toastType: 'success',
+        duration: 4000
+      } as any)
     } catch (error) {
       console.error('Export to XLSX failed:', error)
       toast({
         title: "Export Failed",
         description: "Failed to export data to Excel. Please try again.",
         variant: "destructive",
-      })
+        toastType: 'error',
+        duration: 5000
+      } as any)
     } finally {
       setIsExporting(false)
     }
@@ -392,14 +404,18 @@ export function DashboardView({
       toast({
         title: "Export Successful",
         description: `Inventory data exported to ${filename}.json`,
-      })
+        toastType: 'success',
+        duration: 4000
+      } as any)
     } catch (error) {
       console.error('Export to JSON failed:', error)
       toast({
         title: "Export Failed",
         description: "Failed to export data to JSON. Please try again.",
         variant: "destructive",
-      })
+        toastType: 'error',
+        duration: 5000
+      } as any)
     } finally {
       setIsExporting(false)
     }
@@ -461,7 +477,13 @@ export function DashboardView({
     } catch (error) {
       console.error('[v0] Failed to fetch logs:', error)
       setLogsError(String(error))
-      toast({ title: 'Failed to load logs', description: String(error), variant: 'destructive' })
+      toast({ 
+        title: 'Failed to load logs', 
+        description: String(error), 
+        variant: 'destructive',
+        toastType: 'error',
+        duration: 5000
+      } as any)
     } finally {
       setIsLoadingLogs(false)
     }
@@ -478,7 +500,13 @@ export function DashboardView({
   const handleExportLogsXLSX = async () => {
     try {
       if (!logs || logs.length === 0) {
-        toast({ title: 'No Logs', description: 'No logs available to export', variant: 'destructive' })
+        toast({ 
+          title: 'No Logs', 
+          description: 'No logs available to export', 
+          variant: 'destructive',
+          toastType: 'warning',
+          duration: 4000
+        } as any)
         return
       }
 
@@ -486,10 +514,21 @@ export function DashboardView({
       const filename = `toolbox-logs-${new Date().toISOString().split('T')[0]}`
       exportLogsToXLSX(logs, { filename })
 
-      toast({ title: 'Export Successful', description: `Logs exported to ${filename}.xlsx` })
+      toast({ 
+        title: 'Export Successful', 
+        description: `Logs exported to ${filename}.xlsx`,
+        toastType: 'success',
+        duration: 4000
+      } as any)
     } catch (error) {
       console.error('Export logs failed:', error)
-      toast({ title: 'Export Failed', description: 'Failed to export logs to Excel', variant: 'destructive' })
+      toast({ 
+        title: 'Export Failed', 
+        description: 'Failed to export logs to Excel', 
+        variant: 'destructive',
+        toastType: 'error',
+        duration: 5000
+      } as any)
     } finally {
       setIsExporting(false)
     }
@@ -869,45 +908,45 @@ export function DashboardView({
               </div>
 
               {/* Categories Section */}
-              <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
+              <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-3 shadow-sm">
                 <button
                   onClick={() => setIsCategoriesCollapsed(!isCategoriesCollapsed)}
-                  className="w-full flex items-center justify-between mb-3 group"
+                  className="w-full flex items-center justify-between mb-2 group"
                 >
-                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <div className="w-5 h-5 bg-gradient-to-br from-purple-400 to-pink-500 rounded-md flex items-center justify-center">
-                      <Filter className="w-3 h-3 text-white" />
+                  <h3 className="text-xs font-semibold text-foreground flex items-center gap-2">
+                    <div className="w-4 h-4 bg-gradient-to-br from-purple-400 to-pink-500 rounded flex items-center justify-center">
+                      <Filter className="w-2.5 h-2.5 text-white" />
                     </div>
                     Categories
                   </h3>
-                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isCategoriesCollapsed ? "-rotate-90" : ""}`} />
+                  <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${isCategoriesCollapsed ? "-rotate-90" : ""}`} />
                 </button>
                 
                 {!isCategoriesCollapsed && (
-                  <div className="space-y-2">
+                  <div className="space-y-0.5 max-h-64 overflow-y-auto custom-scrollbar">
                     <button
                       onClick={() => setSelectedCategory("all")}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
+                      className={`w-full text-left px-2.5 py-1.5 rounded-md transition-all duration-200 ${
                         selectedCategory === "all"
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "text-foreground hover:bg-muted"
+                          ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+                          : "text-foreground hover:bg-muted font-medium"
                       }`}
                     >
-                      <span className="text-sm font-medium">All Items</span>
-                      <span className="text-xs ml-2 opacity-70">({products.length})</span>
+                      <span className="text-xs">All Items</span>
+                      <span className="text-[10px] ml-1.5 opacity-70">({products.length})</span>
                     </button>
                     {categories.map((cat) => (
                       <button
                         key={cat}
                         onClick={() => setSelectedCategory(cat)}
-                        className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
+                        className={`w-full text-left px-2.5 py-1.5 rounded-md transition-all duration-200 ${
                           selectedCategory === cat
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-foreground hover:bg-muted"
+                            ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+                            : "text-foreground hover:bg-muted font-medium"
                         }`}
                       >
-                        <span className="text-sm font-medium">{cat === "all" ? "All Items" : cat}</span>
-                        <span className="text-xs ml-2 opacity-70">
+                        <span className="text-xs truncate block">{cat === "all" ? "All Items" : cat}</span>
+                        <span className="text-[10px] opacity-70">
                           ({cat === "all" ? products.length : products.filter((p) => p.itemType === cat).length})
                         </span>
                       </button>
@@ -956,9 +995,10 @@ export function DashboardView({
       )}
 
       {/* Desktop Sidebar - Hidden on mobile, visible on lg+ */}
-      <div className="hidden lg:block w-72 bg-card border-r border-border backdrop-blur-sm sticky top-0 h-screen overflow-y-auto custom-scrollbar">
-        {/* Sidebar Header */}
-        <div className="p-6 border-b border-border">
+      <div className="hidden lg:block w-72 bg-card border-r border-border backdrop-blur-sm sticky top-0 h-screen">
+        <div className="h-full overflow-y-auto custom-scrollbar">
+          {/* Sidebar Header */}
+          <div className="p-6 border-b border-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
@@ -1287,17 +1327,13 @@ export function DashboardView({
               </h3>
               
               <div className="space-y-3">
-                <div className="text-xs text-slate-700 dark:text-slate-300 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg">
-                  📱 Click input field first, then scan Code-128 barcode (ITM001, ITM004, etc.)
-                </div>
-                
                 <Input
                   id="barcode-scanner-input"
                   placeholder="Click here first, then scan ITM001, ITM004..."
                   value={barcodeInput}
                   onChange={handleBarcodeInputChange}
                   onKeyPress={handleBarcodeKeyPress}
-                  className="font-mono text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 border-border rounded-lg transition-all duration-200 hover:border-muted-foreground focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/50"
+                  className="font-mono text-sm bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 border-2 border-slate-300 dark:border-slate-600 rounded-lg transition-all duration-200 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900/50 focus:bg-white dark:focus:bg-slate-900"
                 />
                 
                 <Button
@@ -1316,48 +1352,48 @@ export function DashboardView({
           </div>
 
           {/* Categories Card - Collapsible */}
-          <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
-            <div className="space-y-3">
+          <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-3 shadow-sm">
+            <div className="space-y-2">
               <button 
                 onClick={() => setIsCategoriesCollapsed(!isCategoriesCollapsed)}
-                className="w-full flex items-center justify-between group hover:bg-muted -mx-2 -my-1 px-2 py-1 rounded-lg transition-all duration-200"
+                className="w-full flex items-center justify-between group hover:bg-muted -mx-1 px-1 py-1 rounded-lg transition-all duration-200"
               >
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 bg-gradient-to-br from-purple-400 to-pink-500 rounded-md flex items-center justify-center">
-                    <Package className="w-3 h-3 text-white" />
+                  <div className="w-4 h-4 bg-gradient-to-br from-purple-400 to-pink-500 rounded flex items-center justify-center">
+                    <Package className="w-2.5 h-2.5 text-white" />
                   </div>
-                  <h3 className="text-sm font-medium text-foreground">
+                  <h3 className="text-xs font-semibold text-foreground">
                     Categories
                   </h3>
-                  <div className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                  <div className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full font-medium">
                     {categories.length}
                   </div>
                 </div>
-                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
+                <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${
                   isCategoriesCollapsed ? 'rotate-180' : ''
                 }`} />
               </button>
               
               <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                isCategoriesCollapsed ? 'max-h-0 opacity-0' : 'max-h-96 opacity-100'
+                isCategoriesCollapsed ? 'max-h-0 opacity-0' : 'max-h-64 opacity-100 overflow-y-auto custom-scrollbar'
               }`}>
-                <div className="space-y-1 pt-1">
+                <div className="space-y-0.5 pt-0.5">
                   {categories.map((category) => (
                     <button
                       key={category}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+                      className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-all duration-200 ${
                         selectedCategory === category
-                          ? "bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-100 dark:to-slate-200 text-white dark:text-slate-900 shadow-sm"
-                          : "text-foreground hover:bg-muted"
+                          ? "bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-100 dark:to-slate-200 text-white dark:text-slate-900 shadow-sm font-semibold"
+                          : "text-foreground hover:bg-muted font-medium"
                       }`}
                       onClick={() => setSelectedCategory(category)}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-medium">
+                        <span className="truncate">
                           {category === "all" ? "All Items" : category}
                         </span>
                         {selectedCategory === category && (
-                          <div className="w-2 h-2 rounded-full bg-white dark:bg-slate-900"></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-slate-900 shrink-0 ml-1"></div>
                         )}
                       </div>
                     </button>
@@ -1404,6 +1440,7 @@ export function DashboardView({
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
 
