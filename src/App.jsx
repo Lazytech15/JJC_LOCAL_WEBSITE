@@ -11,6 +11,7 @@ import SuperAdminDashboard from "./components/SuperAdminDashboard"
 import EmployeeLanding from "./components/employeeLandingPage/EmployeeLanding"
 import EmployeeLogin from "./components/employeeLandingPage/EmployeeLogin"
 import EmployeeDashboard from "./components/employeeLandingPage/EmployeeDashboard"
+import UserInventory from "../Toolbox_new/app/page"
 
 function App() {
   return (
@@ -62,6 +63,9 @@ function AppContent() {
               </EmployeeProtectedRoute>
             }
           />
+          
+          {/* Public User Inventory Route */}
+          <Route path="/jjctoolbox" element={<UserInventory />} />
 
           {/* Admin/Department Routes (Protected with special URL) */}
           <Route path="/jjcewgsaccess" element={<DepartmentSelector />} />
