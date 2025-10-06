@@ -1,12 +1,10 @@
 @import "tailwindcss";
 
-@variant dark (.dark &);
-
+/* Light mode - default */
 @theme {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   
-  /* Light mode colors */
   --color-background: #f8fafc;
   --color-foreground: #0f172a;
   --color-card: #ffffff;
@@ -23,12 +21,14 @@
   --color-accent-foreground: #ffffff;
   --color-destructive: #dc2626;
   --color-destructive-foreground: #ffffff;
+  --color-success: #10b981;
+  --color-success-foreground: #ffffff;
   --color-border: #e2e8f0;
   --color-input: #ffffff;
   --color-ring: #8b5cf6;
   --color-chart-1: #8b5cf6;
   --color-chart-2: #ea580c;
-  --color-chart-3: #15803d;
+  --color-chart-3: #10b981;
   --color-chart-4: #f97316;
   --color-chart-5: #0f172a;
   
@@ -38,34 +38,92 @@
   --radius-xl: calc(0.5rem + 4px);
 }
 
-.dark {
+/* Dark mode via media query or class */
+@media (prefers-color-scheme: dark) {
   @theme {
-    /* Dark mode colors */
-    --color-background: #020617;
+    --color-background: #0f172a;
     --color-foreground: #f1f5f9;
-    --color-card: #0f172a;
+    --color-card: #1e293b;
     --color-card-foreground: #f1f5f9;
-    --color-popover: #0f172a;
+    --color-popover: #1e293b;
     --color-popover-foreground: #f1f5f9;
-    --color-primary: #f1f5f9;
+    --color-primary: #60a5fa;
     --color-primary-foreground: #0f172a;
-    --color-secondary: #8b5cf6;
+    --color-secondary: #a78bfa;
     --color-secondary-foreground: #ffffff;
-    --color-muted: #1e293b;
-    --color-muted-foreground: #94a3b8;
-    --color-accent: #8b5cf6;
+    --color-muted: #334155;
+    --color-muted-foreground: #cbd5e1;
+    --color-accent: #a78bfa;
     --color-accent-foreground: #ffffff;
-    --color-destructive: #dc2626;
+    --color-destructive: #ef4444;
     --color-destructive-foreground: #ffffff;
-    --color-border: #1e293b;
-    --color-input: #0f172a;
-    --color-ring: #8b5cf6;
-    --color-chart-1: #8b5cf6;
-    --color-chart-2: #ea580c;
-    --color-chart-3: #15803d;
-    --color-chart-4: #f97316;
-    --color-chart-5: #f1f5f9;
+    --color-success: #10b981;
+    --color-success-foreground: #ffffff;
+    --color-border: #334155;
+    --color-input: #1e293b;
+    --color-ring: #a78bfa;
+    --color-chart-1: #a78bfa;
+    --color-chart-2: #fb923c;
+    --color-chart-3: #10b981;
+    --color-chart-4: #fbbf24;
+    --color-chart-5: #60a5fa;
   }
+}
+
+/* Explicit dark class - should override everything */
+html.dark,
+html.dark *,
+.dark,
+.dark * {
+  --color-background: #0f172a !important;
+  --color-foreground: #f1f5f9 !important;
+  --color-card: #1e293b !important;
+  --color-card-foreground: #f1f5f9 !important;
+  --color-popover: #1e293b !important;
+  --color-popover-foreground: #f1f5f9 !important;
+  --color-primary: #60a5fa !important;
+  --color-primary-foreground: #0f172a !important;
+  --color-secondary: #a78bfa !important;
+  --color-secondary-foreground: #ffffff !important;
+  --color-muted: #334155 !important;
+  --color-muted-foreground: #cbd5e1 !important;
+  --color-accent: #a78bfa !important;
+  --color-accent-foreground: #ffffff !important;
+  --color-destructive: #ef4444 !important;
+  --color-destructive-foreground: #ffffff !important;
+  --color-success: #10b981 !important;
+  --color-success-foreground: #ffffff !important;
+  --color-border: #334155 !important;
+  --color-input: #1e293b !important;
+  --color-ring: #a78bfa !important;
+}
+
+/* Explicit light class */
+html.light,
+html.light *,
+.light,
+.light * {
+  --color-background: #f8fafc !important;
+  --color-foreground: #0f172a !important;
+  --color-card: #ffffff !important;
+  --color-card-foreground: #0f172a !important;
+  --color-popover: #ffffff !important;
+  --color-popover-foreground: #0f172a !important;
+  --color-primary: #0f172a !important;
+  --color-primary-foreground: #ffffff !important;
+  --color-secondary: #8b5cf6 !important;
+  --color-secondary-foreground: #ffffff !important;
+  --color-muted: #f1f5f9 !important;
+  --color-muted-foreground: #64748b !important;
+  --color-accent: #8b5cf6 !important;
+  --color-accent-foreground: #ffffff !important;
+  --color-destructive: #dc2626 !important;
+  --color-destructive-foreground: #ffffff !important;
+  --color-success: #10b981 !important;
+  --color-success-foreground: #ffffff !important;
+  --color-border: #e2e8f0 !important;
+  --color-input: #ffffff !important;
+  --color-ring: #8b5cf6 !important;
 }
 
 @layer base {
@@ -115,12 +173,40 @@
   }
 }
 
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
 .animate-float {
   animation: float 3s ease-in-out infinite;
+}
+
+.animate-slide-in {
+  animation: slideInFromLeft 0.3s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
 }
 
 /* Custom Scrollbar Styles */

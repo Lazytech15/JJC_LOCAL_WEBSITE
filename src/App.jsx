@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { AuthProvider, useAuth } from "./contexts/AuthContext"
 import DepartmentSelector from "./components/DepartmentSelector"
 import LoginForm from "./components/LoginForm"
@@ -11,10 +11,8 @@ import SuperAdminDashboard from "./components/SuperAdminDashboard"
 import EmployeeLanding from "./components/employeeLandingPage/EmployeeLanding"
 import EmployeeLogin from "./components/employeeLandingPage/EmployeeLogin"
 import EmployeeDashboard from "./components/employeeLandingPage/EmployeeDashboard"
-import "./index.css"
-import '../Toolbox_new/styles/globals.css'
-import UserInventory from "../Toolbox_new/app/page"
-import { LoadingProvider } from "../Toolbox_new/components/loading-context"
+import './index.css'
+import ToolboxWrapper from "./components/ToolboxWrapper"
 
 function App() {
   return (
@@ -46,94 +44,108 @@ function AppContent() {
 
   return (
     <Router>
-      <div
-        className={`min-h-screen transition-all duration-300 ${isDarkMode
-            ? "bg-gradient-to-br from-gray-900 via-slate-900 to-zinc-900 text-gray-100"
-            : "bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50 text-gray-900"
-          }`}
-      >
-        <Routes>
-          {/* Employee Routes (Main/Public) */}
-          <Route path="/" element={<EmployeeLanding />} />
-          <Route path="/employee/login" element={<EmployeeLogin />} />
-          <Route
-            path="/employee/dashboard"
-            element={
-              <EmployeeProtectedRoute>
-                <EmployeeDashboard />
-              </EmployeeProtectedRoute>
-            }
-          />
-
-          {/* Public User Inventory Route */}
-          <Route
-            path="/jjctoolbox"
-            element={
-              <div data-app="toolbox" className="min-h-screen">
-                <LoadingProvider>
-                  <UserInventory />
-                </LoadingProvider>
-              </div>
-            }
-          />
-
-          {/* Admin/Department Routes (Protected with special URL) */}
-          <Route path="/jjcewgsaccess" element={<DepartmentSelector />} />
-          <Route path="/jjcewgsaccess/login/:department" element={<LoginForm />} />
-          <Route
-            path="/jjcewgsaccess/super-admin"
-            element={
-              <AdminProtectedRoute department="super-admin" requireSuperAdmin={true}>
-                <SuperAdminDashboard />
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/jjcewgsaccess/hr"
-            element={
-              <AdminProtectedRoute department="Human Resources">
-                <HRDepartment />
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/jjcewgsaccess/operations"
-            element={
-              <AdminProtectedRoute department="Operation">
-                <OperationsDepartment />
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/jjcewgsaccess/finance"
-            element={
-              <AdminProtectedRoute department="Finance">
-                <FinancePayrollDepartment />
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/jjcewgsaccess/procurement"
-            element={
-              <AdminProtectedRoute department="Procurement">
-                <ProcurementDepartment />
-              </AdminProtectedRoute>
-            }
-          />
-          <Route
-            path="/jjcewgsaccess/engineering"
-            element={
-              <AdminProtectedRoute department="Engineering">
-                <EngineeringDepartment />
-              </AdminProtectedRoute>
-            }
-          />
-
-          {/* Catch all - redirect to employee landing */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </div>
+      <RoutesWrapper />
     </Router>
+  )
+}
+
+function RoutesWrapper() {
+  const location = useLocation()
+  const { isDarkMode } = useAuth()
+  const isToolboxRoute = location.pathname === "/jjctoolbox"
+
+  console.log("Current pathname:", location.pathname)
+  console.log("Is Toolbox route?", isToolboxRoute)
+  console.log("AuthContext isDarkMode:", isDarkMode)
+
+  // For toolbox route, don't apply main app styling
+  if (isToolboxRoute) {
+    console.log("Rendering Toolbox with ThemeProvider")
+    return (
+      <Routes>
+        <Route path="/jjctoolbox" element={<ToolboxWrapper />} />
+      </Routes>
+    )
+  }
+
+  // For all other routes, apply main app styling
+  console.log("Rendering main app routes with AuthContext styling")
+  return (
+    <div
+      className={`min-h-screen transition-all duration-300 ${isDarkMode
+          ? "bg-gradient-to-br from-gray-900 via-slate-900 to-zinc-900 text-gray-100"
+          : "bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50 text-gray-900"
+        }`}
+    >
+      <Routes>
+              {/* Employee Routes (Main/Public) */}
+              <Route path="/" element={<EmployeeLanding />} />
+              <Route path="/employee/login" element={<EmployeeLogin />} />
+              <Route
+                path="/employee/dashboard"
+                element={
+                  <EmployeeProtectedRoute>
+                    <EmployeeDashboard />
+                  </EmployeeProtectedRoute>
+                }
+              />
+
+              {/* Admin/Department Routes (Protected with special URL) */}
+              <Route path="/jjcewgsaccess" element={<DepartmentSelector />} />
+              <Route path="/jjcewgsaccess/login/:department" element={<LoginForm />} />
+              <Route
+                path="/jjcewgsaccess/super-admin"
+                element={
+                  <AdminProtectedRoute department="super-admin" requireSuperAdmin={true}>
+                    <SuperAdminDashboard />
+                  </AdminProtectedRoute>
+                }
+              />
+              <Route
+                path="/jjcewgsaccess/hr"
+                element={
+                  <AdminProtectedRoute department="Human Resources">
+                    <HRDepartment />
+                  </AdminProtectedRoute>
+                }
+              />
+              <Route
+                path="/jjcewgsaccess/operations"
+                element={
+                  <AdminProtectedRoute department="Operation">
+                    <OperationsDepartment />
+                  </AdminProtectedRoute>
+                }
+              />
+              <Route
+                path="/jjcewgsaccess/finance"
+                element={
+                  <AdminProtectedRoute department="Finance">
+                    <FinancePayrollDepartment />
+                  </AdminProtectedRoute>
+                }
+              />
+              <Route
+                path="/jjcewgsaccess/procurement"
+                element={
+                  <AdminProtectedRoute department="Procurement">
+                    <ProcurementDepartment />
+                  </AdminProtectedRoute>
+                }
+              />
+              <Route
+                path="/jjcewgsaccess/engineering"
+                element={
+                  <AdminProtectedRoute department="Engineering">
+                    <EngineeringDepartment />
+                  </AdminProtectedRoute>
+                }
+              />
+
+              {/* Catch all - redirect to employee landing */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </div>
   )
 }
 

@@ -5,7 +5,7 @@ import {
   processBarcodeInput,
   type Product
 } from "../lib/barcode-scanner"
-import { Filter, Grid, List, Scan, ChevronDown, RefreshCw, Settings, Wifi, Download, FileText, FileSpreadsheet, Code, Plus, Package } from "lucide-react"
+import { Filter, Grid, List, Scan, ChevronDown, RefreshCw, Settings, Wifi, Download, FileText, FileSpreadsheet, Code, Plus, Package, Menu, X } from "lucide-react"
 import { useLoading } from "./loading-context"
 import { SearchLoader } from "./enhanced-loaders"
 import { OfflineStatusPanel } from "./offline-status"
@@ -113,6 +113,7 @@ export function DashboardView({
   const [hasLoadedLogs, setHasLoadedLogs] = useState(false)
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? navigator.onLine : true)
   const [isCategoriesCollapsed, setIsCategoriesCollapsed] = useState(false)
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const { toast } = useToast()
   const { setSearchLoading } = useLoading()
 
@@ -774,8 +775,188 @@ export function DashboardView({
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Modern Sidebar */}
-      <div className="w-72 bg-card border-r border-border backdrop-blur-sm sticky top-0 h-screen overflow-y-auto custom-scrollbar">
+      {/* Mobile Sidebar Overlay */}
+      {isMobileSidebarOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300"
+            onClick={() => setIsMobileSidebarOpen(false)}
+            aria-hidden="true"
+          />
+          {/* Mobile Drawer */}
+          <div className="fixed inset-y-0 left-0 w-72 bg-card border-r border-border z-50 lg:hidden overflow-y-auto custom-scrollbar transform transition-transform duration-300 ease-in-out">
+            {/* Mobile Sidebar Header with Close Button */}
+            <div className="p-6 border-b border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
+                    <Filter className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-foreground">Controls</h2>
+                    <p className="text-xs text-muted-foreground">Filter & manage items</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsMobileSidebarOpen(false)}
+                  className="w-8 h-8 p-0 hover:bg-muted rounded-lg transition-all duration-200"
+                  aria-label="Close sidebar"
+                >
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Mobile Sidebar Content (same as desktop) */}
+            <div className="p-6 space-y-8">
+              {/* System Status Card */}
+              <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <div className="w-5 h-5 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
+                      <Wifi className="w-3 h-3 text-white" />
+                    </div>
+                    System Status
+                  </h3>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-success' : 'bg-orange-500'}`}></div>
+                        <span className="text-xs text-muted-foreground">API</span>
+                      </div>
+                      <Badge 
+                        variant={isConnected ? "default" : "outline"} 
+                        className="text-xs px-2 py-0.5 rounded-full"
+                      >
+                        {isConnected ? "Connected" : "Disconnected"}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-success' : 'bg-red-500'}`}></div>
+                        <span className="text-xs text-muted-foreground">Network</span>
+                      </div>
+                      <Badge 
+                        variant={isOnline ? "default" : "outline"} 
+                        className="text-xs px-2 py-0.5 rounded-full"
+                      >
+                        {isOnline ? "Online" : "Offline"}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Source</span>
+                      <Badge 
+                        variant={dataSource === "api" ? "default" : "outline"} 
+                        className="text-xs px-2 py-0.5 rounded-full"
+                      >
+                        {dataSource === "api" ? "Live" : "Cache"}
+                      </Badge>
+                    </div>
+                    
+                    {lastFetchTime && (
+                      <div className="text-xs text-muted-foreground pt-1 border-t border-border">
+                        Updated {lastFetchTime.toLocaleTimeString()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Categories Section */}
+              <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
+                <button
+                  onClick={() => setIsCategoriesCollapsed(!isCategoriesCollapsed)}
+                  className="w-full flex items-center justify-between mb-3 group"
+                >
+                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <div className="w-5 h-5 bg-gradient-to-br from-purple-400 to-pink-500 rounded-md flex items-center justify-center">
+                      <Filter className="w-3 h-3 text-white" />
+                    </div>
+                    Categories
+                  </h3>
+                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isCategoriesCollapsed ? "-rotate-90" : ""}`} />
+                </button>
+                
+                {!isCategoriesCollapsed && (
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setSelectedCategory("all")}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
+                        selectedCategory === "all"
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <span className="text-sm font-medium">All Items</span>
+                      <span className="text-xs ml-2 opacity-70">({products.length})</span>
+                    </button>
+                    {categories.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
+                          selectedCategory === cat
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <span className="text-sm font-medium">{cat === "all" ? "All Items" : cat}</span>
+                        <span className="text-xs ml-2 opacity-70">
+                          ({cat === "all" ? products.length : products.filter((p) => p.itemType === cat).length})
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Availability Filters */}
+              <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
+                <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                  <div className="w-5 h-5 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-md flex items-center justify-center">
+                    <Package className="w-3 h-3 text-white" />
+                  </div>
+                  Availability
+                </h3>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <Checkbox 
+                      id="mobile-available" 
+                      checked={showAvailable} 
+                      onCheckedChange={(checked) => setShowAvailable(checked === true)}
+                      className="border-border data-[state=checked]:bg-success data-[state=checked]:border-success"
+                    />
+                    <span className="text-sm text-foreground group-hover:text-foreground transition-colors">
+                      In Stock
+                    </span>
+                  </label>
+                  
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <Checkbox 
+                      id="mobile-unavailable" 
+                      checked={showUnavailable} 
+                      onCheckedChange={(checked) => setShowUnavailable(checked === true)}
+                      className="border-border data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                    />
+                    <span className="text-sm text-foreground group-hover:text-foreground transition-colors">
+                      Out of Stock
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Desktop Sidebar - Hidden on mobile, visible on lg+ */}
+      <div className="hidden lg:block w-72 bg-card border-r border-border backdrop-blur-sm sticky top-0 h-screen overflow-y-auto custom-scrollbar">
         {/* Sidebar Header */}
         <div className="p-6 border-b border-border">
           <div className="flex items-center justify-between">
@@ -1106,7 +1287,7 @@ export function DashboardView({
               </h3>
               
               <div className="space-y-3">
-                <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg">
+                <div className="text-xs text-slate-700 dark:text-slate-300 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg">
                   📱 Click input field first, then scan Code-128 barcode (ITM001, ITM004, etc.)
                 </div>
                 
@@ -1116,7 +1297,7 @@ export function DashboardView({
                   value={barcodeInput}
                   onChange={handleBarcodeInputChange}
                   onKeyPress={handleBarcodeKeyPress}
-                  className="font-mono text-sm bg-card border-border rounded-lg transition-all duration-200 hover:border-muted-foreground focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/50"
+                  className="font-mono text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 border-border rounded-lg transition-all duration-200 hover:border-muted-foreground focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/50"
                 />
                 
                 <Button
@@ -1233,6 +1414,16 @@ export function DashboardView({
           <div className="bg-background relative z-10 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4 px-2 py-1 rounded">
+                {/* Mobile Menu Button - Hidden on desktop (lg+) */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="lg:hidden"
+                  onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+                  title="Toggle filters"
+                >
+                  <Menu className="w-5 h-5" />
+                </Button>
                 <h1 className="text-2xl font-bold text-foreground">All Items</h1>
                 <Badge
                   variant="secondary"

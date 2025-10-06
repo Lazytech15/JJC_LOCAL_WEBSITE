@@ -18,7 +18,7 @@ const STATIC_ASSETS = [
   '/favicon.ico',
   '/_next/static/css/',
   '/_next/static/js/',
-  '/placeholder-logo.svg',
+  '/ToolBoxlogo.png',
   '/placeholder-user.jpg',
 ]
 

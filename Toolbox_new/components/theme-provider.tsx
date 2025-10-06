@@ -15,16 +15,16 @@ type ThemeProviderState = {
 }
 
 const initialState: ThemeProviderState = {
-  theme: "system",
+  theme: "dark",
   setTheme: () => null,
-  resolvedTheme: "light",
+  resolvedTheme: "dark",
 }
 
 const ThemeProviderContext = React.createContext<ThemeProviderState>(initialState)
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
+  defaultTheme = "dark",
   storageKey = "toolbox-theme",
   ...props
 }: ThemeProviderProps) {
@@ -35,15 +35,21 @@ export function ThemeProvider({
     return defaultTheme
   })
 
-  const [resolvedTheme, setResolvedTheme] = React.useState<"dark" | "light">("light")
+  const [resolvedTheme, setResolvedTheme] = React.useState<"dark" | "light">("dark")
 
   React.useEffect(() => {
     const root = window.document.documentElement
 
+    console.log("ThemeProvider useEffect running")
+    console.log("Current theme:", theme)
+    console.log("Current HTML classes:", root.className)
+
+    // Remove both classes first
     root.classList.remove("light", "dark")
 
     if (theme === "system") {
       const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+      console.log("System theme detected:", systemTheme)
       root.classList.add(systemTheme)
       setResolvedTheme(systemTheme)
       
@@ -51,6 +57,7 @@ export function ThemeProvider({
       const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
       const handleChange = (e: MediaQueryListEvent) => {
         const newTheme = e.matches ? "dark" : "light"
+        console.log("System theme changed to:", newTheme)
         root.classList.remove("light", "dark")
         root.classList.add(newTheme)
         setResolvedTheme(newTheme)
@@ -61,8 +68,10 @@ export function ThemeProvider({
         mediaQuery.removeEventListener("change", handleChange)
       }
     } else {
+      console.log("Applying theme:", theme)
       root.classList.add(theme)
       setResolvedTheme(theme)
+      console.log("HTML classes after apply:", root.className)
     }
 
     return undefined
@@ -72,6 +81,7 @@ export function ThemeProvider({
     theme,
     resolvedTheme,
     setTheme: (newTheme: Theme) => {
+      console.log("Setting theme to:", newTheme)
       localStorage?.setItem(storageKey, newTheme)
       setTheme(newTheme)
     },

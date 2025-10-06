@@ -10,7 +10,7 @@ import "./app/globals.css"
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="system" storageKey="toolbox-theme">
+      <ThemeProvider defaultTheme="dark" storageKey="toolbox-theme">
         <LoadingProvider>
           <KeyboardShortcuts />
           <App />

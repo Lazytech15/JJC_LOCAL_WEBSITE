@@ -1,40 +1,68 @@
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "./theme-provider"
 import { Button } from "./ui/button"
+import { useState } from "react"
 
 export function ThemeToggle() {
   const { theme, setTheme, resolvedTheme } = useTheme()
+  const [isAnimating, setIsAnimating] = useState(false)
+  const isDark = resolvedTheme === "dark"
 
-  const cycleTheme = () => {
-    if (theme === "light") {
-      setTheme("dark")
-    } else if (theme === "dark") {
-      setTheme("system")
-    } else {
+  const toggleTheme = () => {
+    console.log("Current theme:", theme, "Resolved:", resolvedTheme)
+    
+    // Trigger animation
+    setIsAnimating(true)
+    
+    // Simple toggle: dark <-> light
+    if (resolvedTheme === "dark") {
+      console.log("Switching to light")
       setTheme("light")
+    } else {
+      console.log("Switching to dark")
+      setTheme("dark")
     }
+    
+    // Reset animation after it completes
+    setTimeout(() => setIsAnimating(false), 500)
   }
 
   return (
     <Button
       variant="ghost"
       size="icon"
-      onClick={cycleTheme}
-      className="h-9 w-9 relative"
-      title={`Current theme: ${theme === "system" ? `system (${resolvedTheme})` : theme}`}
+      onClick={toggleTheme}
+      className={`h-9 w-9 relative overflow-hidden transition-all duration-300 ${
+        isAnimating 
+          ? 'scale-90 rotate-180' 
+          : 'scale-100 rotate-0'
+      } hover:bg-slate-200/50 dark:hover:bg-slate-700/50`}
+      title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
     >
-      {/* Light mode icon */}
-      <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      {/* Sun icon - visible in DARK mode (shows what you'll switch TO) */}
+      <Sun 
+        className={`h-[1.3rem] w-[1.3rem] absolute transition-all duration-500 ease-in-out ${
+          isDark 
+            ? 'rotate-0 scale-100 opacity-100 text-amber-500' 
+            : 'rotate-90 scale-0 opacity-0 text-amber-500'
+        }`} 
+      />
       
-      {/* Dark mode icon */}
-      <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+      {/* Moon icon - visible in LIGHT mode (shows what you'll switch TO) */}
+      <Moon 
+        className={`h-[1.2rem] w-[1.2rem] absolute transition-all duration-500 ease-in-out ${
+          !isDark 
+            ? 'rotate-0 scale-100 opacity-100 text-indigo-600' 
+            : '-rotate-90 scale-0 opacity-0 text-indigo-600'
+        }`} 
+      />
       
-      {/* System mode indicator */}
-      {theme === "system" && (
-        <div className="absolute bottom-0 right-0 w-2 h-2 bg-blue-500 rounded-full border border-background" />
+      {/* Animated ring effect on click */}
+      {isAnimating && (
+        <span className="absolute inset-0 rounded-full bg-gradient-to-r from-amber-500 to-indigo-600 opacity-20 animate-ping" />
       )}
       
-      <span className="sr-only">Toggle theme (current: {theme})</span>
+      <span className="sr-only">Toggle theme</span>
     </Button>
   )
 }
