@@ -139,148 +139,189 @@ export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
   }, [currentIndex, images])
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* Back Button */}
-      <div className="flex justify-between items-center mb-6">
+    <div className="max-w-5xl mx-auto p-4 sm:p-6">
+      {/* Industrial Themed Header */}
+      <div className="flex justify-between items-center mb-4 bg-gradient-to-r from-slate-800 via-zinc-800 to-slate-800 dark:from-slate-900 dark:via-zinc-900 dark:to-slate-900 rounded-lg p-3 sm:p-4 relative overflow-hidden border-l-4 border-amber-500">
+        {/* Decorative Gear */}
+        <div className="absolute top-0 right-0 w-20 h-20 opacity-5">
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-amber-500">
+            <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z" />
+          </svg>
+        </div>
+        
         <button
           onClick={onBack}
-          className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"
+          className="relative z-10 px-3 py-2 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-all flex items-center gap-2 text-sm font-medium"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Inventory
+          <span className="hidden sm:inline">Back to Inventory</span>
+          <span className="sm:hidden">Back</span>
         </button>
         
         {onEdit && (
           <button
             onClick={() => onEdit(item)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+            className="relative z-10 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-lg transition-all flex items-center gap-2 shadow-lg hover:shadow-xl text-sm font-semibold"
           >
-            Edit Item
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span className="hidden sm:inline">Edit Item</span>
+            <span className="sm:hidden">Edit</span>
           </button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Image Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-8">
-          <div className="aspect-square bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 text-lg overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        {/* Image Section - Industrial Theme */}
+        <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-lg shadow-lg border-2 border-slate-300 dark:border-slate-700 p-4 sm:p-6 relative overflow-hidden">
+          {/* Metal pattern overlay */}
+          <div className="absolute inset-0 opacity-5 pointer-events-none">
+            <div className="absolute inset-0" style={{
+              backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.1) 10px, rgba(0,0,0,0.1) 20px)`
+            }}/>
+          </div>
+          
+          <div className="relative aspect-square bg-white dark:bg-slate-950 rounded-lg flex items-center justify-center overflow-hidden border-2 border-slate-200 dark:border-slate-800 shadow-inner">
             {imageUrl && !imageError ? (
               <img
                 src={imageUrl}
                 alt={item.item_name}
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain p-4"
                 onError={() => setImageError(true)}
               />
             ) : (
-              <div className="text-center">
-                <div className="text-6xl mb-2">📦</div>
-                <div>No Image</div>
+              <div className="text-center text-slate-400 dark:text-slate-600">
+                <svg className="w-20 h-20 mx-auto mb-3 opacity-30" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2m0 2v3h4V6H4m6 0v3h10V6H10M4 11v3h4v-3H4m6 0v3h10v-3H10M4 16v2h4v-2H4m6 0v2h10v-2H10z" />
+                </svg>
+                <div className="text-sm font-medium">No Image Available</div>
               </div>
             )}
           </div>
           {images.length > 1 && (
-            <div className="flex justify-center gap-2 mt-3">
+            <div className="relative flex justify-center gap-2 mt-4">
               {images.map((_, i) => (
                 <button
                   key={i}
                   aria-label={`Image ${i+1}`}
                   onClick={() => setCurrentIndex(i)}
-                  className={`w-2.5 h-2.5 rounded-full ${i===currentIndex ? 'bg-slate-600 dark:bg-slate-300' : 'bg-slate-300 dark:bg-slate-600'}`}
+                  className={`w-3 h-3 rounded-full transition-all ${
+                    i===currentIndex 
+                      ? 'bg-amber-500 ring-2 ring-amber-300 dark:ring-amber-700 scale-110' 
+                      : 'bg-slate-300 dark:bg-slate-600 hover:bg-slate-400 dark:hover:bg-slate-500'
+                  }`}
                 />
               ))}
             </div>
           )}
         </div>
 
-        {/* Product Information */}
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-4">{item.item_name}</h1>
+        {/* Product Information - Industrial Theme */}
+        <div className="space-y-4">
+          <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900 rounded-lg shadow-lg border-2 border-slate-300 dark:border-slate-700 p-4 sm:p-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-100 mb-3 flex items-start gap-2">
+              <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-amber-600 dark:text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+                </svg>
+              </div>
+              <span>{item.item_name}</span>
+            </h1>
 
-            <div className="space-y-3 text-slate-600 dark:text-slate-300">
-              <div className="flex justify-between">
-                <span className="font-medium">Item Number:</span>
-                <span>{item.item_no}</span>
+            <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
+              <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-700">
+                <span className="font-semibold text-amber-700 dark:text-amber-500">Item Number:</span>
+                <span className="font-mono text-slate-900 dark:text-slate-100">#{item.item_no}</span>
               </div>
 
-              <div className="flex justify-between">
-                <span className="font-medium">Brand:</span>
-                <span>{item.brand || '-'}</span>
+              <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-700">
+                <span className="font-semibold">Brand:</span>
+                <span className="text-slate-900 dark:text-slate-100">{item.brand || '-'}</span>
               </div>
 
-              <div className="flex justify-between">
-                <span className="font-medium">Item Type:</span>
-                <span>{item.item_type || '-'}</span>
+              <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-700">
+                <span className="font-semibold">Item Type:</span>
+                <span className="text-slate-900 dark:text-slate-100">{item.item_type || '-'}</span>
               </div>
 
-              <div className="flex justify-between">
-                <span className="font-medium">Location:</span>
-                <span>{item.location || '-'}</span>
+              <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-700">
+                <span className="font-semibold">Location:</span>
+                <span className="text-slate-900 dark:text-slate-100">{item.location || '-'}</span>
               </div>
 
-              <div className="flex justify-between">
-                <span className="font-medium">Current Balance:</span>
-                <span className="font-bold text-slate-900 dark:text-slate-100">{item.balance || 0} {item.unit_of_measure || ''}</span>
+              <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-700">
+                <span className="font-semibold">Current Balance:</span>
+                <span className="font-bold text-lg text-slate-900 dark:text-slate-100">{item.balance || 0} <span className="text-xs text-slate-500">{item.unit_of_measure || ''}</span></span>
               </div>
 
-              <div className="flex justify-between">
-                <span className="font-medium">Price per Unit:</span>
-                <span className="font-bold text-slate-900 dark:text-slate-100">{formatCurrency(item.price_per_unit || 0)}</span>
+              <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-700">
+                <span className="font-semibold">Price per Unit:</span>
+                <span className="font-bold text-lg text-amber-600 dark:text-amber-500">{formatCurrency(item.price_per_unit || 0)}</span>
               </div>
 
-              <div className="flex justify-between">
-                <span className="font-medium">Supplier:</span>
-                <span>{item.supplier || '-'}</span>
+              <div className="flex justify-between py-2">
+                <span className="font-semibold">Supplier:</span>
+                <span className="text-slate-900 dark:text-slate-100">{item.supplier || '-'}</span>
               </div>
             </div>
           </div>
 
-          {/* Status Badge */}
-          <div>
-            <span className={`${getStatusColor(status)} text-white text-sm px-4 py-2 rounded-full inline-block`}>
+          {/* Status Badge - Industrial Style */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Status:</span>
+            <span className={`${getStatusColor(status)} text-white text-sm px-4 py-1.5 rounded-full inline-flex items-center gap-2 font-semibold shadow-md`}>
+              <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
               {getStatusText(status)}
             </span>
           </div>
 
 
-          {/* Quantity Selection */}
+          {/* Quantity Selection - Industrial Theme */}
           {status !== "Out Of Stock" && onAddToCart && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4">
-              <div className="space-y-4">
-                <h3 className="font-medium text-slate-900 dark:text-slate-100">Select Quantity</h3>
+            <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900 rounded-lg shadow-lg border-2 border-slate-300 dark:border-slate-700 p-4">
+              <div className="space-y-3">
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-amber-600 dark:text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                  </svg>
+                  Select Quantity
+                </h3>
 
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center justify-center gap-4">
                   <button
                     onClick={decrementQuantity}
                     disabled={quantity <= 1}
-                    className="w-10 h-10 border border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-10 h-10 bg-gradient-to-br from-slate-700 to-slate-800 dark:from-slate-800 dark:to-slate-900 border-2 border-slate-600 dark:border-slate-700 rounded-lg flex items-center justify-center text-white hover:from-slate-600 hover:to-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-md active:scale-95"
                   >
-                    <Minus className="w-4 h-4" />
+                    <Minus className="w-5 h-5" />
                   </button>
 
-                  <div className="text-2xl font-bold w-16 text-center">{quantity}</div>
+                  <div className="text-3xl font-bold w-20 text-center text-slate-900 dark:text-slate-100 tabular-nums">{quantity}</div>
 
                   <button
                     onClick={incrementQuantity}
                     disabled={quantity >= (item.balance || 0)}
-                    className="w-10 h-10 border border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-10 h-10 bg-gradient-to-br from-slate-700 to-slate-800 dark:from-slate-800 dark:to-slate-900 border-2 border-slate-600 dark:border-slate-700 rounded-lg flex items-center justify-center text-white hover:from-slate-600 hover:to-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-md active:scale-95"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-5 h-5" />
                   </button>
                 </div>
 
-                <p className="text-sm text-slate-500 dark:text-slate-400">Maximum available: {item.balance || 0}</p>
+                <p className="text-xs text-center text-slate-500 dark:text-slate-400">
+                  <span className="font-semibold">Available:</span> {item.balance || 0} units
+                </p>
               </div>
             </div>
           )}
 
-          {/* Add to Cart Button */}
+          {/* Add to Cart Button - Industrial Theme */}
           {onAddToCart && (
-            <div className="space-y-3">
+            <div className="space-y-2">
               <button
                 onClick={handleAddToCart}
                 disabled={status === "Out Of Stock"}
-                className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg transition-colors text-lg font-semibold"
+                className="w-full bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg transition-all text-base font-bold shadow-lg hover:shadow-xl disabled:shadow-none flex items-center justify-center gap-2"
               >
                 {status === "Out Of Stock" ? "Out of Stock" : `Add ${quantity} to Toolbox`}
               </button>

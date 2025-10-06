@@ -384,6 +384,12 @@ export function StartPage({
               <span className="block">TOOLBOX v2.0 • INDUSTRIAL GRADE</span>
               <span className="block text-slate-600">Built for Heavy-Duty Operations</span>
             </p>
+            <div className="mt-3 pt-2 border-t border-slate-800">
+              <p className="text-xs text-slate-600 space-y-0.5">
+                <span className="block">© {new Date().getFullYear()} JJC Engineering. All rights reserved.</span>
+                <span className="block text-slate-700">Developed by KEIYK & Lazytech15</span>
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
