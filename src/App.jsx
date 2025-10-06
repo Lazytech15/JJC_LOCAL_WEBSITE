@@ -11,7 +11,10 @@ import SuperAdminDashboard from "./components/SuperAdminDashboard"
 import EmployeeLanding from "./components/employeeLandingPage/EmployeeLanding"
 import EmployeeLogin from "./components/employeeLandingPage/EmployeeLogin"
 import EmployeeDashboard from "./components/employeeLandingPage/EmployeeDashboard"
+import "./index.css"
+import '../Toolbox_new/styles/globals.css'
 import UserInventory from "../Toolbox_new/app/page"
+import { LoadingProvider } from "../Toolbox_new/components/loading-context"
 
 function App() {
   return (
@@ -28,11 +31,10 @@ function AppContent() {
   if (isLoading) {
     return (
       <div
-        className={`min-h-screen flex items-center justify-center transition-all duration-300 ${
-          isDarkMode
+        className={`min-h-screen flex items-center justify-center transition-all duration-300 ${isDarkMode
             ? "bg-gradient-to-br from-gray-900 via-slate-900 to-zinc-900 text-gray-100"
             : "bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50 text-gray-900"
-        }`}
+          }`}
       >
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -45,11 +47,10 @@ function AppContent() {
   return (
     <Router>
       <div
-        className={`min-h-screen transition-all duration-300 ${
-          isDarkMode
+        className={`min-h-screen transition-all duration-300 ${isDarkMode
             ? "bg-gradient-to-br from-gray-900 via-slate-900 to-zinc-900 text-gray-100"
             : "bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50 text-gray-900"
-        }`}
+          }`}
       >
         <Routes>
           {/* Employee Routes (Main/Public) */}
@@ -63,9 +64,18 @@ function AppContent() {
               </EmployeeProtectedRoute>
             }
           />
-          
+
           {/* Public User Inventory Route */}
-          <Route path="/jjctoolbox" element={<UserInventory />} />
+          <Route
+            path="/jjctoolbox"
+            element={
+              <div data-app="toolbox" className="min-h-screen">
+                <LoadingProvider>
+                  <UserInventory />
+                </LoadingProvider>
+              </div>
+            }
+          />
 
           {/* Admin/Department Routes (Protected with special URL) */}
           <Route path="/jjcewgsaccess" element={<DepartmentSelector />} />
