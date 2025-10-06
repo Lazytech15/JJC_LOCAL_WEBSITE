@@ -1,5 +1,5 @@
 //client attendance.jsx - Enhanced with employee details modal, statistics, and Excel export
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { pollingManager } from "../../utils/api/websocket/polling-manager";
 import apiService from "../../utils/api/api-service";
@@ -1400,141 +1400,150 @@ function Attendance() {
   };
 
   useEffect(() => {
-    // Initialize polling manager if not already running
-    if (!pollingManager.isPolling) {
-      pollingManager.initialize();
-      pollingManager.joinAllRooms(); // Or joinRoom('attendance')
-    }
+  // Initialize polling manager if not already running
+  if (!pollingManager.isPolling) {
+    pollingManager.initialize();
+    pollingManager.joinAllRooms();
+  }
 
+  // Only fetch on mount
+  fetchAttendanceData();
+  fetchAttendanceStats();
+
+  setConnectionStatus("connecting");
+
+  // Subscribe to attendance events
+  const unsubscribeAttendanceCreated = pollingManager.subscribeToUpdates(
+    "attendance_created",
+    (data) => {
+      console.log("[Attendance] New attendance record:", data);
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
+
+      // Check if the record matches current filters
+      const matchesFilters = 
+        (!filters.date || data.date === filters.date) &&
+        (!filters.employee_uid || data.employee_uid === filters.employee_uid) &&
+        (!filters.clock_type || data.clock_type === filters.clock_type);
+
+      if (matchesFilters) {
+        setAttendanceData((prev) => {
+          const exists = prev.some((record) => record.id === data.id);
+          if (!exists) {
+            setNewRecordIds((prev) => new Set([...prev, data.id]));
+            setTimeout(() => {
+              setNewRecordIds((prev) => {
+                const updated = new Set(prev);
+                updated.delete(data.id);
+                return updated;
+              });
+            }, 5000);
+
+            if (data.employee_uid) {
+              loadNewProfilePicture(data.employee_uid);
+            }
+
+            return [data, ...prev].slice(0, filters.limit);
+          }
+          return prev;
+        });
+        fetchAttendanceStats();
+      }
+    }
+  );
+
+  const unsubscribeAttendanceUpdated = pollingManager.subscribeToUpdates(
+    "attendance_updated",
+    (data) => {
+      console.log("[Attendance] Attendance record updated:", data);
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
+
+      setAttendanceData((prev) => {
+        const updated = prev.map((record) =>
+          record.id === data.id ? { ...record, ...data } : record
+        );
+        return [...updated];
+      });
+      fetchAttendanceStats();
+    }
+  );
+
+  const unsubscribeAttendanceDeleted = pollingManager.subscribeToUpdates(
+    "attendance_deleted",
+    (data) => {
+      console.log("[Attendance] Attendance record deleted:", data);
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
+
+      setAttendanceData((prev) => {
+        const filtered = prev.filter((record) => record.id !== data.id);
+        return [...filtered];
+      });
+      fetchAttendanceStats();
+    }
+  );
+
+  const unsubscribeAttendanceSynced = pollingManager.subscribeToUpdates(
+    "attendance_synced",
+    (data) => {
+      console.log("[Attendance] Attendance records synced:", data);
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
+
+      fetchAttendanceData();
+      fetchAttendanceStats();
+    }
+  );
+
+  const unsubscribeEmployeeUpdated = pollingManager.subscribeToUpdates(
+    "employee_updated",
+    (data) => {
+      console.log("[Attendance] Employee updated, refreshing attendance data");
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
+
+      fetchAttendanceData();
+    }
+  );
+
+  const unsubscribeConnection = pollingManager.subscribeToUpdates(
+    "connection",
+    (data) => {
+      console.log("[Attendance] Connection status:", data.status);
+      setConnectionStatus(data.status);
+    }
+  );
+
+  return () => {
+    // Unsubscribe from all events
+    unsubscribeAttendanceCreated();
+    unsubscribeAttendanceUpdated();
+    unsubscribeAttendanceDeleted();
+    unsubscribeAttendanceSynced();
+    unsubscribeEmployeeUpdated();
+    unsubscribeConnection();
+
+    setConnectionStatus("disconnected");
+
+    // Clean up profile picture URLs
+    Object.values(profilePictures).forEach((url) => {
+      if (url && url.startsWith("blob:")) {
+        URL.revokeObjectURL(url);
+      }
+    });
+  };
+}, []); // Only run on mount
+
+// Separate effect for filter changes
+useEffect(() => {
+  // Skip the initial render (when component first mounts)
+  if (attendanceData.length > 0 || filters.date || filters.employee_uid || filters.clock_type) {
     fetchAttendanceData();
     fetchAttendanceStats();
-
-    setConnectionStatus("connecting");
-
-    // Subscribe to attendance events
-    const unsubscribeAttendanceCreated = pollingManager.subscribeToUpdates(
-      "attendance_created",
-      (data) => {
-        console.log("[Attendance] New attendance record:", data);
-        setConnectionStatus("connected");
-        setLastUpdate(new Date());
-
-        if (!filters.date || data.date === filters.date) {
-          setAttendanceData((prev) => {
-            const exists = prev.some((record) => record.id === data.id);
-            if (!exists) {
-              setNewRecordIds((prev) => new Set([...prev, data.id]));
-              setTimeout(() => {
-                setNewRecordIds((prev) => {
-                  const updated = new Set(prev);
-                  updated.delete(data.id);
-                  return updated;
-                });
-              }, 5000);
-
-              if (data.employee_uid) {
-                loadNewProfilePicture(data.employee_uid);
-              }
-
-              return [data, ...prev.slice(0, filters.limit - 1)];
-            }
-            return prev;
-          });
-        }
-        fetchAttendanceStats();
-      }
-    );
-
-    const unsubscribeAttendanceUpdated = pollingManager.subscribeToUpdates(
-      "attendance_updated",
-      (data) => {
-        console.log("[Attendance] Attendance record updated:", data);
-        setConnectionStatus("connected");
-        setLastUpdate(new Date());
-
-        setAttendanceData((prev) =>
-          prev.map((record) =>
-            record.id === data.id ? { ...record, ...data } : record
-          )
-        );
-        fetchAttendanceStats();
-      }
-    );
-
-    const unsubscribeAttendanceDeleted = pollingManager.subscribeToUpdates(
-      "attendance_deleted",
-      (data) => {
-        console.log("[Attendance] Attendance record deleted:", data);
-        setConnectionStatus("connected");
-        setLastUpdate(new Date());
-
-        setAttendanceData((prev) =>
-          prev.filter((record) => record.id !== data.id)
-        );
-        fetchAttendanceStats();
-      }
-    );
-
-    const unsubscribeAttendanceSynced = pollingManager.subscribeToUpdates(
-      "attendance_synced",
-      (data) => {
-        console.log("[Attendance] Attendance records synced:", data);
-        setConnectionStatus("connected");
-        setLastUpdate(new Date());
-
-        fetchAttendanceData();
-        fetchAttendanceStats();
-      }
-    );
-
-    const unsubscribeEmployeeUpdated = pollingManager.subscribeToUpdates(
-      "employee_updated",
-      (data) => {
-        console.log("[Attendance] Employee updated, refreshing attendance data");
-        setConnectionStatus("connected");
-        setLastUpdate(new Date());
-
-        fetchAttendanceData();
-      }
-    );
-
-    // Monitor connection status
-    const unsubscribeConnection = pollingManager.subscribeToUpdates(
-      "connection",
-      (data) => {
-        console.log("[Attendance] Connection status:", data.status);
-        setConnectionStatus(data.status);
-      }
-    );
-
-    // Remove this timeout - let the connection event handle it
-    // The pollingManager will notify when actually connected
-    // setTimeout(() => {
-    //   if (connectionStatus === "connecting") {
-    //     setConnectionStatus("connected");
-    //   }
-    // }, 2000);
-
-    return () => {
-      // Unsubscribe from all events
-      unsubscribeAttendanceCreated();
-      unsubscribeAttendanceUpdated();
-      unsubscribeAttendanceDeleted();
-      unsubscribeAttendanceSynced();
-      unsubscribeEmployeeUpdated();
-      unsubscribeConnection();
-
-      // Correct: Don't disconnect polling manager - other components use it
-      setConnectionStatus("disconnected");
-
-      // Clean up profile picture URLs
-      Object.values(profilePictures).forEach((url) => {
-        if (url && url.startsWith("blob:")) {
-          URL.revokeObjectURL(url);
-        }
-      });
-    };
-  }, [filters]); // Keep filters as the only dependency
+  }
+}, [filters.date, filters.startDate, filters.endDate, filters.useRange, 
+    filters.employee_uid, filters.clock_type, filters.limit]);
 
   const fetchAttendanceData = async () => {
     try {
@@ -2629,8 +2638,9 @@ function Attendance() {
     );
   };
 
-  // Group the attendance data
-  const groupedAttendance = groupAttendanceByEmployee(attendanceData);
+  const groupedAttendance = useMemo(() => {
+  return groupAttendanceByEmployee(attendanceData);
+}, [attendanceData]);
 
   return (
     <div className="space-y-8">
@@ -3133,13 +3143,14 @@ function Attendance() {
 
                 return (
                   <div
-                    key={`${employee.employee_uid}-${employee.date}-${index}`}
-                    onClick={() =>
-                      loadEmployeeDetails(
-                        employee.employee_uid,
-                        employee.employee_info
-                      )
-                    }
+                    // Add unique key that will change when records update
+        key={`${employee.employee_uid}-${employee.date}-${employee.records.length}-${employee.latest_clock_time}`}
+        onClick={() =>
+          loadEmployeeDetails(
+            employee.employee_uid,
+            employee.employee_info
+          )
+        }
                     className={`group relative overflow-hidden rounded-3xl border transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl cursor-pointer ${hasNewRecords
                         ? "bg-gradient-to-br from-emerald-50/90 to-emerald-100/70 dark:from-emerald-900/30 dark:to-emerald-800/20 border-emerald-300/60 dark:border-emerald-700/60 shadow-2xl animate-pulse shadow-emerald-500/20"
                         : "bg-gradient-to-br from-white/80 to-white/60 dark:from-slate-800/80 dark:to-slate-900/60 border-white/40 dark:border-slate-700/40 hover:shadow-xl backdrop-blur-xl hover:border-indigo-300/60 dark:hover:border-indigo-700/60"
