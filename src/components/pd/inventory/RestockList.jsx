@@ -20,27 +20,42 @@ export default function RestockList() {
         return acc
       }, {})
       const result = await apiService.items.getItems({ ...cleanFilters, limit: 1000 })
+      
+      console.log("RestockList - Raw API response:", result)
+      console.log("RestockList - Items fetched:", result.data?.length || 0)
+      console.log("RestockList - Sample item with DB trigger status:", result.data?.[0])
+      
+      // Log status distribution from database triggers
+      const statusCounts = result.data?.reduce((acc, item) => {
+        const status = item.item_status || "Unknown"
+        acc[status] = (acc[status] || 0) + 1
+        return acc
+      }, {})
+      console.log("RestockList - Status distribution from DB triggers:", statusCounts)
+      
       setItems(result.data || [])
     } catch (err) {
+      console.error("RestockList - Fetch error:", err)
       setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const statusFromText = (text) => {
-    if (!text) return null
-    const t = String(text).toLowerCase().trim()
-    if (t.includes("out")) return "Out Of Stock"
-    if (t.includes("low")) return "Low In Stock"
-    if (t.includes("in")) return "In Stock"
-    return null
-  }
-  const deriveStatus = (item) => {
-    const bal = Number(item.balance) || 0
-    const min = Number(item.min_stock) || 0
-    if (bal === 0) return "Out Of Stock"
-    if (min > 0 && bal < min) return "Low In Stock"
+  // Trust the database trigger - it automatically sets item_status based on:
+  // balance = in_qty - out_qty
+  // balance <= 0 → "Out of Stock"
+  // 0 < balance < min_stock → "Low in Stock"  
+  // balance >= min_stock → "In Stock"
+  const normalizeStatus = (dbStatus) => {
+    if (!dbStatus) return "In Stock" // Default fallback
+    const status = String(dbStatus).trim()
+    // Database returns exact strings: "Out of Stock", "Low in Stock", "In Stock"
+    // Normalize to title case for UI consistency
+    if (status === "Out of Stock") return "Out Of Stock"
+    if (status === "Low in Stock") return "Low In Stock"
+    if (status === "In Stock") return "In Stock"
+    // Fallback for any unexpected values
     return "In Stock"
   }
 
@@ -51,12 +66,14 @@ export default function RestockList() {
 
   const restockItems = useMemo(() => {
     const withStatus = items.map((i) => {
-      const status = statusFromText(i.item_status) || deriveStatus(i)
+      // Trust the database trigger's item_status field
+      const status = normalizeStatus(i.item_status)
       const shortage = Math.max((Number(i.min_stock) || 0) - (Number(i.balance) || 0), 0)
       const recommended = Math.max(shortage, 1)
       return { ...i, __status: status, __shortage: shortage, __recommended_order: recommended }
     })
-    return withStatus
+    
+    const filtered = withStatus
       .filter((i) => i.__status === "Out Of Stock" || i.__status === "Low In Stock")
       .sort((a, b) => {
         // Out of stock first
@@ -69,6 +86,12 @@ export default function RestockList() {
         // Then by name
         return String(a.item_name || "").localeCompare(String(b.item_name || ""))
       })
+    
+    console.log("RestockList - Total items with status:", withStatus.length)
+    console.log("RestockList - Filtered restock items:", filtered.length)
+    console.log("RestockList - Restock items:", filtered)
+    
+    return filtered
   }, [items])
 
   const uniqueSuppliers = useMemo(() => {

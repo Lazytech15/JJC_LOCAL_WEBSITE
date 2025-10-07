@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
-import ModalPortal from "/src/components/pd/ModalPortal"
-import { items as itemsService } from "../../utils/api/api-service.js"
+import ModalPortal from "../shared/ModalPortal"
+import { items as itemsService } from "../../../utils/api/api-service.js"
 
 function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
   const [currentStep, setCurrentStep] = useState(1)

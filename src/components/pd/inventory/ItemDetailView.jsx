@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeft, Plus, Minus } from "lucide-react"
-import { items as itemsService } from "../../utils/api/api-service.js"
+import { items as itemsService } from "../../../utils/api/api-service.js"
 
 export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
   const [quantity, setQuantity] = useState(1)

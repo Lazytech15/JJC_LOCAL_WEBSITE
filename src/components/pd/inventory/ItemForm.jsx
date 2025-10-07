@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { items as itemsService } from "../../utils/api/api-service.js"
+import { items as itemsService } from "../../../utils/api/api-service.js"
 
 function ItemForm({ item, onSave, onCancel }) {
   const [formData, setFormData] = useState({

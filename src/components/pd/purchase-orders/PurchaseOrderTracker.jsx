@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react"
-import apiService from "../../utils/api/api-service"
-import ModalPortal from "./ModalPortal"
+import apiService from "../../../utils/api/api-service"
+import { ModalPortal, useToast } from "../shared"
 import CreatePurchaseOrderWizard from "./CreatePurchaseOrderWizard"
-import { useToast } from "./ToastNotification"
 
 function PurchaseOrderTracker() {
   const { success, error: showError } = useToast()
@@ -684,153 +683,201 @@ function PurchaseOrderTracker() {
       {/* Order Details Modal */}
       {showOrderDetails && selectedOrder && (
         <ModalPortal>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
-            <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Order Details - {selectedOrder.id}</h3>
-                  <button
-                    onClick={() => setShowOrderDetails(false)}
-                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+              {/* Header with Gradient */}
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
+                <div>
+                  <h3 className="text-2xl font-bold text-white">Purchase Order Details</h3>
+                  <p className="text-blue-100 text-sm mt-1">{selectedOrder.id}</p>
                 </div>
+                <button
+                  onClick={() => setShowOrderDetails(false)}
+                  className="text-white hover:text-blue-200 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
+              {/* Scrollable Content */}
+              <div className="overflow-y-auto flex-1 p-6 bg-gray-50 dark:bg-gray-800">
                 <div className="space-y-6">
-                  {/* Order Info */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Supplier</label>
-                      <div className="text-gray-800 dark:text-gray-200 font-medium">{selectedOrder.supplier}</div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Status</label>
-                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.status)}`}>
-                        {getStatusText(selectedOrder.status)}
-                      </span>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Order Date</label>
-                      <div className="text-gray-800 dark:text-gray-200">{formatDate(selectedOrder.order_date)}</div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Expected Delivery</label>
-                      <div className="text-gray-800 dark:text-gray-200">{formatDate(selectedOrder.expected_delivery_date)}</div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Priority</label>
-                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(selectedOrder.priority)}`}>
-                        {selectedOrder.priority}
-                      </span>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Total Value</label>
-                      <div className="text-gray-800 dark:text-gray-200 font-bold">{formatCurrency(selectedOrder.total_value)}</div>
-                    </div>
-                  </div>
-
-                  {/* Order Items */}
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Order Items</h4>
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead className="bg-gray-100 dark:bg-gray-700">
-                          <tr>
-                            <th className="px-4 py-2 text-left font-semibold text-gray-800 dark:text-gray-200">Item</th>
-                            <th className="px-4 py-2 text-center font-semibold text-gray-800 dark:text-gray-200">Quantity</th>
-                            <th className="px-4 py-2 text-center font-semibold text-gray-800 dark:text-gray-200">Unit Price</th>
-                            <th className="px-4 py-2 text-center font-semibold text-gray-800 dark:text-gray-200">Total</th>
-                            <th className="px-4 py-2 text-center font-semibold text-gray-800 dark:text-gray-200">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                          {selectedOrder.items.map((item) => (
-                            <tr key={item.item_no}>
-                              <td className="px-4 py-2">
-                                <div className="font-medium text-gray-800 dark:text-gray-200">{item.item_name}</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">ID: {item.item_no}</div>
-                              </td>
-                              <td className="px-4 py-2 text-center text-gray-600 dark:text-gray-400">
-                                {item.quantity} {item.unit_of_measure || ''}
-                              </td>
-                              <td className="px-4 py-2 text-center text-gray-600 dark:text-gray-400">
-                                {formatCurrency(item.unit_price)}
-                              </td>
-                              <td className="px-4 py-2 text-center font-semibold text-gray-800 dark:text-gray-200">
-                                {formatCurrency(item.quantity * item.unit_price)}
-                              </td>
-                              <td className="px-4 py-2 text-center">
-                                <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
-                                  {getStatusText(item.status)}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Update Status */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                    <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Update Order Status</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">New Status</label>
-                        <select
-                          value={statusUpdate.new_status}
-                          onChange={(e) => setStatusUpdate({ ...statusUpdate, new_status: e.target.value })}
-                          className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="requested">Requested</option>
-                          <option value="ordered">Ordered</option>
-                          <option value="in_transit">In Transit</option>
-                          <option value="ready_for_pickup">Ready for Pickup</option>
-                          <option value="received">Received</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
+                  {/* Order Information Section */}
+                  <div className="bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg p-6 shadow-sm">
+                    <h4 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Order Information
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Supplier</label>
+                        <div className="text-gray-900 dark:text-gray-100 font-semibold text-lg">{selectedOrder.supplier}</div>
                       </div>
-                      {statusUpdate.new_status === "received" && (
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Status</label>
+                        <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(selectedOrder.status)}`}>
+                          {getStatusText(selectedOrder.status)}
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Priority</label>
+                        <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${getPriorityColor(selectedOrder.priority)}`}>
+                          {selectedOrder.priority?.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Order Date</label>
+                        <div className="text-gray-800 dark:text-gray-200 font-medium">{formatDate(selectedOrder.order_date)}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Expected Delivery</label>
+                        <div className="text-gray-800 dark:text-gray-200 font-medium">{formatDate(selectedOrder.expected_delivery_date)}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Total Value</label>
+                        <div className="text-blue-600 dark:text-blue-400 font-bold text-xl">{formatCurrency(selectedOrder.total_value)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Order Items Section */}
+                  <div className="bg-white dark:bg-gray-900 border border-green-200 dark:border-green-800 rounded-lg p-6 shadow-sm">
+                    <h4 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      Order Items ({selectedOrder.items?.length || 0})
+                    </h4>
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700">
+                            <tr>
+                              <th className="px-4 py-3 text-left font-bold text-gray-700 dark:text-gray-200 border-b-2 border-gray-300 dark:border-gray-600">Item</th>
+                              <th className="px-4 py-3 text-center font-bold text-gray-700 dark:text-gray-200 border-b-2 border-gray-300 dark:border-gray-600">Quantity</th>
+                              <th className="px-4 py-3 text-right font-bold text-gray-700 dark:text-gray-200 border-b-2 border-gray-300 dark:border-gray-600">Unit Price</th>
+                              <th className="px-4 py-3 text-right font-bold text-gray-700 dark:text-gray-200 border-b-2 border-gray-300 dark:border-gray-600">Total</th>
+                              <th className="px-4 py-3 text-center font-bold text-gray-700 dark:text-gray-200 border-b-2 border-gray-300 dark:border-gray-600">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
+                            {selectedOrder.items.map((item, idx) => (
+                              <tr key={item.item_no} className={idx % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800/50'}>
+                                <td className="px-4 py-3">
+                                  <div className="font-semibold text-gray-900 dark:text-gray-100">{item.item_name}</div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">#{item.item_no}</div>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <span className="inline-block px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded font-medium">
+                                    {item.quantity} {item.unit_of_measure || ''}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300 font-medium">
+                                  {formatCurrency(item.unit_price)}
+                                </td>
+                                <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-gray-100">
+                                  {formatCurrency(item.quantity * item.unit_price)}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(item.status)}`}>
+                                    {getStatusText(item.status)}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                            {/* Total Row */}
+                            <tr className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 font-bold">
+                              <td colSpan="3" className="px-4 py-3 text-right text-gray-900 dark:text-gray-100 uppercase text-sm">
+                                Total Amount:
+                              </td>
+                              <td className="px-4 py-3 text-right text-blue-600 dark:text-blue-400 text-lg font-bold">
+                                {formatCurrency(selectedOrder.total_value)}
+                              </td>
+                              <td></td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Update Status Section */}
+                  <div className="bg-white dark:bg-gray-900 border border-purple-200 dark:border-purple-800 rounded-lg p-6 shadow-sm">
+                    <h4 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Update Order Status
+                    </h4>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Actual Delivery Date</label>
-                          <input
-                            type="date"
-                            value={statusUpdate.actual_delivery_date}
-                            onChange={(e) => setStatusUpdate({ ...statusUpdate, actual_delivery_date: e.target.value })}
-                            className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">New Status</label>
+                          <select
+                            value={statusUpdate.new_status}
+                            onChange={(e) => setStatusUpdate({ ...statusUpdate, new_status: e.target.value })}
+                            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-lg px-4 py-2.5 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                          >
+                            <option value="">Select new status...</option>
+                            <option value="requested">Requested</option>
+                            <option value="ordered">Ordered</option>
+                            <option value="in_transit">In Transit</option>
+                            <option value="ready_for_pickup">Ready for Pickup</option>
+                            <option value="received">Received</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
                         </div>
-                      )}
-                    </div>
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Update Notes</label>
-                      <textarea
-                        value={statusUpdate.notes}
-                        onChange={(e) => setStatusUpdate({ ...statusUpdate, notes: e.target.value })}
-                        rows={3}
-                        className="w-full border border-gray-300 dark:border-gray-600 bg-white/50 dark:bg-black/30 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Notes about this status update..."
-                      />
-                    </div>
-                    <div className="flex gap-3 mt-4">
-                      <button
-                        onClick={handleUpdateStatus}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
-                      >
-                        Update Status
-                      </button>
-                      <button
-                        onClick={() => setShowOrderDetails(false)}
-                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        Cancel
-                      </button>
+                        {statusUpdate.new_status === "received" && (
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Actual Delivery Date</label>
+                            <input
+                              type="date"
+                              value={statusUpdate.actual_delivery_date}
+                              onChange={(e) => setStatusUpdate({ ...statusUpdate, actual_delivery_date: e.target.value })}
+                              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-lg px-4 py-2.5 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Update Notes</label>
+                        <textarea
+                          value={statusUpdate.notes}
+                          onChange={(e) => setStatusUpdate({ ...statusUpdate, notes: e.target.value })}
+                          rows={3}
+                          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-lg px-4 py-2.5 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none"
+                          placeholder="Add notes about this status update..."
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Footer with Action Buttons */}
+              <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4 flex gap-3">
+                <button
+                  onClick={handleUpdateStatus}
+                  disabled={!statusUpdate.new_status}
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Update Status
+                  </span>
+                </button>
+                <button
+                  onClick={() => setShowOrderDetails(false)}
+                  className="px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold transition-all"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>
