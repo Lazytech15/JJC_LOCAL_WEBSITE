@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import apiService from "../../utils/api/api-service"
-import { useToast } from "./ToastNotification"
+import { useToast } from "./shared/ToastNotification"
 
 function SupplierManagement() {
   const { error: showError } = useToast()

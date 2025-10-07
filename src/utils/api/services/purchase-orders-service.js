@@ -38,4 +38,40 @@ export class PurchaseOrdersService extends BaseAPIService {
       method: "DELETE",
     })
   }
+
+  // GET /api/items/purchase-orders/suppliers - Get list of suppliers
+  // Options: { lowStock: true } to filter suppliers with low/out of stock items
+  async getSuppliers(options = {}) {
+    const params = new URLSearchParams()
+    if (options.lowStock) {
+      params.append('low_stock', 'true')
+    }
+    const query = params.toString()
+    return this.request(`/api/items/purchase-orders/suppliers${query ? '?' + query : ''}`)
+  }
+
+  // GET /api/items/purchase-orders/generate-prefix - Generate current MMYY prefix
+  async generatePOPrefix() {
+    return this.request("/api/items/purchase-orders/generate-prefix")
+  }
+
+  // GET /api/items/purchase-orders/suggest-number - Get suggested next PO number
+  async suggestPONumber() {
+    return this.request("/api/items/purchase-orders/suggest-number")
+  }
+
+  // GET /api/items/purchase-orders/items-by-supplier - Get items filtered by supplier
+  // Options: { lowStock: true } to filter only low/out of stock items
+  async getItemsBySupplier(supplierName, options = {}) {
+    const params = new URLSearchParams({ supplier: supplierName })
+    if (options.lowStock) {
+      params.append('low_stock', 'true')
+    }
+    return this.request(`/api/items/purchase-orders/items-by-supplier?${params.toString()}`)
+  }
+
+  // GET /api/items/purchase-orders/check/:po_number - Check if PO number exists
+  async checkPONumber(poNumber) {
+    return this.request(`/api/items/purchase-orders/check/${poNumber}`)
+  }
 }
