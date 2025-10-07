@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
-import { ArrowLeft, Plus, Minus } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { ArrowLeft, Plus, Minus, Package, Briefcase, Cog, Wrench } from "lucide-react"
 import { Button } from "./ui/button"
 import { Card, CardContent } from "./ui/card"
 import { Badge } from "./ui/badge"
 import type { Product } from "../lib/barcode-scanner"
+import { apiService } from "../lib/api_service"
 
 interface ItemDetailViewProps {
   product: Product
@@ -15,6 +16,12 @@ interface ItemDetailViewProps {
 
 export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewProps) {
   const [quantity, setQuantity] = useState(1)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [imageError, setImageError] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const [images, setImages] = useState<any[]>([])
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const rotationTimer = useRef<NodeJS.Timeout | null>(null)
 
   const getStatusColor = (status: Product["status"]) => {
     switch (status) {
@@ -59,28 +66,156 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
     }
   }
 
+  // Load images when component mounts or product changes
+  useEffect(() => {
+    setImageError(false)
+    setImageLoaded(false)
+    if (!product?.id) {
+      setImageUrl(null)
+      return
+    }
+    
+    const itemId = typeof product.id === 'number' ? product.id : parseInt(product.id, 10)
+    if (isNaN(itemId)) {
+      setImageUrl(null)
+      return
+    }
+    
+    // Load images list
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await apiService.getItemImages(itemId)
+        if (!res?.success) throw new Error('Failed to load images')
+        
+        const list = (res.data || []).map((img: any) => ({
+          ...img,
+          url: `${apiService.getItemImageUrl(itemId, img.filename)}?t=${Date.now()}`,
+        }))
+        
+        if (!cancelled) {
+          setImages(list)
+          setCurrentIndex(0)
+          setImageUrl(list[0]?.url || null)
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setImages([])
+          // Fallback to latest endpoint if listing fails
+          const url = apiService.getItemLatestImageUrl(itemId)
+          setImageUrl(`${url}?t=${Date.now()}`)
+        }
+      }
+    })()
+    
+    return () => { cancelled = true }
+  }, [product?.id])
+
+  // Auto-rotate when multiple images
+  useEffect(() => {
+    if (rotationTimer.current) {
+      clearInterval(rotationTimer.current)
+      rotationTimer.current = null
+    }
+    
+    if (images.length > 1) {
+      rotationTimer.current = setInterval(() => {
+        setCurrentIndex((prev) => {
+          const next = (prev + 1) % images.length
+          setImageUrl(images[next]?.url || null)
+          return next
+        })
+      }, 5000) // Change image every 5 seconds
+    }
+    
+    return () => {
+      if (rotationTimer.current) {
+        clearInterval(rotationTimer.current)
+        rotationTimer.current = null
+      }
+    }
+  }, [images])
+
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* Back Button */}
-      <Button variant="ghost" onClick={onBack} className="mb-6">
+    <div className="max-w-4xl mx-auto p-6 relative">
+      {/* Industrial background pattern */}
+      <div className="absolute inset-0 opacity-5 pointer-events-none">
+        <div className="absolute top-10 right-10">
+          <Cog className="w-32 h-32 text-slate-400 animate-spin-slow" />
+        </div>
+        <div className="absolute bottom-10 left-10">
+          <Wrench className="w-24 h-24 text-slate-400 rotate-45" />
+        </div>
+      </div>
+
+      {/* Back Button - Industrial Style */}
+      <Button 
+        variant="ghost" 
+        onClick={onBack} 
+        className="mb-6 border-2 border-slate-700 hover:bg-slate-800 hover:border-slate-600 transition-all"
+      >
         <ArrowLeft className="w-4 h-4 mr-2" />
         Back to Dashboard
       </Button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Image Section */}
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative">
+        {/* Image Section - Industrial Frame */}
+        <Card className="border-2 border-slate-700 bg-card/50 backdrop-blur-sm relative overflow-hidden">
+          {/* Corner bolts */}
+          <div className="absolute top-3 left-3 w-2 h-2 bg-slate-500 rounded-full z-10"></div>
+          <div className="absolute top-3 right-3 w-2 h-2 bg-slate-500 rounded-full z-10"></div>
+          <div className="absolute bottom-3 left-3 w-2 h-2 bg-slate-500 rounded-full z-10"></div>
+          <div className="absolute bottom-3 right-3 w-2 h-2 bg-slate-500 rounded-full z-10"></div>
+          
           <CardContent className="p-8">
-            <div className="aspect-square bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-lg">
-              image here
+            <div className="aspect-square bg-slate-900/50 rounded-lg flex items-center justify-center overflow-hidden border-2 border-slate-700 relative">
+              {/* Industrial frame corners */}
+              <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-slate-500"></div>
+              <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-slate-500"></div>
+              <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-slate-500"></div>
+              <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-slate-500"></div>
+              
+              {!imageError && (
+                <img 
+                  src={imageUrl || undefined} 
+                  alt={product.name}
+                  className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  onLoad={() => setImageLoaded(true)}
+                  onError={() => setImageError(true)}
+                />
+              )}
+              {(!imageUrl || !imageLoaded || imageError) && (
+                <Package className="w-24 h-24 text-slate-400" />
+              )}
+              
+              {/* Image Counter */}
+              {images.length > 1 && (
+                <div className="absolute bottom-4 right-4 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-medium">
+                  {currentIndex + 1} / {images.length}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Product Information */}
+        {/* Product Information - Industrial Style */}
         <div className="space-y-6">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-4">{product.name}</h1>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="relative">
+                <div className="absolute -inset-0.5 border border-slate-600 rounded"></div>
+                <div className="relative bg-slate-800 p-2 rounded border border-slate-600">
+                  <Briefcase className="w-5 h-5 text-slate-300" />
+                  <div className="absolute top-0 left-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+                  <div className="absolute top-0 right-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+                  <div className="absolute bottom-0 left-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+                  <div className="absolute bottom-0 right-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+                </div>
+              </div>
+              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-200 via-slate-100 to-slate-300">
+                {product.name}
+              </h1>
+            </div>
 
             <div className="space-y-3 text-muted-foreground">
               <div className="flex justify-between">
@@ -195,3 +330,4 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
     </div>
   )
 }
+

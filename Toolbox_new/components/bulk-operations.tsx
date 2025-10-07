@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { 
-  ShoppingCart, 
+  Briefcase, 
   Download, 
   Trash2, 
   X
@@ -139,7 +139,7 @@ export function BulkOperationsBar({
               size="sm"
               className="flex items-center gap-2"
             >
-              <ShoppingCart className="w-4 h-4" />
+              <Briefcase className="w-4 h-4" />
               Add to Cart ({availableItemsCount})
             </Button>
           )}

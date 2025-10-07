@@ -60,7 +60,7 @@ export default function HomePage() {
   
   // Move products state to parent to prevent unnecessary API calls
   const [products, setProducts] = useState<Product[]>([])
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true)
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [productsDataSource, setProductsDataSource] = useState<"api" | "cached">("cached")
   const [productsLastFetchTime, setProductsLastFetchTime] = useState<Date | null>(null)
 
@@ -166,6 +166,10 @@ export default function HomePage() {
 
   const totalCartItems = cartItems.reduce((sum, item) => sum + item.quantity, 0)
 
+  // Check if we have cached data available
+  const offlineData = getOfflineData()
+  const hasCachedData = offlineData.products.length > 0
+
   if (!isAppStarted) {
     return (
       <StartPage
@@ -175,6 +179,8 @@ export default function HomePage() {
         isConnected={isApiConnected}
         apiError={apiError}
         isTestingConnection={isTestingConnection}
+        hasCachedData={hasCachedData}
+        isDataLoading={isLoadingProducts}
       />
     )
   }

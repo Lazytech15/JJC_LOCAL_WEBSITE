@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react"
 import apiService from "../../utils/api/api-service"
-import Swal from "sweetalert2"
+import { useToast } from "./ToastNotification"
 
 function SupplierManagement() {
+  const { error: showError } = useToast()
   // Supplier Management States
   const [selectedSupplier, setSelectedSupplier] = useState("")
   const [supplierItems, setSupplierItems] = useState([])
@@ -72,12 +73,7 @@ function SupplierManagement() {
       await apiService.items.exportAndDownloadSupplierReport(supplier)
     } catch (error) {
       console.error("Error downloading supplier report:", error)
-      Swal.fire({
-        title: "Error!",
-        text: "Failed to download supplier report",
-        icon: "error",
-        confirmButtonText: "OK",
-      })
+      showError("Error!", "Failed to download supplier report")
     }
   }
 

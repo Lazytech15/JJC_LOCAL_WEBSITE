@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { Search, Home, ShoppingCart, X } from "lucide-react"
+import { Search, Home, Briefcase, X, Zap } from "lucide-react"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Badge } from "./ui/badge"
@@ -99,20 +99,37 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-slate-900 dark:bg-slate-950 border-b border-border shadow-lg">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b-2 border-slate-700 shadow-2xl">
+      {/* Industrial accent line */}
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-blue-500/50 to-transparent"></div>
+      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-8 py-3 sm:py-4 gap-3 sm:gap-0">
         {/* Logo */}
         <div className="flex items-center space-x-3">
           <div className="relative">
-            <img 
-              src="/ToolBoxlogo.png" 
-              alt="Toolbox Logo" 
-              className="w-10 h-10 object-contain"
-            />
+            {/* Industrial frame around logo */}
+            <div className="absolute -inset-1 border border-slate-600 rounded-lg"></div>
+            <div className="relative bg-slate-800 p-1.5 rounded-lg border border-slate-600">
+              <img 
+                src="/ToolBoxlogo.png" 
+                alt="Toolbox Logo" 
+                className="w-7 h-7 object-contain"
+              />
+              {/* Corner bolts */}
+              <div className="absolute top-0 left-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+              <div className="absolute top-0 right-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+              <div className="absolute bottom-0 left-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+              <div className="absolute bottom-0 right-0 w-1 h-1 bg-slate-500 rounded-full"></div>
+            </div>
           </div>
           <div>
-            <span className="text-xl font-bold tracking-wide text-white">TOOLBOX</span>
-            <div className="text-xs text-slate-300 font-medium">Inventory System</div>
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-slate-100 via-white to-slate-200">
+                TOOLBOX
+              </span>
+              <Zap className="w-3 h-3 text-yellow-500" />
+            </div>
+            <div className="text-[10px] text-slate-400 font-mono tracking-wide uppercase">Industrial POS</div>
           </div>
         </div>
 
@@ -170,7 +187,6 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-1">
               <CartStatusIndicator />
             </div>
-            <div className="w-px h-6 bg-slate-600/50"></div>
             <ThemeToggle />
           </div>
 
@@ -203,7 +219,7 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
                   : "text-slate-300 hover:text-white hover:bg-white/10"
               }`}
             >
-              <ShoppingCart className="w-5 h-5" />
+              <Briefcase className="w-5 h-5" />
               <span className="ml-2 hidden sm:inline font-medium">Cart</span>
               {cartItemCount > 0 && (
                 <Badge

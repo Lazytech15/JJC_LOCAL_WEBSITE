@@ -7,12 +7,14 @@ import type { ToastActionElement, ToastProps } from '../components/ui/toast'
 
 const TOAST_LIMIT = 3
 const TOAST_REMOVE_DELAY = 3000
+const DUPLICATE_CHECK_WINDOW = 1000 // Prevent duplicates within 1 second
 
 type ToasterToast = ToastProps & {
   id: string
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
+  timestamp?: number
 }
 
 const actionTypes = {
@@ -74,6 +76,22 @@ const addToRemoveQueue = (toastId: string) => {
 export const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case 'ADD_TOAST':
+      // Check for duplicates within the time window
+      const isDuplicate = state.toasts.some((existingToast) => {
+        const timeDiff = action.toast.timestamp && existingToast.timestamp 
+          ? action.toast.timestamp - existingToast.timestamp 
+          : 0
+        return (
+          existingToast.title === action.toast.title &&
+          existingToast.description === action.toast.description &&
+          timeDiff < DUPLICATE_CHECK_WINDOW
+        )
+      })
+      
+      if (isDuplicate) {
+        return state // Don't add duplicate toast
+      }
+      
       return {
         ...state,
         toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
@@ -141,6 +159,7 @@ type Toast = Omit<ToasterToast, 'id'>
 
 function toast({ ...props }: Toast) {
   const id = genId()
+  const timestamp = Date.now()
 
   const update = (props: ToasterToast) =>
     dispatch({
@@ -154,6 +173,7 @@ function toast({ ...props }: Toast) {
     toast: {
       ...props,
       id,
+      timestamp,
       open: true,
       onOpenChange: (open) => {
         if (!open) dismiss()
@@ -161,10 +181,13 @@ function toast({ ...props }: Toast) {
     },
   })
 
-  // Auto-dismiss after 2 seconds for better UX
-  setTimeout(() => {
-    dismiss()
-  }, 2000)
+  // Auto-dismiss based on duration or default
+  const duration = (props as any).duration !== undefined ? (props as any).duration : 4000
+  if (duration > 0) {
+    setTimeout(() => {
+      dismiss()
+    }, duration)
+  }
 
   return {
     id: id,

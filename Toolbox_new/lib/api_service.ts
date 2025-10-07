@@ -95,6 +95,27 @@ export class ApiServices {
     return this.itemsService.updateItemQuantity(itemId, updateType, value, notes)
   }
 
+  /**
+   * Get list of images for an item
+   */
+  async getItemImages(itemId: number): Promise<any> {
+    return this.itemsService.getItemImages(itemId)
+  }
+
+  /**
+   * Build URL for latest image (direct <img src>)
+   */
+  getItemLatestImageUrl(itemId: number): string {
+    return this.itemsService.getItemLatestImageUrl(itemId)
+  }
+
+  /**
+   * Build URL for a specific image filename
+   */
+  getItemImageUrl(itemId: number, filename: string): string {
+    return this.itemsService.getItemImageUrl(itemId, filename)
+  }
+
   // ========================================
   // EMPLOYEES OPERATIONS
   // ========================================
