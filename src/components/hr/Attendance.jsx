@@ -19,6 +19,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import AttendanceEdit from "./AttendanceEdit"
 
 function Attendance() {
   const { user } = useAuth();
@@ -51,6 +52,8 @@ function Attendance() {
     limit: 20,
     offset: 0,
   });
+  // Add state for modal
+  const [showEditModal, setShowEditModal] = useState(false);
   const [newRecordIds, setNewRecordIds] = useState(new Set());
 
   // Employee Details Modal State
@@ -59,6 +62,7 @@ function Attendance() {
   const [employeeStats, setEmployeeStats] = useState(null);
   const [employeeHistory, setEmployeeHistory] = useState([]);
   const [loadingEmployeeData, setLoadingEmployeeData] = useState(false);
+  const [selectedRecordsToUnsync, setSelectedRecordsToUnsync] = useState(new Set());
 
   // Export State
   const [isExporting, setIsExporting] = useState(false);
@@ -1211,6 +1215,64 @@ function Attendance() {
     }
   };
 
+  const handleMarkAsUnsynced = async () => {
+  if (selectedRecordsToUnsync.size === 0) {
+    alert("Please select at least one record to mark as unsynced");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Mark ${selectedRecordsToUnsync.size} record(s) as unsynced?\n\nThis will allow you to edit them in the Attendance Editor.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    // Get full attendance records for selected dates
+    const recordsToMark = [];
+    
+    for (const historyId of selectedRecordsToUnsync) {
+      const historyRecord = employeeHistory.find(h => h.id === historyId);
+      if (historyRecord) {
+        // Fetch attendance records for this date
+        const result = await apiService.attendance.getAttendanceRecords({
+          employee_uid: selectedEmployee.uid,
+          date: historyRecord.date,
+          limit: "100"
+        });
+
+        if (result.success) {
+          const syncedRecords = result.data.filter(r => r.is_synced);
+          recordsToMark.push(...syncedRecords.map(r => ({
+            id: r.id,
+            notes: `Marked for editing on ${new Date().toLocaleString()}`
+          })));
+        }
+      }
+    }
+
+    if (recordsToMark.length === 0) {
+      alert("No synced records found for the selected dates");
+      return;
+    }
+
+    const batchResult = await apiService.editAttendance.batchEditRecords(recordsToMark);
+
+    if (batchResult.success) {
+      alert(`Successfully marked ${batchResult.success_count} records as unsynced!`);
+      setSelectedRecordsToUnsync(new Set());
+      fetchAttendanceData();
+      fetchAttendanceStats();
+      closeEmployeeModal();
+    } else {
+      throw new Error(batchResult.error || "Failed to mark records as unsynced");
+    }
+  } catch (error) {
+    console.error("Error marking records as unsynced:", error);
+    alert("Failed to mark records as unsynced: " + error.message);
+  }
+};
+
   // Bulk load all profile pictures as a zip file with deduplication
   const loadBulkProfilePictures = async (uniqueUids) => {
     if (!uniqueUids || uniqueUids.length === 0) return;
@@ -1776,37 +1838,53 @@ useEffect(() => {
     const pieData = preparePieData(employeeStats);
 
     return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-          {/* Modal Header */}
-          <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-t-3xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <ProfilePicture
-                  uid={selectedEmployee.uid}
-                  name={employeeName}
-                  size="w-20 h-20"
-                />
-                <div>
-                  <h2 className="text-3xl font-bold text-white">
-                    {employeeName}
-                  </h2>
-                  <div className="text-indigo-100 mt-2 space-y-1">
-                    <p>
-                      <span className="font-medium">ID:</span>{" "}
-                      {selectedEmployee.info.id_number || selectedEmployee.uid}
-                    </p>
-                    <p>
-                      <span className="font-medium">Department:</span>{" "}
-                      {selectedEmployee.info.department || "N/A"}
-                    </p>
-                    <p>
-                      <span className="font-medium">Position:</span>{" "}
-                      {selectedEmployee.info.position || "N/A"}
-                    </p>
-                  </div>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Modal Header */}
+        <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-t-3xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <ProfilePicture
+                uid={selectedEmployee.uid}
+                name={employeeName}
+                size="w-20 h-20"
+              />
+              <div>
+                <h2 className="text-3xl font-bold text-white">
+                  {employeeName}
+                </h2>
+                <div className="text-indigo-100 mt-2 space-y-1">
+                  <p>
+                    <span className="font-medium">ID:</span>{" "}
+                    {selectedEmployee.info.id_number || selectedEmployee.uid}
+                  </p>
+                  <p>
+                    <span className="font-medium">Department:</span>{" "}
+                    {selectedEmployee.info.department || "N/A"}
+                  </p>
+                  <p>
+                    <span className="font-medium">Position:</span>{" "}
+                    {selectedEmployee.info.position || "N/A"}
+                  </p>
                 </div>
               </div>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3">
+              {/* Mark as Unsynced Button */}
+              <button
+                onClick={handleMarkAsUnsynced}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg"
+                title="Mark records as unsynced for editing"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span>Mark for Editing</span>
+              </button>
+
+              {/* Close Button */}
               <button
                 onClick={closeEmployeeModal}
                 className="p-3 bg-white/20 hover:bg-white/30 rounded-2xl text-white transition-colors"
@@ -1827,6 +1905,7 @@ useEffect(() => {
               </button>
             </div>
           </div>
+        </div>
 
           {/* Modal Content */}
           <div className="p-6">
@@ -2473,6 +2552,22 @@ useEffect(() => {
                               key={record.id || index}
                               className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
                             >
+                              <td className="p-4">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedRecordsToUnsync.has(record.id)}
+                                  onChange={(e) => {
+                                    const newSet = new Set(selectedRecordsToUnsync);
+                                    if (e.target.checked) {
+                                      newSet.add(record.id);
+                                    } else {
+                                      newSet.delete(record.id);
+                                    }
+                                    setSelectedRecordsToUnsync(newSet);
+                                  }}
+                                  className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                                />
+                            </td>
                               <td className="p-4 font-medium text-slate-800 dark:text-slate-200">
                                 {new Date(record.date).toLocaleDateString()}
                               </td>
@@ -2917,6 +3012,13 @@ useEffect(() => {
                 </>
               )}
             </button>
+<button
+  onClick={() => setShowEditModal(true)}
+  className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl flex items-center gap-2"
+>
+  <span>✏️</span>
+  <span>Edit Records ({stats.unsynced_count || 0})</span>
+</button>
           </div>
 
           {/* Date Mode Toggle */}
@@ -3413,6 +3515,42 @@ useEffect(() => {
           </div>
         </div>
       )}
+      {showEditModal && (
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 overflow-y-auto">
+    <div className="min-h-screen p-4">
+      <div className="max-w-7xl mx-auto my-8">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl">
+          {/* Optional: Add a header bar with close button (alternative placement) */}
+          <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 p-4 rounded-t-3xl flex justify-between items-center z-10">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">✏️</span>
+              <h2 className="text-2xl font-bold text-white">
+                Attendance Editor
+              </h2>
+            </div>
+            <button
+              onClick={() => setShowEditModal(false)}
+              className="p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-colors text-white group"
+              title="Close Editor"
+            >
+              <svg className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          <div className="p-6">
+            <AttendanceEdit 
+              apiService={apiService} 
+              pollingManager={pollingManager}
+              onClose={() => setShowEditModal(false)}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
