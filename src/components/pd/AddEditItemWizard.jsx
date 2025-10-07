@@ -641,39 +641,70 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                       </div>
 
                       <div className="flex-1">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            setUploadError("")
-                            setSelectedImage(null)
-                            setPreviewUrl("")
-                            if (!file) return
-                            const allowed = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp"]
-                            if (!allowed.includes(file.type)) {
-                              setUploadError("Invalid file type. Use JPG, PNG, GIF, WEBP, or BMP.")
-                              return
-                            }
-                            if (file.size > 10 * 1024 * 1024) {
-                              setUploadError("File too large (max 10MB).")
-                              return
-                            }
-                            setSelectedImage(file)
-                            const reader = new FileReader()
-                            reader.onload = () => setPreviewUrl(reader.result)
-                            reader.readAsDataURL(file)
-                          }}
-                          className="w-full"
-                        />
+                        <label className="block mb-2">
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
+                            Select Image File
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              setUploadError("")
+                              setSelectedImage(null)
+                              setPreviewUrl("")
+                              if (!file) return
+                              const allowed = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp"]
+                              if (!allowed.includes(file.type)) {
+                                setUploadError("Invalid file type. Use JPG, PNG, GIF, WEBP, or BMP.")
+                                return
+                              }
+                              if (file.size > 10 * 1024 * 1024) {
+                                setUploadError("File too large (max 10MB).")
+                                return
+                              }
+                              setSelectedImage(file)
+                              const reader = new FileReader()
+                              reader.onload = () => setPreviewUrl(reader.result)
+                              reader.readAsDataURL(file)
+                            }}
+                            className="block w-full text-sm text-slate-600 dark:text-slate-400
+                              file:mr-4 file:py-2.5 file:px-4
+                              file:rounded-lg file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-gradient-to-r file:from-violet-500 file:to-purple-600
+                              file:text-white
+                              hover:file:from-violet-600 hover:file:to-purple-700
+                              file:cursor-pointer file:transition-all file:shadow-md hover:file:shadow-lg
+                              cursor-pointer
+                              border-2 border-dashed border-slate-300 dark:border-slate-600 
+                              rounded-lg p-3
+                              hover:border-violet-400 dark:hover:border-violet-500
+                              bg-slate-50 dark:bg-slate-800/50
+                              transition-colors"
+                          />
+                        </label>
+                        
+                        {selectedImage && (
+                          <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-lg">
+                            <p className="text-xs text-green-700 dark:text-green-400 flex items-center gap-1">
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                              <span className="font-medium">File selected:</span> {selectedImage.name} ({(selectedImage.size / 1024).toFixed(1)} KB)
+                            </p>
+                          </div>
+                        )}
+                        
                         {uploadError && <p className="text-red-500 text-xs mt-2">{uploadError}</p>}
                         
                         <div className="flex gap-2 mt-3">
                           <button
                             type="button"
-                            disabled={!selectedImage || uploading || !selectedItem}
+                            disabled={!selectedImage || uploading || !selectedItem?.item_no}
                             onClick={() => handleImageUpload(false)}
                             className="flex-1 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            title={!selectedItem?.item_no ? "Item must be saved first" : !selectedImage ? "Please select an image file" : ""}
                           >
                             {uploading ? (
                               <>
@@ -694,9 +725,10 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                           </button>
                           <button
                             type="button"
-                            disabled={!selectedImage || uploading || !selectedItem}
+                            disabled={!selectedImage || uploading || !selectedItem?.item_no}
                             onClick={() => handleImageUpload(true)}
                             className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            title={!selectedItem?.item_no ? "Item must be saved first" : !selectedImage ? "Please select an image file" : ""}
                           >
                             {uploading ? (
                               <>
@@ -716,7 +748,7 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                             )}
                           </button>
                         </div>
-                        {!selectedItem && (
+                        {!selectedItem?.item_no && (
                           <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg">
                             <div className="flex items-start gap-2">
                               <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -724,13 +756,30 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                               </svg>
                               <div>
                                 <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                                  ℹ️ New Item - Image Upload Info
+                                  ℹ️ New Item - Images Disabled
                                 </p>
                                 <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                                  <strong>Workflow:</strong> Complete all steps and click "Create Item" first. After the item is saved, you can reopen it from the inventory list to upload images.
+                                  Upload buttons are disabled because this item hasn't been saved yet. Images require an item number (item_no) from the database.
                                 </p>
-                                <p className="text-xs text-amber-600 dark:text-amber-500 mt-1 italic">
-                                  Images can only be attached to existing items in the database.
+                                <p className="text-xs text-amber-600 dark:text-amber-500 mt-1.5 font-medium">
+                                  📝 To upload images: Complete the wizard → Click "Create Item" → Edit the item from inventory → Upload images
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {selectedItem?.item_no && !selectedImage && (
+                          <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg">
+                            <div className="flex items-start gap-2">
+                              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                              </svg>
+                              <div>
+                                <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">
+                                  📸 Ready to Upload
+                                </p>
+                                <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
+                                  Item #{selectedItem.item_no} is ready for image uploads. Select a file above to enable the upload buttons.
                                 </p>
                               </div>
                             </div>

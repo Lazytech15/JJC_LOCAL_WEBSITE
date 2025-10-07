@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent } from './ui/card'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Briefcase, Eye, Package, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react'
 import type { Product } from '../lib/barcode-scanner'
+import { apiService } from '../lib/api_service'
 
 interface EnhancedItemCardProps {
   product: Product
@@ -20,9 +21,28 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
 }) => {
   const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
   
-  // Construct image URL from API
-  const imageUrl = `https://qxw.2ee.mytemp.website/api/items/images/${product.id}/`
+  // Fetch image URL from API
+  useEffect(() => {
+    setImageError(false)
+    setImageLoaded(false)
+    
+    if (!product?.id) {
+      setImageUrl(null)
+      return
+    }
+    
+    const itemId = typeof product.id === 'number' ? product.id : parseInt(product.id, 10)
+    if (isNaN(itemId)) {
+      setImageUrl(null)
+      return
+    }
+    
+    // Use latest image URL
+    const url = apiService.getItemLatestImageUrl(itemId)
+    setImageUrl(`${url}?t=${Date.now()}`)
+  }, [product?.id])
   
   const getStockStatus = (balance: number) => {
     if (balance <= 0) return { label: 'Out of Stock', color: 'destructive', icon: AlertTriangle }
@@ -43,14 +63,14 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
             <div className="relative w-16 h-16 bg-muted rounded-lg flex items-center justify-center overflow-hidden group-hover:shadow-inner transition-all">
               {!imageError && (
                 <img 
-                  src={imageUrl} 
+                  src={imageUrl || undefined} 
                   alt={product.name}
                   className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                   onLoad={() => setImageLoaded(true)}
                   onError={() => setImageError(true)}
                 />
               )}
-              {(!imageLoaded || imageError) && (
+              {(!imageUrl || !imageLoaded || imageError) && (
                 <Package className="w-8 h-8 text-muted-foreground group-hover:text-primary transition-colors" />
               )}
             </div>
@@ -117,14 +137,14 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
           <div className="w-full h-full flex items-center justify-center">
             {!imageError && (
               <img 
-                src={imageUrl} 
+                src={imageUrl || undefined} 
                 alt={product.name}
                 className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                 onLoad={() => setImageLoaded(true)}
                 onError={() => setImageError(true)}
               />
             )}
-            {(!imageLoaded || imageError) && (
+            {(!imageUrl || !imageLoaded || imageError) && (
               <Package className="w-12 h-12 text-muted-foreground group-hover:text-primary transition-colors" />
             )}
           </div>

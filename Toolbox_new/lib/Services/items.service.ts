@@ -244,4 +244,50 @@ export class ItemsService {
       throw error
     }
   }
+
+  /**
+   * ============================================================================
+   * IMAGE OPERATIONS - Matching Inventory Management Pattern
+   * ============================================================================
+   */
+
+  /**
+   * Get list of images for an item
+   */
+  async getItemImages(itemId: number): Promise<any> {
+    try {
+      const response = await fetch(`${this.config.baseUrl}/api/items/images/${itemId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        mode: "cors",
+        signal: AbortSignal.timeout(10000),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch item images: ${response.status}`)
+      }
+
+      const result = await response.json()
+      return result
+    } catch (error) {
+      console.error(`[ItemsService] Failed to fetch images for item ${itemId}:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * Build URL for latest image (direct <img src>)
+   */
+  getItemLatestImageUrl(itemId: number): string {
+    return `${this.config.baseUrl}/api/items/images/${itemId}/latest`
+  }
+
+  /**
+   * Build URL for a specific image filename
+   */
+  getItemImageUrl(itemId: number, filename: string): string {
+    return `${this.config.baseUrl}/api/items/images/${itemId}/file/${filename}`
+  }
 }
