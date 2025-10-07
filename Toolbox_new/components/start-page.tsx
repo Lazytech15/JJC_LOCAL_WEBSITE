@@ -379,7 +379,7 @@ export function StartPage({
           </div>
 
           {/* Footer Info */}
-          <div className="text-center pt-2 border-t border-slate-700">
+          <div className="text-center pt-2 border-t border-slate-700 space-y-2">
             <p className="text-xs text-slate-500 font-mono space-y-1">
               <span className="block">TOOLBOX v2.0 • INDUSTRIAL GRADE</span>
               <span className="block text-slate-600">Built for Heavy-Duty Operations</span>

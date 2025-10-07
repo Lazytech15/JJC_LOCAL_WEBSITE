@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/ToolBoxlogo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Preconnect to API domains for faster connection -->
+    <link rel="preconnect" href="https://qxw.2ee.mytemp.website" crossorigin />
+    <link rel="dns-prefetch" href="https://qxw.2ee.mytemp.website" />
+    
+    <!-- Preload critical assets for LCP improvement -->
+    <link rel="preload" href="/ToolBoxlogo.png" as="image" type="image/png" />
+    
+    <!-- Preload main JavaScript module -->
+    <link rel="modulepreload" href="/main.tsx" />
+    
     <script>
       // Prevent flash of unstyled content by setting theme before page renders
       // Default to dark mode
