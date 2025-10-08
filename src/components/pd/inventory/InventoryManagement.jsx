@@ -1,12 +1,14 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, lazy, Suspense } from "react"
 import apiService from "../../../utils/api/api-service"
-import AddEditItemWizard from './AddEditItemWizard' // Updated to wizard
 import ModalPortal from "../shared/ModalPortal"
 import QRCodeSmall from "../barcode/QRCodeSmall"
 import { ItemDetailView } from "./ItemDetailView"
 import InventoryListView from "./InventoryListView"
 import { useToast } from "../shared/ToastNotification"
 import ConfirmationModal from "../shared/ConfirmationModal"
+
+// Lazy load the heavy wizard component
+const AddEditItemWizard = lazy(() => import('./AddEditItemWizard'))
 
 function InventoryManagement() {
   const { success, error: showError, warning } = useToast()
@@ -1048,22 +1050,33 @@ function InventoryManagement() {
         </ModalPortal>
       )}
 
-      {/* Item Form Modal - Now using Wizard! */}
-      <AddEditItemWizard
-        isOpen={showForm}
-        onClose={() => {
-          setShowForm(false)
-          setSelectedItem(null)
-          resetFormData()
-          if (returnToDetailView) {
-            setShowItemDetail(true)
-            setSelectedItemForDetail(selectedItem)
+      {/* Item Form Modal - Now using Wizard with lazy loading! */}
+      <Suspense fallback={
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-2xl">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-4 text-gray-700 dark:text-gray-300">Loading form...</p>
+            </div>
+          </div>
+        </ModalPortal>
+      }>
+        <AddEditItemWizard
+          isOpen={showForm}
+          onClose={() => {
+            setShowForm(false)
+            setSelectedItem(null)
+            resetFormData()
+            if (returnToDetailView) {
+              setShowItemDetail(true)
+              setSelectedItemForDetail(selectedItem)
             setReturnToDetailView(false)
           }
         }}
         onSave={handleSaveItem}
         selectedItem={selectedItem}
       />
+      </Suspense>
 
       {/* Stock Manager Modal */}
       {showStockManager && selectedItem && (

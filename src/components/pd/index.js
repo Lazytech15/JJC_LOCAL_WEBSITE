@@ -1,17 +1,36 @@
 // Procurement Department Components - Main Barrel Export
 // This file provides clean imports for all PD components
+// Using explicit named exports for optimal tree-shaking
 
 // Purchase Orders
-export * from './purchase-orders'
+export { 
+  PurchaseOrderTracker, 
+  CreatePurchaseOrderWizard 
+} from './purchase-orders'
 
 // Inventory Management
-export * from './inventory'
+export { 
+  InventoryManagement,
+  InventoryListView,
+  AddEditItemWizard,
+  ItemDetailView,
+  RestockList
+} from './inventory'
 
 // Barcode & QR Code
-export * from './barcode'
+export { 
+  BarCodeGenerator, 
+  BarCodeScanner, 
+  QRCodeSmall 
+} from './barcode'
 
 // Shared Utilities
-export * from './shared'
+export { 
+  ModalPortal, 
+  ConfirmationModal, 
+  ToastProvider, 
+  useToast 
+} from './shared'
 
 // Root Level Components
 export { default as AdminDashboard } from './AdminDashboard'

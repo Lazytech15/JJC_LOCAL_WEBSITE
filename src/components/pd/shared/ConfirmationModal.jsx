@@ -1,3 +1,4 @@
+import { memo } from "react"
 import ModalPortal from "./ModalPortal"
 
 function ConfirmationModal({ 
@@ -96,4 +97,5 @@ function ConfirmationModal({
   )
 }
 
-export default ConfirmationModal
+// Memoize to prevent unnecessary re-renders
+export default memo(ConfirmationModal)
