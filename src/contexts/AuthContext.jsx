@@ -106,18 +106,27 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     localStorage.setItem("darkMode", JSON.stringify(isDarkMode))
     
+    console.log("🌓 AuthContext: isDarkMode changed to:", isDarkMode)
+    console.log("🌓 AuthContext: Current pathname:", window.location.pathname)
+    
     // Don't manage dark mode class for toolbox route - it has its own theme system
     if (window.location.pathname === "/jjctoolbox") {
+      console.log("🌓 AuthContext: Skipping dark mode for toolbox route")
       return
     }
     
     if (isDarkMode) {
+      console.log("🌓 AuthContext: Adding dark class")
       document.documentElement.classList.add("dark")
       document.body.classList.add("dark")
     } else {
+      console.log("🌓 AuthContext: Removing dark class")
       document.documentElement.classList.remove("dark")
       document.body.classList.remove("dark")
     }
+    
+    console.log("🌓 AuthContext: HTML classes:", document.documentElement.className)
+    console.log("🌓 AuthContext: Body classes:", document.body.className)
   }, [isDarkMode])
 
   const login = (userData, department, token) => {
@@ -147,7 +156,9 @@ export function AuthProvider({ children }) {
   }
 
   const toggleDarkMode = () => {
+    console.log("🌓 toggleDarkMode called, current isDarkMode:", isDarkMode)
     setIsDarkMode(!isDarkMode)
+    console.log("🌓 toggleDarkMode: will change to:", !isDarkMode)
   }
 
   const authValue = {

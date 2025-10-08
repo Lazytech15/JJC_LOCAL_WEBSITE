@@ -18,6 +18,12 @@ function ProcurementDepartment() {
   const [error, setError] = useState(null)
   const [isScrolled, setIsScrolled] = useState(false)
 
+  // Debug dark mode
+  useEffect(() => {
+    console.log("🎨 Procurement isDarkMode:", isDarkMode)
+    console.log("🎨 HTML has dark class:", document.documentElement.classList.contains("dark"))
+  }, [isDarkMode])
+
   // Apple-style scroll detection for liquid glass effect
   useEffect(() => {
     const handleScroll = () => {
