@@ -229,24 +229,24 @@ export function DashboardView({
       console.log(apiItems)
 
       // Transform API data to match our Product interface
+      // Trust the API/database to provide balance (calculated as in_qty - out_qty)
+      // and item_status (calculated by database trigger based on balance vs min_stock)
       const transformedProducts: Product[] = apiItems.map((item: any, index: number) => ({
         id: item.item_no?.toString() || item.id?.toString() || (index + 1).toString(),
         name: item.item_name || item.name || item.title || `Item ${index + 1}`,
         brand: item.brand || item.manufacturer || "Unknown Brand",
         itemType: item.item_type || item.itemType || item.category || item.type || "General",
         location: item.location || item.warehouse || "Unknown Location",
-        balance: item.balance || item.stock || item.quantity || item.in_qty || 0,
+        // Trust the database-calculated balance (in_qty - out_qty)
+        balance: item.balance ?? 0,
+        // Trust the database trigger's item_status calculation
         status: (() => {
-          const balance = item.balance || item.stock || item.quantity || item.in_qty || 0;
-          if (item.item_status) {
-            // Map API status to our status format
-            const apiStatus = item.item_status.toLowerCase();
-            if (apiStatus.includes('out of stock')) return "out-of-stock";
-            if (apiStatus.includes('low')) return "low-stock";
-            return "in-stock";
-          }
-          // Fallback to balance-based logic
-          return balance > 10 ? "in-stock" : balance > 0 ? "low-stock" : "out-of-stock";
+          const apiStatus = (item.item_status || "").toLowerCase();
+          // Database returns: "Out of Stock", "Low in Stock", "In Stock"
+          if (apiStatus.includes('out of stock')) return "out-of-stock";
+          if (apiStatus.includes('low')) return "low-stock";
+          // Default to in-stock for "In Stock" or any unexpected values
+          return "in-stock";
         })(),
       }))
 

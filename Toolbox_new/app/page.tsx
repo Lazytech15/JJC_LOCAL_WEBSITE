@@ -21,8 +21,10 @@ export interface CartItem {
   brand: string
   itemType: string
   location: string
+  // Balance is automatically calculated by the database as (in_qty - out_qty)
   balance: number
   quantity: number
+  // Status is automatically calculated by the database trigger based on balance vs min_stock
   status: "in-stock" | "low-stock" | "out-of-stock"
 }
 

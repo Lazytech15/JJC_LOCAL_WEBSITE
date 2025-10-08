@@ -4,13 +4,19 @@
  */
 
 // Product type definition
+// Balance and status are calculated by the database and should not be modified client-side
 export interface Product {
   id: string
   name: string
   brand: string
   itemType: string
   location: string
+  // Balance is automatically calculated by the database as (in_qty - out_qty)
   balance: number
+  // Status is automatically calculated by the database trigger based on balance vs min_stock
+  // "Out of Stock" -> balance <= 0
+  // "Low in Stock" -> 0 < balance < min_stock
+  // "In Stock" -> balance >= min_stock
   status: "in-stock" | "low-stock" | "out-of-stock"
 }
 

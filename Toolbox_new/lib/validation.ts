@@ -57,13 +57,16 @@ export const SearchQuerySchema = z.string()
   .regex(/^[A-Za-z0-9\s._-]*$/, "Search query contains invalid characters")
 
 // API response validation schemas
+// Note: balance and item_status are calculated by the database and should be trusted as-is
 export const ApiItemSchema = z.object({
   item_no: z.union([z.string(), z.number()]).transform(String),
   item_name: z.string().min(1, "Item name is required"),
   brand: z.string().optional().default("Unknown Brand"),
   item_type: z.string().optional().default("General"),
   location: z.string().optional().default("Unknown Location"),
+  // balance is automatically calculated by database as (in_qty - out_qty)
   balance: z.number().min(0, "Balance cannot be negative"),
+  // item_status is automatically set by database trigger based on balance vs min_stock
   item_status: z.string().optional(),
 })
 
