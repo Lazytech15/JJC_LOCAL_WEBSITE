@@ -52,6 +52,8 @@ function AttendanceEdit() {
     by_clock_type: {},
   });
 
+  const [isLogout, setIsLogout] = useState(false);
+
   useEffect(() => {
     // Initialize polling manager
     if (!pollingManager.isPolling) {
@@ -285,6 +287,7 @@ function AttendanceEdit() {
       is_late: record.is_late ? true : false,
       notes: record.notes || "",
     });
+    setIsLogout(false); // Reset logout checkbox
     setShowEditModal(true);
   };
 
@@ -299,33 +302,59 @@ function AttendanceEdit() {
     setSaving(true);
 
     try {
-      // Combine date and time
       const clockTime = `${editForm.date} ${editForm.clock_time}:00`;
 
-      const updateData = {
-        clock_type: editForm.clock_type,
-        clock_time: clockTime,
-        date: editForm.date,
-        regular_hours: parseFloat(editForm.regular_hours),
-        overtime_hours: parseFloat(editForm.overtime_hours),
-        is_late: editForm.is_late,
-        notes: editForm.notes,
-      };
+      if (isLogout) {
+        // Create a new logout record instead of updating
+        const logoutType = editingRecord.clock_type.replace('_in', '_out');
 
-      const result = await apiService.editAttendance.editAttendanceRecord(
-        editingRecord.id,
-        updateData
-      );
+        const newRecord = {
+          employee_uid: editingRecord.employee_uid,
+          clock_type: logoutType,
+          clock_time: clockTime,
+          date: editForm.date,
+          regular_hours: parseFloat(editForm.regular_hours) || 0,
+          overtime_hours: parseFloat(editForm.overtime_hours) || 0,
+          is_late: editForm.is_late,
+          notes: editForm.notes || `Logout created from ${editingRecord.clock_type}`,
+        };
 
-      if (result.success) {
-        closeEditModal();
-        fetchUnsyncedRecords();
-        alert("Record updated successfully!");
+        const result = await apiService.editAttendance.addAttendanceRecord(newRecord);
+
+        if (result.success) {
+          closeEditModal();
+          fetchUnsyncedRecords();
+          alert(`Logout record created successfully for ${formatClockType(logoutType)}!`);
+        } else {
+          throw new Error(result.error || "Failed to create logout record");
+        }
       } else {
-        throw new Error(result.error || "Failed to update record");
+        // Normal update flow
+        const updateData = {
+          clock_type: editForm.clock_type,
+          clock_time: clockTime,
+          date: editForm.date,
+          regular_hours: parseFloat(editForm.regular_hours),
+          overtime_hours: parseFloat(editForm.overtime_hours),
+          is_late: editForm.is_late,
+          notes: editForm.notes,
+        };
+
+        const result = await apiService.editAttendance.editAttendanceRecord(
+          editingRecord.id,
+          updateData
+        );
+
+        if (result.success) {
+          closeEditModal();
+          fetchUnsyncedRecords();
+          alert("Record updated successfully!");
+        } else {
+          throw new Error(result.error || "Failed to update record");
+        }
       }
     } catch (err) {
-      alert("Error updating record: " + err.message);
+      alert("Error: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -498,20 +527,19 @@ function AttendanceEdit() {
           {/* Connection Status */}
           <div className="flex items-center gap-3 px-4 py-2 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl border border-white/30 dark:border-gray-700/30">
             <div
-              className={`w-3 h-3 rounded-full ${
-                connectionStatus === "connected"
+              className={`w-3 h-3 rounded-full ${connectionStatus === "connected"
                   ? "bg-emerald-500 shadow-lg shadow-emerald-500/50"
                   : connectionStatus === "connecting"
-                  ? "bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50"
-                  : "bg-red-500 shadow-lg shadow-red-500/50"
-              }`}
+                    ? "bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50"
+                    : "bg-red-500 shadow-lg shadow-red-500/50"
+                }`}
             ></div>
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
               {connectionStatus === "connected"
                 ? "Live Updates"
                 : connectionStatus === "connecting"
-                ? "Connecting..."
-                : "Disconnected"}
+                  ? "Connecting..."
+                  : "Disconnected"}
             </span>
             {lastUpdate && (
               <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">
@@ -1138,6 +1166,31 @@ function AttendanceEdit() {
               </div>
             </div>
             <form onSubmit={handleEditSubmit} className="p-6 space-y-6">
+              {/* Logout Checkbox - NEW */}
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-2 border-emerald-200 dark:border-emerald-800/30 rounded-xl p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isLogout}
+                    onChange={(e) => setIsLogout(e.target.checked)}
+                    className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 mt-0.5"
+                  />
+                  <div>
+                    <span className="text-sm font-bold text-emerald-800 dark:text-emerald-300 block">
+                      📤 Create Logout Record
+                    </span>
+                    <span className="text-xs text-emerald-700 dark:text-emerald-400">
+                      Check this to create a new logout record instead of updating this entry.
+                      {editingRecord.clock_type.includes('_in') && (
+                        <span className="block mt-1 font-medium">
+                          Will create: {formatClockType(editingRecord.clock_type.replace('_in', '_out'))}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </label>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
@@ -1151,7 +1204,8 @@ function AttendanceEdit() {
                         clock_type: e.target.value,
                       }))
                     }
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    disabled={isLogout}
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     required
                   >
                     <option value="morning_in">Morning In</option>
@@ -1163,6 +1217,11 @@ function AttendanceEdit() {
                     <option value="overtime_in">Overtime In</option>
                     <option value="overtime_out">Overtime Out</option>
                   </select>
+                  {isLogout && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      Logout type will be auto-set based on clock-in type
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
@@ -1273,15 +1332,18 @@ function AttendanceEdit() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-400 disabled:to-slate-500 text-white rounded-xl font-semibold transition-all disabled:cursor-not-allowed flex items-center gap-2"
+                  className={`px-6 py-3 ${isLogout
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
+                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+                    } disabled:from-slate-400 disabled:to-slate-500 text-white rounded-xl font-semibold transition-all disabled:cursor-not-allowed flex items-center gap-2`}
                 >
                   {saving ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Saving...</span>
+                      <span>{isLogout ? 'Creating Logout...' : 'Saving...'}</span>
                     </>
                   ) : (
-                    <span>Save Changes</span>
+                    <span>{isLogout ? '📤 Create Logout Record' : '💾 Save Changes'}</span>
                   )}
                 </button>
               </div>
