@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import apiService from "../../utils/api/api-service"
 import { useToast } from "./shared/ToastNotification"
 
-function SupplierManagement({ isDarkMode = false }) {
+function SupplierManagement({ isDarkMode }) {
   const { error: showError } = useToast()
   // Supplier Management States
   const [selectedSupplier, setSelectedSupplier] = useState("")
