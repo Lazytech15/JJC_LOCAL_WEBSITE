@@ -119,19 +119,17 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
     try {
       console.log("[v0] Starting checkout process...")
 
+      // Trust the API/database to calculate balance and item_status after checkout
+      // Only send the necessary data: item_no, quantity, and item_name
       const itemUpdates = items.map((item) => ({
         id: item.id,
         name: item.name,
+        quantity: item.quantity,
+        // Include these for logging purposes only (not used by API)
         brand: item.brand,
         itemType: item.itemType,
         location: item.location,
-        balance: Math.max(0, item.balance - item.quantity), // Reduce balance by quantity taken
-        status:
-          item.balance - item.quantity > 10
-            ? "in-stock"
-            : item.balance - item.quantity > 0
-              ? "low-stock"
-              : "out-of-stock",
+        balance: item.balance, // Current balance for transaction logging
       }))
 
       console.log("[v0] Item updates prepared:", itemUpdates)
