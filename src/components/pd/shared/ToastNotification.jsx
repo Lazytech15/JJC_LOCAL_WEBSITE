@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, useCallback } from "react"
+import { useState, useEffect, createContext, useContext, useCallback, memo } from "react"
 
 // Toast Context
 const ToastContext = createContext()
@@ -79,8 +79,8 @@ export function ToastProvider({ children }) {
   )
 }
 
-// Toast Container Component
-function ToastContainer({ toasts, onDismiss }) {
+// Toast Container Component (Memoized)
+const ToastContainer = memo(function ToastContainer({ toasts, onDismiss }) {
   return (
     <div className="fixed top-4 right-4 z-[10000] flex flex-col gap-2 pointer-events-none max-w-md w-full sm:max-w-sm">
       {toasts.map(toast => (
@@ -88,10 +88,10 @@ function ToastContainer({ toasts, onDismiss }) {
       ))}
     </div>
   )
-}
+})
 
-// Individual Toast Component
-function ToastItem({ toast, onDismiss }) {
+// Individual Toast Component (Memoized)
+const ToastItem = memo(function ToastItem({ toast, onDismiss }) {
   const [isExiting, setIsExiting] = useState(false)
 
   const handleDismiss = () => {
@@ -215,7 +215,7 @@ function ToastItem({ toast, onDismiss }) {
       </div>
     </div>
   )
-}
+})
 
 // Add animation styles to global CSS or use inline styles
 const styles = `
