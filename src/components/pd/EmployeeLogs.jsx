@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import apiService from "../../utils/api/api-service"
 
-function EmployeeLogs({ isDarkMode = false }) {
+function EmployeeLogs({ isDarkMode }) {
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)

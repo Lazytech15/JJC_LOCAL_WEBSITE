@@ -5,7 +5,7 @@ import { useAuth } from "../../contexts/AuthContext"
 import axios from "axios"
 
 function DatabaseDepartment() {
-  const { user, logout } = useAuth()
+  const { user, logout, isDarkMode, toggleDarkMode } = useAuth()
   const [serverInfo, setServerInfo] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -30,11 +30,17 @@ function DatabaseDepartment() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center text-white">
+      <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${
+        isDarkMode 
+          ? "bg-gradient-to-br from-gray-900 via-slate-900 to-zinc-900" 
+          : "bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50"
+      }`}>
+        <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold mb-2">🔄 Loading Database Server...</h2>
-          <p className="text-gray-300">Connecting to your database...</p>
+          <h2 className={`text-xl font-semibold mb-2 ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}>🔄 Loading Database Server...</h2>
+          <p className={isDarkMode ? "text-gray-300" : "text-gray-700"}>Connecting to your database...</p>
         </div>
       </div>
     )
@@ -42,11 +48,23 @@ function DatabaseDepartment() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center text-white max-w-md">
-          <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-2">❌ Connection Error</h2>
-            <p className="text-gray-300 mb-4">{error}</p>
+      <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${
+        isDarkMode 
+          ? "bg-gradient-to-br from-gray-900 via-slate-900 to-zinc-900" 
+          : "bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50"
+      }`}>
+        <div className="text-center max-w-md">
+          <div className={`rounded-lg p-6 border ${
+            isDarkMode 
+              ? "bg-red-500/20 border-red-500/50" 
+              : "bg-red-50 border-red-300"
+          }`}>
+            <h2 className={`text-xl font-semibold mb-2 ${
+              isDarkMode ? "text-white" : "text-gray-900"
+            }`}>❌ Connection Error</h2>
+            <p className={`mb-4 ${
+              isDarkMode ? "text-gray-300" : "text-gray-700"
+            }`}>{error}</p>
             <button
               onClick={fetchServerInfo}
               className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors duration-200"
@@ -62,60 +80,109 @@ function DatabaseDepartment() {
   const baseUrl = window.location.origin
 
   return (
-    <div className="min-h-screen p-8">
+    <div className={`min-h-screen p-8 transition-colors duration-300 ${
+      isDarkMode 
+        ? "bg-gradient-to-br from-gray-900 via-slate-900 to-zinc-900" 
+        : "bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50"
+    }`}>
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">🗃️ Database Management</h1>
-          <p className="text-gray-300">Welcome back, {user?.username}!</p>
+          <h1 className={`text-3xl font-bold mb-2 ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}>🗃️ Database Management</h1>
+          <p className={isDarkMode ? "text-gray-300" : "text-gray-700"}>Welcome back, {user?.username}!</p>
         </div>
-        <button
-          onClick={logout}
-          className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors duration-200"
-        >
-          Logout
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={toggleDarkMode}
+            className={`p-2 rounded-lg transition-all duration-300 ${
+              isDarkMode 
+                ? "bg-slate-700/50 hover:bg-slate-600/50 border border-slate-600/30" 
+                : "bg-white/50 hover:bg-white/80 border border-gray-300"
+            }`}
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            <div className="relative w-5 h-5">
+              {isDarkMode ? (
+                <svg className="w-full h-full text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="w-full h-full text-slate-700" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                </svg>
+              )}
+            </div>
+          </button>
+          <button
+            onClick={logout}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+          >
+            Logout
+          </button>
+        </div>
       </div>
 
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Status Card */}
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
+        <div className={`backdrop-blur-md rounded-2xl p-6 border shadow-lg ${
+          isDarkMode 
+            ? "bg-white/10 border-white/20" 
+            : "bg-white/70 border-gray-200"
+        }`}>
           <div className="flex items-center mb-4">
             <div className="w-3 h-3 bg-green-500 rounded-full mr-3 animate-pulse"></div>
-            <h2 className="text-xl font-semibold text-white">Database Status</h2>
+            <h2 className={`text-xl font-semibold ${
+              isDarkMode ? "text-white" : "text-gray-900"
+            }`}>Database Status</h2>
           </div>
           <p className="text-green-400 font-medium">✅ Database server is running and ready!</p>
-          <p className="text-gray-300 mt-2">Your database is now publicly accessible through this REST API.</p>
+          <p className={`mt-2 ${
+            isDarkMode ? "text-gray-300" : "text-gray-700"
+          }`}>Your database is now publicly accessible through this REST API.</p>
         </div>
 
         {/* Server Info */}
         {serverInfo && (
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
-            <h3 className="text-lg font-semibold text-white mb-4">🔧 Server Information</h3>
+          <div className={`backdrop-blur-md rounded-2xl p-6 border shadow-lg ${
+            isDarkMode 
+              ? "bg-white/10 border-white/20" 
+              : "bg-white/70 border-gray-200"
+          }`}>
+            <h3 className={`text-lg font-semibold mb-4 ${
+              isDarkMode ? "text-white" : "text-gray-900"
+            }`}>🔧 Server Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-gray-400">Status:</span>
+                <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Status:</span>
                 <span className="text-green-400 ml-2 font-medium">{serverInfo.status}</span>
               </div>
               <div>
-                <span className="text-gray-400">Database:</span>
-                <span className="text-white ml-2">{serverInfo.database}</span>
+                <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Database:</span>
+                <span className={`ml-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>{serverInfo.database}</span>
               </div>
               <div>
-                <span className="text-gray-400">Environment:</span>
-                <span className="text-white ml-2">{serverInfo.environment}</span>
+                <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Environment:</span>
+                <span className={`ml-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>{serverInfo.environment}</span>
               </div>
               <div>
-                <span className="text-gray-400">Process ID:</span>
-                <span className="text-white ml-2">{serverInfo.processInfo?.pid}</span>
+                <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Process ID:</span>
+                <span className={`ml-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>{serverInfo.processInfo?.pid}</span>
               </div>
             </div>
           </div>
         )}
 
         {/* API Endpoints */}
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
-          <h2 className="text-lg font-semibold text-white mb-4">🔗 Available Endpoints</h2>
+        <div className={`backdrop-blur-md rounded-2xl p-6 border shadow-lg ${
+          isDarkMode 
+            ? "bg-white/10 border-white/20" 
+            : "bg-white/70 border-gray-200"
+        }`}>
+          <h2 className={`text-lg font-semibold mb-4 ${
+            isDarkMode ? "text-white" : "text-gray-900"
+          }`}>🔗 Available Endpoints</h2>
           <div className="space-y-4">
             {[
               { method: "GET", url: "/api/health", desc: "Check if the database server is running and healthy" },
@@ -131,7 +198,11 @@ function DatabaseDepartment() {
               { method: "DELETE", url: "/api/tables/{tableName}/data/{id}", desc: "Delete a record by ID" },
               { method: "POST", url: "/api/query", desc: "Execute custom SQL queries" },
             ].map((endpoint, index) => (
-              <div key={index} className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <div key={index} className={`rounded-lg p-4 border ${
+                isDarkMode 
+                  ? "bg-white/5 border-white/10" 
+                  : "bg-white border-gray-200"
+              }`}>
                 <div className="flex items-center mb-2">
                   <span
                     className={`px-2 py-1 rounded text-xs font-medium mr-3 ${
@@ -146,9 +217,13 @@ function DatabaseDepartment() {
                   >
                     {endpoint.method}
                   </span>
-                  <code className="text-gray-300 text-sm">{endpoint.url}</code>
+                  <code className={`text-sm ${
+                    isDarkMode ? "text-gray-300" : "text-gray-700"
+                  }`}>{endpoint.url}</code>
                 </div>
-                <p className="text-gray-400 text-sm">{endpoint.desc}</p>
+                <p className={`text-sm ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}>{endpoint.desc}</p>
               </div>
             ))}
           </div>
