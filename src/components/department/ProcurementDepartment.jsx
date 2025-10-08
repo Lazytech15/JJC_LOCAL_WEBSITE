@@ -1,14 +1,15 @@
 import { useAuth } from "../../contexts/AuthContext"
 import { useState, useEffect } from "react"
-import InventoryManagement from "../pd/InventoryManagement"
-import SupplierManagement from "../pd/SuppliesManagement"
-import ModalPortal from "../pd/ModalPortal"
-import RestockList from "../pd/RestockList"
-import PurchaseOrderTracker from "../pd/PurchaseOrderTracker"
-import EmployeeLogs from "../pd/EmployeeLogs"
-import { ItemDetailView } from "../pd/ItemDetailView"
-import AdminDashboard from "../pd/AdminDashboard"
-import { ToastProvider } from "../pd/ToastNotification"
+import {
+  InventoryManagement,
+  RestockList,
+  PurchaseOrderTracker,
+  EmployeeLogs,
+  ItemDetailView,
+  AdminDashboard,
+  SupplierManagement,
+  ToastProvider
+} from "../pd"
 
 function ProcurementDepartment() {
   const { user, logout, isDarkMode, toggleDarkMode } = useAuth()

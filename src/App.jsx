@@ -1,18 +1,33 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { AuthProvider, useAuth } from "./contexts/AuthContext"
+import { lazy, Suspense } from "react"
 import DepartmentSelector from "./components/DepartmentSelector"
 import LoginForm from "./components/LoginForm"
-import HRDepartment from "./components/department/HRDepartment"
-import OperationsDepartment from "./components/department/OperationsDepartment"
-import FinancePayrollDepartment from "./components/department/FinancePayrollDepartment"
-import ProcurementDepartment from "./components/department/ProcurementDepartment"
-import EngineeringDepartment from "./components/department/EngineeringDepartment"
-import SuperAdminDashboard from "./components/SuperAdminDashboard"
-import EmployeeLanding from "./components/employeeLandingPage/EmployeeLanding"
-import EmployeeLogin from "./components/employeeLandingPage/EmployeeLogin"
-import EmployeeDashboard from "./components/employeeLandingPage/EmployeeDashboard"
 import './index.css'
-import ToolboxWrapper from "./components/ToolboxWrapper"
+
+// Lazy load department components for better performance
+const HRDepartment = lazy(() => import("./components/department/HRDepartment"))
+const OperationsDepartment = lazy(() => import("./components/department/OperationsDepartment"))
+const FinancePayrollDepartment = lazy(() => import("./components/department/FinancePayrollDepartment"))
+const ProcurementDepartment = lazy(() => import("./components/department/ProcurementDepartment"))
+const EngineeringDepartment = lazy(() => import("./components/department/EngineeringDepartment"))
+const SuperAdminDashboard = lazy(() => import("./components/SuperAdminDashboard"))
+const EmployeeLanding = lazy(() => import("./components/employeeLandingPage/EmployeeLanding"))
+const EmployeeLogin = lazy(() => import("./components/employeeLandingPage/EmployeeLogin"))
+const EmployeeDashboard = lazy(() => import("./components/employeeLandingPage/EmployeeDashboard"))
+const ToolboxWrapper = lazy(() => import("./components/ToolboxWrapper"))
+
+// Loading component for lazy-loaded routes
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50 dark:from-gray-900 dark:via-slate-900 dark:to-zinc-900">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-lg font-medium text-gray-900 dark:text-gray-100">Loading...</p>
+      </div>
+    </div>
+  )
+}
 
 function App() {
   return (
@@ -62,9 +77,11 @@ function RoutesWrapper() {
   if (isToolboxRoute) {
     console.log("Rendering Toolbox with ThemeProvider")
     return (
-      <Routes>
-        <Route path="/jjctoolbox" element={<ToolboxWrapper />} />
-      </Routes>
+      <Suspense fallback={<LoadingFallback />}>
+        <Routes>
+          <Route path="/jjctoolbox" element={<ToolboxWrapper />} />
+        </Routes>
+      </Suspense>
     )
   }
 
@@ -77,12 +94,13 @@ function RoutesWrapper() {
           : "bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50 text-gray-900"
         }`}
     >
-      <Routes>
-              {/* Employee Routes (Main/Public) */}
-              <Route path="/" element={<EmployeeLanding />} />
-              <Route path="/employee/login" element={<EmployeeLogin />} />
-              <Route
-                path="/employee/dashboard"
+      <Suspense fallback={<LoadingFallback />}>
+        <Routes>
+                {/* Employee Routes (Main/Public) */}
+                <Route path="/" element={<EmployeeLanding />} />
+                <Route path="/employee/login" element={<EmployeeLogin />} />
+                <Route
+                  path="/employee/dashboard"
                 element={
                   <EmployeeProtectedRoute>
                     <EmployeeDashboard />
@@ -144,7 +162,8 @@ function RoutesWrapper() {
 
               {/* Catch all - redirect to employee landing */}
               <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+        </Routes>
+      </Suspense>
     </div>
   )
 }

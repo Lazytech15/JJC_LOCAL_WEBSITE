@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react"
-import apiService from "../../utils/api/api-service"
+import apiService from "../../../utils/api/api-service"
 import AddEditItemWizard from './AddEditItemWizard' // Updated to wizard
-import ModalPortal from "/src/components/pd/ModalPortal"
-import QRCodeSmall from "/src/components/pd/QRCodeSmall"
+import ModalPortal from "../shared/ModalPortal"
+import QRCodeSmall from "../barcode/QRCodeSmall"
 import { ItemDetailView } from "./ItemDetailView"
 import InventoryListView from "./InventoryListView"
-import { useToast } from "./ToastNotification"
-import ConfirmationModal from "./ConfirmationModal"
+import { useToast } from "../shared/ToastNotification"
+import ConfirmationModal from "../shared/ConfirmationModal"
 
 function InventoryManagement() {
   const { success, error: showError, warning } = useToast()

@@ -1,7 +1,6 @@
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import tailwindcss from '@tailwindcss/vite'
-import path from "path"
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -10,30 +9,21 @@ export default defineConfig({
     tailwindcss(),
   ],
 
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./"),
-    },
-  },
-
   server: {
     host: "localhost",
-    port: 3000,
     cors: true,
   },
   
   build: {
     outDir: "dist",
-    sourcemap: false, // Disable for production
     // Enable minification
-    minify: 'esbuild',
+    minify: 'esbuild', // Using esbuild for faster builds
     // Code splitting for better caching
     rollupOptions: {
       output: {
         manualChunks: {
           // Separate vendor chunks for better caching
-          'react-vendor': ['react', 'react-dom'],
-          'ui-vendor': ['lucide-react'],
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
         },
       },
     },
@@ -41,17 +31,19 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     // Enable CSS code splitting
     cssCodeSplit: true,
+    // Source maps for debugging (disable in production for smaller bundle)
+    sourcemap: false,
     // Asset optimization
-    assetsInlineLimit: 4096,
+    assetsInlineLimit: 4096, // Inline assets smaller than 4kb
   },
   
   // Optimize dependencies
   optimizeDeps: {
-    include: ['react', 'react-dom', 'lucide-react'],
+    include: ['react', 'react-dom', 'react-router-dom'],
   },
   
   // Performance optimizations
   esbuild: {
-    drop: ['console', 'debugger'],
+    drop: ['console', 'debugger'], // Remove console and debugger in production
   },
 })
