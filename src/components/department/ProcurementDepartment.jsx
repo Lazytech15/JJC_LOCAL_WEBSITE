@@ -238,12 +238,12 @@ function ProcurementDepartment() {
         {/* Content - Compact */}
         <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-lg shadow-lg border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
           <div className="p-3 sm:p-4">
-            {activeTab === "dashboard" && <AdminDashboard onNavigate={setActiveTab} />}
-            {activeTab === "inventory" && <InventoryManagement />}
-            {activeTab === "restock" && <RestockList />}
-            {activeTab === "orders" && <PurchaseOrderTracker />}
-            {activeTab === "suppliers" && <SupplierManagement />}
-            {activeTab === "logs" && <EmployeeLogs />}
+            {activeTab === "dashboard" && <AdminDashboard onNavigate={setActiveTab} isDarkMode={isDarkMode} />}
+            {activeTab === "inventory" && <InventoryManagement isDarkMode={isDarkMode} />}
+            {activeTab === "restock" && <RestockList isDarkMode={isDarkMode} />}
+            {activeTab === "orders" && <PurchaseOrderTracker isDarkMode={isDarkMode} />}
+            {activeTab === "suppliers" && <SupplierManagement isDarkMode={isDarkMode} />}
+            {activeTab === "logs" && <EmployeeLogs isDarkMode={isDarkMode} />}
           </div>
         </div>
       </div>

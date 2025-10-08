@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import apiService from "/src/utils/api/api-service"
 import * as XLSX from "xlsx"
 
-export default function RestockList() {
+export default function RestockList({ isDarkMode = false }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
