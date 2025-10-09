@@ -12,6 +12,7 @@ import { DocumentService } from "./services/document-service.js"
 import { DailySummaryService } from "./services/daily-summary-service.js"
 import { ItemsService } from "./services/items-service.js"
 import { PurchaseOrdersService } from "./services/purchase-orders-service.js"
+import { SuppliersService } from "./services/suppliers-service.js"
 import { EmployeeLogsService } from "./services/employee-logs-service.js"
 import { AttendanceEditService } from "./services/attendance-edit-service.js"
 
@@ -29,6 +30,7 @@ class APIService {
     this.summary = new DailySummaryService()
     this.items = new ItemsService()
     this.purchaseOrders = new PurchaseOrdersService()
+    this.suppliers = new SuppliersService()
     this.employeeLogs = new EmployeeLogsService()
     this.editAttendance = new AttendanceEditService()
   }
