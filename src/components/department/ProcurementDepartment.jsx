@@ -18,12 +18,6 @@ function ProcurementDepartment() {
   const [error, setError] = useState(null)
   const [isScrolled, setIsScrolled] = useState(false)
 
-  // Debug dark mode
-  useEffect(() => {
-    console.log("🎨 Procurement isDarkMode:", isDarkMode)
-    console.log("🎨 HTML has dark class:", document.documentElement.classList.contains("dark"))
-  }, [isDarkMode])
-
   // Apple-style scroll detection for liquid glass effect
   useEffect(() => {
     const handleScroll = () => {
@@ -155,28 +149,14 @@ function ProcurementDepartment() {
         `}>
           <div className={`
             relative overflow-hidden
+            backdrop-blur-[40px] bg-white/75 dark:bg-slate-900/75
             transition-all duration-[800ms] ease-[cubic-bezier(0.4,0,0.2,1)]
             ${isScrolled 
               ? 'rounded-full shadow-2xl border-2' 
               : 'rounded-lg shadow-lg border'
             }
             border-slate-200/50 dark:border-slate-700/50
-          `}
-          style={{
-            backgroundColor: isDarkMode
-              ? (isScrolled ? 'rgba(15, 23, 42, 0.65)' : 'rgba(15, 23, 42, 0.75)')
-              : (isScrolled ? 'rgba(255, 255, 255, 0.65)' : 'rgba(255, 255, 255, 0.75)'),
-            boxShadow: isScrolled 
-              ? (isDarkMode 
-                  ? '0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05) inset'
-                  : '0 8px 32px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.1) inset')
-              : (isDarkMode
-                  ? '0 4px 16px rgba(0, 0, 0, 0.3)'
-                  : '0 4px 16px rgba(0, 0, 0, 0.08)'),
-            backdropFilter: 'blur(40px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(40px) saturate(180%)',
-            transition: 'all 800ms cubic-bezier(0.4, 0, 0.2, 1)',
-          }}>
+          `}>
             {/* Liquid glass shimmer effect */}
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none opacity-0 hover:opacity-100 transition-opacity duration-500"></div>
             
@@ -200,12 +180,10 @@ function ProcurementDepartment() {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  style={{
-                    transition: 'all 800ms cubic-bezier(0.4, 0, 0.2, 1)',
-                  }}
                   className={`
                     relative flex-shrink-0 font-medium 
                     flex items-center gap-1.5 group
+                    transition-all duration-[800ms] ease-[cubic-bezier(0.4,0,0.2,1)]
                     ${isScrolled 
                       ? 'px-3 py-1.5 text-xs rounded-full' 
                       : 'px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm rounded-none'
