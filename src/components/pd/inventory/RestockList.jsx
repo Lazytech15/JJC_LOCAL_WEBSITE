@@ -7,6 +7,15 @@ export default function RestockList({ isDarkMode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filters, setFilters] = useState({ search: "", supplier: "" })
+  
+  // Bulk selection state
+  const [selectedItems, setSelectedItems] = useState([])
+  const [isAllSelected, setIsAllSelected] = useState(false)
+  
+  // PO creation modal state
+  const [isPOModalOpen, setIsPOModalOpen] = useState(false)
+  const [poLoading, setPOLoading] = useState(false)
+  const [poNumber, setPONumber] = useState("")
 
   useEffect(() => {
     fetchItems()
@@ -100,6 +109,134 @@ export default function RestockList({ isDarkMode }) {
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(amount || 0)
+
+  // Bulk selection handlers
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedItems([])
+      setIsAllSelected(false)
+    } else {
+      setSelectedItems(restockItems.map(item => item.item_no))
+      setIsAllSelected(true)
+    }
+  }
+
+  const handleSelectItem = (itemNo) => {
+    if (selectedItems.includes(itemNo)) {
+      setSelectedItems(selectedItems.filter(id => id !== itemNo))
+      setIsAllSelected(false)
+    } else {
+      const newSelected = [...selectedItems, itemNo]
+      setSelectedItems(newSelected)
+      if (newSelected.length === restockItems.length) {
+        setIsAllSelected(true)
+      }
+    }
+  }
+
+  const handleCreatePO = async () => {
+    if (selectedItems.length === 0) {
+      alert("Please select at least one item to create a purchase order.")
+      return
+    }
+    
+    // Get suggested PO number
+    try {
+      setPOLoading(true)
+      const result = await apiService.purchaseOrders.suggestPONumber()
+      setPONumber(result.data?.suggested_po_number || "")
+      setIsPOModalOpen(true)
+    } catch (err) {
+      console.error("Error getting suggested PO number:", err)
+      alert("Failed to generate PO number. Please try again.")
+    } finally {
+      setPOLoading(false)
+    }
+  }
+
+  const handleConfirmCreatePO = async () => {
+    if (!poNumber.trim()) {
+      alert("Please enter a PO number.")
+      return
+    }
+
+    const selectedItemsData = restockItems.filter(item => selectedItems.includes(item.item_no))
+    
+    // Group by supplier
+    const supplierGroups = selectedItemsData.reduce((acc, item) => {
+      const supplier = item.supplier || "Unknown Supplier"
+      if (!acc[supplier]) {
+        acc[supplier] = []
+      }
+      acc[supplier].push({
+        item_no: item.item_no,
+        item_name: item.item_name,
+        quantity: item.__recommended_order,
+        unit_price: item.price_per_unit || 0,
+        unit_of_measure: item.unit_of_measure || ""
+      })
+      return acc
+    }, {})
+
+    try {
+      setPOLoading(true)
+      
+      // Create PO for each supplier
+      const promises = Object.entries(supplierGroups).map(([supplier, items]) => {
+        const poData = {
+          po_number: poNumber,
+          supplier: supplier,
+          items: items,
+          status: "Pending",
+          notes: `Auto-generated from Restock List for ${items.length} items`
+        }
+        return apiService.purchaseOrders.createPurchaseOrder(poData)
+      })
+
+      await Promise.all(promises)
+      
+      alert(`Purchase Order(s) created successfully! PO Number: ${poNumber}`)
+      setIsPOModalOpen(false)
+      setSelectedItems([])
+      setIsAllSelected(false)
+      
+    } catch (err) {
+      console.error("Error creating purchase order:", err)
+      alert("Failed to create purchase order. Please try again.")
+    } finally {
+      setPOLoading(false)
+    }
+  }
+
+  const handleBulkExport = () => {
+    if (selectedItems.length === 0) {
+      alert("Please select at least one item to export.")
+      return
+    }
+    
+    const selectedData = restockItems.filter(item => selectedItems.includes(item.item_no))
+    
+    const rows = selectedData.map((i) => ({
+      "Item No": i.item_no,
+      "Item Name": i.item_name,
+      Brand: i.brand || "",
+      Location: i.location || "",
+      Status: i.__status,
+      Balance: Number(i.balance) || 0,
+      "Min Stock": Number(i.min_stock) || 0,
+      Shortage: i.__shortage,
+      "Recommended Order Qty": i.__recommended_order,
+      Supplier: i.supplier || "",
+      "Unit": i.unit_of_measure || "",
+      "Price/Unit": Number(i.price_per_unit) || 0,
+      "Estimated Order Value": (Number(i.__recommended_order) || 0) * (Number(i.price_per_unit) || 0),
+    }))
+
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.json_to_sheet(rows)
+    XLSX.utils.book_append_sheet(wb, ws, "Selected Items")
+    XLSX.writeFile(wb, `Restock_Selected_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
 
   const exportToExcel = () => {
     // Sheet 1: Restock (detailed rows)
@@ -311,16 +448,33 @@ export default function RestockList({ isDarkMode }) {
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Restock List</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            Showing {restockItems.length} items
+            Showing {restockItems.length} items {selectedItems.length > 0 && `(${selectedItems.length} selected)`}
           </div>
+          {selectedItems.length > 0 && (
+            <>
+              <button
+                onClick={handleCreatePO}
+                disabled={poLoading}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                📋 Create PO
+              </button>
+              <button
+                onClick={handleBulkExport}
+                className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
+              >
+                📤 Export Selected
+              </button>
+            </>
+          )}
           <button
             onClick={exportToExcel}
             disabled={restockItems.length === 0}
             className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            Export to Excel
+            Export All to Excel
           </button>
         </div>
       </div>
@@ -375,6 +529,14 @@ export default function RestockList({ isDarkMode }) {
             <table className="w-full text-sm">
               <thead className="bg-white/10 dark:bg-black/20">
                 <tr>
+                  <th className="px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={handleSelectAll}
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-800 dark:text-gray-200">Item</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-800 dark:text-gray-200">Brand</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-800 dark:text-gray-200">Location</th>
@@ -388,7 +550,18 @@ export default function RestockList({ isDarkMode }) {
               </thead>
               <tbody className="divide-y divide-gray-300/20 dark:divide-gray-700/20">
                 {restockItems.map((item) => (
-                  <tr key={item.item_no} className="hover:bg-white/5 dark:hover:bg-black/10 transition-colors">
+                  <tr 
+                    key={item.item_no} 
+                    className={`hover:bg-white/5 dark:hover:bg-black/10 transition-colors ${selectedItems.includes(item.item_no) ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`}
+                  >
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.includes(item.item_no)}
+                        onChange={() => handleSelectItem(item.item_no)}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div>
                         <div className="font-medium text-gray-800 dark:text-gray-200">{item.item_name}</div>
@@ -414,6 +587,110 @@ export default function RestockList({ isDarkMode }) {
               <div className="text-gray-500 dark:text-gray-400">No low/out-of-stock items found.</div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* PO Creation Modal */}
+      {isPOModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-2xl border border-gray-200 dark:border-gray-700 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+              Create Purchase Order
+            </h3>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  PO Number *
+                </label>
+                <input
+                  type="text"
+                  value={poNumber}
+                  onChange={(e) => setPONumber(e.target.value)}
+                  className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
+                  placeholder="Enter PO number"
+                />
+              </div>
+
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                  Selected Items ({selectedItems.length})
+                </h4>
+                <div className="max-h-60 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-xl">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-100 dark:bg-gray-700 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2 text-left font-semibold text-gray-800 dark:text-gray-200">Item</th>
+                        <th className="px-4 py-2 text-center font-semibold text-gray-800 dark:text-gray-200">Qty</th>
+                        <th className="px-4 py-2 text-left font-semibold text-gray-800 dark:text-gray-200">Supplier</th>
+                        <th className="px-4 py-2 text-right font-semibold text-gray-800 dark:text-gray-200">Price</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {restockItems
+                        .filter(item => selectedItems.includes(item.item_no))
+                        .map((item) => (
+                          <tr key={item.item_no}>
+                            <td className="px-4 py-2 text-gray-900 dark:text-white">
+                              <div className="font-medium">{item.item_name}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">{item.item_no}</div>
+                            </td>
+                            <td className="px-4 py-2 text-center font-semibold text-gray-900 dark:text-white">
+                              {item.__recommended_order}
+                            </td>
+                            <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
+                              {item.supplier || "N/A"}
+                            </td>
+                            <td className="px-4 py-2 text-right font-semibold text-gray-900 dark:text-white">
+                              {formatCurrency(item.price_per_unit * item.__recommended_order)}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white">Total Estimated Value:</span>
+                  <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    {formatCurrency(
+                      restockItems
+                        .filter(item => selectedItems.includes(item.item_no))
+                        .reduce((sum, item) => sum + (item.price_per_unit * item.__recommended_order), 0)
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-xl p-4">
+                <p className="text-sm text-yellow-800 dark:text-yellow-300">
+                  ℹ️ Purchase orders will be grouped by supplier automatically. Multiple POs may be created if items are from different suppliers.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 mt-8">
+              <button
+                onClick={handleConfirmCreatePO}
+                disabled={poLoading}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {poLoading ? "Creating..." : "Create Purchase Order"}
+              </button>
+              <button
+                onClick={() => {
+                  setIsPOModalOpen(false)
+                  setPONumber("")
+                }}
+                disabled={poLoading}
+                className="flex-1 bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
