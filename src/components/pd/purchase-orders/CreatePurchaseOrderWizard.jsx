@@ -225,12 +225,28 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
     }
   }
 
-  const handleSupplierSelect = (supplierName) => {
+  const handleSupplierSelect = async (supplierName) => {
     const supplier = suppliers.find(s => s.name === supplierName)
+    
+    // Fetch full supplier details from suppliers API
+    let supplierAddress = ""
+    try {
+      const suppliersData = await apiService.suppliers.getSuppliers({ name: supplierName })
+      if (suppliersData.success && suppliersData.suppliers && suppliersData.suppliers.length > 0) {
+        const supplierDetails = suppliersData.suppliers[0]
+        // Build full address from supplier record
+        supplierAddress = apiService.suppliers.getFullAddress(supplierDetails)
+      }
+    } catch (err) {
+      console.error("Error fetching supplier details:", err)
+      // Fallback to supplier object if available
+      supplierAddress = supplier?.supplier_address || ""
+    }
+    
     setFormData(prev => ({
       ...prev,
       supplier_name: supplierName,
-      supplier_address: supplier?.supplier_address || "",
+      supplier_address: supplierAddress,
       selectedItems: [] // Clear items when changing supplier
     }))
   }
