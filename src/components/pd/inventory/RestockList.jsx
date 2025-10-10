@@ -145,8 +145,46 @@ export default function RestockList() {
     // Get suggested PO number
     try {
       setPOLoading(true)
-      const result = await apiService.purchaseOrders.suggestPONumber()
-      setPONumber(result.data?.suggested_po_number || "")
+      // Try to obtain a fully-suggested PO number first
+      const suggested = await apiService.purchaseOrders.suggestPONumber().catch(e => {
+        console.warn('suggestPONumber failed:', e)
+        return null
+      })
+
+      // Some backends return the full suggested number, others return only the next sequence.
+      // Try a few known shapes defensively.
+      let suggestedNumber = null
+      if (suggested) {
+        // Common shapes: { data: { suggested_po_number: 'MMYY-XXX' } }
+        suggestedNumber = suggested.data?.suggested_po_number || suggested.suggested_po_number || suggested.suggested_number || suggested.suggested || suggested.next || suggested.next_sequence
+      }
+
+      // If we didn't get a full MMYY-XXX, try to generate prefix and combine with returned sequence
+      if (!suggestedNumber) {
+        const prefixResp = await apiService.purchaseOrders.generatePOPrefix().catch(e => {
+          console.warn('generatePOPrefix failed:', e)
+          return null
+        })
+
+        const prefix = prefixResp?.prefix || prefixResp?.data?.prefix || prefixResp?.po_prefix || ""
+
+        // If suggested provided a numeric sequence, use it
+        const seq = suggested && (suggested.data?.sequence || suggested.sequence || suggested.next_sequence || suggested.next) || null
+
+        if (seq && prefix) {
+          const pad = String(seq).padStart(3, '0')
+          suggestedNumber = `${prefix}-${pad}`
+        }
+      }
+
+      // Fallback: if still not available, attempt to use prefix + '001'
+      if (!suggestedNumber) {
+        const prefixResp2 = await apiService.purchaseOrders.generatePOPrefix().catch(() => null)
+        const fallbackPrefix = prefixResp2?.prefix || prefixResp2?.data?.prefix || ""
+        if (fallbackPrefix) suggestedNumber = `${fallbackPrefix}-001`
+      }
+
+      setPONumber(suggestedNumber || "")
       setIsPOModalOpen(true)
     } catch (err) {
       console.error("Error getting suggested PO number:", err)
@@ -184,9 +222,29 @@ export default function RestockList() {
       setPOLoading(true)
       
       // Create PO for each supplier
+      // Ensure PO number matches expected MMYY-XXX format. If not, attempt to generate a proper one.
+      const poRegex = /^\d{4}-\d{3}$/
+      let finalPONumber = poNumber.trim()
+      if (!poRegex.test(finalPONumber)) {
+        console.warn('PO number from UI does not match MMYY-XXX, attempting to generate a valid PO number', finalPONumber)
+        // Try to get prefix and suggested sequence
+        const prefixResp = await apiService.purchaseOrders.generatePOPrefix().catch(() => null)
+        const prefix = prefixResp?.prefix || prefixResp?.data?.prefix || ""
+        const suggested = await apiService.purchaseOrders.suggestPONumber().catch(() => null)
+        const seq = suggested && (suggested.data?.sequence || suggested.sequence || suggested.next_sequence || suggested.next || suggested.data?.suggested_sequence)
+        if (seq) {
+          finalPONumber = `${prefix}-${String(seq).padStart(3, '0')}`
+        } else if (suggested && (typeof suggested === 'string')) {
+          // Maybe returned full number
+          finalPONumber = suggested
+        } else if (prefix) {
+          finalPONumber = `${prefix}-001`
+        }
+      }
+
       const promises = Object.entries(supplierGroups).map(([supplier, items]) => {
         const poData = {
-          po_number: poNumber,
+          po_number: finalPONumber,
           supplier: supplier,
           items: items,
           status: "Pending",
