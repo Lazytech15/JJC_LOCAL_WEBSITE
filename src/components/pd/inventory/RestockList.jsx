@@ -221,28 +221,49 @@ export default function RestockList() {
     try {
       setPOLoading(true)
       
-      // Create PO for each supplier
-      // Ensure PO number matches expected MMYY-XXX format. If not, attempt to generate a proper one.
+      // Create PO for each supplier. Generate a separate PO number for every supplier
       const poRegex = /^\d{4}-\d{3}$/
-      let finalPONumber = poNumber.trim()
-      if (!poRegex.test(finalPONumber)) {
-        console.warn('PO number from UI does not match MMYY-XXX, attempting to generate a valid PO number', finalPONumber)
-        // Try to get prefix and suggested sequence
-        const prefixResp = await apiService.purchaseOrders.generatePOPrefix().catch(() => null)
-        const prefix = prefixResp?.prefix || prefixResp?.data?.prefix || ""
-        const suggested = await apiService.purchaseOrders.suggestPONumber().catch(() => null)
-        const seq = suggested && (suggested.data?.sequence || suggested.sequence || suggested.next_sequence || suggested.next || suggested.data?.suggested_sequence)
-        if (seq) {
-          finalPONumber = `${prefix}-${String(seq).padStart(3, '0')}`
-        } else if (suggested && (typeof suggested === 'string')) {
-          // Maybe returned full number
-          finalPONumber = suggested
-        } else if (prefix) {
-          finalPONumber = `${prefix}-001`
-        }
-      }
 
-      const promises = Object.entries(supplierGroups).map(([supplier, items]) => {
+      const supplierEntries = Object.entries(supplierGroups)
+      const createPromises = supplierEntries.map(async ([supplier, items]) => {
+        // Derive a PO number for this supplier. Prefer the UI-provided poNumber only when there's a single supplier.
+        let finalPONumber = poNumber.trim()
+
+        if (supplierEntries.length > 1 || !poRegex.test(finalPONumber)) {
+          // Multiple suppliers: always generate per-supplier PO numbers to avoid duplicates
+          try {
+            const suggested = await apiService.purchaseOrders.suggestPONumber().catch(e => {
+              console.warn('suggestPONumber per-supplier failed for', supplier, e)
+              return null
+            })
+
+            if (suggested) {
+              // Prefer full returned number
+              finalPONumber = suggested.data?.suggested_po_number || suggested.suggested_po_number || suggested.suggested_number || suggested.next || suggested.next_sequence || suggested.sequence || finalPONumber
+            }
+
+            // If still not a valid MMYY-XXX, try prefix + sequence
+            if (!poRegex.test(finalPONumber)) {
+              const prefixResp = await apiService.purchaseOrders.generatePOPrefix().catch(e => {
+                console.warn('generatePOPrefix failed for', supplier, e)
+                return null
+              })
+              const prefix = prefixResp?.prefix || prefixResp?.data?.prefix || prefixResp?.po_prefix || ""
+
+              const seq = suggested && (suggested.data?.sequence || suggested.sequence || suggested.next_sequence || suggested.next || suggested.data?.suggested_sequence)
+              if (seq && prefix) {
+                finalPONumber = `${prefix}-${String(seq).padStart(3, '0')}`
+              } else if (prefix) {
+                // fallback to prefix-001 for this supplier
+                finalPONumber = `${prefix}-001`
+              }
+            }
+          } catch (e) {
+            console.warn('Error generating PO number for supplier', supplier, e)
+            // finalPONumber remains as-is; server will validate and may reject
+          }
+        }
+
         const poData = {
           po_number: finalPONumber,
           supplier: supplier,
@@ -250,8 +271,14 @@ export default function RestockList() {
           status: "Pending",
           notes: `Auto-generated from Restock List for ${items.length} items`
         }
-        return apiService.purchaseOrders.createPurchaseOrder(poData)
+
+        return apiService.purchaseOrders.createPurchaseOrder(poData).catch(error => {
+          console.error(`Error creating PO for supplier ${supplier}:`, error)
+          return { success: false, error: error.message }
+        })
       })
+
+      const promises = Promise.all(createPromises)
 
       await Promise.all(promises)
       
