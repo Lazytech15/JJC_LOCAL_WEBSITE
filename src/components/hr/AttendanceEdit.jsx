@@ -53,77 +53,97 @@ function AttendanceEdit() {
   });
 
   const [isLogout, setIsLogout] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   useEffect(() => {
-    // Initialize polling manager
-    if (!pollingManager.isPolling) {
-      pollingManager.initialize();
-      pollingManager.joinAllRooms();
+  // Initialize polling manager
+  if (!pollingManager.isPolling) {
+    pollingManager.initialize();
+    pollingManager.joinAllRooms();
+  }
+
+  fetchUnsyncedRecords();
+  setConnectionStatus("connecting");
+
+  // ✨ CRITICAL FIX: Subscribe to ALL relevant events
+  
+  // 1. New attendance created (including logout records)
+  const unsubscribeCreated = pollingManager.subscribeToUpdates(
+    "attendance_created",
+    (data) => {
+      console.log("[AttendanceEdit] attendance_created event:", data);
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
+      // ✨ ALWAYS refresh, regardless of is_synced status
+      fetchUnsyncedRecords();
     }
+  );
 
-    fetchUnsyncedRecords();
-    setConnectionStatus("connecting");
+  // 2. Attendance record updated
+  const unsubscribeUpdated = pollingManager.subscribeToUpdates(
+    "attendance_updated",
+    (data) => {
+      console.log("[AttendanceEdit] attendance_updated event:", data);
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
+      fetchUnsyncedRecords();
+    }
+  );
 
-    // Subscribe to attendance events
-    const unsubscribeCreated = pollingManager.subscribeToUpdates(
-      "attendance_created",
-      (data) => {
-        console.log("[AttendanceEdit] New attendance record:", data);
-        setConnectionStatus("connected");
-        setLastUpdate(new Date());
-        if (!data.is_synced) {
-          fetchUnsyncedRecords();
-        }
-      }
-    );
+  // 3. Attendance record deleted
+  const unsubscribeDeleted = pollingManager.subscribeToUpdates(
+    "attendance_deleted",
+    (data) => {
+      console.log("[AttendanceEdit] attendance_deleted event:", data);
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
+      fetchUnsyncedRecords();
+    }
+  );
 
-    const unsubscribeUpdated = pollingManager.subscribeToUpdates(
-      "attendance_updated",
-      (data) => {
-        console.log("[AttendanceEdit] Attendance record updated:", data);
-        setConnectionStatus("connected");
-        setLastUpdate(new Date());
-        fetchUnsyncedRecords();
-      }
-    );
+  // 4. Edit-specific events (created, edited, deleted)
+  const unsubscribeEditCreated = pollingManager.subscribeToUpdates(
+    "attendance_edit_created",
+    (data) => {
+      console.log("[AttendanceEdit] attendance_edit_created event:", data);
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
+      fetchUnsyncedRecords();
+    }
+  );
 
-    const unsubscribeDeleted = pollingManager.subscribeToUpdates(
-      "attendance_deleted",
-      (data) => {
-        console.log("[AttendanceEdit] Attendance record deleted:", data);
-        setConnectionStatus("connected");
-        setLastUpdate(new Date());
-        fetchUnsyncedRecords();
-      }
-    );
+  // 5. ✨ NEW: Listen to daily summary updates
+  const unsubscribeSummaryUpdated = pollingManager.subscribeToUpdates(
+    "daily_summary_updated",
+    (data) => {
+      console.log("[AttendanceEdit] daily_summary_updated event:", data);
+      setConnectionStatus("connected");
+      setLastUpdate(new Date());
+      // Refresh if summary affects unsynced records
+      fetchUnsyncedRecords();
+    }
+  );
 
-    const unsubscribeEditCreated = pollingManager.subscribeToUpdates(
-      "attendance_edit_created",
-      (data) => {
-        console.log("[AttendanceEdit] Edit operation:", data);
-        setConnectionStatus("connected");
-        setLastUpdate(new Date());
-        fetchUnsyncedRecords();
-      }
-    );
+  // 6. Connection status monitoring
+  const unsubscribeConnection = pollingManager.subscribeToUpdates(
+    "connection",
+    (data) => {
+      console.log("[AttendanceEdit] Connection status:", data.status);
+      setConnectionStatus(data.status);
+    }
+  );
 
-    const unsubscribeConnection = pollingManager.subscribeToUpdates(
-      "connection",
-      (data) => {
-        console.log("[AttendanceEdit] Connection status:", data.status);
-        setConnectionStatus(data.status);
-      }
-    );
-
-    return () => {
-      unsubscribeCreated();
-      unsubscribeUpdated();
-      unsubscribeDeleted();
-      unsubscribeEditCreated();
-      unsubscribeConnection();
-      setConnectionStatus("disconnected");
-    };
-  }, []);
+  // Cleanup all subscriptions
+  return () => {
+    unsubscribeCreated();
+    unsubscribeUpdated();
+    unsubscribeDeleted();
+    unsubscribeEditCreated();
+    unsubscribeSummaryUpdated(); // ✨ NEW cleanup
+    unsubscribeConnection();
+    setConnectionStatus("disconnected");
+  };
+}, []);
 
   const fetchUnsyncedRecords = async () => {
     try {
@@ -230,51 +250,55 @@ function AttendanceEdit() {
   };
 
   const handleAddSubmit = async (e) => {
-    e.preventDefault();
-    setAdding(true);
+  e.preventDefault();
+  setAdding(true);
 
-    try {
-      // Validate required fields
-      if (
-        !addForm.employee_uid ||
-        !addForm.clock_type ||
-        !addForm.clock_time ||
-        !addForm.date
-      ) {
-        throw new Error("Please fill in all required fields");
-      }
-
-      // Combine date and time
-      const clockTime = `${addForm.date} ${addForm.clock_time}:00`;
-
-      const newRecord = {
-        employee_uid: addForm.employee_uid,
-        clock_type: addForm.clock_type,
-        clock_time: clockTime,
-        date: addForm.date,
-        regular_hours: parseFloat(addForm.regular_hours) || 0,
-        overtime_hours: parseFloat(addForm.overtime_hours) || 0,
-        is_late: addForm.is_late || false,
-        notes: addForm.notes || "",
-      };
-
-      const result = await apiService.editAttendance.addAttendanceRecord(
-        newRecord
-      );
-
-      if (result.success) {
-        closeAddModal();
-        fetchUnsyncedRecords();
-        alert("Attendance record added successfully!");
-      } else {
-        throw new Error(result.error || "Failed to add record");
-      }
-    } catch (err) {
-      alert("Error adding record: " + err.message);
-    } finally {
-      setAdding(false);
+  try {
+    // Validate required fields
+    if (
+      !addForm.employee_uid ||
+      !addForm.clock_type ||
+      !addForm.clock_time ||
+      !addForm.date
+    ) {
+      throw new Error("Please fill in all required fields");
     }
-  };
+
+    // Combine date and time
+    const clockTime = `${addForm.date} ${addForm.clock_time}:00`;
+
+    const newRecord = {
+      employee_uid: addForm.employee_uid,
+      clock_type: addForm.clock_type,
+      clock_time: clockTime,
+      date: addForm.date,
+      regular_hours: parseFloat(addForm.regular_hours) || 0,
+      overtime_hours: parseFloat(addForm.overtime_hours) || 0,
+      is_late: addForm.is_late || false,
+      notes: addForm.notes || "",
+    };
+
+    const result = await apiService.editAttendance.addAttendanceRecord(
+      newRecord
+    );
+
+    if (result.success) {
+      closeAddModal();
+      
+      // ✨ CRITICAL: Immediate UI refresh BEFORE showing success message
+      await fetchUnsyncedRecords();
+      
+      // ✨ Use toast instead of blocking alert
+      showToast("✅ Attendance record added successfully!", "success");
+    } else {
+      throw new Error(result.error || "Failed to add record");
+    }
+  } catch (err) {
+    showToast(`❌ Error: ${err.message}`, "error");
+  } finally {
+    setAdding(false);
+  }
+};
 
   const openEditModal = (record) => {
     setEditingRecord(record);
@@ -298,67 +322,75 @@ function AttendanceEdit() {
   };
 
   const handleEditSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
+  e.preventDefault();
+  setSaving(true);
 
-    try {
-      const clockTime = `${editForm.date} ${editForm.clock_time}:00`;
+  try {
+    const clockTime = `${editForm.date} ${editForm.clock_time}:00`;
 
-      if (isLogout) {
-        // Create a new logout record instead of updating
-        const logoutType = editingRecord.clock_type.replace('_in', '_out');
+    if (isLogout) {
+      // Create a new logout record
+      const logoutType = editingRecord.clock_type.replace('_in', '_out');
 
-        const newRecord = {
-          employee_uid: editingRecord.employee_uid,
-          clock_type: logoutType,
-          clock_time: clockTime,
-          date: editForm.date,
-          regular_hours: parseFloat(editForm.regular_hours) || 0,
-          overtime_hours: parseFloat(editForm.overtime_hours) || 0,
-          is_late: editForm.is_late,
-          notes: editForm.notes || `Logout created from ${editingRecord.clock_type}`,
-        };
+      const newRecord = {
+        employee_uid: editingRecord.employee_uid,
+        clock_type: logoutType,
+        clock_time: clockTime,
+        date: editForm.date,
+        regular_hours: parseFloat(editForm.regular_hours) || 0,
+        overtime_hours: parseFloat(editForm.overtime_hours) || 0,
+        is_late: editForm.is_late,
+        notes: editForm.notes || `Logout created from ${editingRecord.clock_type}`,
+      };
 
-        const result = await apiService.editAttendance.addAttendanceRecord(newRecord);
+      const result = await apiService.editAttendance.addAttendanceRecord(newRecord);
 
-        if (result.success) {
-          closeEditModal();
-          fetchUnsyncedRecords();
-          alert(`Logout record created successfully for ${formatClockType(logoutType)}!`);
-        } else {
-          throw new Error(result.error || "Failed to create logout record");
-        }
+      if (result.success) {
+        closeEditModal();
+        
+        // ✨ CRITICAL: Immediate UI refresh
+        await fetchUnsyncedRecords();
+        
+        // ✨ Non-blocking success notification
+        showToast(`✅ Logout record created for ${formatClockType(logoutType)}`, 'success');
       } else {
-        // Normal update flow
-        const updateData = {
-          clock_type: editForm.clock_type,
-          clock_time: clockTime,
-          date: editForm.date,
-          regular_hours: parseFloat(editForm.regular_hours),
-          overtime_hours: parseFloat(editForm.overtime_hours),
-          is_late: editForm.is_late,
-          notes: editForm.notes,
-        };
-
-        const result = await apiService.editAttendance.editAttendanceRecord(
-          editingRecord.id,
-          updateData
-        );
-
-        if (result.success) {
-          closeEditModal();
-          fetchUnsyncedRecords();
-          alert("Record updated successfully!");
-        } else {
-          throw new Error(result.error || "Failed to update record");
-        }
+        throw new Error(result.error || "Failed to create logout record");
       }
-    } catch (err) {
-      alert("Error: " + err.message);
-    } finally {
-      setSaving(false);
+    } else {
+      // Normal update flow (existing code)
+      const updateData = {
+        clock_type: editForm.clock_type,
+        clock_time: clockTime,
+        date: editForm.date,
+        regular_hours: parseFloat(editForm.regular_hours),
+        overtime_hours: parseFloat(editForm.overtime_hours),
+        is_late: editForm.is_late,
+        notes: editForm.notes,
+      };
+
+      const result = await apiService.editAttendance.editAttendanceRecord(
+        editingRecord.id,
+        updateData
+      );
+
+      if (result.success) {
+        closeEditModal();
+        
+        // ✨ CRITICAL: Immediate UI refresh
+        await fetchUnsyncedRecords();
+        
+        // ✨ Non-blocking success notification
+        showToast('✅ Record updated successfully', 'success');
+      } else {
+        throw new Error(result.error || "Failed to update record");
+      }
     }
-  };
+  } catch (err) {
+    showToast(`❌ Error: ${err.message}`, 'error');
+  } finally {
+    setSaving(false);
+  }
+};
 
   const openDeleteModal = (record) => {
     setDeletingRecord(record);
@@ -511,6 +543,13 @@ function AttendanceEdit() {
     return colors[clockType] || "bg-gray-50 text-gray-700 border-gray-200";
   };
 
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast({ show: false, message: '', type: 'success' });
+    }, 3000);
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -528,10 +567,10 @@ function AttendanceEdit() {
           <div className="flex items-center gap-3 px-4 py-2 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl border border-white/30 dark:border-gray-700/30">
             <div
               className={`w-3 h-3 rounded-full ${connectionStatus === "connected"
-                  ? "bg-emerald-500 shadow-lg shadow-emerald-500/50"
-                  : connectionStatus === "connecting"
-                    ? "bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50"
-                    : "bg-red-500 shadow-lg shadow-red-500/50"
+                ? "bg-emerald-500 shadow-lg shadow-emerald-500/50"
+                : connectionStatus === "connecting"
+                  ? "bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50"
+                  : "bg-red-500 shadow-lg shadow-red-500/50"
                 }`}
             ></div>
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -1333,8 +1372,8 @@ function AttendanceEdit() {
                   type="submit"
                   disabled={saving}
                   className={`px-6 py-3 ${isLogout
-                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
-                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
+                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
                     } disabled:from-slate-400 disabled:to-slate-500 text-white rounded-xl font-semibold transition-all disabled:cursor-not-allowed flex items-center gap-2`}
                 >
                   {saving ? (
@@ -1611,6 +1650,19 @@ function AttendanceEdit() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+      {toast.show && (
+        <div className={`fixed top-4 right-4 z-[60] animate-slide-in-right ${toast.type === 'success'
+            ? 'bg-emerald-500'
+            : toast.type === 'error'
+              ? 'bg-red-500'
+              : 'bg-amber-500'
+          } text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3`}>
+          <span className="text-lg">
+            {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : '⚠️'}
+          </span>
+          <span className="font-medium">{toast.message}</span>
         </div>
       )}
     </div>
