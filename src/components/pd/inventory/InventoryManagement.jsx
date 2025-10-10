@@ -10,7 +10,7 @@ import ConfirmationModal from "../shared/ConfirmationModal"
 // Lazy load the heavy wizard component
 const AddEditItemWizard = lazy(() => import('./AddEditItemWizard'))
 
-function InventoryManagement({ isDarkMode }) {
+function InventoryManagement() {
   const { success, error: showError, warning } = useToast()
   // Inventory Management States
   const [items, setItems] = useState([])

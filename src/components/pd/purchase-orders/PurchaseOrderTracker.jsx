@@ -3,7 +3,7 @@ import apiService from "../../../utils/api/api-service"
 import { ModalPortal, useToast } from "../shared"
 import CreatePurchaseOrderWizard from "./CreatePurchaseOrderWizard"
 
-function PurchaseOrderTracker({ isDarkMode }) {
+function PurchaseOrderTracker() {
   const { success, error: showError } = useToast()
   const [purchaseOrders, setPurchaseOrders] = useState([])
   const [loading, setLoading] = useState(true)

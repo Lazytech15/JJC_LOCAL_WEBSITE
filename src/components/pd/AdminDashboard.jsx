@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import apiService from "../../utils/api/api-service"
 
-function AdminDashboard({ onNavigate, isDarkMode }) {
+function AdminDashboard({ onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [statistics, setStatistics] = useState({
