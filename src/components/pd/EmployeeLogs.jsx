@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
+import { useAuth } from "../../contexts/AuthContext"
 import apiService from "../../utils/api/api-service"
 
-function EmployeeLogs({ isDarkMode }) {
+function EmployeeLogs() {
+  const { isDarkMode } = useAuth()
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)

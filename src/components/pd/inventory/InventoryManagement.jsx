@@ -1,4 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react"
+import { useAuth } from "../../../contexts/AuthContext"
 import apiService from "../../../utils/api/api-service"
 import ModalPortal from "../shared/ModalPortal"
 import QRCodeSmall from "../barcode/QRCodeSmall"
@@ -10,7 +11,8 @@ import ConfirmationModal from "../shared/ConfirmationModal"
 // Lazy load the heavy wizard component
 const AddEditItemWizard = lazy(() => import('./AddEditItemWizard'))
 
-function InventoryManagement({ isDarkMode }) {
+function InventoryManagement() {
+  const { isDarkMode } = useAuth()
   const { success, error: showError, warning } = useToast()
   // Inventory Management States
   const [items, setItems] = useState([])

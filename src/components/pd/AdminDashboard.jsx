@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react"
+import { useAuth } from "../../contexts/AuthContext"
 import apiService from "../../utils/api/api-service"
 
-function AdminDashboard({ onNavigate, isDarkMode }) {
+function AdminDashboard({ onNavigate }) {
+  const { isDarkMode } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [statistics, setStatistics] = useState({
