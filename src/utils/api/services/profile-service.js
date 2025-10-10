@@ -305,6 +305,208 @@ export class ProfileService extends BaseAPIService {
     return result
   }
 
+  // ============================================================================
+  // FACE RECOGNITION DESCRIPTOR METHODS
+  // ============================================================================
+
+  /**
+   * Get face descriptor for an employee
+   * @param {number} uid - Employee UID
+   * @returns {Promise<Object>} Response with descriptor data
+   */
+  async getEmployeeDescriptor(uid) {
+    try {
+      console.log(`🔍 Fetching face descriptor for UID: ${uid}`);
+      
+      const response = await fetch(`${this.baseURL}/api/profile/${uid}/descriptor`, {
+        method: "GET",
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getStoredToken()}`,
+        },
+      })
+
+      const data = await response.json()
+
+      if (response.status === 404) {
+        console.log(`⚠️ No descriptor found for UID: ${uid}`);
+        return { success: false, error: "No face descriptor found" }
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      console.log(`✅ Descriptor loaded for UID: ${uid}`);
+      return {
+        success: true,
+        descriptor: data.descriptor || data.data?.descriptor,
+        data: data
+      }
+
+    } catch (error) {
+      console.error("Face descriptor fetch error:", error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Save face descriptor for an employee
+   * @param {number} uid - Employee UID
+   * @param {Array<number>} descriptor - 128-dimensional face descriptor array
+   * @returns {Promise<Object>} Response indicating success/failure
+   */
+  async saveEmployeeDescriptor(uid, descriptor) {
+    try {
+      console.log(`💾 Saving face descriptor for UID: ${uid}`);
+      
+      if (!Array.isArray(descriptor) || descriptor.length !== 128) {
+        throw new Error("Invalid descriptor: must be an array of 128 numbers")
+      }
+
+      const response = await fetch(`${this.baseURL}/api/profile/${uid}/descriptor`, {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getStoredToken()}`,
+        },
+        body: JSON.stringify({ descriptor })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      console.log(`✅ Descriptor saved successfully for UID: ${uid}`);
+      return {
+        success: true,
+        message: data.message || "Descriptor saved successfully",
+        data: data
+      }
+
+    } catch (error) {
+      console.error("Face descriptor save error:", error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Update existing face descriptor for an employee
+   * @param {number} uid - Employee UID
+   * @param {Array<number>} descriptor - 128-dimensional face descriptor array
+   * @returns {Promise<Object>} Response indicating success/failure
+   */
+  async updateEmployeeDescriptor(uid, descriptor) {
+    try {
+      console.log(`🔄 Updating face descriptor for UID: ${uid}`);
+      
+      if (!Array.isArray(descriptor) || descriptor.length !== 128) {
+        throw new Error("Invalid descriptor: must be an array of 128 numbers")
+      }
+
+      const response = await fetch(`${this.baseURL}/api/profile/${uid}/descriptor`, {
+        method: "PUT",
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getStoredToken()}`,
+        },
+        body: JSON.stringify({ descriptor })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      console.log(`✅ Descriptor updated successfully for UID: ${uid}`);
+      return {
+        success: true,
+        message: data.message || "Descriptor updated successfully",
+        data: data
+      }
+
+    } catch (error) {
+      console.error("Face descriptor update error:", error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Delete face descriptor for an employee
+   * @param {number} uid - Employee UID
+   * @returns {Promise<Object>} Response indicating success/failure
+   */
+  async deleteEmployeeDescriptor(uid) {
+    try {
+      console.log(`🗑️ Deleting face descriptor for UID: ${uid}`);
+      
+      const response = await fetch(`${this.baseURL}/api/profile/${uid}/descriptor`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${getStoredToken()}`,
+        },
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      console.log(`✅ Descriptor deleted successfully for UID: ${uid}`);
+      return {
+        success: true,
+        message: data.message || "Descriptor deleted successfully",
+        data: data
+      }
+
+    } catch (error) {
+      console.error("Face descriptor delete error:", error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Get all employees with face descriptors
+   * @returns {Promise<Object>} Response with list of employees having descriptors
+   */
+  async getAllEmployeesWithDescriptors() {
+    try {
+      console.log('📋 Fetching all employees with face descriptors...');
+      
+      const response = await fetch(`${this.baseURL}/api/profile/descriptors`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${getStoredToken()}`,
+        },
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      console.log(`✅ Found ${data.count || data.data?.length || 0} employees with descriptors`);
+      return {
+        success: true,
+        data: data.data || data.employees || [],
+        count: data.count || data.data?.length || 0
+      }
+
+    } catch (error) {
+      console.error("Fetch employees with descriptors error:", error)
+      return { success: false, error: error.message, data: [] }
+    }
+  }
+
+  // ============================================================================
+  // UTILITY METHODS
+  // ============================================================================
+
   validateFile(file) {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp']
     if (!allowedTypes.includes(file.type)) {
