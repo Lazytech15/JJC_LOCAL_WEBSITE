@@ -51,39 +51,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     }
   }, [isOpen])
 
-  // If editingOrder is provided, prefill formData
-  useEffect(() => {
-    if (editingOrder) {
-      try {
-        const po = editingOrder
-        setFormData(prev => ({
-          ...prev,
-          supplier_name: po.supplier_name || po.supplier || prev.supplier_name,
-          supplier_address: po.supplier_address || prev.supplier_address,
-          supplier_details: po.supplier_details || prev.supplier_details || null,
-          po_number: po.id || po.po_number || prev.po_number,
-          po_sequence: (po.id || po.po_number || '').split('-')[1] || prev.po_sequence,
-          selectedItems: (po.items || []).map(it => ({
-            item_no: it.item_no,
-            item_name: it.item_name,
-            quantity: it.quantity,
-            unit: it.unit || it.unit_of_measure || 'pcs',
-            price_per_unit: it.unit_price || it.price_per_unit || 0,
-            amount: (it.quantity || 0) * (it.unit_price || it.price_per_unit || 0)
-          })),
-          attention_person: po.attention_person || prev.attention_person,
-          terms: po.terms || prev.terms,
-          po_date: po.po_date || prev.po_date,
-          prepared_by: po.prepared_by ? (Array.isArray(po.prepared_by) ? po.prepared_by : String(po.prepared_by).split(',').map(p => p.trim())) : prev.prepared_by,
-          verified_by: po.verified_by || prev.verified_by,
-          approved_by: po.approved_by || prev.approved_by,
-          notes: po.notes || prev.notes
-        }))
-      } catch (err) {
-        console.error('Error pre-filling edit form:', err)
-      }
-    }
-  }, [editingOrder])
+  // Editing purchase orders was removed; this wizard always creates new POs now.
 
   const initializeWizard = async () => {
     try {
@@ -381,6 +349,32 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     setCurrentStep(prev => prev + 1)
   }
 
+  // Validation helper used for guarded breadcrumb navigation
+  const validateForStep = (step) => {
+    if (step === 1) {
+      if (!formData.supplier_name) return false
+      if (!formData.po_number) return false
+      if (poNumberStatus.exists) return false
+    }
+    if (step === 2) {
+      if (!formData.selectedItems || formData.selectedItems.length === 0) return false
+    }
+    if (step === 3) {
+      // partial checks for details
+      // allow navigation if prepared_by exists (array) and terms present
+      if (!formData.prepared_by || formData.prepared_by.filter(p => p && p.trim()).length === 0) return false
+    }
+    return true
+  }
+
+  const canJumpToStep = (target) => {
+    if (target <= currentStep) return true
+    for (let s = currentStep; s < target; s++) {
+      if (!validateForStep(s)) return false
+    }
+    return true
+  }
+
   const handleBack = () => {
     setError(null)
     setCurrentStep(prev => prev - 1)
@@ -412,12 +406,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         overwrite_existing: overwriteExisting
       }
       let data
-      if (editingOrder && (editingOrder.id || editingOrder.po_number)) {
-        const id = editingOrder.id || editingOrder.po_number
-        data = await apiService.purchaseOrders.updatePurchaseOrder(id, orderData)
-      } else {
-        data = await apiService.purchaseOrders.createPurchaseOrder(orderData)
-      }
+      data = await apiService.purchaseOrders.createPurchaseOrder(orderData)
       
       if (data.success) {
         onSuccess(`Purchase Order ${formData.po_number} created successfully!`)
@@ -497,7 +486,19 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
             <div className="mt-6 flex items-center justify-between">
               {steps.map((step, index) => (
                 <div key={step.number} className="flex items-center flex-1">
-                  <div className="flex flex-col items-center flex-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!canJumpToStep(step.number)) {
+                        setError('Please complete required fields before jumping ahead')
+                        return
+                      }
+                      setError(null)
+                      setCurrentStep(step.number)
+                    }}
+                    className="flex flex-col items-center flex-1"
+                    aria-current={currentStep === step.number}
+                  >
                     <div className={`
                       w-10 h-10 rounded-full flex items-center justify-center text-lg font-semibold
                       transition-all duration-300
@@ -514,7 +515,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                     `}>
                       {step.title}
                     </span>
-                  </div>
+                  </button>
                   {index < steps.length - 1 && (
                     <div className={`
                       flex-1 h-1 mx-2 rounded-full transition-all duration-300

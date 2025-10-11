@@ -43,6 +43,16 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
     { number: 4, title: "Review", description: "Confirm details", icon: "✓" }
   ]
 
+  const canJumpToStep = (target) => {
+    // allow going backwards freely
+    if (target <= currentStep) return true
+    // validate every step up to target-1
+    for (let s = currentStep; s < target; s++) {
+      if (!validateStep(s)) return false
+    }
+    return true
+  }
+
   // Load data when editing
   useEffect(() => {
     if (isOpen && selectedItem) {
@@ -223,6 +233,36 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
           <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col border-2 border-slate-200 dark:border-slate-700">
             {/* Enhanced Header with Industrial Theme */}
             <div className="bg-gradient-to-r from-slate-800 via-zinc-800 to-slate-800 dark:from-slate-900 dark:via-zinc-900 dark:to-slate-900 p-4 sm:p-6 text-white relative overflow-hidden">
+              {/* Clickable step breadcrumbs */}
+              <div className="max-w-3xl mx-auto mb-4">
+                <div className="flex items-center gap-3">
+                  {steps.map((step, idx) => (
+                    <div key={step.number} className="flex items-center flex-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!canJumpToStep(step.number)) {
+                            setErrors(prev => ({ ...prev, global: 'Please complete the required fields before jumping ahead.' }))
+                            return
+                          }
+                          setErrors({})
+                          setCurrentStep(step.number)
+                        }}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-semibold transition-all duration-200 ${currentStep >= step.number ? 'bg-white text-slate-800 shadow-md' : 'bg-white/10 text-white'}`}
+                        aria-current={currentStep === step.number}
+                        aria-label={`Go to step ${step.number}: ${step.title}`}
+                      >
+                        {currentStep > step.number ? '✓' : step.icon}
+                      </button>
+                      <div className="ml-3 text-sm">
+                        <div className={`${currentStep >= step.number ? 'font-semibold text-white' : 'text-white/80'}`}>{step.title}</div>
+                        <div className="text-xs text-white/60">{step.description}</div>
+                      </div>
+                      {idx < steps.length - 1 && <div className={`flex-1 h-0.5 mx-3 ${currentStep > step.number ? 'bg-white' : 'bg-white/20'}`} />}
+                    </div>
+                  ))}
+                </div>
+              </div>
             {/* Step 1: Basic Information */}
             {currentStep === 1 && (
               <div className="space-y-6 max-w-3xl mx-auto">

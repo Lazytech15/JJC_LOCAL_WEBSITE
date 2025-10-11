@@ -12,23 +12,17 @@ export default function RestockList() {
   const [sortBy, setSortBy] = useState(null)
   const [sortOrder, setSortOrder] = useState('asc')
   const [page, setPage] = useState(1)
-  const pageSize = 5
+  const pageSize = 10
   
   // Bulk selection state
   const [selectedItems, setSelectedItems] = useState([])
   const [isAllSelected, setIsAllSelected] = useState(false)
   
-  // PO creation modal state
-  const [isPOModalOpen, setIsPOModalOpen] = useState(false)
-  const [poLoading, setPOLoading] = useState(false)
-  const [poNumber, setPONumber] = useState("")
-  const [poGroups, setPOGroups] = useState([]) // [{ supplier, items: [], po_number }]
-  const [currentPOIndex, setCurrentPOIndex] = useState(0)
-  const [createdPOs, setCreatedPOs] = useState([])
+  // (PO creation removed from Restock List - handled in Purchase Orders section)
 
   useEffect(() => {
     fetchItems()
-  }, [filters])
+  }, [])
 
   const fetchItems = async () => {
     try {
@@ -93,6 +87,25 @@ export default function RestockList() {
     
     let filtered = withStatus.filter((i) => i.__status === "Out Of Stock" || i.__status === "Low In Stock")
 
+    // Apply client-side filters (search and supplier) for reliability across API variations
+    if (filters.search && String(filters.search).trim() !== "") {
+      const q = String(filters.search).trim().toLowerCase()
+      filtered = filtered.filter(i => (
+        (i.item_name || '').toString().toLowerCase().includes(q) ||
+        (i.brand || '').toString().toLowerCase().includes(q) ||
+        (String(i.item_no || '')).toLowerCase().includes(q)
+      ))
+    }
+
+    if (filters.supplier && String(filters.supplier).trim() !== "") {
+      const sel = String(filters.supplier).trim().toLowerCase()
+      filtered = filtered.filter(i => {
+        const s = i.supplier
+        const name = typeof s === 'string' ? s : (s && (s.name || s.label)) || ''
+        return String(name).trim().toLowerCase() === sel
+      })
+    }
+
     // Apply header-based sorting if requested
     if (sortBy) {
       const dir = sortOrder === 'asc' ? 1 : -1
@@ -134,7 +147,13 @@ export default function RestockList() {
     console.log("RestockList - Restock items:", filtered)
     
     return filtered
-  }, [items])
+  }, [items, filters, sortBy, sortOrder])
+  // reset page when filters change
+  useEffect(() => {
+    setPage(1)
+  }, [filters])
+
+  // PO creation removed from Restock List
 
   // Derived paging
   const totalPages = Math.max(1, Math.ceil(restockItems.length / pageSize))
@@ -144,7 +163,18 @@ export default function RestockList() {
   const pagedItems = restockItems.slice((page - 1) * pageSize, page * pageSize)
 
   const uniqueSuppliers = useMemo(() => {
-    return [...new Set(items.filter((i) => i.supplier).map((i) => i.supplier))]
+    // Normalize supplier values to strings for stable filtering and select options
+    const names = items
+      .map(i => i.supplier)
+      .filter(Boolean)
+      .map(s => {
+        if (typeof s === 'string') return s
+        if (s && typeof s === 'object') return s.name || s.label || s.company || ''
+        return String(s)
+      })
+      .map(n => String(n).trim())
+      .filter(Boolean)
+    return [...new Set(names)]
   }, [items])
 
   const formatCurrency = (amount) =>
@@ -174,173 +204,9 @@ export default function RestockList() {
     }
   }
 
-  const handleCreatePO = async () => {
-    if (selectedItems.length === 0) {
-      alert("Please select at least one item to create a purchase order.")
-      return
-    }
+  // PO creation removed here; use the Purchase Orders section to create or edit POs.
 
-    // Prepare groups by supplier and compute PO numbers for each group
-    const selectedItemsData = restockItems.filter(item => selectedItems.includes(item.item_no))
-    const supplierMap = selectedItemsData.reduce((acc, item) => {
-      const supplier = item.supplier || "Unknown Supplier"
-      if (!acc[supplier]) acc[supplier] = []
-      acc[supplier].push(item)
-      return acc
-    }, {})
-
-    const groups = Object.entries(supplierMap).map(([supplier, items]) => ({ supplier, items }))
-
-    try {
-      setPOLoading(true)
-      // Get suggested next PO number from server
-      const resp = await apiService.purchaseOrders.suggestPONumber()
-
-      // API shape: { prefix, suggested_sequence, suggested_po, last_po }
-      const prefix = resp.prefix || (resp.data && resp.data.prefix) || ''
-      const suggestedPo = resp.suggested_po || (resp.data && resp.data.suggested_po)
-      const suggestedSeq = resp.suggested_sequence || (resp.data && resp.data.suggested_sequence) || '001'
-
-      // Build poGroups assigning incremented sequences per supplier
-      const startSeq = parseInt(String(suggestedSeq).replace(/^0+/, '') || '0')
-      const built = await Promise.all(groups.map(async (g, idx) => {
-        const seqNum = startSeq + idx
-        const seqStr = String(seqNum).padStart(3, '0')
-        const po = prefix ? `${prefix}-${seqStr}` : (suggestedPo ? suggestedPo : `00${idx}`)
-
-        // Attempt to fetch full supplier details by name
-        let supplierDetails = { name: g.supplier }
-        try {
-          const supResp = await apiService.suppliers.getSuppliers({ name: g.supplier })
-          if (supResp && (supResp.suppliers || supResp.data?.suppliers)) {
-            const list = supResp.suppliers || supResp.data?.suppliers
-            if (list.length > 0) supplierDetails = list[0]
-          }
-        } catch (err) {
-          console.warn('Failed fetching supplier details for', g.supplier, err)
-        }
-
-        return { supplier: g.supplier, supplierDetails, items: g.items, po_number: po }
-      }))
-
-      setPOGroups(built)
-      setCurrentPOIndex(0)
-      setCreatedPOs([])
-      // Prefill modal PO number and open
-      setPONumber(built[0]?.po_number || '')
-      setIsPOModalOpen(true)
-    } catch (err) {
-      console.error("Error preparing PO groups:", err)
-      alert("Failed to prepare purchase orders. Please try again.")
-    } finally {
-      setPOLoading(false)
-    }
-  }
-
-  // helper: ensure poNumber is available (check and bump if exists)
-  const resolveAvailablePONumber = async (basePrefix, seqStart) => {
-    let trial = seqStart
-    for (let i = 0; i < 200; i++) {
-      const seqStr = String(trial).padStart(3, '0')
-      const candidate = `${basePrefix}-${seqStr}`
-      try {
-        const check = await apiService.purchaseOrders.checkPONumber(candidate)
-        // if API returns success and exists flag
-        const exists = (check && (check.exists || check.data?.exists))
-        if (!exists) return candidate
-      } catch (err) {
-        // If check fails, assume candidate available to avoid blocking
-        return candidate
-      }
-      trial++
-    }
-    throw new Error('Unable to generate available PO number')
-  }
-
-  const handleConfirmCreatePO = async () => {
-    // process current group index only; modal will iterate per group
-    const group = poGroups[currentPOIndex]
-    if (!group) return
-    const supplier = group.supplier
-    if (!poNumber || !poNumber.trim()) {
-      alert('Please enter a PO number for ' + supplier)
-      return
-    }
-
-    // Prepare items payload expected by API
-      const itemsPayload = group.items.map(item => ({
-      item_no: item.item_no,
-      item_name: item.item_name,
-      quantity: item.__recommended_order || 1,
-      unit: item.unit_of_measure || 'pcs',
-      price_per_unit: Number(item.price_per_unit) || 0
-    }))
-
-    try {
-      setPOLoading(true)
-
-      // Ensure PO number is available; if prefix present, use its prefix
-      const parts = poNumber.split('-')
-      let finalPONumber = poNumber
-      if (parts.length === 2) {
-        const basePrefix = parts[0]
-        const seq = parseInt(parts[1].replace(/^0+/, '') || '0')
-        try {
-          finalPONumber = await resolveAvailablePONumber(basePrefix, seq)
-        } catch (err) {
-          console.warn('PO number resolution warning:', err)
-        }
-      }
-
-      const poData = {
-        po_number: finalPONumber,
-        supplier_name: supplier,
-        supplier_details: group.supplierDetails || null,
-        supplier_address: group.supplierDetails ? apiService.suppliers.getFullAddress(group.supplierDetails) : undefined,
-        items: itemsPayload,
-        notes: `Auto-generated from Restock List for ${itemsPayload.length} items`
-      }
-
-      const result = await apiService.purchaseOrders.createPurchaseOrder(poData)
-      // record created
-      setCreatedPOs(prev => [...prev, { supplier, po: finalPONumber, result }])
-
-      // Advance to next group
-      const nextIndex = currentPOIndex + 1
-      if (nextIndex < poGroups.length) {
-        // compute next PO number by incrementing sequence if same prefix
-        const prevParts = finalPONumber.split('-')
-        if (prevParts.length === 2) {
-          const prefix = prevParts[0]
-          const prevSeq = parseInt(prevParts[1].replace(/^0+/, '') || '0')
-          const nextSeq = prevSeq + 1
-          const nextSeqStr = String(nextSeq).padStart(3, '0')
-          const nextPo = `${prefix}-${nextSeqStr}`
-          setPONumber(nextPo)
-          // Update next group po_number too
-          setPOGroups(prev => prev.map((g, i) => i === nextIndex ? { ...g, po_number: nextPo } : g))
-        } else {
-          // fallback: keep whatever assigned
-          setPONumber(poGroups[nextIndex].po_number || '')
-        }
-        setCurrentPOIndex(nextIndex)
-      } else {
-        // Completed all groups
-        setIsPOModalOpen(false)
-        setSelectedItems([])
-        setIsAllSelected(false)
-        // Show summary
-        const summary = createdPOs.concat([{ supplier, po: finalPONumber }]).map(c => `${c.po} (${c.supplier})`).join(', ')
-        alert(`Created Purchase Orders: ${summary}`)
-      }
-
-    } catch (err) {
-      console.error('Error creating purchase order for supplier', supplier, err)
-      alert('Failed to create purchase order for ' + supplier + '. ' + (err.message || ''))
-    } finally {
-      setPOLoading(false)
-    }
-  }
+  // PO creation and helpers removed from Restock List
 
   const handleBulkExport = () => {
     if (selectedItems.length === 0) {
@@ -589,13 +455,6 @@ export default function RestockList() {
           {selectedItems.length > 0 && (
             <>
               <button
-                onClick={handleCreatePO}
-                disabled={poLoading}
-                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                📋 Create PO
-              </button>
-              <button
                 onClick={handleBulkExport}
                 className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
               >
@@ -747,133 +606,7 @@ export default function RestockList() {
         </div>
       )}
 
-      {/* PO Creation Modal */}
-      {isPOModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-2xl border border-gray-200 dark:border-gray-700 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-              Create Purchase Order
-            </h3>
-            
-            <div className="space-y-6">
-              {/* Show current group / supplier info */}
-              {poGroups.length > 0 && (
-                <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-start justify-between gap-6">
-                    <div className="flex-1">
-                      <div className="text-sm text-gray-600 dark:text-gray-300">Creating PO for supplier</div>
-                      <div className="text-lg font-semibold text-gray-900 dark:text-white">{poGroups[currentPOIndex]?.supplier || 'N/A'}</div>
-                      {poGroups[currentPOIndex]?.supplierDetails && (
-                        <div className="mt-2 text-sm text-gray-700 dark:text-gray-300 space-y-1">
-                          <div><strong>Contact:</strong> {poGroups[currentPOIndex].supplierDetails.contact_person || poGroups[currentPOIndex].supplierDetails.contact || 'N/A'}</div>
-                          <div><strong>Email:</strong> {poGroups[currentPOIndex].supplierDetails.email || 'N/A'}</div>
-                          <div><strong>Phone:</strong> {poGroups[currentPOIndex].supplierDetails.phone || 'N/A'}</div>
-                          <div><strong>Payment Terms:</strong> {poGroups[currentPOIndex].supplierDetails.payment_terms || 'N/A'}</div>
-                          <div><strong>Tax ID:</strong> {poGroups[currentPOIndex].supplierDetails.tax_id || 'N/A'}</div>
-                          <div><strong>Website:</strong> {poGroups[currentPOIndex].supplierDetails.website || 'N/A'}</div>
-                          <div><strong>Address:</strong> {apiService.suppliers.getFullAddress(poGroups[currentPOIndex].supplierDetails)}</div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">PO {currentPOIndex + 1} of {poGroups.length}</div>
-                  </div>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  PO Number *
-                </label>
-                <input
-                  type="text"
-                  value={poNumber || poGroups[currentPOIndex]?.po_number || ''}
-                  onChange={(e) => setPONumber(e.target.value)}
-                  className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
-                  placeholder="Enter PO number"
-                />
-              </div>
-
-              <div>
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                  Items for this PO ({poGroups[currentPOIndex]?.items?.length || 0})
-                </h4>
-                <div className="max-h-60 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-xl">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-100 dark:bg-gray-700 sticky top-0">
-                      <tr>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-800 dark:text-gray-200">Item</th>
-                        <th className="px-4 py-2 text-center font-semibold text-gray-800 dark:text-gray-200">Qty</th>
-                        <th className="px-4 py-2 text-left font-semibold text-gray-800 dark:text-gray-200">Supplier</th>
-                        <th className="px-4 py-2 text-right font-semibold text-gray-800 dark:text-gray-200">Price</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                      {(poGroups[currentPOIndex]?.items || []).map((item) => (
-                        <tr key={item.item_no}>
-                          <td className="px-4 py-2 text-gray-900 dark:text-white">
-                            <div className="font-medium">{item.item_name}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">{item.item_no}</div>
-                          </td>
-                          <td className="px-4 py-2 text-center font-semibold text-gray-900 dark:text-white">
-                            {item.__recommended_order}
-                          </td>
-                          <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
-                            {item.supplier || "N/A"}
-                          </td>
-                          <td className="px-4 py-2 text-right font-semibold text-gray-900 dark:text-white">
-                            {formatCurrency((item.price_per_unit || item.unit_price || 0) * (item.__recommended_order || 1))}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-lg font-semibold text-gray-900 dark:text-white">Total Estimated Value:</span>
-                  <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    {formatCurrency(
-                      restockItems
-                        .filter(item => selectedItems.includes(item.item_no))
-                        .reduce((sum, item) => sum + (item.price_per_unit * item.__recommended_order), 0)
-                    )}
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-xl p-4">
-                <p className="text-sm text-yellow-800 dark:text-yellow-300">
-                  ℹ️ Purchase orders will be grouped by supplier automatically. Multiple POs may be created if items are from different suppliers.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-4 mt-8">
-              <button
-                onClick={handleConfirmCreatePO}
-                disabled={poLoading}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {poLoading ? "Creating..." : "Create Purchase Order"}
-              </button>
-              <button
-                onClick={() => {
-                  setIsPOModalOpen(false)
-                  setPONumber("")
-                  setPOGroups([])
-                  setCurrentPOIndex(0)
-                  setCreatedPOs([])
-                }}
-                disabled={poLoading}
-                className="flex-1 bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      
     </div>
   )
 }

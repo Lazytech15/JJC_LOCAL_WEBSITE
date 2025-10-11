@@ -12,7 +12,6 @@ function PurchaseOrderTracker() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [editingOrder, setEditingOrder] = useState(null)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [restockItems, setRestockItems] = useState([])
@@ -242,13 +241,6 @@ function PurchaseOrderTracker() {
       notes: "",
       priority: "normal"
     })
-    setEditingOrder(null)
-    setShowCreateModal(true)
-  }
-
-  const handleEditOrder = (order) => {
-    // Open the create wizard in edit mode with the selected order
-    setEditingOrder(order)
     setShowCreateModal(true)
   }
 
@@ -463,25 +455,8 @@ function PurchaseOrderTracker() {
   }
 
   const handleUpdateStatus = async () => {
-    try {
-      const statusData = {
-        new_status: statusUpdate.new_status,
-        notes: statusUpdate.notes,
-        actual_delivery_date: statusUpdate.actual_delivery_date || undefined
-      }
-
-      const result = await apiService.purchaseOrders.updatePurchaseOrderStatus(statusUpdate.order_id, statusData)
-
-      if (result.success) {
-        success("Success", "Order status updated successfully!")
-        setShowOrderDetails(false)
-        fetchPurchaseOrders()
-      } else {
-        showError("Failed", result.message || "Failed to update order status")
-      }
-    } catch (err) {
-      setError(err.message || "Failed to update order status")
-    }
+    // Status updates for purchase orders have been removed.
+    showError('Update Disabled', 'Updating purchase order status is no longer supported.')
   }
 
   const handleViewOrderDetails = (order) => {
@@ -679,12 +654,7 @@ function PurchaseOrderTracker() {
                       >
                         View Details
                       </button>
-                      <button
-                        onClick={() => handleEditOrder(order)}
-                        className="px-3 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-xs font-medium transition-colors"
-                      >
-                        Edit
-                      </button>
+                      {/* Edit removed - editing purchase orders is no longer supported */}
                       <button
                         onClick={() => handleExportPDF(order)}
                         className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
@@ -721,9 +691,8 @@ function PurchaseOrderTracker() {
       {/* Create Order Wizard */}
       <CreatePurchaseOrderWizard 
         isOpen={showCreateModal}
-        onClose={() => { setShowCreateModal(false); setEditingOrder(null) }}
-        onSuccess={(msg) => { handleWizardSuccess(msg); setEditingOrder(null) }}
-        editingOrder={editingOrder}
+        onClose={() => { setShowCreateModal(false) }}
+        onSuccess={(msg) => { handleWizardSuccess(msg); }}
       />
 
       {/* Order Details Modal */}
