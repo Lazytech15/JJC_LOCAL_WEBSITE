@@ -3,10 +3,9 @@ import { useAuth } from "../../contexts/AuthContext";
 import { pollingManager } from "../../utils/api/websocket/polling-manager";
 import apiService from "../../utils/api/api-service";
 
-function AttendanceEdit() {
+function AttendanceEdit({ onClose }) {
   const { user } = useAuth();
-  const [unsyncedRecords, setUnsyncedRecords] = useState([]);
-  const [deletedRecords, setDeletedRecords] = useState([]);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
@@ -17,6 +16,13 @@ function AttendanceEdit() {
   const [editingRecord, setEditingRecord] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
+
+  // Daily Summary Edit State
+  const [showDailySummaryModal, setShowDailySummaryModal] = useState(false);
+  const [editingDailySummary, setEditingDailySummary] = useState(null);
+  const [dailySummaryForm, setDailySummaryForm] = useState({});
+  const [savingDailySummary, setSavingDailySummary] = useState(false);
+  const [loadingDailySummary, setLoadingDailySummary] = useState(false);
 
   // Add Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -39,151 +45,121 @@ function AttendanceEdit() {
   // Filters
   const [filters, setFilters] = useState({
     employee_uid: "",
-    date: "",
+    date: new Date().toISOString().split("T")[0],
+    startDate: "",
+    endDate: "",
+    useRange: false,
     clock_type: "",
     limit: 100,
   });
 
   // Statistics
   const [stats, setStats] = useState({
-    total_unsynced: 0,
-    total_deleted: 0,
+    total_records: 0,
     by_employee: {},
     by_clock_type: {},
+    late_count: 0,
   });
 
-  const [isLogout, setIsLogout] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   useEffect(() => {
-  // Initialize polling manager
-  if (!pollingManager.isPolling) {
-    pollingManager.initialize();
-    pollingManager.joinAllRooms();
-  }
-
-  fetchUnsyncedRecords();
-  setConnectionStatus("connecting");
-
-  // ✨ CRITICAL FIX: Subscribe to ALL relevant events
-  
-  // 1. New attendance created (including logout records)
-  const unsubscribeCreated = pollingManager.subscribeToUpdates(
-    "attendance_created",
-    (data) => {
-      console.log("[AttendanceEdit] attendance_created event:", data);
-      setConnectionStatus("connected");
-      setLastUpdate(new Date());
-      // ✨ ALWAYS refresh, regardless of is_synced status
-      fetchUnsyncedRecords();
+    // Initialize polling manager
+    if (!pollingManager.isPolling) {
+      pollingManager.initialize();
+      pollingManager.joinAllRooms();
     }
-  );
 
-  // 2. Attendance record updated
-  const unsubscribeUpdated = pollingManager.subscribeToUpdates(
-    "attendance_updated",
-    (data) => {
-      console.log("[AttendanceEdit] attendance_updated event:", data);
-      setConnectionStatus("connected");
-      setLastUpdate(new Date());
-      fetchUnsyncedRecords();
-    }
-  );
+    fetchAttendanceRecords();
+    setConnectionStatus("connecting");
 
-  // 3. Attendance record deleted
-  const unsubscribeDeleted = pollingManager.subscribeToUpdates(
-    "attendance_deleted",
-    (data) => {
-      console.log("[AttendanceEdit] attendance_deleted event:", data);
-      setConnectionStatus("connected");
-      setLastUpdate(new Date());
-      fetchUnsyncedRecords();
-    }
-  );
+    // Subscribe to attendance events
+    const unsubscribeCreated = pollingManager.subscribeToUpdates(
+      "attendance_created",
+      (data) => {
+        console.log("[AttendanceEdit] attendance_created event:", data);
+        setConnectionStatus("connected");
+        setLastUpdate(new Date());
+        fetchAttendanceRecords();
+      }
+    );
 
-  // 4. Edit-specific events (created, edited, deleted)
-  const unsubscribeEditCreated = pollingManager.subscribeToUpdates(
-    "attendance_edit_created",
-    (data) => {
-      console.log("[AttendanceEdit] attendance_edit_created event:", data);
-      setConnectionStatus("connected");
-      setLastUpdate(new Date());
-      fetchUnsyncedRecords();
-    }
-  );
+    const unsubscribeUpdated = pollingManager.subscribeToUpdates(
+      "attendance_updated",
+      (data) => {
+        console.log("[AttendanceEdit] attendance_updated event:", data);
+        setConnectionStatus("connected");
+        setLastUpdate(new Date());
+        fetchAttendanceRecords();
+      }
+    );
 
-  // 5. ✨ NEW: Listen to daily summary updates
-  const unsubscribeSummaryUpdated = pollingManager.subscribeToUpdates(
-    "daily_summary_updated",
-    (data) => {
-      console.log("[AttendanceEdit] daily_summary_updated event:", data);
-      setConnectionStatus("connected");
-      setLastUpdate(new Date());
-      // Refresh if summary affects unsynced records
-      fetchUnsyncedRecords();
-    }
-  );
+    const unsubscribeDeleted = pollingManager.subscribeToUpdates(
+      "attendance_deleted",
+      (data) => {
+        console.log("[AttendanceEdit] attendance_deleted event:", data);
+        setConnectionStatus("connected");
+        setLastUpdate(new Date());
+        fetchAttendanceRecords();
+      }
+    );
 
-  // 6. Connection status monitoring
-  const unsubscribeConnection = pollingManager.subscribeToUpdates(
-    "connection",
-    (data) => {
-      console.log("[AttendanceEdit] Connection status:", data.status);
-      setConnectionStatus(data.status);
-    }
-  );
+    const unsubscribeConnection = pollingManager.subscribeToUpdates(
+      "connection",
+      (data) => {
+        console.log("[AttendanceEdit] Connection status:", data.status);
+        setConnectionStatus(data.status);
+      }
+    );
 
-  // Cleanup all subscriptions
-  return () => {
-    unsubscribeCreated();
-    unsubscribeUpdated();
-    unsubscribeDeleted();
-    unsubscribeEditCreated();
-    unsubscribeSummaryUpdated(); // ✨ NEW cleanup
-    unsubscribeConnection();
-    setConnectionStatus("disconnected");
-  };
-}, []);
+    // Cleanup all subscriptions
+    return () => {
+      unsubscribeCreated();
+      unsubscribeUpdated();
+      unsubscribeDeleted();
+      unsubscribeConnection();
+      setConnectionStatus("disconnected");
+    };
+  }, []);
 
-  const fetchUnsyncedRecords = async () => {
+  // Refetch when filters change
+useEffect(() => {
+  fetchAttendanceRecords();
+}, [filters.date, filters.startDate, filters.endDate, filters.useRange, 
+    filters.employee_uid, filters.clock_type, filters.limit]);
+
+  const fetchAttendanceRecords = async () => {
     try {
       setLoading(true);
-      const result = await apiService.editAttendance.getUnsyncedRecords(
-        filters.limit
-      );
+      const params = {
+        limit: filters.limit.toString(),
+        sort_by: "clock_time",
+        sort_order: "DESC",
+      };
+
+      if (filters.employee_uid) params.employee_uid = filters.employee_uid;
+      if (filters.clock_type) params.clock_type = filters.clock_type;
+      
+      // Date filtering
+      if (filters.useRange && filters.startDate && filters.endDate) {
+        params.start_date = filters.startDate;
+        params.end_date = filters.endDate;
+      } else if (filters.date) {
+        params.date = filters.date;
+      }
+
+      const result = await apiService.attendance.getAttendanceRecords(params);
 
       if (result.success) {
-        const edited = result.data.edited || [];
-        const deleted = result.data.deleted || [];
-
-        // Apply filters
-        let filteredRecords = edited;
-        if (filters.employee_uid) {
-          filteredRecords = filteredRecords.filter(
-            (r) => r.employee_uid === filters.employee_uid
-          );
-        }
-        if (filters.date) {
-          filteredRecords = filteredRecords.filter(
-            (r) => r.date === filters.date
-          );
-        }
-        if (filters.clock_type) {
-          filteredRecords = filteredRecords.filter(
-            (r) => r.clock_type === filters.clock_type
-          );
-        }
-
-        setUnsyncedRecords(filteredRecords);
-        setDeletedRecords(deleted);
-        calculateStats(filteredRecords);
+        setAttendanceRecords(result.data);
+        calculateStats(result.data);
         setError(null);
       } else {
-        throw new Error(result.error || "Failed to fetch unsynced records");
+        throw new Error(result.error || "Failed to fetch attendance records");
       }
     } catch (err) {
       setError(err.message);
-      console.error("Error fetching unsynced records:", err);
+      console.error("Error fetching attendance records:", err);
     } finally {
       setLoading(false);
     }
@@ -193,10 +169,6 @@ function AttendanceEdit() {
     try {
       setLoadingEmployees(true);
       const result = await apiService.employees.getEmployees({ limit: 1000 });
-      console.log("Full API result:", result);
-      console.log("Employees array:", result.employees);
-      console.log("Departments array:", result.departments);
-
       if (result.success) {
         setEmployees(result.employees || []);
       }
@@ -209,10 +181,10 @@ function AttendanceEdit() {
 
   const calculateStats = (records) => {
     const newStats = {
-      total_unsynced: records.length,
-      total_deleted: deletedRecords.length,
+      total_records: records.length,
       by_employee: {},
       by_clock_type: {},
+      late_count: 0,
     };
 
     records.forEach((record) => {
@@ -222,8 +194,10 @@ function AttendanceEdit() {
 
       // By clock type
       const typeKey = record.clock_type;
-      newStats.by_clock_type[typeKey] =
-        (newStats.by_clock_type[typeKey] || 0) + 1;
+      newStats.by_clock_type[typeKey] = (newStats.by_clock_type[typeKey] || 0) + 1;
+
+      // Late count
+      if (record.is_late) newStats.late_count++;
     });
 
     setStats(newStats);
@@ -235,7 +209,7 @@ function AttendanceEdit() {
       employee_uid: "",
       clock_type: "morning_in",
       clock_time: "",
-      date: new Date().toISOString().split("T")[0],
+      date: filters.date || new Date().toISOString().split("T")[0],
       regular_hours: 0,
       overtime_hours: 0,
       is_late: false,
@@ -250,57 +224,46 @@ function AttendanceEdit() {
   };
 
   const handleAddSubmit = async (e) => {
-  e.preventDefault();
-  setAdding(true);
+    e.preventDefault();
+    setAdding(true);
 
-  try {
-    // Validate required fields
-    if (
-      !addForm.employee_uid ||
-      !addForm.clock_type ||
-      !addForm.clock_time ||
-      !addForm.date
-    ) {
-      throw new Error("Please fill in all required fields");
+    try {
+      // Validate required fields
+      if (!addForm.employee_uid || !addForm.clock_type || !addForm.clock_time || !addForm.date) {
+        throw new Error("Please fill in all required fields");
+      }
+
+      // Combine date and time
+      const clockTime = `${addForm.date} ${addForm.clock_time}:00`;
+
+      const newRecord = {
+        employee_uid: addForm.employee_uid,
+        clock_type: addForm.clock_type,
+        clock_time: clockTime,
+        date: addForm.date,
+        regular_hours: parseFloat(addForm.regular_hours) || 0,
+        overtime_hours: parseFloat(addForm.overtime_hours) || 0,
+        is_late: addForm.is_late || false,
+        notes: addForm.notes || "",
+      };
+
+      const result = await apiService.editAttendance.addAttendanceRecord(newRecord);
+
+      if (result.success) {
+        closeAddModal();
+        await fetchAttendanceRecords();
+        showToast("✅ Attendance record added successfully!", "success");
+      } else {
+        throw new Error(result.error || "Failed to add record");
+      }
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`, "error");
+    } finally {
+      setAdding(false);
     }
+  };
 
-    // Combine date and time
-    const clockTime = `${addForm.date} ${addForm.clock_time}:00`;
-
-    const newRecord = {
-      employee_uid: addForm.employee_uid,
-      clock_type: addForm.clock_type,
-      clock_time: clockTime,
-      date: addForm.date,
-      regular_hours: parseFloat(addForm.regular_hours) || 0,
-      overtime_hours: parseFloat(addForm.overtime_hours) || 0,
-      is_late: addForm.is_late || false,
-      notes: addForm.notes || "",
-    };
-
-    const result = await apiService.editAttendance.addAttendanceRecord(
-      newRecord
-    );
-
-    if (result.success) {
-      closeAddModal();
-      
-      // ✨ CRITICAL: Immediate UI refresh BEFORE showing success message
-      await fetchUnsyncedRecords();
-      
-      // ✨ Use toast instead of blocking alert
-      showToast("✅ Attendance record added successfully!", "success");
-    } else {
-      throw new Error(result.error || "Failed to add record");
-    }
-  } catch (err) {
-    showToast(`❌ Error: ${err.message}`, "error");
-  } finally {
-    setAdding(false);
-  }
-};
-
-  const openEditModal = (record) => {
+const openEditModal = (record) => {
     setEditingRecord(record);
     setEditForm({
       clock_type: record.clock_type,
@@ -311,8 +274,126 @@ function AttendanceEdit() {
       is_late: record.is_late ? true : false,
       notes: record.notes || "",
     });
-    setIsLogout(false); // Reset logout checkbox
     setShowEditModal(true);
+  };
+
+  const openDailySummaryEditModal = async (record) => {
+    setEditingDailySummary(record);
+    setLoadingDailySummary(true);
+    setShowDailySummaryModal(true);
+
+    try {
+      // Fetch full details if needed
+      const result = await apiService.summary.getDailySummaryById(record.id);
+      if (result.success) {
+        const fullRecord = result.data;
+        setDailySummaryForm({
+          employee_name: fullRecord.employee_name || "",
+          department: fullRecord.department || "",
+          date: fullRecord.date || "",
+          morning_in: fullRecord.morning_in?.split(" ")[1]?.substring(0, 5) || "",
+          morning_out: fullRecord.morning_out?.split(" ")[1]?.substring(0, 5) || "",
+          afternoon_in: fullRecord.afternoon_in?.split(" ")[1]?.substring(0, 5) || "",
+          afternoon_out: fullRecord.afternoon_out?.split(" ")[1]?.substring(0, 5) || "",
+          evening_in: fullRecord.evening_in?.split(" ")[1]?.substring(0, 5) || "",
+          evening_out: fullRecord.evening_out?.split(" ")[1]?.substring(0, 5) || "",
+          overtime_in: fullRecord.overtime_in?.split(" ")[1]?.substring(0, 5) || "",
+          overtime_out: fullRecord.overtime_out?.split(" ")[1]?.substring(0, 5) || "",
+          regular_hours: fullRecord.regular_hours || 0,
+          overtime_hours: fullRecord.overtime_hours || 0,
+          is_incomplete: fullRecord.is_incomplete || false,
+          has_late_entry: fullRecord.has_late_entry || false,
+        });
+      }
+    } catch (err) {
+      showToast(`❌ Error loading record: ${err.message}`, "error");
+    } finally {
+      setLoadingDailySummary(false);
+    }
+  };
+
+  const closeDailySummaryModal = () => {
+    setShowDailySummaryModal(false);
+    setEditingDailySummary(null);
+    setDailySummaryForm({});
+  };
+
+  const handleDailySummarySubmit = async (e) => {
+    e.preventDefault();
+    setSavingDailySummary(true);
+
+    try {
+      const updateData = {
+        date: dailySummaryForm.date,
+        regular_hours: parseFloat(dailySummaryForm.regular_hours),
+        overtime_hours: parseFloat(dailySummaryForm.overtime_hours),
+        is_incomplete: dailySummaryForm.is_incomplete,
+        has_late_entry: dailySummaryForm.has_late_entry,
+      };
+
+      // Add time fields if they have values
+      if (dailySummaryForm.morning_in) {
+        updateData.morning_in = `${dailySummaryForm.date} ${dailySummaryForm.morning_in}:00`;
+      }
+      if (dailySummaryForm.morning_out) {
+        updateData.morning_out = `${dailySummaryForm.date} ${dailySummaryForm.morning_out}:00`;
+      }
+      if (dailySummaryForm.afternoon_in) {
+        updateData.afternoon_in = `${dailySummaryForm.date} ${dailySummaryForm.afternoon_in}:00`;
+      }
+      if (dailySummaryForm.afternoon_out) {
+        updateData.afternoon_out = `${dailySummaryForm.date} ${dailySummaryForm.afternoon_out}:00`;
+      }
+      if (dailySummaryForm.evening_in) {
+        updateData.evening_in = `${dailySummaryForm.date} ${dailySummaryForm.evening_in}:00`;
+      }
+      if (dailySummaryForm.evening_out) {
+        updateData.evening_out = `${dailySummaryForm.date} ${dailySummaryForm.evening_out}:00`;
+      }
+      if (dailySummaryForm.overtime_in) {
+        updateData.overtime_in = `${dailySummaryForm.date} ${dailySummaryForm.overtime_in}:00`;
+      }
+      if (dailySummaryForm.overtime_out) {
+        updateData.overtime_out = `${dailySummaryForm.date} ${dailySummaryForm.overtime_out}:00`;
+      }
+
+      const result = await apiService.summary.editDailySummaryRecord(
+        editingDailySummary.id,
+        updateData
+      );
+
+      if (result.success) {
+        closeDailySummaryModal();
+        await fetchAttendanceRecords();
+        showToast("✅ Daily summary updated successfully", "success");
+      } else {
+        throw new Error(result.error || "Failed to update daily summary");
+      }
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`, "error");
+    } finally {
+      setSavingDailySummary(false);
+    }
+  };
+
+  const viewDailySummary = async (record) => {
+    try {
+      // Find the daily summary for this employee and date
+      const result = await apiService.summary.getDailySummaryRecords({
+        employee_uid: record.employee_uid,
+        date: record.date,
+        limit: 1,
+      });
+
+      if (result.success && result.data && result.data.length > 0) {
+        // Open edit modal with the existing daily summary
+        openDailySummaryEditModal(result.data[0]);
+      } else {
+        showToast("⚠️ No daily summary found for this date", "error");
+      }
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`, "error");
+    }
   };
 
   const closeEditModal = () => {
@@ -322,42 +403,12 @@ function AttendanceEdit() {
   };
 
   const handleEditSubmit = async (e) => {
-  e.preventDefault();
-  setSaving(true);
+    e.preventDefault();
+    setSaving(true);
 
-  try {
-    const clockTime = `${editForm.date} ${editForm.clock_time}:00`;
+    try {
+      const clockTime = `${editForm.date} ${editForm.clock_time}:00`;
 
-    if (isLogout) {
-      // Create a new logout record
-      const logoutType = editingRecord.clock_type.replace('_in', '_out');
-
-      const newRecord = {
-        employee_uid: editingRecord.employee_uid,
-        clock_type: logoutType,
-        clock_time: clockTime,
-        date: editForm.date,
-        regular_hours: parseFloat(editForm.regular_hours) || 0,
-        overtime_hours: parseFloat(editForm.overtime_hours) || 0,
-        is_late: editForm.is_late,
-        notes: editForm.notes || `Logout created from ${editingRecord.clock_type}`,
-      };
-
-      const result = await apiService.editAttendance.addAttendanceRecord(newRecord);
-
-      if (result.success) {
-        closeEditModal();
-        
-        // ✨ CRITICAL: Immediate UI refresh
-        await fetchUnsyncedRecords();
-        
-        // ✨ Non-blocking success notification
-        showToast(`✅ Logout record created for ${formatClockType(logoutType)}`, 'success');
-      } else {
-        throw new Error(result.error || "Failed to create logout record");
-      }
-    } else {
-      // Normal update flow (existing code)
       const updateData = {
         clock_type: editForm.clock_type,
         clock_time: clockTime,
@@ -375,22 +426,17 @@ function AttendanceEdit() {
 
       if (result.success) {
         closeEditModal();
-        
-        // ✨ CRITICAL: Immediate UI refresh
-        await fetchUnsyncedRecords();
-        
-        // ✨ Non-blocking success notification
+        await fetchAttendanceRecords();
         showToast('✅ Record updated successfully', 'success');
       } else {
         throw new Error(result.error || "Failed to update record");
       }
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`, 'error');
+    } finally {
+      setSaving(false);
     }
-  } catch (err) {
-    showToast(`❌ Error: ${err.message}`, 'error');
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
   const openDeleteModal = (record) => {
     setDeletingRecord(record);
@@ -406,19 +452,17 @@ function AttendanceEdit() {
     setDeleting(true);
 
     try {
-      const result = await apiService.editAttendance.deleteAttendanceRecord(
-        deletingRecord.id
-      );
+      const result = await apiService.editAttendance.deleteAttendanceRecord(deletingRecord.id);
 
       if (result.success) {
         closeDeleteModal();
-        fetchUnsyncedRecords();
-        alert("Record deleted successfully!");
+        await fetchAttendanceRecords();
+        showToast("✅ Record deleted successfully!", "success");
       } else {
         throw new Error(result.error || "Failed to delete record");
       }
     } catch (err) {
-      alert("Error deleting record: " + err.message);
+      showToast("❌ Error deleting record: " + err.message, "error");
     } finally {
       setDeleting(false);
     }
@@ -435,16 +479,16 @@ function AttendanceEdit() {
   };
 
   const selectAllRecords = () => {
-    if (selectedRecords.size === unsyncedRecords.length) {
+    if (selectedRecords.size === attendanceRecords.length) {
       setSelectedRecords(new Set());
     } else {
-      setSelectedRecords(new Set(unsyncedRecords.map((r) => r.id)));
+      setSelectedRecords(new Set(attendanceRecords.map((r) => r.id)));
     }
   };
 
   const openBatchModal = () => {
     if (selectedRecords.size === 0) {
-      alert("Please select at least one record");
+      showToast("⚠️ Please select at least one record", "error");
       return;
     }
     setBatchForm({});
@@ -478,15 +522,16 @@ function AttendanceEdit() {
       if (result.success) {
         closeBatchModal();
         setSelectedRecords(new Set());
-        fetchUnsyncedRecords();
-        alert(
-          `Batch edit completed: ${result.success_count} successful, ${result.fail_count} failed`
+        await fetchAttendanceRecords();
+        showToast(
+          `✅ Batch edit completed: ${result.success_count} successful, ${result.fail_count} failed`,
+          "success"
         );
       } else {
         throw new Error(result.error || "Failed to batch edit records");
       }
     } catch (err) {
-      alert("Error in batch edit: " + err.message);
+      showToast("❌ Error in batch edit: " + err.message, "error");
     } finally {
       setBatchProcessing(false);
     }
@@ -521,11 +566,7 @@ function AttendanceEdit() {
   };
 
   const formatEmployeeName = (record) => {
-    const parts = [
-      record.last_name,
-      record.first_name,
-      record.middle_name,
-    ].filter(Boolean);
+    const parts = [record.last_name, record.first_name, record.middle_name].filter(Boolean);
     return parts.length > 0 ? parts.join(" ") : "Unknown Employee";
   };
 
@@ -559,26 +600,27 @@ function AttendanceEdit() {
             Attendance Editor
           </h1>
           <p className="text-slate-600 dark:text-slate-400 text-lg mt-2">
-            Add, edit, delete, and manage attendance records
+            Add, edit, and manage attendance records
           </p>
         </div>
         <div className="flex items-center gap-3">
           {/* Connection Status */}
           <div className="flex items-center gap-3 px-4 py-2 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl border border-white/30 dark:border-gray-700/30">
             <div
-              className={`w-3 h-3 rounded-full ${connectionStatus === "connected"
-                ? "bg-emerald-500 shadow-lg shadow-emerald-500/50"
-                : connectionStatus === "connecting"
+              className={`w-3 h-3 rounded-full ${
+                connectionStatus === "connected"
+                  ? "bg-emerald-500 shadow-lg shadow-emerald-500/50"
+                  : connectionStatus === "connecting"
                   ? "bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50"
                   : "bg-red-500 shadow-lg shadow-red-500/50"
-                }`}
+              }`}
             ></div>
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
               {connectionStatus === "connected"
                 ? "Live Updates"
                 : connectionStatus === "connecting"
-                  ? "Connecting..."
-                  : "Disconnected"}
+                ? "Connecting..."
+                : "Disconnected"}
             </span>
             {lastUpdate && (
               <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">
@@ -591,17 +633,33 @@ function AttendanceEdit() {
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 rounded-3xl p-6 border border-amber-200/40 dark:border-amber-800/40">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-3xl p-6 border border-blue-200/40 dark:border-blue-800/40">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-2xl">
-              <span className="text-2xl">⚠️</span>
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-2xl">
+              <span className="text-2xl">📊</span>
             </div>
             <div className="text-right">
-              <p className="text-3xl font-bold text-amber-700 dark:text-amber-300">
-                {stats.total_unsynced}
+              <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">
+                {stats.total_records}
               </p>
-              <p className="text-amber-600 dark:text-amber-400 text-sm font-medium">
-                Unsynced Records
+              <p className="text-blue-600 dark:text-blue-400 text-sm font-medium">
+                Total Records
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 rounded-3xl p-6 border border-emerald-200/40 dark:border-emerald-800/40">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl">
+              <span className="text-2xl">👥</span>
+            </div>
+            <div className="text-right">
+              <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-300">
+                {Object.keys(stats.by_employee).length}
+              </p>
+              <p className="text-emerald-600 dark:text-emerald-400 text-sm font-medium">
+                Employees
               </p>
             </div>
           </div>
@@ -610,30 +668,14 @@ function AttendanceEdit() {
         <div className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-3xl p-6 border border-red-200/40 dark:border-red-800/40">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-2xl">
-              <span className="text-2xl">🗑️</span>
+              <span className="text-2xl">⚠️</span>
             </div>
             <div className="text-right">
               <p className="text-3xl font-bold text-red-700 dark:text-red-300">
-                {stats.total_deleted}
+                {stats.late_count}
               </p>
               <p className="text-red-600 dark:text-red-400 text-sm font-medium">
-                Deleted Records
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-3xl p-6 border border-blue-200/40 dark:border-blue-800/40">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-2xl">
-              <span className="text-2xl">👥</span>
-            </div>
-            <div className="text-right">
-              <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">
-                {Object.keys(stats.by_employee).length}
-              </p>
-              <p className="text-blue-600 dark:text-blue-400 text-sm font-medium">
-                Affected Employees
+                Late Arrivals
               </p>
             </div>
           </div>
@@ -679,31 +721,86 @@ function AttendanceEdit() {
               disabled={selectedRecords.size === 0}
               className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-slate-400 disabled:to-slate-500 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl disabled:hover:translate-y-0 disabled:cursor-not-allowed"
             >
-              Batch Edit ({selectedRecords.size})
+              📝 Batch Edit ({selectedRecords.size})
             </button>
             <button
-              onClick={fetchUnsyncedRecords}
+              onClick={fetchAttendanceRecords}
               className="px-5 py-3 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl"
             >
-              Refresh
+              🔄 Refresh
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
-              Date
-            </label>
+        {/* Date Mode Toggle */}
+        <div className="mb-6">
+          <label className="flex items-center gap-2 cursor-pointer">
             <input
-              type="date"
-              value={filters.date}
+              type="checkbox"
+              checked={filters.useRange}
               onChange={(e) =>
-                setFilters((prev) => ({ ...prev, date: e.target.value }))
+                setFilters((prev) => ({
+                  ...prev,
+                  useRange: e.target.checked,
+                  startDate: e.target.checked ? prev.startDate : "",
+                  endDate: e.target.checked ? prev.endDate : "",
+                }))
               }
-              className="w-full px-4 py-3 bg-white/60 dark:bg-gray-700/60 rounded-xl border border-white/40 dark:border-gray-600/40 text-slate-800 dark:text-slate-200 backdrop-blur-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500"
             />
-          </div>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Use date range instead of single date
+            </span>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Date Filters */}
+          {filters.useRange ? (
+            <>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={filters.startDate}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, startDate: e.target.value }))
+                  }
+                  className="w-full px-4 py-3 bg-white/60 dark:bg-gray-700/60 rounded-xl border border-white/40 dark:border-gray-600/40 text-slate-800 dark:text-slate-200 backdrop-blur-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={filters.endDate}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, endDate: e.target.value }))
+                  }
+                  min={filters.startDate}
+                  className="w-full px-4 py-3 bg-white/60 dark:bg-gray-700/60 rounded-xl border border-white/40 dark:border-gray-600/40 text-slate-800 dark:text-slate-200 backdrop-blur-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                />
+              </div>
+            </>
+          ) : (
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                Date
+              </label>
+              <input
+                type="date"
+                value={filters.date}
+                onChange={(e) =>
+                  setFilters((prev) => ({ ...prev, date: e.target.value }))
+                }
+                className="w-full px-4 py-3 bg-white/60 dark:bg-gray-700/60 rounded-xl border border-white/40 dark:border-gray-600/40 text-slate-800 dark:text-slate-200 backdrop-blur-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
@@ -735,10 +832,7 @@ function AttendanceEdit() {
             <select
               value={filters.limit}
               onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  limit: parseInt(e.target.value),
-                }))
+                setFilters((prev) => ({ ...prev, limit: parseInt(e.target.value) }))
               }
               className="w-full px-4 py-3 bg-white/60 dark:bg-gray-700/60 rounded-xl border border-white/40 dark:border-gray-600/40 text-slate-800 dark:text-slate-200 backdrop-blur-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
             >
@@ -752,14 +846,14 @@ function AttendanceEdit() {
       </div>
 
       {/* Loading State */}
-      {loading && unsyncedRecords.length === 0 && (
+      {loading && attendanceRecords.length === 0 && (
         <div className="text-center py-16">
           <div className="relative">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-slate-200 dark:border-slate-700 mx-auto"></div>
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-transparent border-t-indigo-600 dark:border-t-indigo-400 absolute top-0 left-1/2 transform -translate-x-1/2"></div>
           </div>
           <p className="text-slate-600 dark:text-slate-400 mt-6 text-lg">
-            Loading unsynced records...
+            Loading attendance records...
           </p>
         </div>
       )}
@@ -780,20 +874,18 @@ function AttendanceEdit() {
       )}
 
       {/* Records Table */}
-      {!loading && unsyncedRecords.length > 0 && (
+      {!loading && attendanceRecords.length > 0 && (
         <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-white/40 dark:border-gray-700/40 shadow-2xl overflow-hidden">
           <div className="p-6 border-b border-slate-200 dark:border-slate-700">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">
-                Unsynced Records
+                Attendance Records
               </h2>
               <button
                 onClick={selectAllRecords}
                 className="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
               >
-                {selectedRecords.size === unsyncedRecords.length
-                  ? "Deselect All"
-                  : "Select All"}
+                {selectedRecords.size === attendanceRecords.length ? "Deselect All" : "Select All"}
               </button>
             </div>
           </div>
@@ -805,39 +897,22 @@ function AttendanceEdit() {
                   <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">
                     <input
                       type="checkbox"
-                      checked={
-                        selectedRecords.size === unsyncedRecords.length &&
-                        unsyncedRecords.length > 0
-                      }
+                      checked={selectedRecords.size === attendanceRecords.length && attendanceRecords.length > 0}
                       onChange={selectAllRecords}
                       className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
                     />
                   </th>
-                  <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">
-                    Employee
-                  </th>
-                  <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">
-                    Date
-                  </th>
-                  <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">
-                    Clock Type
-                  </th>
-                  <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">
-                    Clock Time
-                  </th>
-                  <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">
-                    Hours
-                  </th>
-                  <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">
-                    Status
-                  </th>
-                  <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">
-                    Actions
-                  </th>
+                  <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">Employee</th>
+                  <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">Date</th>
+                  <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">Clock Type</th>
+                  <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">Clock Time</th>
+                  <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">Hours</th>
+                  <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">Status</th>
+                  <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {unsyncedRecords.map((record) => (
+                {attendanceRecords.map((record) => (
                   <tr
                     key={record.id}
                     className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
@@ -858,15 +933,9 @@ function AttendanceEdit() {
                         {record.department || "N/A"}
                       </div>
                     </td>
-                    <td className="p-4 text-slate-700 dark:text-slate-300">
-                      {record.date}
-                    </td>
+                    <td className="p-4 text-slate-700 dark:text-slate-300">{record.date}</td>
                     <td className="p-4">
-                      <span
-                        className={`inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full border ${getClockTypeColor(
-                          record.clock_type
-                        )}`}
-                      >
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full border ${getClockTypeColor(record.clock_type)}`}>
                         {formatClockType(record.clock_type)}
                       </span>
                     </td>
@@ -886,53 +955,44 @@ function AttendanceEdit() {
                             ⏰ Late
                           </span>
                         )}
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                          🔄 Unsynced
-                        </span>
+                        {!record.is_synced && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                            🔄 Unsynced
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => openEditModal(record)}
-                          className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => openDeleteModal(record)}
-                          className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
+  <div className="flex items-center gap-2">
+    <button
+      onClick={() => openEditModal(record)}
+      className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
+      title="Edit Attendance"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+      </svg>
+    </button>
+    <button
+      onClick={() => viewDailySummary(record)}
+      className="p-2 bg-teal-50 hover:bg-teal-100 text-teal-600 rounded-lg transition-colors"
+      title="View Daily Summary"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+      </svg>
+    </button>
+    <button
+      onClick={() => openDeleteModal(record)}
+      className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
+      title="Delete"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+      </svg>
+    </button>
+  </div>
+</td>
                   </tr>
                 ))}
               </tbody>
@@ -942,14 +1002,14 @@ function AttendanceEdit() {
       )}
 
       {/* Empty State */}
-      {!loading && unsyncedRecords.length === 0 && (
+      {!loading && attendanceRecords.length === 0 && (
         <div className="text-center py-16 bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl rounded-3xl border border-white/40 dark:border-gray-700/40">
-          <div className="text-6xl mb-4">✅</div>
+          <div className="text-6xl mb-4">📭</div>
           <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">
-            All Records Synced
+            No Records Found
           </h3>
           <p className="text-slate-500 dark:text-slate-400">
-            There are no unsynced attendance records at the moment.
+            No attendance records found for the selected filters.
           </p>
         </div>
       )}
@@ -961,29 +1021,12 @@ function AttendanceEdit() {
             <div className="sticky top-0 bg-gradient-to-r from-emerald-600 to-teal-600 p-6 rounded-t-3xl">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">
-                    Add Attendance Record
-                  </h2>
-                  <p className="text-emerald-100 mt-1">
-                    Create a new attendance entry
-                  </p>
+                  <h2 className="text-2xl font-bold text-white">Add Attendance Record</h2>
+                  <p className="text-emerald-100 mt-1">Create a new attendance entry</p>
                 </div>
-                <button
-                  onClick={closeAddModal}
-                  className="p-2 bg-white/20 hover:bg-white/30 rounded-xl text-white transition-colors"
-                >
-                  <svg
-                    className="w-6 h-6"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
+                <button onClick={closeAddModal} className="p-2 bg-white/20 hover:bg-white/30 rounded-xl text-white transition-colors">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
@@ -1001,12 +1044,7 @@ function AttendanceEdit() {
                   ) : (
                     <select
                       value={addForm.employee_uid}
-                      onChange={(e) =>
-                        setAddForm((prev) => ({
-                          ...prev,
-                          employee_uid: e.target.value,
-                        }))
-                      }
+                      onChange={(e) => setAddForm((prev) => ({ ...prev, employee_uid: e.target.value }))}
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                       required
                     >
@@ -1025,12 +1063,7 @@ function AttendanceEdit() {
                   </label>
                   <select
                     value={addForm.clock_type}
-                    onChange={(e) =>
-                      setAddForm((prev) => ({
-                        ...prev,
-                        clock_type: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, clock_type: e.target.value }))}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                     required
                   >
@@ -1051,9 +1084,7 @@ function AttendanceEdit() {
                   <input
                     type="date"
                     value={addForm.date}
-                    onChange={(e) =>
-                      setAddForm((prev) => ({ ...prev, date: e.target.value }))
-                    }
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, date: e.target.value }))}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                     required
                   />
@@ -1065,12 +1096,7 @@ function AttendanceEdit() {
                   <input
                     type="time"
                     value={addForm.clock_time}
-                    onChange={(e) =>
-                      setAddForm((prev) => ({
-                        ...prev,
-                        clock_time: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, clock_time: e.target.value }))}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                     required
                   />
@@ -1083,12 +1109,7 @@ function AttendanceEdit() {
                     type="number"
                     step="0.1"
                     value={addForm.regular_hours}
-                    onChange={(e) =>
-                      setAddForm((prev) => ({
-                        ...prev,
-                        regular_hours: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, regular_hours: e.target.value }))}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                   />
                 </div>
@@ -1100,12 +1121,7 @@ function AttendanceEdit() {
                     type="number"
                     step="0.1"
                     value={addForm.overtime_hours}
-                    onChange={(e) =>
-                      setAddForm((prev) => ({
-                        ...prev,
-                        overtime_hours: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setAddForm((prev) => ({ ...prev, overtime_hours: e.target.value }))}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                   />
                 </div>
@@ -1114,29 +1130,18 @@ function AttendanceEdit() {
                     <input
                       type="checkbox"
                       checked={addForm.is_late}
-                      onChange={(e) =>
-                        setAddForm((prev) => ({
-                          ...prev,
-                          is_late: e.target.checked,
-                        }))
-                      }
+                      onChange={(e) => setAddForm((prev) => ({ ...prev, is_late: e.target.checked }))}
                       className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500"
                     />
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                      Mark as Late
-                    </span>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Mark as Late</span>
                   </label>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                  Notes
-                </label>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Notes</label>
                 <textarea
                   value={addForm.notes}
-                  onChange={(e) =>
-                    setAddForm((prev) => ({ ...prev, notes: e.target.value }))
-                  }
+                  onChange={(e) => setAddForm((prev) => ({ ...prev, notes: e.target.value }))}
                   rows={3}
                   className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all resize-none"
                   placeholder="Add any notes or comments..."
@@ -1170,81 +1175,31 @@ function AttendanceEdit() {
         </div>
       )}
 
-      {/* Edit Modal */}
+      {/* Edit Modal - Similar structure */}
       {showEditModal && editingRecord && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 p-6 rounded-t-3xl">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">
-                    Edit Attendance Record
-                  </h2>
-                  <p className="text-blue-100 mt-1">
-                    {formatEmployeeName(editingRecord)} - {editingRecord.date}
-                  </p>
+                  <h2 className="text-2xl font-bold text-white">Edit Attendance Record</h2>
+                  <p className="text-blue-100 mt-1">{formatEmployeeName(editingRecord)} - {editingRecord.date}</p>
                 </div>
-                <button
-                  onClick={closeEditModal}
-                  className="p-2 bg-white/20 hover:bg-white/30 rounded-xl text-white transition-colors"
-                >
-                  <svg
-                    className="w-6 h-6"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
+                <button onClick={closeEditModal} className="p-2 bg-white/20 hover:bg-white/30 rounded-xl text-white transition-colors">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
             </div>
             <form onSubmit={handleEditSubmit} className="p-6 space-y-6">
-              {/* Logout Checkbox - NEW */}
-              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-2 border-emerald-200 dark:border-emerald-800/30 rounded-xl p-4">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isLogout}
-                    onChange={(e) => setIsLogout(e.target.checked)}
-                    className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 mt-0.5"
-                  />
-                  <div>
-                    <span className="text-sm font-bold text-emerald-800 dark:text-emerald-300 block">
-                      📤 Create Logout Record
-                    </span>
-                    <span className="text-xs text-emerald-700 dark:text-emerald-400">
-                      Check this to create a new logout record instead of updating this entry.
-                      {editingRecord.clock_type.includes('_in') && (
-                        <span className="block mt-1 font-medium">
-                          Will create: {formatClockType(editingRecord.clock_type.replace('_in', '_out'))}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                </label>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                    Clock Type
-                  </label>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Clock Type</label>
                   <select
                     value={editForm.clock_type}
-                    onChange={(e) =>
-                      setEditForm((prev) => ({
-                        ...prev,
-                        clock_type: e.target.value,
-                      }))
-                    }
-                    disabled={isLogout}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, clock_type: e.target.value }))}
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     required
                   >
                     <option value="morning_in">Morning In</option>
@@ -1256,74 +1211,44 @@ function AttendanceEdit() {
                     <option value="overtime_in">Overtime In</option>
                     <option value="overtime_out">Overtime Out</option>
                   </select>
-                  {isLogout && (
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      Logout type will be auto-set based on clock-in type
-                    </p>
-                  )}
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                    Date
-                  </label>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Date</label>
                   <input
                     type="date"
                     value={editForm.date}
-                    onChange={(e) =>
-                      setEditForm((prev) => ({ ...prev, date: e.target.value }))
-                    }
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, date: e.target.value }))}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                    Clock Time
-                  </label>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Clock Time</label>
                   <input
                     type="time"
                     value={editForm.clock_time}
-                    onChange={(e) =>
-                      setEditForm((prev) => ({
-                        ...prev,
-                        clock_time: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, clock_time: e.target.value }))}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                    Regular Hours
-                  </label>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Regular Hours</label>
                   <input
                     type="number"
                     step="0.1"
                     value={editForm.regular_hours}
-                    onChange={(e) =>
-                      setEditForm((prev) => ({
-                        ...prev,
-                        regular_hours: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, regular_hours: e.target.value }))}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                    Overtime Hours
-                  </label>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Overtime Hours</label>
                   <input
                     type="number"
                     step="0.1"
                     value={editForm.overtime_hours}
-                    onChange={(e) =>
-                      setEditForm((prev) => ({
-                        ...prev,
-                        overtime_hours: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, overtime_hours: e.target.value }))}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   />
                 </div>
@@ -1332,29 +1257,18 @@ function AttendanceEdit() {
                     <input
                       type="checkbox"
                       checked={editForm.is_late}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          is_late: e.target.checked,
-                        }))
-                      }
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, is_late: e.target.checked }))}
                       className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
                     />
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                      Mark as Late
-                    </span>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Mark as Late</span>
                   </label>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                  Notes
-                </label>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Notes</label>
                 <textarea
                   value={editForm.notes}
-                  onChange={(e) =>
-                    setEditForm((prev) => ({ ...prev, notes: e.target.value }))
-                  }
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
                   rows={3}
                   className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
                   placeholder="Add any notes or comments..."
@@ -1371,18 +1285,15 @@ function AttendanceEdit() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className={`px-6 py-3 ${isLogout
-                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
-                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
-                    } disabled:from-slate-400 disabled:to-slate-500 text-white rounded-xl font-semibold transition-all disabled:cursor-not-allowed flex items-center gap-2`}
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-400 disabled:to-slate-500 text-white rounded-xl font-semibold transition-all disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {saving ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>{isLogout ? 'Creating Logout...' : 'Saving...'}</span>
+                      <span>Saving...</span>
                     </>
                   ) : (
-                    <span>{isLogout ? '📤 Create Logout Record' : '💾 Save Changes'}</span>
+                    <span>💾 Save Changes</span>
                   )}
                 </button>
               </div>
@@ -1401,44 +1312,24 @@ function AttendanceEdit() {
                   <span className="text-3xl">🗑️</span>
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">
-                    Delete Record?
-                  </h3>
-                  <p className="text-slate-600 dark:text-slate-400 mt-1">
-                    This action cannot be undone
-                  </p>
+                  <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">Delete Record?</h3>
+                  <p className="text-slate-600 dark:text-slate-400 mt-1">This action cannot be undone</p>
                 </div>
               </div>
               <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4 mb-6">
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-400">
-                      Employee:
-                    </span>
-                    <span className="font-medium text-slate-800 dark:text-slate-200">
-                      {formatEmployeeName(deletingRecord)}
-                    </span>
+                    <span className="text-slate-600 dark:text-slate-400">Date:</span>
+                    <span className="font-medium text-slate-800 dark:text-slate-200">{deletingRecord.date}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-400">
-                      Date:
-                    </span>
-                    <span className="font-medium text-slate-800 dark:text-slate-200">
-                      {deletingRecord.date}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-400">
-                      Type:
-                    </span>
+                    <span className="text-slate-600 dark:text-slate-400">Type:</span>
                     <span className="font-medium text-slate-800 dark:text-slate-200">
                       {formatClockType(deletingRecord.clock_type)}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-400">
-                      Time:
-                    </span>
+                    <span className="text-slate-600 dark:text-slate-400">Time:</span>
                     <span className="font-medium text-slate-800 dark:text-slate-200">
                       {formatTime(deletingRecord.clock_time)}
                     </span>
@@ -1479,30 +1370,14 @@ function AttendanceEdit() {
             <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-indigo-600 p-6 rounded-t-3xl">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">
-                    Batch Edit Records
-                  </h2>
+                  <h2 className="text-2xl font-bold text-white">Batch Edit Records</h2>
                   <p className="text-purple-100 mt-1">
-                    Editing {selectedRecords.size} record
-                    {selectedRecords.size !== 1 ? "s" : ""}
+                    Editing {selectedRecords.size} record{selectedRecords.size !== 1 ? "s" : ""}
                   </p>
                 </div>
-                <button
-                  onClick={closeBatchModal}
-                  className="p-2 bg-white/20 hover:bg-white/30 rounded-xl text-white transition-colors"
-                >
-                  <svg
-                    className="w-6 h-6"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
+                <button onClick={closeBatchModal} className="p-2 bg-white/20 hover:bg-white/30 rounded-xl text-white transition-colors">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
@@ -1513,8 +1388,7 @@ function AttendanceEdit() {
                   <span className="text-2xl">⚠️</span>
                   <div>
                     <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                      Only fill in the fields you want to update. Empty fields
-                      will be ignored.
+                      Only fill in the fields you want to update. Empty fields will be ignored.
                     </p>
                   </div>
                 </div>
@@ -1526,12 +1400,7 @@ function AttendanceEdit() {
                   </label>
                   <select
                     value={batchForm.clock_type || ""}
-                    onChange={(e) =>
-                      setBatchForm((prev) => ({
-                        ...prev,
-                        clock_type: e.target.value || undefined,
-                      }))
-                    }
+                    onChange={(e) => setBatchForm((prev) => ({ ...prev, clock_type: e.target.value || undefined }))}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                   >
                     <option value="">Don't change</option>
@@ -1553,12 +1422,7 @@ function AttendanceEdit() {
                     type="number"
                     step="0.1"
                     value={batchForm.regular_hours || ""}
-                    onChange={(e) =>
-                      setBatchForm((prev) => ({
-                        ...prev,
-                        regular_hours: e.target.value || undefined,
-                      }))
-                    }
+                    onChange={(e) => setBatchForm((prev) => ({ ...prev, regular_hours: e.target.value || undefined }))}
                     placeholder="Leave empty to skip"
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                   />
@@ -1571,12 +1435,7 @@ function AttendanceEdit() {
                     type="number"
                     step="0.1"
                     value={batchForm.overtime_hours || ""}
-                    onChange={(e) =>
-                      setBatchForm((prev) => ({
-                        ...prev,
-                        overtime_hours: e.target.value || undefined,
-                      }))
-                    }
+                    onChange={(e) => setBatchForm((prev) => ({ ...prev, overtime_hours: e.target.value || undefined }))}
                     placeholder="Leave empty to skip"
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                   />
@@ -1586,18 +1445,11 @@ function AttendanceEdit() {
                     Late Status (Optional)
                   </label>
                   <select
-                    value={
-                      batchForm.is_late !== undefined
-                        ? String(batchForm.is_late)
-                        : ""
-                    }
+                    value={batchForm.is_late !== undefined ? String(batchForm.is_late) : ""}
                     onChange={(e) =>
                       setBatchForm((prev) => ({
                         ...prev,
-                        is_late:
-                          e.target.value === ""
-                            ? undefined
-                            : e.target.value === "true",
+                        is_late: e.target.value === "" ? undefined : e.target.value === "true",
                       }))
                     }
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
@@ -1614,12 +1466,7 @@ function AttendanceEdit() {
                 </label>
                 <textarea
                   value={batchForm.notes || ""}
-                  onChange={(e) =>
-                    setBatchForm((prev) => ({
-                      ...prev,
-                      notes: e.target.value || undefined,
-                    }))
-                  }
+                  onChange={(e) => setBatchForm((prev) => ({ ...prev, notes: e.target.value || undefined }))}
                   rows={3}
                   placeholder="Add notes to all selected records..."
                   className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none"
@@ -1652,13 +1499,241 @@ function AttendanceEdit() {
           </div>
         </div>
       )}
+
+      {/* Daily Summary Edit Modal */}
+      {showDailySummaryModal && editingDailySummary && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-gradient-to-r from-teal-600 to-cyan-600 p-6 rounded-t-3xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Edit Daily Summary</h2>
+                  <p className="text-teal-100 mt-1">
+                    {dailySummaryForm.employee_name} - {dailySummaryForm.date}
+                  </p>
+                </div>
+                <button onClick={closeDailySummaryModal} className="p-2 bg-white/20 hover:bg-white/30 rounded-xl text-white transition-colors">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {loadingDailySummary ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-teal-600 border-t-transparent"></div>
+              </div>
+            ) : (
+              <form onSubmit={handleDailySummarySubmit} className="p-6 space-y-6">
+                {/* Employee Info */}
+                <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Employee:</span>
+                      <p className="font-medium text-slate-800 dark:text-slate-200 mt-1">
+                        {dailySummaryForm.employee_name}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Department:</span>
+                      <p className="font-medium text-slate-800 dark:text-slate-200 mt-1">
+                        {dailySummaryForm.department || "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Time Fields */}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-4">Clock Times</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        Morning In
+                      </label>
+                      <input
+                        type="time"
+                        value={dailySummaryForm.morning_in || ""}
+                        onChange={(e) => setDailySummaryForm((prev) => ({ ...prev, morning_in: e.target.value }))}
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        Morning Out
+                      </label>
+                      <input
+                        type="time"
+                        value={dailySummaryForm.morning_out || ""}
+                        onChange={(e) => setDailySummaryForm((prev) => ({ ...prev, morning_out: e.target.value }))}
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        Afternoon In
+                      </label>
+                      <input
+                        type="time"
+                        value={dailySummaryForm.afternoon_in || ""}
+                        onChange={(e) => setDailySummaryForm((prev) => ({ ...prev, afternoon_in: e.target.value }))}
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        Afternoon Out
+                      </label>
+                      <input
+                        type="time"
+                        value={dailySummaryForm.afternoon_out || ""}
+                        onChange={(e) => setDailySummaryForm((prev) => ({ ...prev, afternoon_out: e.target.value }))}
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        Evening In
+                      </label>
+                      <input
+                        type="time"
+                        value={dailySummaryForm.evening_in || ""}
+                        onChange={(e) => setDailySummaryForm((prev) => ({ ...prev, evening_in: e.target.value }))}
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        Evening Out
+                      </label>
+                      <input
+                        type="time"
+                        value={dailySummaryForm.evening_out || ""}
+                        onChange={(e) => setDailySummaryForm((prev) => ({ ...prev, evening_out: e.target.value }))}
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        Overtime In
+                      </label>
+                      <input
+                        type="time"
+                        value={dailySummaryForm.overtime_in || ""}
+                        onChange={(e) => setDailySummaryForm((prev) => ({ ...prev, overtime_in: e.target.value }))}
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        Overtime Out
+                      </label>
+                      <input
+                        type="time"
+                        value={dailySummaryForm.overtime_out || ""}
+                        onChange={(e) => setDailySummaryForm((prev) => ({ ...prev, overtime_out: e.target.value }))}
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hours & Status */}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-4">Hours & Status</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        Regular Hours
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={dailySummaryForm.regular_hours || 0}
+                        onChange={(e) => setDailySummaryForm((prev) => ({ ...prev, regular_hours: e.target.value }))}
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        Overtime Hours
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={dailySummaryForm.overtime_hours || 0}
+                        onChange={(e) => setDailySummaryForm((prev) => ({ ...prev, overtime_hours: e.target.value }))}
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={dailySummaryForm.is_incomplete || false}
+                          onChange={(e) => setDailySummaryForm((prev) => ({ ...prev, is_incomplete: e.target.checked }))}
+                          className="w-5 h-5 text-teal-600 rounded focus:ring-teal-500"
+                        />
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                          Mark as Incomplete
+                        </span>
+                      </label>
+                    </div>
+                    <div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={dailySummaryForm.has_late_entry || false}
+                          onChange={(e) => setDailySummaryForm((prev) => ({ ...prev, has_late_entry: e.target.checked }))}
+                          className="w-5 h-5 text-teal-600 rounded focus:ring-teal-500"
+                        />
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                          Has Late Entry
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={closeDailySummaryModal}
+                    className="px-6 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-xl font-semibold transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingDailySummary}
+                    className="px-6 py-3 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 disabled:from-slate-400 disabled:to-slate-500 text-white rounded-xl font-semibold transition-all disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {savingDailySummary ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <span>💾 Save Summary</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-[60] animate-slide-in-right ${toast.type === 'success'
+        <div className={`fixed top-4 right-4 z-[60] animate-slide-in-right ${
+          toast.type === 'success'
             ? 'bg-emerald-500'
             : toast.type === 'error'
-              ? 'bg-red-500'
-              : 'bg-amber-500'
-          } text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3`}>
+            ? 'bg-red-500'
+            : 'bg-amber-500'
+        } text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3`}>
           <span className="text-lg">
             {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : '⚠️'}
           </span>
@@ -1669,4 +1744,4 @@ function AttendanceEdit() {
   );
 }
 
-export default AttendanceEdit;
+export default AttendanceEdit

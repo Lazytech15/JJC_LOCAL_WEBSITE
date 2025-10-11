@@ -3,7 +3,6 @@ import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { pollingManager } from "../../utils/api/websocket/polling-manager";
 import apiService from "../../utils/api/api-service";
-import JSZip from "jszip";
 import * as XLSX from "xlsx";
 import {
   LineChart,
@@ -20,13 +19,13 @@ import {
   Cell,
 } from "recharts";
 import AttendanceEdit from "./AttendanceEdit"
+import FaceRecognitionModal from './FaceRecognitionDetection';
 
 function Attendance() {
   const { user } = useAuth();
   const [attendanceData, setAttendanceData] = useState([]);
   const [profilePictures, setProfilePictures] = useState({});
   const [profileLoadingState, setProfileLoadingState] = useState("idle"); // 'idle', 'loading', 'loaded', 'error'
-  const [currentBulkRequest, setCurrentBulkRequest] = useState(null); // Track ongoing bulk requests
   const [stats, setStats] = useState({
     total_records: 0,
     unique_employees: 0,
@@ -66,6 +65,7 @@ function Attendance() {
 
   // Export State
   const [isExporting, setIsExporting] = useState(false);
+  const [showFaceRecognition, setShowFaceRecognition] = useState(false);
 
   // Group attendance records by employee and date
   const groupAttendanceByEmployee = (records) => {
@@ -115,6 +115,25 @@ function Attendance() {
     return Object.values(grouped).sort(
       (a, b) => new Date(b.latest_clock_time) - new Date(a.latest_clock_time)
     );
+  };
+
+  const handleEmployeeIdentified = (employee, descriptor) => {
+    console.log('Employee identified:', employee);
+    console.log('Face descriptor saved:', descriptor);
+
+    // You can perform additional actions here, such as:
+    // - Auto-clock in the employee
+    // - Show a success notification
+    // - Refresh attendance data
+
+    // Example: Auto-refresh attendance after identification
+    fetchAttendanceData();
+    fetchAttendanceStats();
+
+    // Close the modal after a delay
+    setTimeout(() => {
+      setShowFaceRecognition(false);
+    }, 2000);
   };
 
   // Load detailed employee data
@@ -1216,65 +1235,64 @@ function Attendance() {
   };
 
   const handleMarkAsUnsynced = async () => {
-  if (selectedRecordsToUnsync.size === 0) {
-    alert("Please select at least one record to mark as unsynced");
-    return;
-  }
-
-  const confirmed = window.confirm(
-    `Mark ${selectedRecordsToUnsync.size} record(s) as unsynced?\n\nThis will allow you to edit them in the Attendance Editor.`
-  );
-
-  if (!confirmed) return;
-
-  try {
-    // Get full attendance records for selected dates
-    const recordsToMark = [];
-    
-    for (const historyId of selectedRecordsToUnsync) {
-      const historyRecord = employeeHistory.find(h => h.id === historyId);
-      if (historyRecord) {
-        // Fetch attendance records for this date
-        const result = await apiService.attendance.getAttendanceRecords({
-          employee_uid: selectedEmployee.uid,
-          date: historyRecord.date,
-          limit: "100"
-        });
-
-        if (result.success) {
-          const syncedRecords = result.data.filter(r => r.is_synced);
-          recordsToMark.push(...syncedRecords.map(r => ({
-            id: r.id,
-            notes: `Marked for editing on ${new Date().toLocaleString()}`
-          })));
-        }
-      }
-    }
-
-    if (recordsToMark.length === 0) {
-      alert("No synced records found for the selected dates");
+    if (selectedRecordsToUnsync.size === 0) {
+      alert("Please select at least one record to mark as unsynced");
       return;
     }
 
-    const batchResult = await apiService.editAttendance.batchEditRecords(recordsToMark);
+    const confirmed = window.confirm(
+      `Mark ${selectedRecordsToUnsync.size} record(s) as unsynced?\n\nThis will allow you to edit them in the Attendance Editor.`
+    );
 
-    if (batchResult.success) {
-      alert(`Successfully marked ${batchResult.success_count} records as unsynced!`);
-      setSelectedRecordsToUnsync(new Set());
-      fetchAttendanceData();
-      fetchAttendanceStats();
-      closeEmployeeModal();
-    } else {
-      throw new Error(batchResult.error || "Failed to mark records as unsynced");
+    if (!confirmed) return;
+
+    try {
+      // Get full attendance records for selected dates
+      const recordsToMark = [];
+
+      for (const historyId of selectedRecordsToUnsync) {
+        const historyRecord = employeeHistory.find(h => h.id === historyId);
+        if (historyRecord) {
+          // Fetch attendance records for this date
+          const result = await apiService.attendance.getAttendanceRecords({
+            employee_uid: selectedEmployee.uid,
+            date: historyRecord.date,
+            limit: "100"
+          });
+
+          if (result.success) {
+            const syncedRecords = result.data.filter(r => r.is_synced);
+            recordsToMark.push(...syncedRecords.map(r => ({
+              id: r.id,
+              notes: `Marked for editing on ${new Date().toLocaleString()}`
+            })));
+          }
+        }
+      }
+
+      if (recordsToMark.length === 0) {
+        alert("No synced records found for the selected dates");
+        return;
+      }
+
+      const batchResult = await apiService.editAttendance.batchEditRecords(recordsToMark);
+
+      if (batchResult.success) {
+        alert(`Successfully marked ${batchResult.success_count} records as unsynced!`);
+        setSelectedRecordsToUnsync(new Set());
+        fetchAttendanceData();
+        fetchAttendanceStats();
+        closeEmployeeModal();
+      } else {
+        throw new Error(batchResult.error || "Failed to mark records as unsynced");
+      }
+    } catch (error) {
+      console.error("Error marking records as unsynced:", error);
+      alert("Failed to mark records as unsynced: " + error.message);
     }
-  } catch (error) {
-    console.error("Error marking records as unsynced:", error);
-    alert("Failed to mark records as unsynced: " + error.message);
-  }
-};
+  };
 
-  // Bulk load all profile pictures as a zip file with deduplication
-  const loadBulkProfilePictures = async (uniqueUids) => {
+    const loadProfilePictures = async (uniqueUids) => {
     if (!uniqueUids || uniqueUids.length === 0) return;
 
     // Filter out UIDs that we already have loaded or are currently loading
@@ -1284,147 +1302,51 @@ function Attendance() {
 
     if (uidsToLoad.length === 0) return;
 
-    // Check if there's already a bulk request in progress with the same UIDs
-    const requestKey = uidsToLoad.sort().join(",");
-    if (currentBulkRequest === requestKey) {
-      console.log(
-        "Bulk request already in progress for these UIDs, skipping..."
-      );
-      return;
-    }
+    console.log(`Loading ${uidsToLoad.length} profile pictures individually...`, uidsToLoad);
+    setProfileLoadingState("loading");
 
-    // If there's a different bulk request in progress, wait for it to complete
-    if (currentBulkRequest) {
-      console.log("Another bulk request in progress, waiting...");
-      // Wait a bit and try again
-      setTimeout(() => loadBulkProfilePictures(uniqueUids), 100);
-      return;
-    }
-
-    try {
-      setCurrentBulkRequest(requestKey);
-      setProfileLoadingState("loading");
-      console.log(
-        `Loading ${uidsToLoad.length} profile pictures in bulk...`,
-        uidsToLoad
-      );
-
-      // Use POST method for bulk download with specific UIDs
-      const result = await apiService.profiles.downloadBulkProfilesPost(
-        uidsToLoad,
-        {
-          include_summary: false, // We don't need summary for this use case
-          compression_level: 6,
+    // Load each profile picture individually
+    const loadPromises = uidsToLoad.map(async (uid) => {
+      try {
+        const result = await apiService.profiles.getProfileByUid(uid);
+        
+        if (result.success && result.url) {
+          // Update state immediately for this UID
+          setProfilePictures(prev => ({
+            ...prev,
+            [uid]: result.url
+          }));
+          console.log(`✅ Loaded profile picture for UID: ${uid}`);
+          return { uid, success: true };
+        } else {
+          // Mark as no profile available
+          setProfilePictures(prev => ({
+            ...prev,
+            [uid]: null
+          }));
+          console.log(`⚠️ No profile picture found for UID: ${uid}`);
+          return { uid, success: false };
         }
-      );
-
-      if (result.success) {
-        // Extract the zip file using JSZip
-        const zip = new JSZip();
-        const zipContent = await zip.loadAsync(result.blob);
-        const newProfilePictures = { ...profilePictures };
-
-        console.log("Zip file contents:", Object.keys(zipContent.files));
-
-        // Process each file in the zip
-        for (const [filename, file] of Object.entries(zipContent.files)) {
-          if (!file.dir) {
-            // Extract UID from the file path
-            // Handle both formats: "uid/filename.ext" and "filename.ext"
-            let extractedUid = null;
-
-            if (filename.includes("/")) {
-              // Format: "uid/filename.ext"
-              const pathParts = filename.split("/");
-              extractedUid = pathParts[0];
-            } else {
-              // Try to extract UID from filename if it starts with the UID
-              // Format might be "uid_filename.ext" or just "uid.ext"
-              const filenameParts = filename.split("_")[0].split(".")[0];
-              extractedUid = filenameParts;
-            }
-
-            // Convert to number if it's a numeric string to match employee_uid format
-            const numericUid = !isNaN(extractedUid)
-              ? Number(extractedUid)
-              : extractedUid;
-
-            console.log(
-              `Processing file: ${filename}, extracted UID: ${extractedUid}, numeric UID: ${numericUid}`
-            );
-
-            // Check if this UID matches any of the UIDs we requested
-            const matchingUid = uidsToLoad.find(
-              (uid) =>
-                uid == extractedUid ||
-                uid == numericUid ||
-                String(uid) === String(extractedUid) ||
-                String(uid) === String(numericUid)
-            );
-
-            if (matchingUid) {
-              try {
-                // Get the file as a blob
-                const fileBlob = await file.async("blob");
-
-                // Create object URL for the image
-                const imageUrl = URL.createObjectURL(fileBlob);
-
-                // Store using the original UID format from our data
-                newProfilePictures[matchingUid] = imageUrl;
-                console.log(
-                  `Successfully loaded profile picture for UID: ${matchingUid} from file: ${filename}`
-                );
-              } catch (fileError) {
-                console.warn(`Failed to process file ${filename}:`, fileError);
-                newProfilePictures[matchingUid] = null;
-              }
-            } else {
-              console.log(
-                `No matching UID found for file: ${filename} (extracted: ${extractedUid})`
-              );
-            }
-          }
-        }
-
-        // Mark UIDs that weren't found in the zip as null (no profile available)
-        uidsToLoad.forEach((uid) => {
-          if (!newProfilePictures.hasOwnProperty(uid)) {
-            newProfilePictures[uid] = null;
-            console.log(`No profile picture found for UID: ${uid}`);
-          }
-        });
-
-        setProfilePictures(newProfilePictures);
-        setProfileLoadingState("loaded");
-
-        const loadedCount = uidsToLoad.filter(
-          (uid) => newProfilePictures[uid] && newProfilePictures[uid] !== null
-        ).length;
-        console.log(
-          `Successfully loaded ${loadedCount} out of ${uidsToLoad.length} requested profile pictures`
-        );
-      } else {
-        console.error("Failed to download bulk profiles:", result.error);
-        // Mark all requested UIDs as null (failed to load)
-        const updatedProfiles = { ...profilePictures };
-        uidsToLoad.forEach((uid) => {
-          updatedProfiles[uid] = null;
-        });
-        setProfilePictures(updatedProfiles);
-        setProfileLoadingState("error");
+      } catch (error) {
+        console.warn(`Failed to load profile for UID ${uid}:`, error);
+        // Mark as failed to load
+        setProfilePictures(prev => ({
+          ...prev,
+          [uid]: null
+        }));
+        return { uid, success: false, error };
       }
+    });
+
+    // Wait for all to complete
+    try {
+      const results = await Promise.allSettled(loadPromises);
+      const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+      console.log(`✅ Successfully loaded ${successCount} out of ${uidsToLoad.length} profile pictures`);
+      setProfileLoadingState("loaded");
     } catch (error) {
-      console.error("Bulk profile loading error:", error);
-      // Mark all requested UIDs as null (failed to load)
-      const updatedProfiles = { ...profilePictures };
-      uidsToLoad.forEach((uid) => {
-        updatedProfiles[uid] = null;
-      });
-      setProfilePictures(updatedProfiles);
+      console.error("Error loading profile pictures:", error);
       setProfileLoadingState("error");
-    } finally {
-      setCurrentBulkRequest(null);
     }
   };
 
@@ -1462,150 +1384,150 @@ function Attendance() {
   };
 
   useEffect(() => {
-  // Initialize polling manager if not already running
-  if (!pollingManager.isPolling) {
-    pollingManager.initialize();
-    pollingManager.joinAllRooms();
-  }
+    // Initialize polling manager if not already running
+    if (!pollingManager.isPolling) {
+      pollingManager.initialize();
+      pollingManager.joinAllRooms();
+    }
 
-  // Only fetch on mount
-  fetchAttendanceData();
-  fetchAttendanceStats();
+    // Only fetch on mount
+    fetchAttendanceData();
+    fetchAttendanceStats();
 
-  setConnectionStatus("connecting");
+    setConnectionStatus("connecting");
 
-  // Subscribe to attendance events
-  const unsubscribeAttendanceCreated = pollingManager.subscribeToUpdates(
-    "attendance_created",
-    (data) => {
-      console.log("[Attendance] New attendance record:", data);
-      setConnectionStatus("connected");
-      setLastUpdate(new Date());
+    // Subscribe to attendance events
+    const unsubscribeAttendanceCreated = pollingManager.subscribeToUpdates(
+      "attendance_created",
+      (data) => {
+        console.log("[Attendance] New attendance record:", data);
+        setConnectionStatus("connected");
+        setLastUpdate(new Date());
 
-      // Check if the record matches current filters
-      const matchesFilters = 
-        (!filters.date || data.date === filters.date) &&
-        (!filters.employee_uid || data.employee_uid === filters.employee_uid) &&
-        (!filters.clock_type || data.clock_type === filters.clock_type);
+        // Check if the record matches current filters
+        const matchesFilters =
+          (!filters.date || data.date === filters.date) &&
+          (!filters.employee_uid || data.employee_uid === filters.employee_uid) &&
+          (!filters.clock_type || data.clock_type === filters.clock_type);
 
-      if (matchesFilters) {
-        setAttendanceData((prev) => {
-          const exists = prev.some((record) => record.id === data.id);
-          if (!exists) {
-            setNewRecordIds((prev) => new Set([...prev, data.id]));
-            setTimeout(() => {
-              setNewRecordIds((prev) => {
-                const updated = new Set(prev);
-                updated.delete(data.id);
-                return updated;
-              });
-            }, 5000);
+        if (matchesFilters) {
+          setAttendanceData((prev) => {
+            const exists = prev.some((record) => record.id === data.id);
+            if (!exists) {
+              setNewRecordIds((prev) => new Set([...prev, data.id]));
+              setTimeout(() => {
+                setNewRecordIds((prev) => {
+                  const updated = new Set(prev);
+                  updated.delete(data.id);
+                  return updated;
+                });
+              }, 5000);
 
-            if (data.employee_uid) {
-              loadNewProfilePicture(data.employee_uid);
+              if (data.employee_uid) {
+                loadNewProfilePicture(data.employee_uid);
+              }
+
+              return [data, ...prev].slice(0, filters.limit);
             }
+            return prev;
+          });
+          fetchAttendanceStats();
+        }
+      }
+    );
 
-            return [data, ...prev].slice(0, filters.limit);
-          }
-          return prev;
+    const unsubscribeAttendanceUpdated = pollingManager.subscribeToUpdates(
+      "attendance_updated",
+      (data) => {
+        console.log("[Attendance] Attendance record updated:", data);
+        setConnectionStatus("connected");
+        setLastUpdate(new Date());
+
+        setAttendanceData((prev) => {
+          const updated = prev.map((record) =>
+            record.id === data.id ? { ...record, ...data } : record
+          );
+          return [...updated];
         });
         fetchAttendanceStats();
       }
-    }
-  );
+    );
 
-  const unsubscribeAttendanceUpdated = pollingManager.subscribeToUpdates(
-    "attendance_updated",
-    (data) => {
-      console.log("[Attendance] Attendance record updated:", data);
-      setConnectionStatus("connected");
-      setLastUpdate(new Date());
+    const unsubscribeAttendanceDeleted = pollingManager.subscribeToUpdates(
+      "attendance_deleted",
+      (data) => {
+        console.log("[Attendance] Attendance record deleted:", data);
+        setConnectionStatus("connected");
+        setLastUpdate(new Date());
 
-      setAttendanceData((prev) => {
-        const updated = prev.map((record) =>
-          record.id === data.id ? { ...record, ...data } : record
-        );
-        return [...updated];
-      });
-      fetchAttendanceStats();
-    }
-  );
-
-  const unsubscribeAttendanceDeleted = pollingManager.subscribeToUpdates(
-    "attendance_deleted",
-    (data) => {
-      console.log("[Attendance] Attendance record deleted:", data);
-      setConnectionStatus("connected");
-      setLastUpdate(new Date());
-
-      setAttendanceData((prev) => {
-        const filtered = prev.filter((record) => record.id !== data.id);
-        return [...filtered];
-      });
-      fetchAttendanceStats();
-    }
-  );
-
-  const unsubscribeAttendanceSynced = pollingManager.subscribeToUpdates(
-    "attendance_synced",
-    (data) => {
-      console.log("[Attendance] Attendance records synced:", data);
-      setConnectionStatus("connected");
-      setLastUpdate(new Date());
-
-      fetchAttendanceData();
-      fetchAttendanceStats();
-    }
-  );
-
-  const unsubscribeEmployeeUpdated = pollingManager.subscribeToUpdates(
-    "employee_updated",
-    (data) => {
-      console.log("[Attendance] Employee updated, refreshing attendance data");
-      setConnectionStatus("connected");
-      setLastUpdate(new Date());
-
-      fetchAttendanceData();
-    }
-  );
-
-  const unsubscribeConnection = pollingManager.subscribeToUpdates(
-    "connection",
-    (data) => {
-      console.log("[Attendance] Connection status:", data.status);
-      setConnectionStatus(data.status);
-    }
-  );
-
-  return () => {
-    // Unsubscribe from all events
-    unsubscribeAttendanceCreated();
-    unsubscribeAttendanceUpdated();
-    unsubscribeAttendanceDeleted();
-    unsubscribeAttendanceSynced();
-    unsubscribeEmployeeUpdated();
-    unsubscribeConnection();
-
-    setConnectionStatus("disconnected");
-
-    // Clean up profile picture URLs
-    Object.values(profilePictures).forEach((url) => {
-      if (url && url.startsWith("blob:")) {
-        URL.revokeObjectURL(url);
+        setAttendanceData((prev) => {
+          const filtered = prev.filter((record) => record.id !== data.id);
+          return [...filtered];
+        });
+        fetchAttendanceStats();
       }
-    });
-  };
-}, []); // Only run on mount
+    );
 
-// Separate effect for filter changes
-useEffect(() => {
-  // Skip the initial render (when component first mounts)
-  if (attendanceData.length > 0 || filters.date || filters.employee_uid || filters.clock_type) {
-    fetchAttendanceData();
-    fetchAttendanceStats();
-  }
-}, [filters.date, filters.startDate, filters.endDate, filters.useRange, 
-    filters.employee_uid, filters.clock_type, filters.limit]);
+    const unsubscribeAttendanceSynced = pollingManager.subscribeToUpdates(
+      "attendance_synced",
+      (data) => {
+        console.log("[Attendance] Attendance records synced:", data);
+        setConnectionStatus("connected");
+        setLastUpdate(new Date());
+
+        fetchAttendanceData();
+        fetchAttendanceStats();
+      }
+    );
+
+    const unsubscribeEmployeeUpdated = pollingManager.subscribeToUpdates(
+      "employee_updated",
+      (data) => {
+        console.log("[Attendance] Employee updated, refreshing attendance data");
+        setConnectionStatus("connected");
+        setLastUpdate(new Date());
+
+        fetchAttendanceData();
+      }
+    );
+
+    const unsubscribeConnection = pollingManager.subscribeToUpdates(
+      "connection",
+      (data) => {
+        console.log("[Attendance] Connection status:", data.status);
+        setConnectionStatus(data.status);
+      }
+    );
+
+    return () => {
+      // Unsubscribe from all events
+      unsubscribeAttendanceCreated();
+      unsubscribeAttendanceUpdated();
+      unsubscribeAttendanceDeleted();
+      unsubscribeAttendanceSynced();
+      unsubscribeEmployeeUpdated();
+      unsubscribeConnection();
+
+      setConnectionStatus("disconnected");
+
+      // Clean up profile picture URLs
+      Object.values(profilePictures).forEach((url) => {
+        if (url && url.startsWith("blob:")) {
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+  }, []); // Only run on mount
+
+  // Separate effect for filter changes
+  useEffect(() => {
+    // Skip the initial render (when component first mounts)
+    if (attendanceData.length > 0 || filters.date || filters.employee_uid || filters.clock_type) {
+      fetchAttendanceData();
+      fetchAttendanceStats();
+    }
+  }, [filters.date, filters.startDate, filters.endDate, filters.useRange,
+  filters.employee_uid, filters.clock_type, filters.limit]);
 
   const fetchAttendanceData = async () => {
     try {
@@ -1619,7 +1541,7 @@ useEffect(() => {
 
       if (filters.employee_uid) params.employee_uid = filters.employee_uid;
       if (filters.clock_type) params.clock_type = filters.clock_type;
-      if (filters.date) params.date = filters.date; // Only add if date is set
+      if (filters.date) params.date = filters.date;
 
       const result = await apiService.attendance.getAttendanceRecords(params);
 
@@ -1627,10 +1549,10 @@ useEffect(() => {
         setAttendanceData(result.data);
         setError(null);
 
-        // Load profile pictures in bulk for the fetched records
+        // Load profile pictures individually for the fetched records
         const uniqueUids = getUniqueUids(result.data);
         if (uniqueUids.length > 0) {
-          await loadBulkProfilePictures(uniqueUids);
+          await loadProfilePictures(uniqueUids);
         }
       } else {
         throw new Error(result.error || "Failed to fetch attendance data");
@@ -1653,11 +1575,11 @@ useEffect(() => {
         setStats(result.data.statistics);
         setRecentActivity(result.data.recent_activity || []);
 
-        // Load profile pictures in bulk for recent activity
+        // Load profile pictures individually for recent activity
         if (result.data.recent_activity) {
           const uniqueUids = getUniqueUids(result.data.recent_activity);
           if (uniqueUids.length > 0) {
-            await loadBulkProfilePictures(uniqueUids);
+            await loadProfilePictures(uniqueUids);
           }
         }
       } else {
@@ -1838,74 +1760,74 @@ useEffect(() => {
     const pieData = preparePieData(employeeStats);
 
     return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Modal Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-t-3xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <ProfilePicture
-                uid={selectedEmployee.uid}
-                name={employeeName}
-                size="w-20 h-20"
-              />
-              <div>
-                <h2 className="text-3xl font-bold text-white">
-                  {employeeName}
-                </h2>
-                <div className="text-indigo-100 mt-2 space-y-1">
-                  <p>
-                    <span className="font-medium">ID:</span>{" "}
-                    {selectedEmployee.info.id_number || selectedEmployee.uid}
-                  </p>
-                  <p>
-                    <span className="font-medium">Department:</span>{" "}
-                    {selectedEmployee.info.department || "N/A"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Position:</span>{" "}
-                    {selectedEmployee.info.position || "N/A"}
-                  </p>
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+          {/* Modal Header */}
+          <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-t-3xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <ProfilePicture
+                  uid={selectedEmployee.uid}
+                  name={employeeName}
+                  size="w-20 h-20"
+                />
+                <div>
+                  <h2 className="text-3xl font-bold text-white">
+                    {employeeName}
+                  </h2>
+                  <div className="text-indigo-100 mt-2 space-y-1">
+                    <p>
+                      <span className="font-medium">ID:</span>{" "}
+                      {selectedEmployee.info.id_number || selectedEmployee.uid}
+                    </p>
+                    <p>
+                      <span className="font-medium">Department:</span>{" "}
+                      {selectedEmployee.info.department || "N/A"}
+                    </p>
+                    <p>
+                      <span className="font-medium">Position:</span>{" "}
+                      {selectedEmployee.info.position || "N/A"}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3">
-              {/* Mark as Unsynced Button */}
-              <button
-                onClick={handleMarkAsUnsynced}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg"
-                title="Mark records as unsynced for editing"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                <span>Mark for Editing</span>
-              </button>
 
-              {/* Close Button */}
-              <button
-                onClick={closeEmployeeModal}
-                className="p-3 bg-white/20 hover:bg-white/30 rounded-2xl text-white transition-colors"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3">
+                {/* Mark as Unsynced Button */}
+                <button
+                  onClick={handleMarkAsUnsynced}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg"
+                  title="Mark records as unsynced for editing"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span>Mark for Editing</span>
+                </button>
+
+                {/* Close Button */}
+                <button
+                  onClick={closeEmployeeModal}
+                  className="p-3 bg-white/20 hover:bg-white/30 rounded-2xl text-white transition-colors"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
           {/* Modal Content */}
           <div className="p-6">
@@ -2393,8 +2315,8 @@ useEffect(() => {
                             </div>
                             <div
                               className={`text-lg font-bold ${recentLateCount <= olderLateCount
-                                  ? "text-emerald-600"
-                                  : "text-red-600"
+                                ? "text-emerald-600"
+                                : "text-red-600"
                                 }`}
                             >
                               {recentLateCount <= olderLateCount ? "✅" : "⚠️"}{" "}
@@ -2567,7 +2489,7 @@ useEffect(() => {
                                   }}
                                   className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
                                 />
-                            </td>
+                              </td>
                               <td className="p-4 font-medium text-slate-800 dark:text-slate-200">
                                 {new Date(record.date).toLocaleDateString()}
                               </td>
@@ -2734,8 +2656,8 @@ useEffect(() => {
   };
 
   const groupedAttendance = useMemo(() => {
-  return groupAttendanceByEmployee(attendanceData);
-}, [attendanceData]);
+    return groupAttendanceByEmployee(attendanceData);
+  }, [attendanceData]);
 
   return (
     <div className="space-y-8">
@@ -2781,10 +2703,10 @@ useEffect(() => {
           <div className="flex items-center gap-3 px-4 py-2 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl border border-white/30 dark:border-gray-700/30">
             <div
               className={`w-3 h-3 rounded-full ${connectionStatus === "connected"
-                  ? "bg-emerald-500 shadow-lg shadow-emerald-500/50"
-                  : connectionStatus === "connecting"
-                    ? "bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50"
-                    : "bg-red-500 shadow-lg shadow-red-500/50"
+                ? "bg-emerald-500 shadow-lg shadow-emerald-500/50"
+                : connectionStatus === "connecting"
+                  ? "bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50"
+                  : "bg-red-500 shadow-lg shadow-red-500/50"
                 }`}
             ></div>
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -3012,13 +2934,23 @@ useEffect(() => {
                 </>
               )}
             </button>
-<button
-  onClick={() => setShowEditModal(true)}
-  className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl flex items-center gap-2"
->
-  <span>✏️</span>
-  <span>Edit Records ({stats.unsynced_count || 0})</span>
-</button>
+            <button
+              onClick={() => setShowEditModal(true)}
+              className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl flex items-center gap-2"
+            >
+              <span>✏️</span>
+              <span>Edit Records ({stats.unsynced_count || 0})</span>
+            </button>
+
+            <button
+              onClick={() => setShowFaceRecognition(true)}
+              className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span>Face Recognition</span>
+            </button>
           </div>
 
           {/* Date Mode Toggle */}
@@ -3246,16 +3178,16 @@ useEffect(() => {
                 return (
                   <div
                     // Add unique key that will change when records update
-        key={`${employee.employee_uid}-${employee.date}-${employee.records.length}-${employee.latest_clock_time}`}
-        onClick={() =>
-          loadEmployeeDetails(
-            employee.employee_uid,
-            employee.employee_info
-          )
-        }
+                    key={`${employee.employee_uid}-${employee.date}-${employee.records.length}-${employee.latest_clock_time}`}
+                    onClick={() =>
+                      loadEmployeeDetails(
+                        employee.employee_uid,
+                        employee.employee_info
+                      )
+                    }
                     className={`group relative overflow-hidden rounded-3xl border transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl cursor-pointer ${hasNewRecords
-                        ? "bg-gradient-to-br from-emerald-50/90 to-emerald-100/70 dark:from-emerald-900/30 dark:to-emerald-800/20 border-emerald-300/60 dark:border-emerald-700/60 shadow-2xl animate-pulse shadow-emerald-500/20"
-                        : "bg-gradient-to-br from-white/80 to-white/60 dark:from-slate-800/80 dark:to-slate-900/60 border-white/40 dark:border-slate-700/40 hover:shadow-xl backdrop-blur-xl hover:border-indigo-300/60 dark:hover:border-indigo-700/60"
+                      ? "bg-gradient-to-br from-emerald-50/90 to-emerald-100/70 dark:from-emerald-900/30 dark:to-emerald-800/20 border-emerald-300/60 dark:border-emerald-700/60 shadow-2xl animate-pulse shadow-emerald-500/20"
+                      : "bg-gradient-to-br from-white/80 to-white/60 dark:from-slate-800/80 dark:to-slate-900/60 border-white/40 dark:border-slate-700/40 hover:shadow-xl backdrop-blur-xl hover:border-indigo-300/60 dark:hover:border-indigo-700/60"
                       }`}
                   >
                     {/* New Record Indicator */}
@@ -3516,41 +3448,49 @@ useEffect(() => {
         </div>
       )}
       {showEditModal && (
-  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 overflow-y-auto">
-    <div className="min-h-screen p-4">
-      <div className="max-w-7xl mx-auto my-8">
-        <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl">
-          {/* Optional: Add a header bar with close button (alternative placement) */}
-          <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 p-4 rounded-t-3xl flex justify-between items-center z-10">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">✏️</span>
-              <h2 className="text-2xl font-bold text-white">
-                Attendance Editor
-              </h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 overflow-y-auto">
+          <div className="min-h-screen p-4">
+            <div className="max-w-7xl mx-auto my-8">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl">
+                {/* Optional: Add a header bar with close button (alternative placement) */}
+                <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 p-4 rounded-t-3xl flex justify-between items-center z-10">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">✏️</span>
+                    <h2 className="text-2xl font-bold text-white">
+                      Attendance Editor
+                    </h2>
+                  </div>
+                  <button
+                    onClick={() => setShowEditModal(false)}
+                    className="p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-colors text-white group"
+                    title="Close Editor"
+                  >
+                    <svg className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="p-6">
+                  <AttendanceEdit
+                    apiService={apiService}
+                    pollingManager={pollingManager}
+                    onClose={() => setShowEditModal(false)}
+                  />
+                </div>
+              </div>
             </div>
-            <button
-              onClick={() => setShowEditModal(false)}
-              className="p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-colors text-white group"
-              title="Close Editor"
-            >
-              <svg className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          
-          <div className="p-6">
-            <AttendanceEdit 
-              apiService={apiService} 
-              pollingManager={pollingManager}
-              onClose={() => setShowEditModal(false)}
-            />
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-)}
+      )}
+
+      {showFaceRecognition && (
+        <FaceRecognitionModal
+          apiService={apiService}
+          onClose={() => setShowFaceRecognition(false)}
+          onEmployeeIdentified={handleEmployeeIdentified}
+        />
+      )}
     </div>
   );
 }

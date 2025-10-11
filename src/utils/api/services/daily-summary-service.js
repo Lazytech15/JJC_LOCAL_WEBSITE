@@ -30,6 +30,13 @@ export class DailySummaryService extends BaseAPIService {
     })
   }
 
+  async editDailySummaryRecord(id, updateData) {
+    return this.request(`/api/daily-summary/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(updateData),
+    })
+  }
+
   async deleteDailySummaryRecord(id) {
     return this.request(`/api/daily-summary/${id}`, {
       method: "DELETE",
