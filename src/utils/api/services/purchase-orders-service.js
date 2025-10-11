@@ -32,6 +32,15 @@ export class PurchaseOrdersService extends BaseAPIService {
     })
   }
 
+  // PUT /api/items/purchase-orders/:id - Update purchase order (general fields)
+  async updatePurchaseOrder(id, orderData, options = {}) {
+    return this.request(`/api/items/purchase-orders/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(orderData),
+      ...options
+    })
+  }
+
   // DELETE /api/items/purchase-orders/:id - Delete a purchase order
   async deletePurchaseOrder(id) {
     return this.request(`/api/items/purchase-orders/${id}`, {

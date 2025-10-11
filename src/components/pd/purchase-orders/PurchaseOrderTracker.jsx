@@ -3,6 +3,7 @@ import { useAuth } from "../../../contexts/AuthContext"
 import apiService from "../../../utils/api/api-service"
 import { ModalPortal, useToast } from "../shared"
 import CreatePurchaseOrderWizard from "./CreatePurchaseOrderWizard"
+import { exportPurchaseOrderToPDF, exportPurchaseOrderToExcel } from "../../../utils/purchase-order-export"
 
 function PurchaseOrderTracker() {
   const { isDarkMode } = useAuth()
@@ -11,6 +12,7 @@ function PurchaseOrderTracker() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingOrder, setEditingOrder] = useState(null)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [restockItems, setRestockItems] = useState([])
@@ -240,7 +242,30 @@ function PurchaseOrderTracker() {
       notes: "",
       priority: "normal"
     })
+    setEditingOrder(null)
     setShowCreateModal(true)
+  }
+
+  const handleEditOrder = (order) => {
+    // Open the create wizard in edit mode with the selected order
+    setEditingOrder(order)
+    setShowCreateModal(true)
+  }
+
+  const handleExportPDF = (order) => {
+    try {
+      exportPurchaseOrderToPDF(order)
+    } catch (err) {
+      showError('Export Error', err.message || 'Failed to export PDF')
+    }
+  }
+
+  const handleExportExcel = (order) => {
+    try {
+      exportPurchaseOrderToExcel(order)
+    } catch (err) {
+      showError('Export Error', err.message || 'Failed to export Excel')
+    }
   }
 
   const handleAddItemToOrder = (item) => {
@@ -655,6 +680,24 @@ function PurchaseOrderTracker() {
                         View Details
                       </button>
                       <button
+                        onClick={() => handleEditOrder(order)}
+                        className="px-3 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-xs font-medium transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleExportPDF(order)}
+                        className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
+                      >
+                        PDF
+                      </button>
+                      <button
+                        onClick={() => handleExportExcel(order)}
+                        className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs font-medium transition-colors"
+                      >
+                        Excel
+                      </button>
+                      <button
                         onClick={() => handleDeleteOrder(order.id)}
                         className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
                       >
@@ -678,8 +721,9 @@ function PurchaseOrderTracker() {
       {/* Create Order Wizard */}
       <CreatePurchaseOrderWizard 
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={handleWizardSuccess}
+        onClose={() => { setShowCreateModal(false); setEditingOrder(null) }}
+        onSuccess={(msg) => { handleWizardSuccess(msg); setEditingOrder(null) }}
+        editingOrder={editingOrder}
       />
 
       {/* Order Details Modal */}
@@ -873,6 +917,18 @@ function PurchaseOrderTracker() {
                     </svg>
                     Update Status
                   </span>
+                </button>
+                <button
+                  onClick={() => handleExportPDF(selectedOrder)}
+                  className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
+                >
+                  Export PDF
+                </button>
+                <button
+                  onClick={() => handleExportExcel(selectedOrder)}
+                  className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition-all"
+                >
+                  Export Excel
                 </button>
                 <button
                   onClick={() => setShowOrderDetails(false)}

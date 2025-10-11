@@ -3,7 +3,7 @@ import { ModalPortal } from "../shared"
 import apiService from "../../../utils/api/api-service"
 import { exportPurchaseOrderToPDF, exportPurchaseOrderToExcel } from "../../../utils/purchase-order-export"
 
-function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
+function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = null }) {
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -18,6 +18,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
     // Step 1 - PO Number & Supplier
     supplier_name: "",
     supplier_address: "",
+  supplier_details: null,
     po_number: "",
     po_sequence: "",
     
@@ -49,6 +50,40 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
       initializeWizard()
     }
   }, [isOpen])
+
+  // If editingOrder is provided, prefill formData
+  useEffect(() => {
+    if (editingOrder) {
+      try {
+        const po = editingOrder
+        setFormData(prev => ({
+          ...prev,
+          supplier_name: po.supplier_name || po.supplier || prev.supplier_name,
+          supplier_address: po.supplier_address || prev.supplier_address,
+          supplier_details: po.supplier_details || prev.supplier_details || null,
+          po_number: po.id || po.po_number || prev.po_number,
+          po_sequence: (po.id || po.po_number || '').split('-')[1] || prev.po_sequence,
+          selectedItems: (po.items || []).map(it => ({
+            item_no: it.item_no,
+            item_name: it.item_name,
+            quantity: it.quantity,
+            unit: it.unit || it.unit_of_measure || 'pcs',
+            price_per_unit: it.unit_price || it.price_per_unit || 0,
+            amount: (it.quantity || 0) * (it.unit_price || it.price_per_unit || 0)
+          })),
+          attention_person: po.attention_person || prev.attention_person,
+          terms: po.terms || prev.terms,
+          po_date: po.po_date || prev.po_date,
+          prepared_by: po.prepared_by ? (Array.isArray(po.prepared_by) ? po.prepared_by : String(po.prepared_by).split(',').map(p => p.trim())) : prev.prepared_by,
+          verified_by: po.verified_by || prev.verified_by,
+          approved_by: po.approved_by || prev.approved_by,
+          notes: po.notes || prev.notes
+        }))
+      } catch (err) {
+        console.error('Error pre-filling edit form:', err)
+      }
+    }
+  }, [editingOrder])
 
   const initializeWizard = async () => {
     try {
@@ -236,6 +271,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
         const supplierDetails = suppliersData.suppliers[0]
         // Build full address from supplier record
         supplierAddress = apiService.suppliers.getFullAddress(supplierDetails)
+        // Save supplier details into form data
+        setFormData(prev => ({ ...prev, supplier_details: supplierDetails }))
       }
     } catch (err) {
       console.error("Error fetching supplier details:", err)
@@ -358,6 +395,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
         po_number: formData.po_number,
         supplier_name: formData.supplier_name,
         supplier_address: formData.supplier_address,
+        supplier_details: formData.supplier_details || null,
         attention_person: formData.attention_person,
         terms: formData.terms,
         po_date: formData.po_date,
@@ -373,8 +411,13 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
         })),
         overwrite_existing: overwriteExisting
       }
-      
-      const data = await apiService.purchaseOrders.createPurchaseOrder(orderData)
+      let data
+      if (editingOrder && (editingOrder.id || editingOrder.po_number)) {
+        const id = editingOrder.id || editingOrder.po_number
+        data = await apiService.purchaseOrders.updatePurchaseOrder(id, orderData)
+      } else {
+        data = await apiService.purchaseOrders.createPurchaseOrder(orderData)
+      }
       
       if (data.success) {
         onSuccess(`Purchase Order ${formData.po_number} created successfully!`)
@@ -951,6 +994,16 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
                           <div className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">
                             {formData.supplier_address}
                           </div>
+                          {formData.supplier_details && (
+                            <div className="mt-3 text-sm text-gray-700 space-y-1">
+                              <div><strong>Contact:</strong> {formData.supplier_details.contact_person || formData.supplier_details.contact || 'N/A'}</div>
+                              <div><strong>Email:</strong> {formData.supplier_details.email || 'N/A'}</div>
+                              <div><strong>Phone:</strong> {formData.supplier_details.phone || 'N/A'}</div>
+                              <div><strong>Payment Terms:</strong> {formData.supplier_details.payment_terms || 'N/A'}</div>
+                              <div><strong>Tax ID:</strong> {formData.supplier_details.tax_id || 'N/A'}</div>
+                              <div><strong>Website:</strong> {formData.supplier_details.website || 'N/A'}</div>
+                            </div>
+                          )}
                           {formData.attention_person && (
                             <div className="text-sm text-gray-800 mt-2">
                               Attn: {formData.attention_person}

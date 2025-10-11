@@ -5,10 +5,10 @@ import { useToast } from "./shared/ToastNotification"
 
 function SupplierManagement() {
   const { isDarkMode } = useAuth()
-  const { error: showError, success: showSuccess } = useToast()
+  const {  error: showError, success: showSuccess } = useToast()
   // Supplier Management States
   const [selectedSupplier, setSelectedSupplier] = useState(null)
-  const [supplierItems, setSupplierItems] = useState([])
+  const [supplierMetrics, setSupplierMetrics] = useState(null)
   const [suppliers, setSuppliers] = useState([])
   const [loading, setLoading] = useState(false)
   
@@ -17,6 +17,7 @@ function SupplierManagement() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState(null)
+  const [wizardStep, setWizardStep] = useState(1)
   const [viewingSupplier, setViewingSupplier] = useState(null)
   const [supplierForm, setSupplierForm] = useState({
     name: "",
@@ -73,20 +74,20 @@ function SupplierManagement() {
     }
   }
 
-  const fetchSupplierItems = async (supplier) => {
-    if (!supplier) {
-      setSupplierItems([])
+  const fetchSupplierMetrics = async (supplierId) => {
+    if (!supplierId) {
+      setSupplierMetrics(null)
       return
     }
 
     try {
       setLoading(true)
-      // Use supplier name to fetch items
-      const result = await apiService.items.getItemsBySupplier(supplier.name)
-      setSupplierItems(result.data || [])
+      const result = await apiService.suppliers.getSupplierMetrics(supplierId)
+      // API returns a top-level object with inventory_metrics and purchase_order_metrics
+      setSupplierMetrics(result || null)
     } catch (error) {
-      console.error("Error fetching supplier items:", error)
-      setSupplierItems([])
+      console.error("Error fetching supplier metrics:", error)
+      setSupplierMetrics(null)
     } finally {
       setLoading(false)
     }
@@ -125,6 +126,7 @@ function SupplierManagement() {
   const handleAddSupplier = () => {
     setEditingSupplier(null)
     resetSupplierForm()
+    setWizardStep(1)
     setIsAddEditModalOpen(true)
   }
 
@@ -145,6 +147,7 @@ function SupplierManagement() {
       notes: supplier.notes || "",
       status: supplier.status || "active"
     })
+    setWizardStep(1)
     setIsAddEditModalOpen(true)
   }
 
@@ -200,7 +203,7 @@ function SupplierManagement() {
       // Clear selection if deleted supplier was selected
       if (selectedSupplier?.id === editingSupplier.id) {
         setSelectedSupplier(null)
-        setSupplierItems([])
+        setSupplierMetrics(null)
       }
       
       fetchSuppliers() // Refresh the list
@@ -234,12 +237,13 @@ function SupplierManagement() {
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Select Supplier</h3>
         <div className="flex gap-4 items-end">
           <div className="flex-1">
-            <select
+              <select
               value={selectedSupplier?.id || ""}
               onChange={(e) => {
                 const supplier = suppliers.find(s => s.id === parseInt(e.target.value))
                 setSelectedSupplier(supplier || null)
-                fetchSupplierItems(supplier)
+                // Fetch concise metrics instead of full item list
+                fetchSupplierMetrics(supplier?.id)
               }}
               className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
               disabled={loading}
@@ -353,108 +357,40 @@ function SupplierManagement() {
               )}
             </div>
           </div>
-
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Items from {selectedSupplier?.name}</h3>
-              <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-3 py-1 rounded-full text-sm font-medium">
-                {supplierItems.length} items
-              </span>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Supplier Summary — {selectedSupplier?.name}</h3>
             </div>
 
-          {supplierItems.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">📦</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-700/30 rounded-xl">
+              <div className="text-center">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Total Items</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{supplierMetrics?.inventory_metrics?.total_items ?? selectedSupplier?.item_count ?? 0}</p>
               </div>
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Items Found</h4>
-              <p className="text-gray-600 dark:text-gray-400">This supplier has no items in the inventory.</p>
+              <div className="text-center">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Total Inventory Value</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(supplierMetrics?.inventory_metrics?.total_inventory_value ?? selectedSupplier?.total_inventory_value ?? 0)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-gray-600 dark:text-gray-400">Low/Out of Stock</p>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400">{((supplierMetrics?.inventory_metrics?.low_stock_count ?? 0) + (supplierMetrics?.inventory_metrics?.out_of_stock_count ?? 0)) || 0}</p>
+              </div>
             </div>
-          ) : (
-            <>
-              {/* Supplier Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-700/30 rounded-xl">
-                <div className="text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Items</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{supplierItems.length}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Value</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(
-                      supplierItems.reduce((sum, item) => sum + ((item.balance || 0) * (item.price_per_unit || 0)), 0)
-                    )}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Low/Out of Stock</p>
-                  <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                    {supplierItems.filter(item => 
-                      item.item_status === "Low In Stock" || item.item_status === "Out Of Stock"
-                    ).length}
-                  </p>
-                </div>
-              </div>
 
-              {/* Items Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {supplierItems.map((item) => (
-                  <div
-                    key={item.item_no}
-                    className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 hover:shadow-md transition-all duration-200"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900 dark:text-white text-sm mb-1">{item.item_name}</h4>
-                        {item.brand && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400">{item.brand}</p>
-                        )}
-                      </div>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(item.item_status)}`}
-                      >
-                        {item.item_status}
-                      </span>
-                    </div>
-
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Type:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">{item.item_type || "N/A"}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Location:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">{item.location || "N/A"}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Balance:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {item.balance} {item.unit_of_measure || ""}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Min Stock:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">{item.min_stock}</span>
-                      </div>
-                      <div className="flex justify-between border-t border-gray-200 dark:border-gray-600 pt-2">
-                        <span className="text-gray-600 dark:text-gray-400">Price:</span>
-                        <span className="font-bold text-blue-600 dark:text-blue-400">
-                          {formatCurrency(item.price_per_unit)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Total Value:</span>
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                          {formatCurrency((item.balance || 0) * (item.price_per_unit || 0))}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Recent Purchase Orders (6mo)</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {typeof supplierMetrics?.purchase_order_metrics?.recent_po_count === 'number' && supplierMetrics.purchase_order_metrics.recent_po_count > 0
+                    ? `${supplierMetrics.purchase_order_metrics.recent_po_count} recent PO(s)`
+                    : 'No recent PO'}
+                </p>
+                {supplierMetrics?.purchase_order_metrics?.avg_po_value ? (
+                  <p className="text-sm text-gray-500">Avg PO: {formatCurrency(supplierMetrics.purchase_order_metrics.avg_po_value)}</p>
+                ) : null}
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </div>
         </>
       )}
 
@@ -476,212 +412,157 @@ function SupplierManagement() {
       {/* Add/Edit Supplier Modal */}
       {isAddEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-2xl border border-gray-200 dark:border-gray-700 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl border border-gray-200 dark:border-gray-700 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               {editingSupplier ? "Edit Supplier" : "Add New Supplier"}
             </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Supplier Name *
-                </label>
-                <input
-                  type="text"
-                  value={supplierForm.name}
-                  onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })}
-                  className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
-                  placeholder="Enter supplier name"
-                />
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Contact Person
-                </label>
-                <input
-                  type="text"
-                  value={supplierForm.contact_person}
-                  onChange={(e) => setSupplierForm({ ...supplierForm, contact_person: e.target.value })}
-                  className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
-                  placeholder="Enter contact person name"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={supplierForm.email}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, email: e.target.value })}
-                    className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="email@example.com"
-                  />
+            {/* Wizard Steps Indicator */}
+            <div className="flex items-center gap-3 mb-6">
+              {[1,2,3].map((s) => (
+                <div key={s} className={`flex-1 py-2 px-3 rounded-lg text-center text-sm font-medium ${wizardStep===s? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
+                  {s===1? 'Basic' : s===2? 'Address/Payment' : 'Notes/Review'}
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    value={supplierForm.phone}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, phone: e.target.value })}
-                    className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="+63 912 345 6789"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Address
-                </label>
-                <input
-                  type="text"
-                  value={supplierForm.address}
-                  onChange={(e) => setSupplierForm({ ...supplierForm, address: e.target.value })}
-                  className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
-                  placeholder="Street address"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    City
-                  </label>
-                  <input
-                    type="text"
-                    value={supplierForm.city}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, city: e.target.value })}
-                    className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="City"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Country
-                  </label>
-                  <input
-                    type="text"
-                    value={supplierForm.country}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, country: e.target.value })}
-                    className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="Country"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Postal Code
-                  </label>
-                  <input
-                    type="text"
-                    value={supplierForm.postal_code}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, postal_code: e.target.value })}
-                    className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="Postal code"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Status
-                  </label>
-                  <select
-                    value={supplierForm.status}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, status: e.target.value })}
-                    className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="suspended">Suspended</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Website
-                  </label>
-                  <input
-                    type="url"
-                    value={supplierForm.website}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, website: e.target.value })}
-                    className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="https://example.com"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Tax ID
-                  </label>
-                  <input
-                    type="text"
-                    value={supplierForm.tax_id}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, tax_id: e.target.value })}
-                    className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="Tax identification number"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Payment Terms
-                </label>
-                <select
-                  value={supplierForm.payment_terms}
-                  onChange={(e) => setSupplierForm({ ...supplierForm, payment_terms: e.target.value })}
-                  className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
-                >
-                  <option value="Net 15">Net 15</option>
-                  <option value="Net 30">Net 30</option>
-                  <option value="Net 45">Net 45</option>
-                  <option value="Net 60">Net 60</option>
-                  <option value="Cash on Delivery">Cash on Delivery</option>
-                  <option value="Prepayment">Prepayment</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Notes
-                </label>
-                <textarea
-                  value={supplierForm.notes}
-                  onChange={(e) => setSupplierForm({ ...supplierForm, notes: e.target.value })}
-                  className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 min-h-[100px]"
-                  placeholder="Additional notes about the supplier"
-                />
-              </div>
+              ))}
             </div>
 
-            <div className="flex gap-4 mt-8">
-              <button
-                onClick={handleSaveSupplier}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200"
-              >
-                {editingSupplier ? "Update Supplier" : "Add Supplier"}
-              </button>
-              <button
-                onClick={() => {
-                  setIsAddEditModalOpen(false)
-                  setEditingSupplier(null)
-                }}
-                className="flex-1 bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200"
-              >
-                Cancel
-              </button>
+            {/* Step Content */}
+            <div className="space-y-4">
+              {wizardStep === 1 && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Supplier Name *</label>
+                    <input type="text" value={supplierForm.name} onChange={(e)=>setSupplierForm({...supplierForm, name: e.target.value})}
+                      className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white" placeholder="Enter supplier name" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Contact Person</label>
+                    <input type="text" value={supplierForm.contact_person} onChange={(e)=>setSupplierForm({...supplierForm, contact_person: e.target.value})}
+                      className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white" placeholder="Enter contact person name" />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
+                      <input type="email" value={supplierForm.email} onChange={(e)=>setSupplierForm({...supplierForm, email: e.target.value})}
+                        className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white" placeholder="email@example.com" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Phone</label>
+                      <input type="tel" value={supplierForm.phone} onChange={(e)=>setSupplierForm({...supplierForm, phone: e.target.value})}
+                        className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white" placeholder="+63 912 345 6789" />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {wizardStep === 2 && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Address</label>
+                    <input type="text" value={supplierForm.address} onChange={(e)=>setSupplierForm({...supplierForm, address: e.target.value})}
+                      className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white" placeholder="Street address" />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">City</label>
+                      <input type="text" value={supplierForm.city} onChange={(e)=>setSupplierForm({...supplierForm, city: e.target.value})}
+                        className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white" placeholder="City" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Country</label>
+                      <input type="text" value={supplierForm.country} onChange={(e)=>setSupplierForm({...supplierForm, country: e.target.value})}
+                        className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white" placeholder="Country" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Postal Code</label>
+                      <input type="text" value={supplierForm.postal_code} onChange={(e)=>setSupplierForm({...supplierForm, postal_code: e.target.value})}
+                        className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white" placeholder="Postal code" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
+                      <select value={supplierForm.status} onChange={(e)=>setSupplierForm({...supplierForm, status: e.target.value})}
+                        className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="suspended">Suspended</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Website</label>
+                      <input type="url" value={supplierForm.website} onChange={(e)=>setSupplierForm({...supplierForm, website: e.target.value})}
+                        className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white" placeholder="https://example.com" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Payment Terms</label>
+                      <select value={supplierForm.payment_terms} onChange={(e)=>setSupplierForm({...supplierForm, payment_terms: e.target.value})}
+                        className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white">
+                        <option value="Net 15">Net 15</option>
+                        <option value="Net 30">Net 30</option>
+                        <option value="Net 45">Net 45</option>
+                        <option value="Net 60">Net 60</option>
+                        <option value="Cash on Delivery">Cash on Delivery</option>
+                        <option value="Prepayment">Prepayment</option>
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {wizardStep === 3 && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Notes</label>
+                    <textarea value={supplierForm.notes} onChange={(e)=>setSupplierForm({...supplierForm, notes: e.target.value})}
+                      className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white min-h-[120px]" placeholder="Additional notes about the supplier" />
+                  </div>
+
+                  <div className="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg">
+                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Review</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Name: <span className="font-medium">{supplierForm.name}</span></p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Contact: <span className="font-medium">{supplierForm.contact_person}</span></p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Email: <span className="font-medium">{supplierForm.email}</span></p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Phone: <span className="font-medium">{supplierForm.phone}</span></p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Address: <span className="font-medium">{[supplierForm.address, supplierForm.city, supplierForm.country, supplierForm.postal_code].filter(Boolean).join(', ')}</span></p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Payment: <span className="font-medium">{supplierForm.payment_terms}</span></p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Status: <span className="font-medium">{supplierForm.status}</span></p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Wizard Controls */}
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => { setIsAddEditModalOpen(false); setEditingSupplier(null); }} className="flex-1 bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-6 py-3 rounded-xl font-semibold">Cancel</button>
+
+              {wizardStep > 1 && (
+                <button onClick={() => setWizardStep(w => Math.max(1, w-1))} className="px-6 py-3 rounded-xl bg-gray-200 dark:bg-gray-700">Back</button>
+              )}
+
+              {wizardStep < 3 ? (
+                <button onClick={() => {
+                  // basic front-end validation per step
+                  if (wizardStep === 1) {
+                    if (!supplierForm.name?.trim()) { showError('Validation Error', 'Supplier name is required'); return }
+                    if (!supplierForm.contact_person?.trim()) { showError('Validation Error', 'Contact person is required'); return }
+                    if (!supplierForm.email?.trim()) { showError('Validation Error', 'Email is required'); return }
+                  }
+                  setWizardStep(w => Math.min(3, w+1))
+                }} className="px-6 py-3 rounded-xl bg-blue-600 text-white">Next</button>
+              ) : (
+                <button onClick={async () => {
+                  await handleSaveSupplier()
+                  setWizardStep(1)
+                }} className="flex-1 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold">{editingSupplier? 'Update Supplier' : 'Add Supplier'}</button>
+              )}
             </div>
           </div>
         </div>
