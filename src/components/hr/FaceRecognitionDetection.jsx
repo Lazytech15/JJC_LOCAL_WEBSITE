@@ -26,6 +26,7 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
         progress: 0,
         message: "Initializing...",
     });
+    const MAX_CAPTURES = 10; // Changed from 3 to 10
 
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
@@ -468,7 +469,7 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                         );
                     }
 
-                    if (status.valid && isAutoCapturingActive && currentCount < 3) {
+                    if (status.valid && isAutoCapturingActive && currentCount < MAX_CAPTURES) {
                         if (timeSinceLastCapture > 1500) {
                             console.log("🎯 CAPTURING NOW!");
                             lastCaptureTimeRef.current = now;
@@ -588,13 +589,12 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
 
     const captureForRegistration = async () => {
         if (!videoRef.current || !isModelLoaded) return;
-        if (captureCountRef.current >= 3) {
-            console.log("❌ Already captured 3 images, stopping");
+        if (captureCountRef.current >= MAX_CAPTURES) {
+            console.log(`❌ Already captured ${MAX_CAPTURES} images, stopping`);
             setAutoCapturing(false);
             autoCapturingRef.current = false;
             return;
         }
-
         console.log(`📸 Capturing image ${captureCountRef.current + 1}/3...`);
 
         try {
@@ -644,12 +644,13 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                     }, 200);
                 }
 
-                if (newCount >= 3) {
-                    console.log("🎉 All 3 captures complete! Stopping auto-capture");
+                if (newCount >= MAX_CAPTURES) {
+                    console.log(`🎉 All ${MAX_CAPTURES} captures complete! Stopping auto-capture`);
                     setAutoCapturing(false);
                     autoCapturingRef.current = false;
                     setShowSaveOptions(true);
                 }
+
             } else {
                 console.log("⚠️ No face detected in capture attempt");
             }
@@ -869,8 +870,8 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                             <button
                                 onClick={() => switchMode("identify")}
                                 className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl font-semibold text-sm sm:text-base transition-all ${mode === "identify"
-                                        ? "bg-indigo-600 text-white shadow-lg"
-                                        : "text-slate-600 dark:text-slate-400"
+                                    ? "bg-indigo-600 text-white shadow-lg"
+                                    : "text-slate-600 dark:text-slate-400"
                                     }`}
                             >
                                 🔍 Identify
@@ -878,8 +879,8 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                             <button
                                 onClick={() => switchMode("register")}
                                 className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl font-semibold text-sm sm:text-base transition-all ${mode === "register"
-                                        ? "bg-purple-600 text-white shadow-lg"
-                                        : "text-slate-600 dark:text-slate-400"
+                                    ? "bg-purple-600 text-white shadow-lg"
+                                    : "text-slate-600 dark:text-slate-400"
                                     }`}
                             >
                                 📝 Register
@@ -1014,8 +1015,8 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                                                 <div className="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4">
                                                     <div
                                                         className={`px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl backdrop-blur-md ${facePositionStatus.valid
-                                                                ? "bg-emerald-500/90"
-                                                                : "bg-amber-500/90"
+                                                            ? "bg-emerald-500/90"
+                                                            : "bg-amber-500/90"
                                                             }`}
                                                     >
                                                         <p className="text-white text-xs sm:text-sm font-semibold text-center">
@@ -1029,15 +1030,15 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                                             <div className="absolute bottom-2 sm:bottom-4 left-2 sm:left-4 right-2 sm:right-4">
                                                 <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl">
                                                     <p className="text-slate-800 dark:text-slate-200 text-xs sm:text-sm font-semibold text-center mb-2">
-                                                        Auto-capturing: {captureCount} / 3
+                                                        Auto-capturing: {captureCount} / 10
                                                     </p>
                                                     <div className="flex gap-1 sm:gap-2 mb-2">
-                                                        {[0, 1, 2].map((i) => (
+                                                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
                                                             <div
                                                                 key={i}
                                                                 className={`flex-1 h-1.5 sm:h-2 rounded-full transition-colors ${i < captureCount
-                                                                        ? "bg-emerald-500"
-                                                                        : "bg-slate-300 dark:bg-slate-600"
+                                                                    ? "bg-emerald-500"
+                                                                    : "bg-slate-300 dark:bg-slate-600"
                                                                     }`}
                                                             />
                                                         ))}
@@ -1148,9 +1149,9 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                         {mode === "register" && capturedImages.length > 0 && (
                             <div className="bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-slate-200 dark:border-slate-700">
                                 <h3 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-200 mb-3 sm:mb-4">
-                                    Captured Images ({capturedImages.length}/3)
+                                    Captured Images ({capturedImages.length}/10)
                                 </h3>
-                                <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                                <div className="grid grid-cols-5 gap-2 sm:gap-4">
                                     {capturedImages.map((capture, index) => (
                                         <div key={index} className="relative">
                                             <img
@@ -1163,7 +1164,7 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                                             </div>
                                         </div>
                                     ))}
-                                    {[...Array(3 - capturedImages.length)].map((_, index) => (
+                                    {[...Array(Math.max(0, 10 - capturedImages.length))].map((_, index) => (
                                         <div key={`empty-${index}`} className="relative">
                                             <div className="w-full aspect-square bg-slate-100 dark:bg-slate-700 rounded-lg sm:rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center">
                                                 <span className="text-2xl sm:text-4xl text-slate-400">
@@ -1174,7 +1175,7 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                                     ))}
                                 </div>
 
-                                {capturedImages.length === 3 && showSaveOptions && (
+                                {capturedImages.length === 10 && showSaveOptions && (
                                     <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
                                         <div>
                                             <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -1373,7 +1374,7 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                                         <span className="font-bold shrink-0">3.</span>
                                         <span>
                                             Click "Start Registration" - the system will auto-capture
-                                            3 photos
+                                            10 photos
                                         </span>
                                     </li>
                                     <li className="flex items-start gap-2">
@@ -1392,7 +1393,7 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                                     <li className="flex items-start gap-2">
                                         <span className="font-bold shrink-0">6.</span>
                                         <span>
-                                            Select employee and save - 3 photos = higher accuracy!
+                                            Select employee and save - 10 photos = highest accuracy!
                                         </span>
                                     </li>
                                 </ol>

@@ -588,6 +588,20 @@ export function DashboardView({
     
     if (result.success && result.product) {
       console.log("[Barcode Scanner] Found item:", result.product.name);
+      
+      // Check if item is out of stock
+      if (result.product.status === 'out-of-stock' || result.product.balance <= 0) {
+        console.log("[Barcode Scanner] Item is out of stock");
+        toast({
+          title: "❌ Out of Stock",
+          description: `${result.product.name} (${barcodeValue}) is currently out of stock and cannot be added to cart`,
+          variant: "destructive",
+        });
+        // Clear input after showing error
+        setBarcodeInput("");
+        return;
+      }
+      
       onAddToCart(result.product, 1, true); // Pass true for isFromBarcode
       
       // Show success feedback for barcode scanning specifically

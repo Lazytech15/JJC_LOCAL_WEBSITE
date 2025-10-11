@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import ModalPortal from "../shared/ModalPortal"
-import { items as itemsService } from "../../../utils/api/api-service.js"
+import apiService, { items as itemsService } from "../../../utils/api/api-service.js"
 
 function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
   const [currentStep, setCurrentStep] = useState(1)
@@ -11,7 +11,9 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
     item_name: "",
     brand: "",
     item_type: "",
-    supplier: "",
+  supplier: "",
+  supplier_id: null,
+  custom_supplier: "",
 
     // Step 2: Stock & Pricing
     balance: 0,
@@ -41,6 +43,16 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
     { number: 4, title: "Review", description: "Confirm details", icon: "✓" }
   ]
 
+  const canJumpToStep = (target) => {
+    // allow going backwards freely
+    if (target <= currentStep) return true
+    // validate every step up to target-1
+    for (let s = currentStep; s < target; s++) {
+      if (!validateStep(s)) return false
+    }
+    return true
+  }
+
   // Load data when editing
   useEffect(() => {
     if (isOpen && selectedItem) {
@@ -48,7 +60,9 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
         item_name: selectedItem?.item_name || "",
         brand: selectedItem?.brand || "",
         item_type: selectedItem?.item_type || "",
-        supplier: selectedItem?.supplier || "",
+  supplier: selectedItem?.supplier || "",
+  supplier_id: selectedItem?.supplier_id || null,
+  custom_supplier: "",
         balance: selectedItem?.balance || 0,
         min_stock: selectedItem?.min_stock || 0,
         unit_of_measure: selectedItem?.unit_of_measure || "",
@@ -78,6 +92,27 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
       }
     }
   }, [isOpen, selectedItem])
+
+  // Load suppliers for dropdown
+  const [suppliersList, setSuppliersList] = useState([])
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const opts = await apiService.suppliers.getSuppliersForSelect()
+        if (mounted) setSuppliersList(opts || [])
+      } catch (e) {
+        console.error('Failed to load suppliers list', e)
+      }
+    })()
+    return () => { mounted = false }
+  }, [])
+
+  if (!isOpen) return null
+
+  // Step guards used by footer/navigation to enable/disable Next/Create
+  const canProceedFromStep1 = (wizardData.item_name || "").trim().length > 0
+  const canProceedFromStep2 = (Number(wizardData.balance) || 0) >= 0 && (Number(wizardData.min_stock) || 0) >= 0 && (Number(wizardData.price_per_unit) || 0) >= 0
 
   const validateStep = (step) => {
     const newErrors = {}
@@ -118,7 +153,25 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
 
   const handleSubmit = () => {
     if (validateStep(currentStep)) {
-      onSave(wizardData)
+      const payload = { ...wizardData }
+
+      // Resolve supplier name: backend items endpoints expect `supplier` as a string.
+      if (wizardData.supplier_id === '__custom') {
+        payload.supplier = (wizardData.custom_supplier || '').trim()
+        delete payload.supplier_id
+      } else if (wizardData.supplier_id) {
+        // Find selected supplier in suppliersList and use its label/name
+        const found = suppliersList.find(s => s.id === wizardData.supplier_id)
+        payload.supplier = found?.label || wizardData.supplier || ''
+        delete payload.supplier_id
+      } else {
+        payload.supplier = (wizardData.supplier || '').trim()
+      }
+
+      // Clean up temporary fields not required by API
+      delete payload.custom_supplier
+
+      onSave(payload)
       handleClose()
     }
   }
@@ -173,123 +226,43 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
     }
   }
 
-  const handleImageDelete = async (filename) => {
-    if (!selectedItem?.item_no) return
-    const confirmed = window.confirm(`Delete ${filename}?`)
-    if (!confirmed) return
-    try {
-      await itemsService.deleteItemImage(selectedItem.item_no, filename)
-      setExistingImages(prev => prev.filter(i => i.filename !== filename))
-      if (currentImageUrl.includes(encodeURIComponent(filename))) {
-        const latest = itemsService.getItemLatestImageUrl(selectedItem.item_no)
-        setCurrentImageUrl(`${latest}?t=${Date.now()}`)
-      }
-    } catch (e) {
-      alert(e.message || 'Failed to delete image')
-    }
-  }
-
-  const canProceedFromStep1 = wizardData.item_name.trim().length > 0
-  const canProceedFromStep2 = wizardData.balance >= 0 && wizardData.min_stock >= 0 && wizardData.price_per_unit >= 0
-
-  if (!isOpen) return null
-
-  return (
-    <ModalPortal>
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-[1000]">
-        <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col border-2 border-slate-200 dark:border-slate-700">
-          {/* Enhanced Header with Industrial Theme */}
-          <div className="bg-gradient-to-r from-slate-800 via-zinc-800 to-slate-800 dark:from-slate-900 dark:via-zinc-900 dark:to-slate-900 p-4 sm:p-6 text-white relative overflow-hidden">
-            {/* Decorative gear pattern */}
-            <div className="absolute top-0 right-0 w-32 h-32 opacity-5">
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-amber-500">
-                <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z" />
-              </svg>
-            </div>
-            
-            <div className="relative flex justify-between items-center mb-3 sm:mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-500/20 rounded-lg border border-amber-500/30">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={selectedItem ? "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" : "M12 4v16m8-8H4"} />
-                  </svg>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold">
-                  {selectedItem ? "Edit Inventory Item" : "Add New Inventory Item"}
-                </h2>
-              </div>
-              <button
-                onClick={handleClose}
-                className="text-white/80 hover:text-white hover:bg-white/10 p-2 rounded-lg transition-all"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Enhanced Breadcrumbs - Responsive */}
-            <div className="relative flex items-center justify-between gap-1 sm:gap-2 overflow-x-auto pb-1">
-              {steps.map((step, index) => (
-                <div key={step.number} className="flex items-center flex-shrink-0">
-                  <button
-                    onClick={() => {
-                      if (step.number < currentStep) setCurrentStep(step.number)
-                      if (step.number === 2 && canProceedFromStep1 && currentStep >= 2) setCurrentStep(2)
-                      if (step.number === 3 && canProceedFromStep2 && currentStep >= 3) setCurrentStep(3)
-                      if (step.number === 4 && currentStep >= 4) setCurrentStep(4)
-                    }}
-                    disabled={
-                      (step.number === 2 && !canProceedFromStep1 && currentStep < 2) ||
-                      (step.number === 3 && !canProceedFromStep2 && currentStep < 3) ||
-                      (step.number === 4 && currentStep < 4)
-                    }
-                    className={`
-                      group flex items-center gap-2 px-2 sm:px-4 py-2 rounded-lg transition-all text-xs sm:text-sm
-                      ${currentStep === step.number
-                        ? 'bg-amber-500/20 backdrop-blur-sm shadow-lg border border-amber-500/30'
-                        : currentStep > step.number
-                        ? 'hover:bg-white/10 cursor-pointer'
-                        : 'opacity-50 cursor-not-allowed'
-                      }
-                    `}
-                  >
-                    <div className={`
-                      w-7 h-7 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-lg transition-all flex-shrink-0
-                      ${currentStep === step.number
-                        ? 'bg-amber-500 text-white shadow-md'
-                        : currentStep > step.number
-                        ? 'bg-green-500 text-white'
-                        : 'bg-white/20 text-white'
-                      }
-                    `}>
-                      {currentStep > step.number ? (
-                        <svg className="w-4 h-4 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <span className="text-lg sm:text-xl">{step.icon}</span>
-                      )}
-                    </div>
-                    <div className="hidden sm:block text-left">
-                      <div className={`font-semibold ${currentStep === step.number ? 'text-amber-400' : 'text-white'}`}>
-                        {step.title}
-                      </div>
-                      <div className="text-white/70 text-xs">{step.description}</div>
-                    </div>
-                  </button>
-                  {index < steps.length - 1 && (
-                    <div className={`h-0.5 w-4 sm:w-8 mx-1 transition-colors ${
-                      currentStep > step.number ? 'bg-green-500' : 'bg-white/20'
-                    }`} />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Content Area */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+    return (
+      <ModalPortal>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-[1000]">
+          <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col border-2 border-slate-200 dark:border-slate-700">
+            {/* Enhanced Header with Industrial Theme */}
+            <div className="bg-gradient-to-r from-slate-800 via-zinc-800 to-slate-800 dark:from-slate-900 dark:via-zinc-900 dark:to-slate-900 p-4 sm:p-6 text-white relative overflow-hidden">
+              {/* Clickable step breadcrumbs */}
+              <div className="max-w-3xl mx-auto mb-4">
+                <div className="flex items-center gap-3">
+                  {steps.map((step, idx) => (
+                    <div key={step.number} className="flex items-center flex-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!canJumpToStep(step.number)) {
+                            setErrors(prev => ({ ...prev, global: 'Please complete the required fields before jumping ahead.' }))
+                            return
+                          }
+                          setErrors({})
+                          setCurrentStep(step.number)
+                        }}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-semibold transition-all duration-200 ${currentStep >= step.number ? 'bg-white text-slate-800 shadow-md' : 'bg-white/10 text-white'}`}
+                        aria-current={currentStep === step.number}
+                        aria-label={`Go to step ${step.number}: ${step.title}`}
+                      >
+                        {currentStep > step.number ? '✓' : step.icon}
+                      </button>
+                      <div className="ml-3 text-sm">
+                        <div className={`${currentStep >= step.number ? 'font-semibold text-white' : 'text-white/80'}`}>{step.title}</div>
+                        <div className="text-xs text-white/60">{step.description}</div>
+                      </div>
+                      {idx < steps.length - 1 && <div className={`flex-1 h-0.5 mx-3 ${currentStep > step.number ? 'bg-white' : 'bg-white/20'}`} />}
+                    </div>
+                  ))}
+                </div>
+              </div>
             {/* Step 1: Basic Information */}
             {currentStep === 1 && (
               <div className="space-y-6 max-w-3xl mx-auto">
@@ -348,18 +321,56 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                     </div>
                   </div>
 
-                  {/* Supplier */}
+                  {/* Supplier - select or custom */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      Supplier
-                    </label>
-                    <input
-                      type="text"
-                      value={wizardData.supplier}
-                      onChange={(e) => setWizardData({ ...wizardData, supplier: e.target.value })}
-                      className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:ring-4 focus:ring-zinc-500/20 focus:border-zinc-500"
-                      placeholder="Enter supplier name"
-                    />
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Supplier</label>
+                    <div className="relative max-w-md">
+                      <input
+                        type="text"
+                        value={wizardData.supplier_id === '__custom' ? (wizardData.custom_supplier || '') : (wizardData.supplier || '')}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setWizardData({ ...wizardData, supplier: v, custom_supplier: v, supplier_id: null })
+                        }}
+                        placeholder="Type or select a supplier"
+                        className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-xl px-4 py-3 pr-20 text-gray-900 dark:text-white"
+                        list="supplier-suggestions"
+                      />
+                      <datalist id="supplier-suggestions">
+                        {suppliersList.map(s => <option key={s.id} value={s.label} />)}
+                      </datalist>
+
+                      {/* Compact controls overlaid to the right of the input (keeps input visually full width) */}
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          title="Select matching supplier"
+                          onClick={() => {
+                            const typed = (wizardData.custom_supplier || wizardData.supplier || '').trim().toLowerCase()
+                            const match = suppliersList.find(s => s.label.toLowerCase() === typed)
+                            if (match) setWizardData({ ...wizardData, supplier_id: match.id, supplier: match.label, custom_supplier: '' })
+                            else setWizardData({ ...wizardData, supplier_id: '__custom' })
+                          }}
+                          className="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-sm"
+                        >
+                          Select
+                        </button>
+                        <button
+                          type="button"
+                          title="Add new supplier"
+                          onClick={() => {
+                            setWizardData({ ...wizardData, supplier_id: '__custom', custom_supplier: (wizardData.custom_supplier || wizardData.supplier || '') })
+                            // focus will be manual by user; keeping simple for now
+                          }}
+                          className="px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-sm"
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    </div>
+                    {wizardData.supplier_id === '__custom' && (
+                      <p className="text-xs text-gray-500 mt-2">Typing a new supplier will send its name with the item. To create a full supplier record, use Suppliers &gt; Add Supplier.</p>
+                    )}
                   </div>
 
                   {/* Quick Preview */}
@@ -841,7 +852,8 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                       <p><strong>Name:</strong> {wizardData.item_name}</p>
                       {wizardData.brand && <p><strong>Brand:</strong> {wizardData.brand}</p>}
                       {wizardData.item_type && <p><strong>Type:</strong> {wizardData.item_type}</p>}
-                      {wizardData.supplier && <p><strong>Supplier:</strong> {wizardData.supplier}</p>}
+                      { (wizardData.supplier_id && wizardData.supplier_id !== '__custom') && <p><strong>Supplier:</strong> {wizardData.supplier}</p>}
+                      { wizardData.supplier_id === '__custom' && wizardData.custom_supplier && <p><strong>Supplier:</strong> {wizardData.custom_supplier}</p>}
                     </div>
                   </div>
 
@@ -909,7 +921,7 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Supplier:</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{wizardData.supplier || 'N/A'}</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">{wizardData.supplier_id === '__custom' ? (wizardData.custom_supplier || 'N/A') : (wizardData.supplier || 'N/A')}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Balance:</span>

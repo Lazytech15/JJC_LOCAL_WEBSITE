@@ -3,6 +3,7 @@ import { useAuth } from "../../../contexts/AuthContext"
 import apiService from "../../../utils/api/api-service"
 import { ModalPortal, useToast } from "../shared"
 import CreatePurchaseOrderWizard from "./CreatePurchaseOrderWizard"
+import { exportPurchaseOrderToPDF, exportPurchaseOrderToExcel } from "../../../utils/purchase-order-export"
 
 function PurchaseOrderTracker() {
   const { isDarkMode } = useAuth()
@@ -243,6 +244,22 @@ function PurchaseOrderTracker() {
     setShowCreateModal(true)
   }
 
+  const handleExportPDF = (order) => {
+    try {
+      exportPurchaseOrderToPDF(order)
+    } catch (err) {
+      showError('Export Error', err.message || 'Failed to export PDF')
+    }
+  }
+
+  const handleExportExcel = (order) => {
+    try {
+      exportPurchaseOrderToExcel(order)
+    } catch (err) {
+      showError('Export Error', err.message || 'Failed to export Excel')
+    }
+  }
+
   const handleAddItemToOrder = (item) => {
     setOrderForm(prev => {
       const newItems = [...prev.items, {
@@ -438,25 +455,8 @@ function PurchaseOrderTracker() {
   }
 
   const handleUpdateStatus = async () => {
-    try {
-      const statusData = {
-        new_status: statusUpdate.new_status,
-        notes: statusUpdate.notes,
-        actual_delivery_date: statusUpdate.actual_delivery_date || undefined
-      }
-
-      const result = await apiService.purchaseOrders.updatePurchaseOrderStatus(statusUpdate.order_id, statusData)
-
-      if (result.success) {
-        success("Success", "Order status updated successfully!")
-        setShowOrderDetails(false)
-        fetchPurchaseOrders()
-      } else {
-        showError("Failed", result.message || "Failed to update order status")
-      }
-    } catch (err) {
-      setError(err.message || "Failed to update order status")
-    }
+    // Status updates for purchase orders have been removed.
+    showError('Update Disabled', 'Updating purchase order status is no longer supported.')
   }
 
   const handleViewOrderDetails = (order) => {
@@ -654,6 +654,19 @@ function PurchaseOrderTracker() {
                       >
                         View Details
                       </button>
+                      {/* Edit removed - editing purchase orders is no longer supported */}
+                      <button
+                        onClick={() => handleExportPDF(order)}
+                        className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
+                      >
+                        PDF
+                      </button>
+                      <button
+                        onClick={() => handleExportExcel(order)}
+                        className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs font-medium transition-colors"
+                      >
+                        Excel
+                      </button>
                       <button
                         onClick={() => handleDeleteOrder(order.id)}
                         className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
@@ -678,8 +691,8 @@ function PurchaseOrderTracker() {
       {/* Create Order Wizard */}
       <CreatePurchaseOrderWizard 
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={handleWizardSuccess}
+        onClose={() => { setShowCreateModal(false) }}
+        onSuccess={(msg) => { handleWizardSuccess(msg); }}
       />
 
       {/* Order Details Modal */}
@@ -873,6 +886,18 @@ function PurchaseOrderTracker() {
                     </svg>
                     Update Status
                   </span>
+                </button>
+                <button
+                  onClick={() => handleExportPDF(selectedOrder)}
+                  className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
+                >
+                  Export PDF
+                </button>
+                <button
+                  onClick={() => handleExportExcel(selectedOrder)}
+                  className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition-all"
+                >
+                  Export Excel
                 </button>
                 <button
                   onClick={() => setShowOrderDetails(false)}

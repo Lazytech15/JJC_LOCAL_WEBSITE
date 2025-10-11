@@ -7,6 +7,14 @@ import { ItemDetailView } from "./ItemDetailView"
 import InventoryListView from "./InventoryListView"
 import { useToast } from "../shared/ToastNotification"
 import ConfirmationModal from "../shared/ConfirmationModal"
+import {
+  exportToCSV,
+  exportToExcel,
+  parseCSV,
+  parseExcel,
+  validateImportedItems,
+  downloadTemplate
+} from "../../../utils/inventory-import-export"
 
 // Lazy load the heavy wizard component
 const AddEditItemWizard = lazy(() => import('./AddEditItemWizard'))
@@ -55,6 +63,15 @@ function InventoryManagement() {
 
   // Client-side pagination state for grid view (20 per batch)
   const [visibleCount, setVisibleCount] = useState(20)
+
+  // Import/Export modal state
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importFile, setImportFile] = useState(null)
+  const [importMode, setImportMode] = useState('add') // 'add' or 'replace'
+  const [importPreview, setImportPreview] = useState(null)
+  const [importLoading, setImportLoading] = useState(false)
+  const [importErrors, setImportErrors] = useState([])
+  const [showExportModal, setShowExportModal] = useState(false)
 
   useEffect(() => {
     fetchItems()
@@ -507,6 +524,126 @@ function InventoryManagement() {
     }
   }
 
+  // Import/Export handlers
+  const handleExport = (format) => {
+    try {
+      if (format === 'csv') {
+        exportToCSV(items, `inventory_export_${new Date().toISOString().split('T')[0]}.csv`)
+      } else {
+        exportToExcel(items, `inventory_export_${new Date().toISOString().split('T')[0]}.xlsx`)
+      }
+      success("Export Successful!", `Inventory exported as ${format.toUpperCase()}`)
+      setShowExportModal(false)
+    } catch (error) {
+      showError("Export Failed", error.message)
+    }
+  }
+
+  const handleImportFileChange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    setImportFile(file)
+    setImportErrors([])
+    setImportPreview(null)
+
+    try {
+      setImportLoading(true)
+      const fileExtension = file.name.split('.').pop().toLowerCase()
+      
+      let parseResult
+      if (fileExtension === 'csv') {
+        parseResult = await parseCSV(file)
+      } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+        parseResult = await parseExcel(file)
+      } else {
+        throw new Error('Unsupported file format. Please upload CSV or Excel file.')
+      }
+
+      const { validItems, errors } = validateImportedItems(parseResult.items)
+      
+      setImportPreview(validItems)
+      setImportErrors(errors)
+      
+      if (parseResult.errors && parseResult.errors.length > 0) {
+        warning("Parsing Warnings", `Some rows had issues: ${parseResult.errors.length} warnings`)
+      }
+    } catch (error) {
+      showError("Import Failed", error.message)
+      setImportFile(null)
+    } finally {
+      setImportLoading(false)
+    }
+  }
+
+  const handleImportConfirm = async () => {
+    if (!importPreview || importPreview.length === 0) {
+      showError("No Data", "No valid items to import")
+      return
+    }
+
+    setConfirmModal({
+      isOpen: true,
+      title: importMode === 'replace' ? "Replace All Data?" : "Add Items?",
+      message: importMode === 'replace' 
+        ? `This will DELETE all existing ${items.length} items and replace them with ${importPreview.length} new items. This action CANNOT be undone!`
+        : `This will add ${importPreview.length} new items to your existing ${items.length} items.`,
+      type: importMode === 'replace' ? "danger" : "warning",
+      onConfirm: async () => {
+        try {
+          setImportLoading(true)
+
+          if (importMode === 'replace') {
+            // Delete all existing items first
+            for (const item of items) {
+              await apiService.items.deleteItem(item.item_no)
+            }
+          }
+
+          // Create new items
+          let successCount = 0
+          let failCount = 0
+          
+          for (const item of importPreview) {
+            try {
+              await apiService.items.createItem(item)
+              successCount++
+            } catch (err) {
+              console.error(`Failed to import item: ${item.item_name}`, err)
+              failCount++
+            }
+          }
+
+          // Refresh the list
+          await fetchItems()
+
+          // Close modal and reset
+          setShowImportModal(false)
+          setImportFile(null)
+          setImportPreview(null)
+          setImportErrors([])
+
+          success(
+            "Import Complete!", 
+            `Successfully imported ${successCount} items${failCount > 0 ? `, ${failCount} failed` : ''}`
+          )
+        } catch (error) {
+          showError("Import Failed", error.message)
+        } finally {
+          setImportLoading(false)
+        }
+      }
+    })
+  }
+
+  const handleCancelImport = () => {
+    setShowImportModal(false)
+    setImportFile(null)
+    setImportPreview(null)
+    setImportErrors([])
+    setImportMode('add')
+  }
+
   return (
     <div className="space-y-3">
       {/* Enhanced Header Section - Compact */}
@@ -527,6 +664,24 @@ function InventoryManagement() {
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 dark:from-purple-700 dark:to-purple-800 dark:hover:from-purple-600 dark:hover:to-purple-700 text-white px-3 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg text-xs sm:text-sm"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <span>Import Data</span>
+          </button>
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-700 dark:to-blue-800 dark:hover:from-blue-600 dark:hover:to-blue-700 text-white px-3 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg text-xs sm:text-sm"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Export Data</span>
+          </button>
           <button
             onClick={exportBarcodesToExcel}
             className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 dark:from-green-700 dark:to-green-800 dark:hover:from-green-600 dark:hover:to-green-700 text-white px-3 py-2 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg text-xs sm:text-sm"
@@ -1254,6 +1409,224 @@ function InventoryManagement() {
         message={confirmModal.message}
         type={confirmModal.type}
       />
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6">
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Export Inventory Data</h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Choose a format to export your inventory data ({items.length} items)
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleExport('csv')}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>Export as CSV</span>
+                </button>
+
+                <button
+                  onClick={() => handleExport('excel')}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>Export as Excel</span>
+                </button>
+
+                <button
+                  onClick={() => downloadTemplate('csv')}
+                  className="w-full bg-gray-500 hover:bg-gray-600 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-3"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  <span>Download CSV Template</span>
+                </button>
+
+                <button
+                  onClick={() => downloadTemplate('excel')}
+                  className="w-full bg-gray-500 hover:bg-gray-600 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-3"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  <span>Download Excel Template</span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="mt-6 w-full bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <ModalPortal>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6">
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Import Inventory Data</h3>
+              
+              <div className="space-y-6">
+                {/* Instructions */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Import Instructions</h4>
+                  <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
+                    <li>Upload a CSV or Excel file with your inventory data</li>
+                    <li>Required fields: Item Name, Balance, Min Stock, Price Per Unit</li>
+                    <li>Download a template above to see the correct format</li>
+                    <li>Choose to add items or replace all existing data</li>
+                  </ul>
+                </div>
+
+                {/* Import Mode Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Import Mode
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => setImportMode('add')}
+                      className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                        importMode === 'add'
+                          ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      <div className="font-semibold">Add Items</div>
+                      <div className="text-xs mt-1">Add to existing inventory</div>
+                    </button>
+                    <button
+                      onClick={() => setImportMode('replace')}
+                      className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                        importMode === 'replace'
+                          ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      <div className="font-semibold">Replace All</div>
+                      <div className="text-xs mt-1">⚠️ Delete all & replace</div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* File Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Select File (CSV or Excel)
+                  </label>
+                  <input
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    onChange={handleImportFileChange}
+                    className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Loading State */}
+                {importLoading && (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600 dark:text-gray-400">Processing file...</p>
+                  </div>
+                )}
+
+                {/* Validation Errors */}
+                {importErrors.length > 0 && (
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                    <h4 className="font-semibold text-red-900 dark:text-red-100 mb-2">
+                      ⚠️ Validation Errors ({importErrors.length})
+                    </h4>
+                    <div className="max-h-40 overflow-y-auto space-y-2 text-sm">
+                      {importErrors.slice(0, 10).map((error, index) => (
+                        <div key={index} className="text-red-700 dark:text-red-300">
+                          <strong>Row {error.row}:</strong> {error.item_name} - {error.errors.join(', ')}
+                        </div>
+                      ))}
+                      {importErrors.length > 10 && (
+                        <div className="text-red-600 dark:text-red-400 font-medium">
+                          ...and {importErrors.length - 10} more errors
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Preview */}
+                {importPreview && importPreview.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-gray-900 dark:text-white mb-3">
+                      Preview ({importPreview.length} valid items)
+                    </h4>
+                    <div className="border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden max-h-60 overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-100 dark:bg-gray-700 sticky top-0">
+                          <tr>
+                            <th className="px-4 py-2 text-left font-semibold text-gray-800 dark:text-gray-200">Item Name</th>
+                            <th className="px-4 py-2 text-center font-semibold text-gray-800 dark:text-gray-200">Balance</th>
+                            <th className="px-4 py-2 text-center font-semibold text-gray-800 dark:text-gray-200">Min Stock</th>
+                            <th className="px-4 py-2 text-right font-semibold text-gray-800 dark:text-gray-200">Price</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                          {importPreview.slice(0, 10).map((item, index) => (
+                            <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                              <td className="px-4 py-2 text-gray-900 dark:text-white">{item.item_name}</td>
+                              <td className="px-4 py-2 text-center text-gray-700 dark:text-gray-300">{item.balance}</td>
+                              <td className="px-4 py-2 text-center text-gray-700 dark:text-gray-300">{item.min_stock}</td>
+                              <td className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">
+                                ₱{item.price_per_unit.toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                          {importPreview.length > 10 && (
+                            <tr>
+                              <td colSpan="4" className="px-4 py-2 text-center text-gray-500 dark:text-gray-400 italic">
+                                ...and {importPreview.length - 10} more items
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-4 mt-6">
+                <button
+                  onClick={handleImportConfirm}
+                  disabled={!importPreview || importPreview.length === 0 || importLoading}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 disabled:cursor-not-allowed"
+                >
+                  {importLoading ? 'Importing...' : `Import ${importPreview?.length || 0} Items`}
+                </button>
+                <button
+                  onClick={handleCancelImport}
+                  disabled={importLoading}
+                  className="flex-1 bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
     </div>
   )
 }

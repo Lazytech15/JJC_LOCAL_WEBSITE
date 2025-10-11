@@ -3,7 +3,7 @@ import { ModalPortal } from "../shared"
 import apiService from "../../../utils/api/api-service"
 import { exportPurchaseOrderToPDF, exportPurchaseOrderToExcel } from "../../../utils/purchase-order-export"
 
-function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
+function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = null }) {
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -18,6 +18,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
     // Step 1 - PO Number & Supplier
     supplier_name: "",
     supplier_address: "",
+  supplier_details: null,
     po_number: "",
     po_sequence: "",
     
@@ -49,6 +50,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
       initializeWizard()
     }
   }, [isOpen])
+
+  // Editing purchase orders was removed; this wizard always creates new POs now.
 
   const initializeWizard = async () => {
     try {
@@ -225,12 +228,30 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
     }
   }
 
-  const handleSupplierSelect = (supplierName) => {
+  const handleSupplierSelect = async (supplierName) => {
     const supplier = suppliers.find(s => s.name === supplierName)
+    
+    // Fetch full supplier details from suppliers API
+    let supplierAddress = ""
+    try {
+      const suppliersData = await apiService.suppliers.getSuppliers({ name: supplierName })
+      if (suppliersData.success && suppliersData.suppliers && suppliersData.suppliers.length > 0) {
+        const supplierDetails = suppliersData.suppliers[0]
+        // Build full address from supplier record
+        supplierAddress = apiService.suppliers.getFullAddress(supplierDetails)
+        // Save supplier details into form data
+        setFormData(prev => ({ ...prev, supplier_details: supplierDetails }))
+      }
+    } catch (err) {
+      console.error("Error fetching supplier details:", err)
+      // Fallback to supplier object if available
+      supplierAddress = supplier?.supplier_address || ""
+    }
+    
     setFormData(prev => ({
       ...prev,
       supplier_name: supplierName,
-      supplier_address: supplier?.supplier_address || "",
+      supplier_address: supplierAddress,
       selectedItems: [] // Clear items when changing supplier
     }))
   }
@@ -328,6 +349,32 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
     setCurrentStep(prev => prev + 1)
   }
 
+  // Validation helper used for guarded breadcrumb navigation
+  const validateForStep = (step) => {
+    if (step === 1) {
+      if (!formData.supplier_name) return false
+      if (!formData.po_number) return false
+      if (poNumberStatus.exists) return false
+    }
+    if (step === 2) {
+      if (!formData.selectedItems || formData.selectedItems.length === 0) return false
+    }
+    if (step === 3) {
+      // partial checks for details
+      // allow navigation if prepared_by exists (array) and terms present
+      if (!formData.prepared_by || formData.prepared_by.filter(p => p && p.trim()).length === 0) return false
+    }
+    return true
+  }
+
+  const canJumpToStep = (target) => {
+    if (target <= currentStep) return true
+    for (let s = currentStep; s < target; s++) {
+      if (!validateForStep(s)) return false
+    }
+    return true
+  }
+
   const handleBack = () => {
     setError(null)
     setCurrentStep(prev => prev - 1)
@@ -342,6 +389,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
         po_number: formData.po_number,
         supplier_name: formData.supplier_name,
         supplier_address: formData.supplier_address,
+        supplier_details: formData.supplier_details || null,
         attention_person: formData.attention_person,
         terms: formData.terms,
         po_date: formData.po_date,
@@ -357,8 +405,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
         })),
         overwrite_existing: overwriteExisting
       }
-      
-      const data = await apiService.purchaseOrders.createPurchaseOrder(orderData)
+      let data
+      data = await apiService.purchaseOrders.createPurchaseOrder(orderData)
       
       if (data.success) {
         onSuccess(`Purchase Order ${formData.po_number} created successfully!`)
@@ -438,7 +486,19 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
             <div className="mt-6 flex items-center justify-between">
               {steps.map((step, index) => (
                 <div key={step.number} className="flex items-center flex-1">
-                  <div className="flex flex-col items-center flex-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!canJumpToStep(step.number)) {
+                        setError('Please complete required fields before jumping ahead')
+                        return
+                      }
+                      setError(null)
+                      setCurrentStep(step.number)
+                    }}
+                    className="flex flex-col items-center flex-1"
+                    aria-current={currentStep === step.number}
+                  >
                     <div className={`
                       w-10 h-10 rounded-full flex items-center justify-center text-lg font-semibold
                       transition-all duration-300
@@ -455,7 +515,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
                     `}>
                       {step.title}
                     </span>
-                  </div>
+                  </button>
                   {index < steps.length - 1 && (
                     <div className={`
                       flex-1 h-1 mx-2 rounded-full transition-all duration-300
@@ -935,6 +995,16 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess }) {
                           <div className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">
                             {formData.supplier_address}
                           </div>
+                          {formData.supplier_details && (
+                            <div className="mt-3 text-sm text-gray-700 space-y-1">
+                              <div><strong>Contact:</strong> {formData.supplier_details.contact_person || formData.supplier_details.contact || 'N/A'}</div>
+                              <div><strong>Email:</strong> {formData.supplier_details.email || 'N/A'}</div>
+                              <div><strong>Phone:</strong> {formData.supplier_details.phone || 'N/A'}</div>
+                              <div><strong>Payment Terms:</strong> {formData.supplier_details.payment_terms || 'N/A'}</div>
+                              <div><strong>Tax ID:</strong> {formData.supplier_details.tax_id || 'N/A'}</div>
+                              <div><strong>Website:</strong> {formData.supplier_details.website || 'N/A'}</div>
+                            </div>
+                          )}
                           {formData.attention_person && (
                             <div className="text-sm text-gray-800 mt-2">
                               Attn: {formData.attention_person}
