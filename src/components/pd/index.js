@@ -13,8 +13,7 @@ export {
   InventoryManagement,
   InventoryListView,
   AddEditItemWizard,
-  ItemDetailView,
-  RestockList
+  ItemDetailView
 } from './inventory'
 
 // Barcode & QR Code

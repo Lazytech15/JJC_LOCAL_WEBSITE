@@ -51,7 +51,7 @@
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.5.1",
     "express": "^5.1.0",
-    "face-api.js": "^0.22.2",
+    "face-api.js": "^0.20.0",
     "geist": "^1.5.1",
     "input-otp": "^1.4.1",
     "jsbarcode": "^3.12.1",

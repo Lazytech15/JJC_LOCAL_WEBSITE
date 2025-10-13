@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Minus, Plus, Trash2, History, Package, Briefcase, Cog, Wrench } from "lucide-react"
 import { Button } from "../components/ui/button"
 import { Card, CardContent } from "../components/ui/card"
@@ -19,7 +19,28 @@ import type { Employee } from "../lib/Services/employees.service"
 function CartItemImage({ itemId, itemName }: { itemId: string; itemName: string }) {
   const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
-  const imageUrl = `https://qxw.2ee.mytemp.website/api/items/images/${itemId}/`
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  
+  // Fetch image URL from API - same approach as dashboard
+  useEffect(() => {
+    setImageError(false)
+    setImageLoaded(false)
+    
+    if (!itemId) {
+      setImageUrl(null)
+      return
+    }
+    
+    const numericItemId = typeof itemId === 'number' ? itemId : parseInt(itemId, 10)
+    if (isNaN(numericItemId)) {
+      setImageUrl(null)
+      return
+    }
+    
+    // Use latest image URL from apiService (same as dashboard/EnhancedItemCard)
+    const url = apiService.getItemLatestImageUrl(numericItemId)
+    setImageUrl(`${url}?t=${Date.now()}`)
+  }, [itemId])
 
   return (
     <div className="w-16 h-16 bg-slate-900/50 rounded-lg flex items-center justify-center overflow-hidden border-2 border-slate-700 relative">
@@ -29,7 +50,7 @@ function CartItemImage({ itemId, itemName }: { itemId: string; itemName: string 
       <div className="absolute bottom-0.5 left-0.5 w-1 h-1 bg-slate-500 rounded-full"></div>
       <div className="absolute bottom-0.5 right-0.5 w-1 h-1 bg-slate-500 rounded-full"></div>
       
-      {!imageError && (
+      {!imageError && imageUrl && (
         <img 
           src={imageUrl} 
           alt={itemName}
@@ -38,7 +59,7 @@ function CartItemImage({ itemId, itemName }: { itemId: string; itemName: string 
           onError={() => setImageError(true)}
         />
       )}
-      {(!imageLoaded || imageError) && (
+      {(!imageUrl || !imageLoaded || imageError) && (
         <Package className="w-8 h-8 text-slate-400" />
       )}
     </div>
