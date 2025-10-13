@@ -464,62 +464,135 @@ export const exportPurchaseOrderToPDF = (poData) => {
 }
 
 /**
- * Excel Export with Professional Formatting
+ * Excel Export with Professional Formatting - Matching PDF Layout
  */
 export const exportPurchaseOrderToExcel = (poData) => {
   const wb = XLSX.utils.book_new()
   
+  // Get items and calculate total
   const items = poData.items || poData.selectedItems || []
-  
+  const totalAmount = items.reduce((sum, item) => 
+    sum + ((item.quantity || 0) * (item.price_per_unit || 0)), 0
+  )
+
+  // Format currency
+  const formatPeso = (amount) => {
+    const formatted = amount.toLocaleString('en-PH', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    })
+    return `PHP ${formatted}`
+  }
+
+  // Create worksheet data matching PDF layout
   const wsData = [
-    [COMPANY_INFO.name],
-    [COMPANY_INFO.address],
-    [COMPANY_INFO.address2],
-    [COMPANY_INFO.phone],
-    [COMPANY_INFO.email],
-    [],
-    ["PURCHASE ORDER"],
-    [],
-    ["SUPPLIER'S NAME & ADDRESS", "", "", "", "P. O. #:", poData.po_number],
-    [poData.supplier_name, "", "", "", "DATE:", poData.po_date],
-    [poData.supplier_address, "", "", "", "TERMS:", poData.terms],
-    [`Attention: ${poData.attention_person || ""}`, "", "", "", "", ""],
-    [],
-    ["ITEM", "QTY", "UNIT", "DESCRIPTION OF ITEMS", "UNIT PRICE", "AMOUNT"],
+    // Row 1-4: Company Information (left side)
+    [COMPANY_INFO.name, "", "", "", "", "", "", "", "", "", "", "PURCHASE ORDER"],
+    [COMPANY_INFO.address, "", "", "", "", "", "", "", "", "", "", ""],
+    [COMPANY_INFO.address2, "", "", "", "", "", "", "", "", "", "", ""],
+    [COMPANY_INFO.phone, "", "", "", "", "", "", "", "", "", "", ""],
+    [COMPANY_INFO.email, "", "", "", "", "", "", "", "", "", "", ""],
+    [], // Empty row
+    // Row 7: PO Number
+    ["", "", "", "", "", "", "", "", "", "", "P.O. # :", poData.po_number || "—"],
+    [], // Empty row
+    // Row 9-10: Information Grid Headers
+    ["SUPPLIER'S NAME & ADDRESS", "", "", "", "", "ORDER INFORMATION", "", "", "", "", "", ""],
+    ["", "", "", "", "", "", "", "", "", "", "", ""],
+    // Row 11: Supplier Name
+    [(poData.supplier_name || "").toUpperCase(), "", "", "", "", "DATE :", poData.po_date || "—", "", "", "", "", ""],
+    // Row 12: Supplier Address Line 1
+    [poData.supplier_address ? poData.supplier_address.split('\n')[0] || "" : "", "", "", "", "", "TERMS :", poData.terms || "—", "", "", "", "", ""],
+    // Row 13: Supplier Address Line 2
+    [poData.supplier_address ? poData.supplier_address.split('\n')[1] || "" : "", "", "", "", "", "", "", "", "", "", "", ""],
+    // Row 14: Attention
+    [`Attention: ${poData.attention_person || ""}`, "", "", "", "", "", "", "", "", "", "", ""],
+    [], // Empty row
+    // Row 16: Items Table Header
+    ["ITEM", "QTY", "UNIT", "DESCRIPTION", "UNIT PRICE", "AMOUNT"],
+    // Items rows
     ...items.map((item, index) => [
-      index + 1,
+      (index + 1).toString().padStart(2, '0'),
       item.quantity || 0,
       item.unit || "pcs",
       item.item_name || item.description || "",
-      item.price_per_unit || 0,
-      (item.quantity || 0) * (item.price_per_unit || 0)
+      formatPeso(item.price_per_unit || 0),
+      formatPeso((item.quantity || 0) * (item.price_per_unit || 0))
     ]),
-    [],
-    ["", "", "", "TOTAL AMOUNT =", "", 
-      items.reduce((sum, item) => sum + ((item.quantity || 0) * (item.price_per_unit || 0)), 0)
-    ],
-    [],
-    ["PREPARED BY:", "", "VERIFIED BY:", "", "APPROVED BY:"],
-    [Array.isArray(poData.prepared_by) ? poData.prepared_by.join(', ') : poData.prepared_by, 
+    [], // Empty row
+    // Row X+2: Totals
+    ["", "", "", "GROSS TOTAL =", "", formatPeso(totalAmount)],
+    ["", "", "", "GRAND TOTAL =", "", formatPeso(totalAmount)],
+    [], // Empty row
+    // Row X+4: Signatures
+    ["PREPARED BY", "", "", "VERIFIED BY", "", "", "APPROVED BY"],
+    [Array.isArray(poData.prepared_by) ? poData.prepared_by.join(', ') : poData.prepared_by || "", 
      "", 
-     poData.verified_by, 
      "", 
-     poData.approved_by],
-    [],
-    ["Notes:", poData.notes || ""]
+     poData.verified_by || "", 
+     "", 
+     "", 
+     poData.approved_by || ""],
+    [], // Empty row
+    // Row X+6: Notes
+    ["NOTES:", poData.notes || ""]
   ]
 
   const ws = XLSX.utils.aoa_to_sheet(wsData)
-  
+
+  // Set column widths to match PDF layout
   ws['!cols'] = [
-    { wch: 8 },
-    { wch: 8 },
-    { wch: 8 },
-    { wch: 50 },
-    { wch: 15 },
-    { wch: 15 }
+    { wch: 3 },  // ITEM
+    { wch: 8 },  // QTY
+    { wch: 8 },  // UNIT
+    { wch: 40 }, // DESCRIPTION
+    { wch: 15 }, // UNIT PRICE
+    { wch: 15 }, // AMOUNT
+    { wch: 8 },  // DATE label
+    { wch: 12 }, // DATE value
+    { wch: 8 },  // TERMS label
+    { wch: 12 }, // TERMS value
+    { wch: 10 }, // PO label
+    { wch: 15 }  // PO value
+  ]
+
+  // Merge cells to match PDF layout
+  ws['!merges'] = [
+    // Company name
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
+    // Company address lines
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 10 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 10 } },
+    { s: { r: 4, c: 0 }, e: { r: 4, c: 10 } },
+    // Title
+    { s: { r: 0, c: 11 }, e: { r: 5, c: 11 } },
+    // PO Number
+    { s: { r: 6, c: 10 }, e: { r: 6, c: 11 } },
+    // Information Grid Headers
+    { s: { r: 8, c: 0 }, e: { r: 8, c: 4 } },
+    { s: { r: 8, c: 5 }, e: { r: 8, c: 11 } },
+    // Supplier Name
+    { s: { r: 10, c: 0 }, e: { r: 10, c: 4 } },
+    // Supplier Address
+    { s: { r: 11, c: 0 }, e: { r: 11, c: 4 } },
+    { s: { r: 12, c: 0 }, e: { r: 12, c: 4 } },
+    // Attention
+    { s: { r: 13, c: 0 }, e: { r: 13, c: 4 } },
+    // Totals
+    { s: { r: wsData.length - 5, c: 3 }, e: { r: wsData.length - 5, c: 4 } },
+    { s: { r: wsData.length - 4, c: 3 }, e: { r: wsData.length - 4, c: 4 } },
+    // Signatures
+    { s: { r: wsData.length - 3, c: 0 }, e: { r: wsData.length - 3, c: 2 } },
+    { s: { r: wsData.length - 3, c: 3 }, e: { r: wsData.length - 3, c: 5 } },
+    { s: { r: wsData.length - 3, c: 6 }, e: { r: wsData.length - 3, c: 6 } },
+    { s: { r: wsData.length - 2, c: 0 }, e: { r: wsData.length - 2, c: 2 } },
+    { s: { r: wsData.length - 2, c: 3 }, e: { r: wsData.length - 2, c: 5 } },
+    { s: { r: wsData.length - 2, c: 6 }, e: { r: wsData.length - 2, c: 6 } },
+    // Notes
+    { s: { r: wsData.length - 1, c: 0 }, e: { r: wsData.length - 1, c: 11 } }
   ]
 
   XLSX.utils.book_append_sheet(wb, ws, "Purchase Order")
-  XLSX.writeFile(wb, `PO_${poData.po_number}_${poData.supplier_name}.xlsx`)
+  XLSX.writeFile(wb, `PO_${poData.po_number || 'PO'}_${poData.supplier_name || 'Supplier'}.xlsx`)
 }
