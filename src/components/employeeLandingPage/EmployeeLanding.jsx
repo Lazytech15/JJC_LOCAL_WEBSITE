@@ -142,14 +142,20 @@ export default function EmployeeLanding() {
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg border border-white/20">
                 <img
-                src={logo}
-                alt="JJC Engineering Works Logo"
-                className="w-12 h-12 rounded-sm object-cover shadow-md bg-primary"
-              />
+                  src={logo}
+                  alt="JJC Engineering Works Logo"
+                  className="w-12 h-12 rounded-sm object-cover shadow-md bg-primary"
+                />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-white drop-shadow-lg">JJCEWS</h1>
-                <p className="text-xs text-white/90 font-medium drop-shadow">JJC Engineering Works & General Services</p>
+              <div className="flex justify-center text-white drop-shadow-lg">
+                <div className="flex gap-2 text-center items-center">
+                  <h1 className="text-5xl font-extrabold tracking-wide">JJC</h1>
+                  <div className="text-left mt-2">
+                    <p className="text-sm font-semibold uppercase leading-tight">Engineering Works</p>
+                    <hr className=" border-white/70" />
+                    <p className="text-sm font-semibold uppercase text-white">& General Services</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -206,9 +212,8 @@ export default function EmployeeLanding() {
           {carouselImages.map((image, index) => (
             <div
               key={index}
-              className={`absolute inset-0 transition-opacity duration-1000 ${
-                index === currentSlide ? "opacity-100" : "opacity-0"
-              }`}
+              className={`absolute inset-0 transition-opacity duration-1000 ${index === currentSlide ? "opacity-100" : "opacity-0"
+                }`}
             >
               <img
                 src={image}
@@ -241,9 +246,8 @@ export default function EmployeeLanding() {
             <button
               key={index}
               onClick={() => setCurrentSlide(index)}
-              className={`h-2 rounded-full transition-all ${
-                index === currentSlide ? "w-8 bg-white" : "w-2 bg-white/50 hover:bg-white/75"
-              }`}
+              className={`h-2 rounded-full transition-all ${index === currentSlide ? "w-8 bg-white" : "w-2 bg-white/50 hover:bg-white/75"
+                }`}
             />
           ))}
         </div>
@@ -274,12 +278,12 @@ export default function EmployeeLanding() {
                   </Button>
                 </a>
                 <Link to="/employee/login" className="block">
-                <Button
-                  size="lg"
-                  className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border border-white/30 text-base h-14 px-8 shadow-xl"
-                >
-                  Employee Portal
-                </Button>
+                  <Button
+                    size="lg"
+                    className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border border-white/30 text-base h-14 px-8 shadow-xl"
+                  >
+                    Employee Portal
+                  </Button>
                 </Link>
               </div>
             </div>

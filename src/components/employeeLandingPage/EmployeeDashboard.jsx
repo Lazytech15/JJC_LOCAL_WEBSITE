@@ -12,7 +12,6 @@ import { useServiceWorker } from "../../hooks/use-service-worker"
 import { getStoredToken, verifyToken, clearTokens } from "../../utils/auth"
 import logo from "../../assets/companyLogo.jpg"
 import apiService from "../../utils/api/api-service"
-
 // Import the components
 import DashboardHome from "./DashboardComponents/DashboardHome"
 import Announcements from "./DashboardComponents/Announcements"
@@ -43,7 +42,7 @@ export default function EmployeeDashboard() {
   const { isOnline, connectionQuality } = useOnlineStatus()
   const { updateAvailable, updateServiceWorker } = useServiceWorker()
 
-  const unreadCount = announcements.filter((a) => !a.read).length
+  const unreadCount = Array.isArray(announcements) ? announcements.filter((a) => !a.read).length : 0
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -72,101 +71,95 @@ export default function EmployeeDashboard() {
         }
 
         const uid = payload.userId
-console.log("[v0] Using UID from token:", uid)
+        console.log("[v0] Using UID from token:", uid)
 
-if (!uid) {
-  setLoading(false)
-  setError("Invalid session: No user ID found")
-  return
-}
+        if (!uid) {
+          setLoading(false)
+          setError("Invalid session: No user ID found")
+          return
+        }
 
-let foundEmployee = null
-try {
-  const res = await apiService.employees.getEmployees({ limit: 1000 })
-  if (res?.employees) {
-    foundEmployee = res.employees.find(e => 
-      e.id === uid || e.employee_uid === uid || e.uid === uid
-    )
-  }
-} catch (err) {
-  console.error("Fetch employee failed:", err)
-}
+        let foundEmployee = null
+        try {
+          const res = await apiService.employees.getEmployees({ limit: 1000 })
+          if (res?.employees) {
+            foundEmployee = res.employees.find(e =>
+              e.id === uid || e.employee_uid === uid || e.uid === uid
+            )
+          }
+        } catch (err) {
+          console.error("Fetch employee failed:", err)
+        }
 
-if (!foundEmployee) {
-  foundEmployee = {
-    id: uid,
-    employee_uid: uid,
-    username: payload.username,
-    name: payload.name,
-    department: payload.department,
-    role: payload.role,
-  }
-}
+        if (!foundEmployee) {
+          foundEmployee = {
+            id: uid,
+            employee_uid: uid,
+            username: payload.username,
+            name: payload.name,
+            department: payload.department,
+            role: payload.role,
+          }
+        }
 
-console.log("[v0] Found employee ID:", uid)
+        console.log("[v0] Found employee ID:", uid)
         setEmployeeData(foundEmployee)
 
         // Fetch all records and filter by current user
-const [summaryResponse, attendanceResponse, profilePictureResponse, documentsResponse] =
-  await Promise.allSettled([
-    apiService.summary.getDailySummaryRecords({ 
-      limit: 1000,
-      offset: 0 
-    }),
-    apiService.attendance.getAttendanceRecords({ 
-      limit: 1000,
-      offset: 0 
-    }),
-    apiService.profiles.getProfileByUid(uid),
-    apiService.document.getEmployeeDocuments(uid),
-  ])
+        const [summaryResponse, attendanceResponse, profilePictureResponse, documentsResponse, announcementsResponse] =
+          await Promise.allSettled([
+            apiService.summary.getDailySummaryRecords({
+              limit: 1000,
+              offset: 0
+            }),
+            apiService.attendance.getAttendanceRecords({
+              limit: 1000,
+              offset: 0
+            }),
+            apiService.profiles.getProfileByUid(uid),
+            apiService.document.getEmployeeDocuments(uid),
+            apiService.announcements.getAnnouncements({
+              limit: 1000,
+              offset: 0
+            }),
+          ])
 
         console.log("API Responses:", {
           summary: summaryResponse,
           attendance: attendanceResponse,
           profilePicture: profilePictureResponse,
           documents: documentsResponse,
+          announcements: announcementsResponse,
           employee: foundEmployee,
         })
 
         // Process summaries - filter by current user's UID
-if (summaryResponse.status === "fulfilled") {
-  const allSummaries = summaryResponse.value?.data || []
-  const userSummaries = allSummaries.filter(s => s.employee_uid === uid)
-  
-  console.log("[v0] Filtered summaries for user:", userSummaries.length, "out of", allSummaries.length)
-  setDailySummaries(userSummaries)
-  
-  setAnnouncements(
-    userSummaries.map((s, idx) => ({
-      id: s.id || s.summary_id || idx,
-      title: s.task_description || s.notes || "Daily Summary",
-      time: new Date(s.date).toLocaleDateString(),
-      read: false,
-      fullData: s,
-    })),
-  )
-} else {
-  console.error("Summary fetch failed:", summaryResponse.reason)
-  setDailySummaries([])
-  setAnnouncements([])
-}
+        if (summaryResponse.status === "fulfilled") {
+          const allSummaries = summaryResponse.value?.data || []
+          const userSummaries = allSummaries.filter(s => s.employee_uid === uid)
 
-// Process attendance - filter by current user's UID
-if (attendanceResponse.status === "fulfilled") {
-  const allAttendance = attendanceResponse.value?.data || []
-  const userAttendance = allAttendance.filter(record => record.employee_uid === uid)
-  
-  console.log("[v0] Filtered attendance for user:", userAttendance.length, "out of", allAttendance.length)
-  setAttendanceData({
-    ...attendanceResponse.value,
-    data: userAttendance
-  })
-} else {
-  console.error("Attendance fetch failed:", attendanceResponse.reason)
-}
+          console.log("[v0] Filtered summaries for user:", userSummaries.length, "out of", allSummaries.length)
+          setDailySummaries(userSummaries)
+        } else {
+          console.error("Summary fetch failed:", summaryResponse.reason)
+          setDailySummaries([])
+        }
 
-        // Process profile picture - THIS IS THE KEY CHANGE
+        // Process attendance - filter by current user's UID
+        if (attendanceResponse.status === "fulfilled") {
+          const allAttendance = attendanceResponse.value?.data || []
+          const userAttendance = allAttendance.filter(record => record.employee_uid === uid)
+
+          console.log("[v0] Filtered attendance for user:", userAttendance.length, "out of", allAttendance.length)
+          setAttendanceData({
+            ...attendanceResponse.value,
+            data: userAttendance
+          })
+        } else {
+          console.error("Attendance fetch failed:", attendanceResponse.reason)
+        }
+
+        // Process profile picture
         if (profilePictureResponse.status === "fulfilled") {
           const profileResult = profilePictureResponse.value
           if (profileResult.success && profileResult.url) {
@@ -184,6 +177,17 @@ if (attendanceResponse.status === "fulfilled") {
           setDocumentData(documentsResponse.value)
         } else {
           console.error("Documents fetch failed:", documentsResponse.reason)
+        }
+
+        // Process announcements from API
+        if (announcementsResponse.status === "fulfilled") {
+          const announcementData = announcementsResponse.value?.data || announcementsResponse.value || []
+          const announcements_array = Array.isArray(announcementData) ? announcementData : []
+          console.log("[v0] Fetched announcements:", announcements_array.length)
+          setAnnouncements(announcements_array)
+        } else {
+          console.error("Announcements fetch failed:", announcementsResponse.reason)
+          setAnnouncements([])
         }
       } catch (err) {
         console.error("Error fetching dashboard data:", err)
@@ -271,9 +275,31 @@ if (attendanceResponse.status === "fulfilled") {
                 alt="JJC Engineering Works Logo"
                 className="w-12 h-12 rounded-xl object-cover shadow-md bg-primary"
               />
-              <h1 className={`text-lg font-bold hidden sm:block ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                JJC Portal
-              </h1>
+              <div className={`hidden md:flex justify-center text-white drop-shadow-lg`}>
+                <div className="flex gap-2 text-center items-center">
+                  <h1
+                    className={`text-5xl font-extrabold tracking-wide ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
+                      }`}
+                  >
+                    JJC
+                  </h1>
+                  <div className="text-left mt-2">
+                    <p
+                      className={`text-sm font-semibold uppercase leading-tight ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
+                        }`}
+                    >
+                      Engineering Works
+                    </p>
+                    <hr className="border-white/70" />
+                    <p
+                      className={`text-sm font-semibold uppercase text-white ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
+                        }`}
+                    >
+                      & General Services
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Centered Desktop Navigation */}
@@ -290,10 +316,10 @@ if (attendanceResponse.status === "fulfilled") {
                         key={item.id}
                         onClick={() => setActiveTab(item.id)}
                         className={`relative flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-medium text-sm ${isActive
-                            ? "bg-white text-zinc-900 shadow-md"
-                            : isDarkMode
-                              ? "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
-                              : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-300/50"
+                          ? "bg-white text-zinc-900 shadow-md"
+                          : isDarkMode
+                            ? "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
+                            : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-300/50"
                           }`}
                       >
                         <Icon className="w-4 h-4" />
@@ -445,20 +471,25 @@ if (attendanceResponse.status === "fulfilled") {
         )}
 
         {activeTab === "announcements" && (
-          <Announcements announcements={announcements} setAnnouncements={setAnnouncements} isDarkMode={isDarkMode} />
+          <Announcements
+            announcements={announcements}
+            setAnnouncements={setAnnouncements}
+            isDarkMode={isDarkMode}
+            announcementService={announcements.current}
+          />
         )}
 
         {activeTab === "profile" && (
-  <Profile
-    employee={employee}
-    employeeData={employeeData}
-    profileData={profileData}
-    profileImage={profileImage}  // ✅ Add this line
-    documentData={documentData}
-    handleLogout={handleLogout}
-    isDarkMode={isDarkMode}
-  />
-)}
+          <Profile
+            employee={employee}
+            employeeData={employeeData}
+            profileData={profileData}
+            profileImage={profileImage}
+            documentData={documentData}
+            handleLogout={handleLogout}
+            isDarkMode={isDarkMode}
+          />
+        )}
 
         {activeTab === "attendance" && <TimeAttendance dailySummaries={dailySummaries} isDarkMode={isDarkMode} />}
 
@@ -491,12 +522,12 @@ if (attendanceResponse.status === "fulfilled") {
                 <div className="relative">
                   <Icon
                     className={`w-6 h-6 transition-colors ${isActive
-                        ? isDarkMode
-                          ? "text-white"
-                          : "text-zinc-900"
-                        : isDarkMode
-                          ? "text-zinc-500"
-                          : "text-zinc-400"
+                      ? isDarkMode
+                        ? "text-white"
+                        : "text-zinc-900"
+                      : isDarkMode
+                        ? "text-zinc-500"
+                        : "text-zinc-400"
                       }`}
                   />
                   {item.badge > 0 && (
@@ -507,12 +538,12 @@ if (attendanceResponse.status === "fulfilled") {
                 </div>
                 <span
                   className={`text-xs font-medium truncate w-full text-center ${isActive
-                      ? isDarkMode
-                        ? "text-white"
-                        : "text-zinc-900"
-                      : isDarkMode
-                        ? "text-zinc-500"
-                        : "text-zinc-400"
+                    ? isDarkMode
+                      ? "text-white"
+                      : "text-zinc-900"
+                    : isDarkMode
+                      ? "text-zinc-500"
+                      : "text-zinc-400"
                     }`}
                 >
                   {item.label}

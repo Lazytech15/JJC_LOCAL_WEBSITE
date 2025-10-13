@@ -21,12 +21,13 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
     const [facePositionStatus, setFacePositionStatus] = useState(null);
     const [captureCount, setCaptureCount] = useState(0);
     const [autoCapturing, setAutoCapturing] = useState(false);
+    const [capturedAngles, setCapturedAngles] = useState([]);
     const [initializationProgress, setInitializationProgress] = useState({
         stage: "starting",
         progress: 0,
         message: "Initializing...",
     });
-    const MAX_CAPTURES = 10; // Changed from 3 to 10
+    const MAX_CAPTURES = 30; // Changed from 3 to 10
 
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
@@ -306,6 +307,30 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
 
         setCameraActive(false);
         setAutoCapturing(false);
+    };
+
+    const calculateFaceAngle = (landmarks) => {
+        const leftEye = landmarks.getLeftEye();
+        const rightEye = landmarks.getRightEye();
+        const nose = landmarks.getNose();
+
+        // Calculate horizontal angle based on eye positions
+        const eyeCenterX = (leftEye[0].x + rightEye[0].x) / 2;
+        const noseTipX = nose[3].x;
+        const horizontalAngle = (noseTipX - eyeCenterX) / eyeCenterX;
+
+        // Calculate vertical angle based on nose position
+        const eyeCenterY = (leftEye[0].y + rightEye[0].y) / 2;
+        const noseTipY = nose[3].y;
+        const verticalAngle = (noseTipY - eyeCenterY) / eyeCenterY;
+
+        return { horizontalAngle, verticalAngle };
+    };
+
+    const isSimilarAngle = (angle1, angle2, threshold = 0.15) => {
+        const horizontalDiff = Math.abs(angle1.horizontalAngle - angle2.horizontalAngle);
+        const verticalDiff = Math.abs(angle1.verticalAngle - angle2.verticalAngle);
+        return horizontalDiff < threshold && verticalDiff < threshold;
     };
 
     const startFacePositionDetection = () => {
@@ -595,7 +620,7 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
             autoCapturingRef.current = false;
             return;
         }
-        console.log(`📸 Capturing image ${captureCountRef.current + 1}/3...`);
+        console.log(`📸 Capturing image ${captureCountRef.current + 1}/${MAX_CAPTURES}...`);
 
         try {
             const canvas = document.createElement("canvas");
@@ -612,7 +637,24 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                 .withFaceDescriptor();
 
             if (detections) {
-                console.log("✅ Face detected and captured successfully!");
+                // Calculate the angle of the current face
+                const currentAngle = calculateFaceAngle(detections.landmarks);
+
+                // Check if this angle is too similar to any previously captured angle
+                const isSimilar = capturedAngles.some(existingAngle =>
+                    isSimilarAngle(currentAngle, existingAngle)
+                );
+
+                if (isSimilar) {
+                    console.log("⚠️ Similar angle detected, skipping capture. Please turn your head slightly.");
+                    setFacePositionStatus({
+                        valid: false,
+                        messages: ["Please turn your head to a different angle"]
+                    });
+                    return;
+                }
+
+                console.log("✅ Unique angle detected and captured successfully!");
 
                 setCapturedImages((prev) => [
                     ...prev,
@@ -620,13 +662,16 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                         image: imageDataUrl,
                         descriptor: detections.descriptor,
                         timestamp: Date.now(),
+                        angle: currentAngle
                     },
                 ]);
+
+                setCapturedAngles(prev => [...prev, currentAngle]);
 
                 const newCount = captureCountRef.current + 1;
                 setCaptureCount(newCount);
 
-                console.log(`✅ Capture ${newCount}/3 complete!`);
+                console.log(`✅ Capture ${newCount}/${MAX_CAPTURES} complete!`);
 
                 if (canvasRef.current) {
                     const ctx = canvasRef.current.getContext("2d");
@@ -794,6 +839,7 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
 
     const resetCapture = () => {
         setCapturedImages([]);
+        setCapturedAngles([]);
         setDetectionResult(null);
         setMatchedEmployee(null);
         setError(null);
@@ -1030,16 +1076,17 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                                             <div className="absolute bottom-2 sm:bottom-4 left-2 sm:left-4 right-2 sm:right-4">
                                                 <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl">
                                                     <p className="text-slate-800 dark:text-slate-200 text-xs sm:text-sm font-semibold text-center mb-2">
-                                                        Auto-capturing: {captureCount} / 10
+                                                        Auto-capturing: {captureCount} / 30
                                                     </p>
-                                                    <div className="flex gap-1 sm:gap-2 mb-2">
-                                                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+                                                    <div className="flex gap-1 sm:gap-2 mb-2 flex-wrap">
+                                                        {[...Array(30)].map((_, i) => (
                                                             <div
                                                                 key={i}
-                                                                className={`flex-1 h-1.5 sm:h-2 rounded-full transition-colors ${i < captureCount
-                                                                    ? "bg-emerald-500"
-                                                                    : "bg-slate-300 dark:bg-slate-600"
+                                                                className={`h-1.5 sm:h-2 rounded-full transition-colors ${i < captureCount
+                                                                        ? "bg-emerald-500"
+                                                                        : "bg-slate-300 dark:bg-slate-600"
                                                                     }`}
+                                                                style={{ width: 'calc(10% - 4px)' }}
                                                             />
                                                         ))}
                                                     </div>
@@ -1127,7 +1174,7 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                                                     >
                                                         <span className="flex items-center justify-center gap-2">
                                                             <span>🎯</span>
-                                                            Start Registration (3 photos)
+                                                            Start Registration (30 photos)
                                                         </span>
                                                     </button>
                                                 ) : (
@@ -1149,7 +1196,7 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                         {mode === "register" && capturedImages.length > 0 && (
                             <div className="bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-slate-200 dark:border-slate-700">
                                 <h3 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-200 mb-3 sm:mb-4">
-                                    Captured Images ({capturedImages.length}/10)
+                                    Captured Images ({capturedImages.length}/30)
                                 </h3>
                                 <div className="grid grid-cols-5 gap-2 sm:gap-4">
                                     {capturedImages.map((capture, index) => (
@@ -1164,7 +1211,7 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                                             </div>
                                         </div>
                                     ))}
-                                    {[...Array(Math.max(0, 10 - capturedImages.length))].map((_, index) => (
+                                    {[...Array(Math.max(0, 30 - capturedImages.length))].map((_, index) => (
                                         <div key={`empty-${index}`} className="relative">
                                             <div className="w-full aspect-square bg-slate-100 dark:bg-slate-700 rounded-lg sm:rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center">
                                                 <span className="text-2xl sm:text-4xl text-slate-400">
@@ -1175,7 +1222,7 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                                     ))}
                                 </div>
 
-                                {capturedImages.length === 10 && showSaveOptions && (
+                                {capturedImages.length === 30 && showSaveOptions && (
                                     <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
                                         <div>
                                             <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -1374,7 +1421,7 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                                         <span className="font-bold shrink-0">3.</span>
                                         <span>
                                             Click "Start Registration" - the system will auto-capture
-                                            10 photos
+                                            30 photos
                                         </span>
                                     </li>
                                     <li className="flex items-start gap-2">
@@ -1393,7 +1440,7 @@ function FaceRecognitionModal({ onClose, onEmployeeIdentified }) {
                                     <li className="flex items-start gap-2">
                                         <span className="font-bold shrink-0">6.</span>
                                         <span>
-                                            Select employee and save - 10 photos = highest accuracy!
+                                            Select employee and save - 30 photos = highest accuracy!
                                         </span>
                                     </li>
                                 </ol>

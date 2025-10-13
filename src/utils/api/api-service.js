@@ -15,6 +15,7 @@ import { PurchaseOrdersService } from "./services/purchase-orders-service.js"
 import { SuppliersService } from "./services/suppliers-service.js"
 import { EmployeeLogsService } from "./services/employee-logs-service.js"
 import { AttendanceEditService } from "./services/attendance-edit-service.js"
+import { AnnouncementService } from "./services/announcement-service.js"
 
 class APIService {
   constructor() {
@@ -33,6 +34,7 @@ class APIService {
     this.suppliers = new SuppliersService()
     this.employeeLogs = new EmployeeLogsService()
     this.editAttendance = new AttendanceEditService()
+    this.announcements =  new AnnouncementService();
   }
 
   // Initialize all services
@@ -77,5 +79,6 @@ export const {
   purchaseOrders,
   employeeLogs,
   editAttendance,
-  suppliers
+  suppliers,
+  announcements
 } = apiService

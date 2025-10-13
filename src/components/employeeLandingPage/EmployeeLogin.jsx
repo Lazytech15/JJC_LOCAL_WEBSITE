@@ -355,9 +355,15 @@ export default function EmployeeLogin() {
               className="w-12 h-12 rounded-xl object-cover shadow-md bg-primary"
             />
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-white drop-shadow-lg">JJCEWGS</h1>
-            <p className="text-xs text-white/90 drop-shadow">JJC Engineering Works & General Services</p>
+          <div className="flex justify-center text-white drop-shadow-lg">
+            <div className="flex gap-2 text-center items-center">
+              <h1 className="text-5xl font-extrabold tracking-wide">JJC</h1>
+              <div className="text-left mt-2">
+                <p className="text-sm font-semibold uppercase leading-tight">Engineering Works</p>
+                <hr className=" border-white/70" />
+                <p className="text-sm font-semibold uppercase text-white">& General Services</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

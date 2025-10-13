@@ -1,14 +1,75 @@
+import { useEffect, useState } from "react"
 import { Calendar, CheckCircle2, FileText, Clock, TrendingUp } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../ui/UiComponents"
+import apiService from "../../../utils/api/api-service"
 
 export default function DashboardHome({
   employee,
   employeeData,
-  announcements,
   dailySummaries = [],
   documentData,
   isDarkMode,
 }) {
+  const [announcements, setAnnouncements] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  // Fetch announcements on component mount
+  useEffect(() => {
+    const fetchAnnouncements = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        let announcementData = []
+
+        // If employee ID exists, fetch employee-specific announcements
+        if (employeeData?.id) {
+          const response = await apiService.announcements.getEmployeeAnnouncements(
+            employeeData.id
+          )
+          // Handle the wrapped response from getEmployeeAnnouncements
+          announcementData = Array.isArray(response?.data) ? response.data : []
+        } else {
+          // Otherwise fetch all announcements
+          const response = await apiService.announcements.getAnnouncements({
+            limit: 10,
+            offset: 0,
+          })
+          // Handle both array and object responses
+          announcementData = Array.isArray(response?.announcements)
+            ? response.announcements
+            : Array.isArray(response)
+            ? response
+            : []
+        }
+
+        // Format announcements and add missing 'time' field
+        const formattedAnnouncements = announcementData.map((ann) => ({
+          ...ann,
+          time:
+            ann.time ||
+            new Date(ann.createdAt || ann.created_at).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+        }))
+
+        setAnnouncements(formattedAnnouncements)
+      } catch (err) {
+        console.error("Failed to fetch announcements:", err)
+        setError(err.message)
+        setAnnouncements([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAnnouncements()
+  }, [employeeData?.id])
+
   const userSummaries = Array.isArray(dailySummaries)
     ? dailySummaries.filter((day) => (employeeData?.id ? day.employee_uid === employeeData.id : true))
     : []
@@ -71,6 +132,22 @@ export default function DashboardHome({
       amber: isDarkMode ? "bg-amber-500/20 text-amber-400" : "bg-amber-50 text-amber-600",
     }
     return colors[color] || colors.emerald
+  }
+
+  const handleMarkAsRead = async (announcementId) => {
+    if (!employeeData?.id) return
+
+    try {
+      await apiService.announcements.markAnnouncementAsRead(announcementId, employeeData.id)
+      // Update local state to reflect read status
+      setAnnouncements((prev) =>
+        prev.map((ann) =>
+          ann.id === announcementId ? { ...ann, read: true } : ann
+        )
+      )
+    } catch (err) {
+      console.error("Failed to mark announcement as read:", err)
+    }
   }
 
   return (
@@ -156,27 +233,42 @@ export default function DashboardHome({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {announcements.slice(0, 3).map((announcement) => (
-            <div
-              key={announcement.id}
-              className={`p-4 rounded-xl border transition-all cursor-pointer ${isDarkMode ? "border-zinc-800 hover:bg-zinc-800/50" : "border-zinc-200 hover:bg-zinc-50"
-                }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className={`font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                      {announcement.title}
+          {loading ? (
+            <p className={`text-sm text-center py-4 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+              Loading announcements...
+            </p>
+          ) : error ? (
+            <p className={`text-sm text-center py-4 ${isDarkMode ? "text-red-400" : "text-red-600"}`}>
+              Failed to load announcements
+            </p>
+          ) : announcements.length > 0 ? (
+            announcements.slice(0, 3).map((announcement) => (
+              <div
+                key={announcement.id}
+                className={`p-4 rounded-xl border transition-all cursor-pointer ${isDarkMode ? "border-zinc-800 hover:bg-zinc-800/50" : "border-zinc-200 hover:bg-zinc-50"
+                  }`}
+                onClick={() => handleMarkAsRead(announcement.id)}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className={`font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                        {announcement.title}
+                      </p>
+                      {!announcement.read && <span className="w-2 h-2 bg-red-500 rounded-full"></span>}
+                    </div>
+                    <p className={`text-sm mt-1 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                      {announcement.time}
                     </p>
-                    {!announcement.read && <span className="w-2 h-2 bg-red-500 rounded-full"></span>}
                   </div>
-                  <p className={`text-sm mt-1 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                    {announcement.time}
-                  </p>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p className={`text-sm text-center py-4 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+              No announcements at this time
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

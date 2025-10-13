@@ -1,10 +1,9 @@
-"use client"
-
 import { useAuth } from "../../contexts/AuthContext"
 import { useState, useEffect } from "react"
 import EmployeeRecords from "../hr/EmployeeRecords"
 import Recruitment from "../hr/Recruitment"
 import Attendance from "../hr/Attendance"
+import Announcement from "../hr/Announcement"
 import apiService from "../../utils/api/api-service"
 
 function HRDepartment() {
@@ -77,6 +76,8 @@ const fetchHRData = async () => {
         return <Recruitment />
       case "attendance":
         return <Attendance />
+      case "announce":
+        return <Announcement />
       default:
         return (
           <>
@@ -123,10 +124,10 @@ const fetchHRData = async () => {
                     action: "performance",
                   },
                   {
-                    name: "Training",
-                    icon: "🎓",
-                    desc: "Manage training programs and certifications",
-                    action: "training",
+                    name: "Announcement",
+                    icon: "📣",
+                    desc: "Manage Announcement for Employee",
+                    action: "announce",
                   },
                   {
                     name: "Attendance",
