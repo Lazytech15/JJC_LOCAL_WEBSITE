@@ -2,7 +2,6 @@ import { useAuth } from "../../contexts/AuthContext"
 import { useState, useEffect } from "react"
 import {
   InventoryManagement,
-  RestockList,
   PurchaseOrderTracker,
   EmployeeLogs,
   ItemDetailView,
@@ -172,7 +171,6 @@ function ProcurementDepartment() {
               {[
                 { key: "dashboard", label: "Dashboard", icon: "📊", color: "amber" },
                 { key: "inventory", label: "Inventory", icon: "📦", color: "blue" },
-                { key: "restock", label: "Restock", icon: "🔄", color: "green" },
                 { key: "orders", label: "Purchase Orders", icon: "📋", color: "purple" },
                 { key: "suppliers", label: "Suppliers", icon: "🏢", color: "cyan" },
                 { key: "logs", label: "Employee Logs", icon: "👥", color: "pink" }
@@ -224,7 +222,6 @@ function ProcurementDepartment() {
           <div className="p-3 sm:p-4">
             {activeTab === "dashboard" && <AdminDashboard onNavigate={setActiveTab} />}
             {activeTab === "inventory" && <InventoryManagement />}
-            {activeTab === "restock" && <RestockList />}
             {activeTab === "orders" && <PurchaseOrderTracker />}
             {activeTab === "suppliers" && <SupplierManagement />}
             {activeTab === "logs" && <EmployeeLogs />}
