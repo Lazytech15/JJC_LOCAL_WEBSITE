@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Header } from "../components/header"
 import { DashboardView } from "../components/dashboard-view"
 import { CartView } from "../components/cart-view"
@@ -9,6 +9,7 @@ import { StartPage } from "../components/start-page"
 import { EnhancedToaster } from "../components/enhanced-toaster"
 import { useCartPersistence } from "../hooks/use-cart-persistence"
 import { useOfflineManager } from "../hooks/use-offline-manager"
+import { useTransactionRealtime, useAutoRefresh } from "../hooks/use-realtime"
 import { apiService } from "../lib/api_service"
 import { DEFAULT_API_CONFIG } from "../lib/api-config"
 import type { Product } from "../lib/barcode-scanner"
@@ -134,6 +135,29 @@ export default function HomePage() {
       }
     }
   }, [isOffline, products.length, getOfflineData])
+
+  // Real-time updates integration
+  const refreshProducts = useCallback(() => {
+    if (dashboardRefresh) {
+      dashboardRefresh()
+    }
+  }, [dashboardRefresh])
+
+  // Auto-refresh when items are updated
+  useAutoRefresh(
+    ['item_updated', 'item_created', 'item_deleted', 'inventory_updated'],
+    refreshProducts,
+    { debounce: 1000, enabled: isAppStarted },
+    apiUrl
+  )
+
+  // Listen for transaction updates (for cart/order updates)
+  useTransactionRealtime((update) => {
+    if (update.type === 'created') {
+      console.log('[Toolbox] Transaction created, refreshing data')
+      refreshProducts()
+    }
+  }, apiUrl)
 
   const addToCart = async (product: Product, quantity = 1, isFromBarcode = false) => {
     // Add to persistent storage - this will automatically update cartState via useCartPersistence

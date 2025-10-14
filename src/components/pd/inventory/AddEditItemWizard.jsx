@@ -2,7 +2,161 @@ import { useEffect, useState } from "react"
 import ModalPortal from "../shared/ModalPortal"
 import apiService, { items as itemsService } from "../../../utils/api/api-service.js"
 
-function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
+// Reusable Combobox component that allows both dropdown selection and manual typing
+function Combobox({ value, onChange, options, placeholder, className = "" }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [inputValue, setInputValue] = useState(value || "")
+  const [filteredOptions, setFilteredOptions] = useState(options)
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
+
+  useEffect(() => {
+    setInputValue(value || "")
+  }, [value])
+
+  useEffect(() => {
+    setFilteredOptions(options)
+  }, [options])
+
+  const handleInputChange = (e) => {
+    const newValue = e.target.value
+    setInputValue(newValue)
+    onChange(newValue)
+
+    // Filter options based on input
+    if (newValue.trim()) {
+      const filtered = options.filter(option =>
+        option.toLowerCase().includes(newValue.toLowerCase()) &&
+        option !== '─────────' // Don't include separator in filtered results
+      )
+      // Always add the special option at the end if it matches or if we're adding custom
+      const finalFiltered = [...filtered]
+      if ('+ Add New Supplier'.toLowerCase().includes(newValue.toLowerCase()) || filtered.length === 0) {
+        finalFiltered.push('+ Add New Supplier')
+      }
+      setFilteredOptions(finalFiltered)
+    } else {
+      setFilteredOptions(options)
+    }
+
+    setIsOpen(true)
+    // Reset highlight to first valid option
+    const firstValidIndex = options.findIndex(option => option !== '─────────' && option !== '+ Add New Supplier')
+    setHighlightedIndex(firstValidIndex >= 0 ? firstValidIndex : -1)
+  }
+
+  const handleOptionSelect = (option) => {
+    // Don't select separator or special options
+    if (option === '─────────' || option === '+ Add New Supplier') {
+      if (option === '+ Add New Supplier') {
+        onChange('__add_custom')
+      }
+      setIsOpen(false)
+      setHighlightedIndex(-1)
+      return
+    }
+
+    setInputValue(option)
+    onChange(option)
+    setIsOpen(false)
+    setHighlightedIndex(-1)
+  }
+
+  const handleFocus = () => {
+    setIsOpen(true)
+    setFilteredOptions(options)
+    // Find first valid option (skip separator)
+    const firstValidIndex = options.findIndex(option => option !== '─────────' && option !== '+ Add New Supplier')
+    setHighlightedIndex(firstValidIndex >= 0 ? firstValidIndex : -1)
+  }
+
+  const handleBlur = () => {
+    // Delay closing to allow option selection
+    setTimeout(() => {
+      setIsOpen(false)
+      setHighlightedIndex(-1)
+    }, 150)
+  }
+
+  const handleKeyDown = (e) => {
+    if (!isOpen || filteredOptions.length === 0) return
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setHighlightedIndex(prev => {
+          let next = prev + 1
+          // Skip separator and find next valid option
+          while (next < filteredOptions.length && (filteredOptions[next] === '─────────' || filteredOptions[next] === '+ Add New Supplier')) {
+            next++
+          }
+          return next < filteredOptions.length ? next : prev
+        })
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setHighlightedIndex(prev => {
+          let next = prev - 1
+          // Skip separator and find previous valid option
+          while (next >= 0 && (filteredOptions[next] === '─────────' || filteredOptions[next] === '+ Add New Supplier')) {
+            next--
+          }
+          return next >= 0 ? next : prev
+        })
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
+          handleOptionSelect(filteredOptions[highlightedIndex])
+        }
+        break
+      case 'Escape':
+        setIsOpen(false)
+        setHighlightedIndex(-1)
+        break
+    }
+  }
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={inputValue}
+        onChange={handleInputChange}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        className={`w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${className}`}
+      />
+      {isOpen && filteredOptions.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+          {filteredOptions.slice(0, 8).map((option, index) => (
+            <div
+              key={index}
+              onClick={() => handleOptionSelect(option)}
+              className={`px-3 py-2 text-sm cursor-pointer text-gray-900 dark:text-white transition-colors ${
+                option === '─────────' 
+                  ? 'cursor-default bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 select-none' 
+                  : option === '+ Add New Supplier'
+                  ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 font-medium'
+                  : index === highlightedIndex 
+                  ? 'bg-blue-50 dark:bg-blue-900/30' 
+                  : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+            >
+              {option}
+            </div>
+          ))}
+          {filteredOptions.length > 8 && (
+            <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 text-center border-t border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900">
+              +{filteredOptions.length - 8} more options
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
   const [currentStep, setCurrentStep] = useState(1)
   const [errors, setErrors] = useState({})
 
@@ -36,22 +190,27 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState("")
 
+  // New state for auto-upload queue
+  const [uploadQueue, setUploadQueue] = useState([])
+  const [uploadingImages, setUploadingImages] = useState(new Set())
+
+  // Load suppliers for dropdown
+  const [suppliersList, setSuppliersList] = useState([])
+  
+  // Load filter options for comboboxes
+  const [filterOptions, setFilterOptions] = useState({
+    brands: [],
+    item_types: [],
+    unit_of_measures: [],
+    locations: []
+  })
+
   const steps = [
     { number: 1, title: "Basic Info", description: "Item details", icon: "📦" },
     { number: 2, title: "Stock & Price", description: "Inventory & pricing", icon: "💰" },
     { number: 3, title: "Location & Media", description: "Storage & images", icon: "📍" },
     { number: 4, title: "Review", description: "Confirm details", icon: "✓" }
   ]
-
-  const canJumpToStep = (target) => {
-    // allow going backwards freely
-    if (target <= currentStep) return true
-    // validate every step up to target-1
-    for (let s = currentStep; s < target; s++) {
-      if (!validateStep(s)) return false
-    }
-    return true
-  }
 
   // Load data when editing
   useEffect(() => {
@@ -94,7 +253,6 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
   }, [isOpen, selectedItem])
 
   // Load suppliers for dropdown
-  const [suppliersList, setSuppliersList] = useState([])
   useEffect(() => {
     let mounted = true
     ;(async () => {
@@ -108,7 +266,37 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
     return () => { mounted = false }
   }, [])
 
-  if (!isOpen) return null
+  // Load filter options for comboboxes
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const response = await itemsService.getFilterOptions()
+        if (mounted && response.success) {
+          setFilterOptions(response.data || {
+            brands: [],
+            item_types: [],
+            unit_of_measures: [],
+            locations: []
+          })
+        }
+      } catch (e) {
+        console.error('Failed to load filter options', e)
+      }
+    })()
+    return () => { mounted = false }
+  }, [])
+
+  // Auto-upload when queue changes and item exists
+  useEffect(() => {
+    if (selectedItem?.item_no && uploadQueue.length > 0) {
+      uploadQueue.forEach((item, index) => {
+        if (!item.error && !uploadingImages.has(index)) {
+          autoUploadImage(item.file, index)
+        }
+      })
+    }
+  }, [uploadQueue, selectedItem?.item_no])
 
   // Step guards used by footer/navigation to enable/disable Next/Create
   const canProceedFromStep1 = (wizardData.item_name || "").trim().length > 0
@@ -196,6 +384,14 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
     setCurrentImageUrl("")
     setExistingImages([])
     setUploadError("")
+    // Clean up upload queue
+    uploadQueue.forEach(item => {
+      if (item.previewUrl) {
+        URL.revokeObjectURL(item.previewUrl)
+      }
+    })
+    setUploadQueue([])
+    setUploadingImages(new Set())
     onClose()
   }
 
@@ -226,7 +422,129 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
     }
   }
 
-          {/* Content Area */}
+  // Auto-upload function for queued images
+  const autoUploadImage = async (file, index) => {
+    if (!selectedItem?.item_no) return
+
+    try {
+      setUploadingImages(prev => new Set(prev).add(index))
+      
+      await itemsService.uploadItemImage(selectedItem.item_no, file)
+      
+      // Refresh images list
+      const fres = await itemsService.getItemImages(selectedItem.item_no)
+      const list = (fres?.data || []).map(img => ({
+        ...img,
+        url: `${itemsService.getItemImageUrl(selectedItem.item_no, img.filename)}?t=${Date.now()}`,
+      }))
+      setExistingImages(list)
+      
+      // Remove from queue
+      setUploadQueue(prev => prev.filter((_, i) => i !== index))
+      setUploadingImages(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(index)
+        return newSet
+      })
+      
+    } catch (e) {
+      console.error('Auto-upload failed:', e)
+      // Mark as failed but keep in queue for retry
+      setUploadQueue(prev => prev.map((item, i) => 
+        i === index ? { ...item, error: e.message } : item
+      ))
+      setUploadingImages(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(index)
+        return newSet
+      })
+    }
+  }
+
+  // Handle file selection with auto-upload
+  const handleFileSelect = (files) => {
+    setUploadError("")
+    
+    Array.from(files).forEach(file => {
+      // Validate file
+      const allowed = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp"]
+      if (!allowed.includes(file.type)) {
+        setUploadError("Invalid file type. Use JPG, PNG, GIF, WEBP, or BMP.")
+        return
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        setUploadError("File too large (max 10MB).")
+        return
+      }
+
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file)
+      
+      // Add to upload queue
+      const queueItem = {
+        file,
+        previewUrl,
+        name: file.name,
+        size: file.size,
+        error: null
+      }
+      
+      setUploadQueue(prev => [...prev, queueItem])
+    })
+  }
+
+  // Remove image from queue
+  const removeQueuedImage = (index) => {
+    setUploadQueue(prev => {
+      const newQueue = [...prev]
+      const removed = newQueue.splice(index, 1)[0]
+      // Revoke object URL to free memory
+      if (removed.previewUrl) {
+        URL.revokeObjectURL(removed.previewUrl)
+      }
+      return newQueue
+    })
+  }
+
+  // Retry failed upload
+  const retryUpload = (index) => {
+    const item = uploadQueue[index]
+    if (item) {
+      setUploadQueue(prev => prev.map((q, i) => 
+        i === index ? { ...q, error: null } : q
+      ))
+      autoUploadImage(item.file, index)
+    }
+  }
+
+  // Check if can jump to step (for breadcrumbs)
+  const canJumpToStep = (targetStep) => {
+    if (targetStep <= currentStep) return true
+    if (targetStep === 2 && canProceedFromStep1) return true
+    if (targetStep === 3) return canProceedFromStep1 && canProceedFromStep2
+    if (targetStep === 4) return canProceedFromStep1 && canProceedFromStep2
+    return false
+  }
+
+  // Handle image deletion
+  const handleImageDelete = async (filename) => {
+    if (!selectedItem?.item_no) return
+    try {
+      await itemsService.deleteItemImage(selectedItem.item_no, filename)
+      const fres = await itemsService.getItemImages(selectedItem.item_no)
+      const list = (fres?.data || []).map(img => ({
+        ...img,
+        url: `${itemsService.getItemImageUrl(selectedItem.item_no, img.filename)}?t=${Date.now()}`,
+      }))
+      setExistingImages(list)
+      const latest = itemsService.getItemLatestImageUrl(selectedItem.item_no)
+      setCurrentImageUrl(`${latest}?t=${Date.now()}`)
+    } catch (e) {
+      console.error('Failed to delete image:', e)
+    }
+  }
+
+  if (!isOpen) return null
     return (
       <ModalPortal>
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-[1000]">
@@ -284,7 +602,7 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                       type="text"
                       value={wizardData.item_name}
                       onChange={(e) => setWizardData({ ...wizardData, item_name: e.target.value })}
-                      className={`w-full border-2 ${errors.item_name ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:ring-4 focus:ring-zinc-500/20 focus:border-zinc-500 text-lg`}
+                      className={`w-full border ${errors.item_name ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                       placeholder="Enter the item name"
                     />
                     {errors.item_name && (
@@ -298,11 +616,10 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                         Brand
                       </label>
-                      <input
-                        type="text"
+                      <Combobox
                         value={wizardData.brand}
-                        onChange={(e) => setWizardData({ ...wizardData, brand: e.target.value })}
-                        className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:ring-4 focus:ring-zinc-500/20 focus:border-zinc-500"
+                        onChange={(value) => setWizardData({ ...wizardData, brand: value })}
+                        options={filterOptions.brands}
                         placeholder="e.g., Samsung, Nike"
                       />
                     </div>
@@ -311,65 +628,44 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                         Item Type
                       </label>
-                      <input
-                        type="text"
+                      <Combobox
                         value={wizardData.item_type}
-                        onChange={(e) => setWizardData({ ...wizardData, item_type: e.target.value })}
-                        className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:ring-4 focus:ring-zinc-500/20 focus:border-zinc-500"
+                        onChange={(value) => setWizardData({ ...wizardData, item_type: value })}
+                        options={filterOptions.item_types}
                         placeholder="e.g., Electronics, Tools"
                       />
                     </div>
                   </div>
 
-                  {/* Supplier - select or custom */}
+                  {/* Supplier - using Combobox for consistency */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Supplier</label>
-                    <div className="relative max-w-md">
-                      <input
-                        type="text"
-                        value={wizardData.supplier_id === '__custom' ? (wizardData.custom_supplier || '') : (wizardData.supplier || '')}
-                        onChange={(e) => {
-                          const v = e.target.value
-                          setWizardData({ ...wizardData, supplier: v, custom_supplier: v, supplier_id: null })
-                        }}
-                        placeholder="Type or select a supplier"
-                        className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-xl px-4 py-3 pr-20 text-gray-900 dark:text-white"
-                        list="supplier-suggestions"
-                      />
-                      <datalist id="supplier-suggestions">
-                        {suppliersList.map(s => <option key={s.id} value={s.label} />)}
-                      </datalist>
-
-                      {/* Compact controls overlaid to the right of the input (keeps input visually full width) */}
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                        <button
-                          type="button"
-                          title="Select matching supplier"
-                          onClick={() => {
-                            const typed = (wizardData.custom_supplier || wizardData.supplier || '').trim().toLowerCase()
-                            const match = suppliersList.find(s => s.label.toLowerCase() === typed)
-                            if (match) setWizardData({ ...wizardData, supplier_id: match.id, supplier: match.label, custom_supplier: '' })
-                            else setWizardData({ ...wizardData, supplier_id: '__custom' })
-                          }}
-                          className="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-sm"
-                        >
-                          Select
-                        </button>
-                        <button
-                          type="button"
-                          title="Add new supplier"
-                          onClick={() => {
-                            setWizardData({ ...wizardData, supplier_id: '__custom', custom_supplier: (wizardData.custom_supplier || wizardData.supplier || '') })
-                            // focus will be manual by user; keeping simple for now
-                          }}
-                          className="px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-sm"
-                        >
-                          + Add
-                        </button>
-                      </div>
-                    </div>
+                    <Combobox
+                      value={wizardData.supplier_id === '__custom' ? (wizardData.custom_supplier || '') : (wizardData.supplier || '')}
+                      onChange={(value) => {
+                        if (value === '__add_custom') {
+                          // Special option to add custom supplier
+                          setWizardData({ ...wizardData, supplier_id: '__custom', custom_supplier: '', supplier: '' })
+                        } else {
+                          // Check if it's an existing supplier
+                          const existingSupplier = suppliersList.find(s => s.label === value)
+                          if (existingSupplier) {
+                            setWizardData({ ...wizardData, supplier_id: existingSupplier.id, supplier: existingSupplier.label, custom_supplier: '' })
+                          } else {
+                            // Custom supplier
+                            setWizardData({ ...wizardData, supplier: value, custom_supplier: value, supplier_id: '__custom' })
+                          }
+                        }
+                      }}
+                      options={[
+                        ...suppliersList.map(s => s.label),
+                        '─────────', // Separator
+                        '+ Add New Supplier'
+                      ]}
+                      placeholder="Select or type supplier"
+                    />
                     {wizardData.supplier_id === '__custom' && (
-                      <p className="text-xs text-gray-500 mt-2">Typing a new supplier will send its name with the item. To create a full supplier record, use Suppliers &gt; Add Supplier.</p>
+                      <p className="text-xs text-gray-500 mt-2">💡 Custom supplier will be saved with the item</p>
                     )}
                   </div>
 
@@ -419,7 +715,7 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                           min="0"
                           value={wizardData.balance}
                           onChange={(e) => setWizardData({ ...wizardData, balance: parseInt(e.target.value) || 0 })}
-                          className={`w-full border-2 ${errors.balance ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:ring-4 focus:ring-zinc-500/20 focus:border-zinc-500 text-lg`}
+                          className={`w-full border ${errors.balance ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                           placeholder="Enter initial quantity"
                         />
                         {errors.balance && (
@@ -435,7 +731,7 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                           type="text"
                           value={`${selectedItem.balance}`}
                           disabled
-                          className="w-full border-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 rounded-xl px-4 py-3 text-gray-600 dark:text-gray-400 cursor-not-allowed"
+                          className="w-full border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-600 dark:text-gray-400 cursor-not-allowed"
                         />
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           Use "Stock Management" to modify inventory levels
@@ -452,7 +748,7 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                         min="0"
                         value={wizardData.min_stock}
                         onChange={(e) => setWizardData({ ...wizardData, min_stock: parseInt(e.target.value) || 0 })}
-                        className={`w-full border-2 ${errors.min_stock ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:ring-4 focus:ring-zinc-500/20 focus:border-zinc-500 text-lg`}
+                        className={`w-full border ${errors.min_stock ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                         placeholder="Alert threshold"
                       />
                       {errors.min_stock && (
@@ -467,11 +763,10 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                         Unit of Measure
                       </label>
-                      <input
-                        type="text"
+                      <Combobox
                         value={wizardData.unit_of_measure}
-                        onChange={(e) => setWizardData({ ...wizardData, unit_of_measure: e.target.value })}
-                        className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:ring-4 focus:ring-zinc-500/20 focus:border-zinc-500"
+                        onChange={(value) => setWizardData({ ...wizardData, unit_of_measure: value })}
+                        options={filterOptions.unit_of_measures}
                         placeholder="e.g., pcs, kg, ltr, box"
                       />
                     </div>
@@ -488,7 +783,7 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                           step="0.01"
                           value={wizardData.price_per_unit}
                           onChange={(e) => setWizardData({ ...wizardData, price_per_unit: parseFloat(e.target.value) || 0 })}
-                          className={`w-full border-2 ${errors.price_per_unit ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-xl pl-10 pr-4 py-3 text-gray-900 dark:text-white focus:ring-4 focus:ring-zinc-500/20 focus:border-zinc-500 text-lg`}
+                          className={`w-full border ${errors.price_per_unit ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-lg pl-8 pr-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                           placeholder="0.00"
                         />
                       </div>
@@ -566,11 +861,10 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                       Storage Location
                     </label>
-                    <input
-                      type="text"
+                    <Combobox
                       value={wizardData.location}
-                      onChange={(e) => setWizardData({ ...wizardData, location: e.target.value })}
-                      className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:ring-4 focus:ring-zinc-500/20 focus:border-zinc-500"
+                      onChange={(value) => setWizardData({ ...wizardData, location: value })}
+                      options={filterOptions.locations}
                       placeholder="e.g., Warehouse A, Shelf 1-A, Bin 23"
                     />
                   </div>
@@ -654,111 +948,111 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                       <div className="flex-1">
                         <label className="block mb-2">
                           <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
-                            Select Image File
+                            Select or Drop Images
                           </span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0]
-                              setUploadError("")
-                              setSelectedImage(null)
-                              setPreviewUrl("")
-                              if (!file) return
-                              const allowed = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp"]
-                              if (!allowed.includes(file.type)) {
-                                setUploadError("Invalid file type. Use JPG, PNG, GIF, WEBP, or BMP.")
-                                return
-                              }
-                              if (file.size > 10 * 1024 * 1024) {
-                                setUploadError("File too large (max 10MB).")
-                                return
-                              }
-                              setSelectedImage(file)
-                              const reader = new FileReader()
-                              reader.onload = () => setPreviewUrl(reader.result)
-                              reader.readAsDataURL(file)
+                          <div
+                            className="relative border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-3 hover:border-violet-400 dark:hover:border-violet-500 bg-slate-50 dark:bg-slate-800/50 transition-colors"
+                            onDragOver={(e) => {
+                              e.preventDefault()
+                              e.currentTarget.classList.add('border-violet-400', 'dark:border-violet-500')
                             }}
-                            className="block w-full text-sm text-slate-600 dark:text-slate-400
-                              file:mr-4 file:py-2.5 file:px-4
-                              file:rounded-lg file:border-0
-                              file:text-sm file:font-semibold
-                              file:bg-gradient-to-r file:from-violet-500 file:to-purple-600
-                              file:text-white
-                              hover:file:from-violet-600 hover:file:to-purple-700
-                              file:cursor-pointer file:transition-all file:shadow-md hover:file:shadow-lg
-                              cursor-pointer
-                              border-2 border-dashed border-slate-300 dark:border-slate-600 
-                              rounded-lg p-3
-                              hover:border-violet-400 dark:hover:border-violet-500
-                              bg-slate-50 dark:bg-slate-800/50
-                              transition-colors"
-                          />
+                            onDragLeave={(e) => {
+                              e.preventDefault()
+                              e.currentTarget.classList.remove('border-violet-400', 'dark:border-violet-500')
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              e.currentTarget.classList.remove('border-violet-400', 'dark:border-violet-500')
+                              handleFileSelect(e.dataTransfer.files)
+                            }}
+                          >
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={(e) => {
+                                handleFileSelect(e.target.files)
+                                e.target.value = '' // Reset input
+                              }}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            />
+                            <div className="text-center">
+                              <svg className="w-8 h-8 mx-auto text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                              </svg>
+                              <p className="text-sm text-slate-600 dark:text-slate-400">
+                                Drop images here or click to select
+                              </p>
+                              <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                                Supports JPG, PNG, GIF, WEBP, BMP (max 10MB each)
+                              </p>
+                            </div>
+                          </div>
                         </label>
                         
-                        {selectedImage && (
-                          <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-lg">
-                            <p className="text-xs text-green-700 dark:text-green-400 flex items-center gap-1">
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                              <span className="font-medium">File selected:</span> {selectedImage.name} ({(selectedImage.size / 1024).toFixed(1)} KB)
+                        {/* Queued Images Preview */}
+                        {uploadQueue.length > 0 && (
+                          <div className="mt-4">
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                              Uploading ({uploadQueue.length})
                             </p>
+                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                              {uploadQueue.map((item, index) => (
+                                <div key={index} className="relative group border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-black/30">
+                                  <img 
+                                    src={item.previewUrl} 
+                                    alt={item.name} 
+                                    className="w-full h-20 object-cover" 
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-colors flex items-center justify-center">
+                                    {uploadingImages.has(index) ? (
+                                      <div className="text-white text-xs">
+                                        <svg className="animate-spin w-4 h-4 mx-auto mb-1" fill="none" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Uploading...</span>
+                                      </div>
+                                    ) : item.error ? (
+                                      <div className="text-center">
+                                        <button
+                                          type="button"
+                                          onClick={() => retryUpload(index)}
+                                          className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded mb-1"
+                                        >
+                                          Retry
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => removeQueuedImage(index)}
+                                          className="text-xs bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded"
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => removeQueuedImage(index)}
+                                        className="opacity-0 group-hover:opacity-100 text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg font-medium transition-all"
+                                      >
+                                        Remove
+                                      </button>
+                                    )}
+                                  </div>
+                                  {item.error && (
+                                    <div className="absolute bottom-0 left-0 right-0 bg-red-600 text-white text-xs p-1 text-center">
+                                      Failed
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                         
                         {uploadError && <p className="text-red-500 text-xs mt-2">{uploadError}</p>}
                         
-                        <div className="flex gap-2 mt-3">
-                          <button
-                            type="button"
-                            disabled={!selectedImage || uploading || !selectedItem?.item_no}
-                            onClick={() => handleImageUpload(false)}
-                            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            title={!selectedItem?.item_no ? "Item must be saved first" : !selectedImage ? "Please select an image file" : ""}
-                          >
-                            {uploading ? (
-                              <>
-                                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <span>Uploading...</span>
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                <span>Upload (Add)</span>
-                              </>
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={!selectedImage || uploading || !selectedItem?.item_no}
-                            onClick={() => handleImageUpload(true)}
-                            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            title={!selectedItem?.item_no ? "Item must be saved first" : !selectedImage ? "Please select an image file" : ""}
-                          >
-                            {uploading ? (
-                              <>
-                                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <span>Replacing...</span>
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                                <span>Replace All</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
                         {!selectedItem?.item_no && (
                           <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg">
                             <div className="flex items-start gap-2">
@@ -770,27 +1064,7 @@ function AddEditItemWizard({ isOpen, onClose, onSave, selectedItem = null }) {
                                   ℹ️ New Item - Images Disabled
                                 </p>
                                 <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                                  Upload buttons are disabled because this item hasn't been saved yet. Images require an item number (item_no) from the database.
-                                </p>
-                                <p className="text-xs text-amber-600 dark:text-amber-500 mt-1.5 font-medium">
-                                  📝 To upload images: Complete the wizard → Click "Create Item" → Edit the item from inventory → Upload images
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        {selectedItem?.item_no && !selectedImage && (
-                          <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg">
-                            <div className="flex items-start gap-2">
-                              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                              </svg>
-                              <div>
-                                <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">
-                                  📸 Ready to Upload
-                                </p>
-                                <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
-                                  Item #{selectedItem.item_no} is ready for image uploads. Select a file above to enable the upload buttons.
+                                  Images will be uploaded automatically once the item is saved. Select images now and they will upload after creating the item.
                                 </p>
                               </div>
                             </div>
