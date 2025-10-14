@@ -374,68 +374,72 @@ export const exportPurchaseOrderToPDF = (poData) => {
     })
     
     yPos = doc.lastAutoTable.finalY + sectionSpacing
-    
     // ============================================================================
     // TOTAL AMOUNT - ONLY ON LAST PAGE
     // ============================================================================
     
     if (pageIndex === totalPages - 1) {
       const totalBoxWidth = 75
-      // Calculate dynamic height based on whether there's a discount
-      const baseHeight = breakdown.discountAmount > 0 ? 32 : 28
-      const totalBoxHeight = baseHeight
       const totalBoxX = pageWidth - rightMargin - totalBoxWidth - 1
+      const labelColumnWidth = 48
+      
+      // Calculate exact height based on content
+      const rowHeight = 5
+      const numberOfRows = taxBreakdown.discountAmount > 0 ? 5 : 4
+      const topPadding = 3
+      const dividerSpace = 1.5
+      const grandTotalSpace = 5.5
+      const totalBoxHeight = topPadding + (numberOfRows * rowHeight) + dividerSpace + grandTotalSpace
       
       doc.setLineWidth(LINE_WEIGHTS.divider)
       doc.rect(totalBoxX, yPos, totalBoxWidth, totalBoxHeight)
       
-      let rowY = yPos + 5
-      const rowSpacing = 4.5
+      let rowY = yPos + topPadding + 3.5
       
       // Gross Total (with VAT)
       doc.setFont("helvetica", "normal")
       doc.setFontSize(FONT_SIZES.small)
       doc.text("GROSS TOTAL (with 12% VAT) =", totalBoxX + 2, rowY)
       doc.setFontSize(FONT_SIZES.section)
-      doc.text(formatPesoWithPrefix(breakdown.totalBeforeWithholdingTax), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
+      doc.text(formatPesoWithPrefix(taxBreakdown.totalBeforeWithholdingTax), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
       
-      rowY += rowSpacing
+      rowY += rowHeight
       
       // Subtotal (after VAT removal)
       doc.setFont("helvetica", "normal")
       doc.setFontSize(FONT_SIZES.tiny)
       doc.text("Subtotal (Gross ÷ 1.12) =", totalBoxX + 2, rowY)
       doc.setFontSize(FONT_SIZES.body)
-      doc.text(formatPesoWithPrefix(breakdown.subtotal), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
+      doc.text(formatPesoWithPrefix(taxBreakdown.subtotal), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
       
-      rowY += rowSpacing
+      rowY += rowHeight
       
       // Withholding Tax
       const taxTypeLabel = poData.tax_type ? poData.tax_type.charAt(0).toUpperCase() + poData.tax_type.slice(1) : 'Goods'
       doc.setFont("helvetica", "normal")
       doc.setFontSize(FONT_SIZES.tiny)
-      doc.text(`Less: Withholding Tax (${breakdown.taxRate}% - ${taxTypeLabel}) =`, totalBoxX + 2, rowY)
+      doc.text(`Less: Withholding Tax (${taxBreakdown.taxRate}% - ${taxTypeLabel}) =`, totalBoxX + 2, rowY)
       doc.setFontSize(FONT_SIZES.body)
-      doc.text(`(${formatPesoWithPrefix(breakdown.withholdingTax)})`, totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
+      doc.text(`(${formatPesoWithPrefix(taxBreakdown.withholdingTax)})`, totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
       
-      rowY += rowSpacing
+      rowY += rowHeight
       
       // Discount if applicable
-      if (breakdown.discountAmount > 0) {
+      if (taxBreakdown.discountAmount > 0) {
         doc.setFont("helvetica", "normal")
         doc.setFontSize(FONT_SIZES.tiny)
-        doc.text(`Less: Discount (${breakdown.discountPercentage}%) =`, totalBoxX + 2, rowY)
+        doc.text(`Less: Discount (${taxBreakdown.discountPercentage}%) =`, totalBoxX + 2, rowY)
         doc.setFontSize(FONT_SIZES.body)
-        doc.text(`(${formatPesoWithPrefix(breakdown.discountAmount)})`, totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
+        doc.text(`(${formatPesoWithPrefix(taxBreakdown.discountAmount)})`, totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
         
-        rowY += rowSpacing
+        rowY += rowHeight
       }
       
       // Divider before Grand Total
       doc.setLineWidth(LINE_WEIGHTS.divider)
-      doc.line(totalBoxX, rowY - 1, totalBoxX + totalBoxWidth, rowY - 1)
+      doc.line(totalBoxX + 1, rowY + 0.5, totalBoxX + totalBoxWidth - 1, rowY + 0.5)
       
-      rowY += 1
+      rowY += dividerSpace + 3
       
       // Grand Total
       doc.setFont("helvetica", "bold")
@@ -443,11 +447,11 @@ export const exportPurchaseOrderToPDF = (poData) => {
       doc.text("GRAND TOTAL =", totalBoxX + 2, rowY)
       
       doc.setFontSize(FONT_SIZES.section)
-      doc.text(formatPesoWithPrefix(breakdown.grandTotal), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
+      doc.text(formatPesoWithPrefix(taxBreakdown.grandTotal), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
 
       yPos += totalBoxHeight + sectionSpacing
     }
-
+    
     // ============================================================================
     // APPROVAL SECTION
     // ============================================================================
@@ -611,7 +615,7 @@ export const exportPurchaseOrderToExcel = (poData) => {
     }
   }
 
-  const breakdown = calculateTaxBreakdown()
+  const taxBreakdown = calculateTaxBreakdown()
   const taxTypeLabel = poData.tax_type ? poData.tax_type.charAt(0).toUpperCase() + poData.tax_type.slice(1) : 'Goods'
 
   // Create worksheet data matching PDF layout
@@ -651,13 +655,13 @@ export const exportPurchaseOrderToExcel = (poData) => {
     ]),
     [], // Empty row
     // Totals with Tax Breakdown
-    ["", "", "", "GROSS TOTAL (with 12% VAT) =", "", formatPesoWithPrefix(breakdown.totalBeforeWithholdingTax)],
-    ["", "", "", `Subtotal (Gross ÷ 1.12) =`, "", formatPesoWithPrefix(breakdown.subtotal)],
-    ["", "", "", `Less: Withholding Tax (${breakdown.taxRate}% - ${taxTypeLabel}) =`, "", `(${formatPesoWithPrefix(breakdown.withholdingTax)})`],
-    ...(breakdown.discountAmount > 0 ? [
-      ["", "", "", `Less: Discount (${breakdown.discountPercentage}%) =`, "", `(${formatPesoWithPrefix(breakdown.discountAmount)})`]
+    ["", "", "", "GROSS TOTAL (with 12% VAT) =", "", formatPesoWithPrefix(taxBreakdown.totalBeforeWithholdingTax)],
+    ["", "", "", `Subtotal (Gross ÷ 1.12) =`, "", formatPesoWithPrefix(taxBreakdown.subtotal)],
+    ["", "", "", `Less: Withholding Tax (${taxBreakdown.taxRate}% - ${taxTypeLabel}) =`, "", `(${formatPesoWithPrefix(taxBreakdown.withholdingTax)})`],
+    ...(taxBreakdown.discountAmount > 0 ? [
+      ["", "", "", `Less: Discount (${taxBreakdown.discountPercentage}%) =`, "", `(${formatPesoWithPrefix(taxBreakdown.discountAmount)})`]
     ] : []),
-    ["", "", "", "GRAND TOTAL =", "", formatPesoWithPrefix(breakdown.grandTotal)],
+    ["", "", "", "GRAND TOTAL =", "", formatPesoWithPrefix(taxBreakdown.grandTotal)],
     [], // Empty row
     // Signatures
     ["PREPARED BY", "", "", "VERIFIED BY", "", "", "APPROVED BY"],
@@ -692,7 +696,7 @@ export const exportPurchaseOrderToExcel = (poData) => {
   ]
 
   // Calculate merge indices based on actual content
-  const totalRowsBeforeSignatures = breakdown.discountAmount > 0 ? 5 : 4 // Number of total rows
+  const totalRowsBeforeSignatures = taxBreakdown.discountAmount > 0 ? 5 : 4 // Number of total rows
   const signaturesOffset = 3 // Signatures section rows
   const notesOffset = 1 // Notes section rows
   
