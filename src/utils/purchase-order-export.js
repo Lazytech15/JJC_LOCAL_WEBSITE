@@ -62,14 +62,59 @@ export const exportPurchaseOrderToPDF = (poData) => {
     sum + ((item.quantity || 0) * (item.price_per_unit || 0)), 0
   )
 
-  // Format currency - Using "PHP" prefix for better PDF compatibility
+  // Format currency - Remove "PHP" prefix and peso sign from unit price and amount
   const formatPeso = (amount) => {
+    return amount.toLocaleString('en-PH', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    })
+  }
+
+  // Format currency with PHP prefix for totals
+  const formatPesoWithPrefix = (amount) => {
     const formatted = amount.toLocaleString('en-PH', { 
       minimumFractionDigits: 2, 
       maximumFractionDigits: 2 
     })
     return `PHP ${formatted}`
   }
+
+  // Tax calculation
+  const getTaxRate = () => {
+    switch(poData.tax_type) {
+      case 'goods': return 0.01 // 1%
+      case 'services': return 0.02 // 2%
+      case 'rental': return 0.05 // 5%
+      default: return 0.01
+    }
+  }
+
+  const calculateTaxBreakdown = () => {
+    const totalBeforeWithholdingTax = totalAmount
+    const subtotal = totalBeforeWithholdingTax / 1.12 // Remove 12% VAT
+    const taxRate = getTaxRate()
+    const withholdingTax = subtotal * taxRate
+    const totalAfterWithholdingTax = totalBeforeWithholdingTax - withholdingTax
+    
+    const discountAmount = poData.has_discount 
+      ? totalAfterWithholdingTax * (Number(poData.discount_percentage) / 100)
+      : 0
+    
+    const grandTotal = totalAfterWithholdingTax - discountAmount
+
+    return {
+      totalBeforeWithholdingTax,
+      subtotal,
+      taxRate: taxRate * 100,
+      withholdingTax,
+      totalAfterWithholdingTax,
+      discountPercentage: poData.has_discount ? Number(poData.discount_percentage) : 0,
+      discountAmount,
+      grandTotal
+    }
+  }
+
+  const taxBreakdown = calculateTaxBreakdown()
 
   // ============================================================================
   // ITEMS TABLE PREPARATION
@@ -336,30 +381,69 @@ export const exportPurchaseOrderToPDF = (poData) => {
     
     if (pageIndex === totalPages - 1) {
       const totalBoxWidth = 75
-      const totalBoxHeight = 16
+      // Calculate dynamic height based on whether there's a discount
+      const baseHeight = breakdown.discountAmount > 0 ? 32 : 28
+      const totalBoxHeight = baseHeight
       const totalBoxX = pageWidth - rightMargin - totalBoxWidth - 1
       
       doc.setLineWidth(LINE_WEIGHTS.divider)
       doc.rect(totalBoxX, yPos, totalBoxWidth, totalBoxHeight)
       
-      // Gross Total
-      doc.setFont("helvetica", "bold")
+      let rowY = yPos + 5
+      const rowSpacing = 4.5
+      
+      // Gross Total (with VAT)
+      doc.setFont("helvetica", "normal")
       doc.setFontSize(FONT_SIZES.small)
-      doc.text("GROSS TOTAL =", totalBoxX + 2, yPos + 5)
-      
+      doc.text("GROSS TOTAL (with 12% VAT) =", totalBoxX + 2, rowY)
       doc.setFontSize(FONT_SIZES.section)
-      doc.text(formatPeso(totalAmount), totalBoxX + totalBoxWidth - 2, yPos + 5, { align: "right" })
+      doc.text(formatPesoWithPrefix(breakdown.totalBeforeWithholdingTax), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
       
-      doc.setLineWidth(LINE_WEIGHTS.grid)
-      doc.line(totalBoxX, yPos + 8, totalBoxX + totalBoxWidth, yPos + 8)
+      rowY += rowSpacing
+      
+      // Subtotal (after VAT removal)
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(FONT_SIZES.tiny)
+      doc.text("Subtotal (Gross ÷ 1.12) =", totalBoxX + 2, rowY)
+      doc.setFontSize(FONT_SIZES.body)
+      doc.text(formatPesoWithPrefix(breakdown.subtotal), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
+      
+      rowY += rowSpacing
+      
+      // Withholding Tax
+      const taxTypeLabel = poData.tax_type ? poData.tax_type.charAt(0).toUpperCase() + poData.tax_type.slice(1) : 'Goods'
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(FONT_SIZES.tiny)
+      doc.text(`Less: Withholding Tax (${breakdown.taxRate}% - ${taxTypeLabel}) =`, totalBoxX + 2, rowY)
+      doc.setFontSize(FONT_SIZES.body)
+      doc.text(`(${formatPesoWithPrefix(breakdown.withholdingTax)})`, totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
+      
+      rowY += rowSpacing
+      
+      // Discount if applicable
+      if (breakdown.discountAmount > 0) {
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(FONT_SIZES.tiny)
+        doc.text(`Less: Discount (${breakdown.discountPercentage}%) =`, totalBoxX + 2, rowY)
+        doc.setFontSize(FONT_SIZES.body)
+        doc.text(`(${formatPesoWithPrefix(breakdown.discountAmount)})`, totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
+        
+        rowY += rowSpacing
+      }
+      
+      // Divider before Grand Total
+      doc.setLineWidth(LINE_WEIGHTS.divider)
+      doc.line(totalBoxX, rowY - 1, totalBoxX + totalBoxWidth, rowY - 1)
+      
+      rowY += 1
       
       // Grand Total
       doc.setFont("helvetica", "bold")
       doc.setFontSize(FONT_SIZES.small)
-      doc.text("GRAND TOTAL =", totalBoxX + 2, yPos + 13)
+      doc.text("GRAND TOTAL =", totalBoxX + 2, rowY)
       
       doc.setFontSize(FONT_SIZES.section)
-      doc.text(formatPeso(totalAmount), totalBoxX + totalBoxWidth - 2, yPos + 13, { align: "right" })
+      doc.text(formatPesoWithPrefix(breakdown.grandTotal), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
 
       yPos += totalBoxHeight + sectionSpacing
     }
@@ -475,14 +559,60 @@ export const exportPurchaseOrderToExcel = (poData) => {
     sum + ((item.quantity || 0) * (item.price_per_unit || 0)), 0
   )
 
-  // Format currency
+  // Format currency - Remove PHP prefix for unit prices and amounts
   const formatPeso = (amount) => {
+    return amount.toLocaleString('en-PH', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    })
+  }
+
+  // Format currency with PHP prefix for totals
+  const formatPesoWithPrefix = (amount) => {
     const formatted = amount.toLocaleString('en-PH', { 
       minimumFractionDigits: 2, 
       maximumFractionDigits: 2 
     })
     return `PHP ${formatted}`
   }
+
+  // Tax calculation functions
+  const getTaxRate = () => {
+    switch(poData.tax_type) {
+      case 'goods': return 0.01
+      case 'services': return 0.02
+      case 'rental': return 0.05
+      default: return 0.01
+    }
+  }
+
+  const calculateTaxBreakdown = () => {
+    const totalBeforeWithholdingTax = totalAmount
+    const subtotal = totalBeforeWithholdingTax / 1.12
+    const taxRate = getTaxRate()
+    const withholdingTax = subtotal * taxRate
+    const totalAfterWithholdingTax = totalBeforeWithholdingTax - withholdingTax
+    
+    const discountAmount = poData.has_discount 
+      ? totalAfterWithholdingTax * (Number(poData.discount_percentage) / 100)
+      : 0
+    
+    const grandTotal = totalAfterWithholdingTax - discountAmount
+
+    return {
+      totalBeforeWithholdingTax,
+      subtotal,
+      taxRate: taxRate * 100,
+      withholdingTax,
+      totalAfterWithholdingTax,
+      discountPercentage: poData.has_discount ? Number(poData.discount_percentage) : 0,
+      discountAmount,
+      grandTotal
+    }
+  }
+
+  const breakdown = calculateTaxBreakdown()
+  const taxTypeLabel = poData.tax_type ? poData.tax_type.charAt(0).toUpperCase() + poData.tax_type.slice(1) : 'Goods'
 
   // Create worksheet data matching PDF layout
   const wsData = [
@@ -520,11 +650,16 @@ export const exportPurchaseOrderToExcel = (poData) => {
       formatPeso((item.quantity || 0) * (item.price_per_unit || 0))
     ]),
     [], // Empty row
-    // Row X+2: Totals
-    ["", "", "", "GROSS TOTAL =", "", formatPeso(totalAmount)],
-    ["", "", "", "GRAND TOTAL =", "", formatPeso(totalAmount)],
+    // Totals with Tax Breakdown
+    ["", "", "", "GROSS TOTAL (with 12% VAT) =", "", formatPesoWithPrefix(breakdown.totalBeforeWithholdingTax)],
+    ["", "", "", `Subtotal (Gross ÷ 1.12) =`, "", formatPesoWithPrefix(breakdown.subtotal)],
+    ["", "", "", `Less: Withholding Tax (${breakdown.taxRate}% - ${taxTypeLabel}) =`, "", `(${formatPesoWithPrefix(breakdown.withholdingTax)})`],
+    ...(breakdown.discountAmount > 0 ? [
+      ["", "", "", `Less: Discount (${breakdown.discountPercentage}%) =`, "", `(${formatPesoWithPrefix(breakdown.discountAmount)})`]
+    ] : []),
+    ["", "", "", "GRAND TOTAL =", "", formatPesoWithPrefix(breakdown.grandTotal)],
     [], // Empty row
-    // Row X+4: Signatures
+    // Signatures
     ["PREPARED BY", "", "", "VERIFIED BY", "", "", "APPROVED BY"],
     [Array.isArray(poData.prepared_by) ? poData.prepared_by.join(', ') : poData.prepared_by || "", 
      "", 
@@ -534,7 +669,7 @@ export const exportPurchaseOrderToExcel = (poData) => {
      "", 
      poData.approved_by || ""],
     [], // Empty row
-    // Row X+6: Notes
+    // Notes
     ["NOTES:", poData.notes || ""]
   ]
 
@@ -556,6 +691,11 @@ export const exportPurchaseOrderToExcel = (poData) => {
     { wch: 15 }  // PO value
   ]
 
+  // Calculate merge indices based on actual content
+  const totalRowsBeforeSignatures = breakdown.discountAmount > 0 ? 5 : 4 // Number of total rows
+  const signaturesOffset = 3 // Signatures section rows
+  const notesOffset = 1 // Notes section rows
+  
   // Merge cells to match PDF layout
   ws['!merges'] = [
     // Company name
@@ -579,16 +719,18 @@ export const exportPurchaseOrderToExcel = (poData) => {
     { s: { r: 12, c: 0 }, e: { r: 12, c: 4 } },
     // Attention
     { s: { r: 13, c: 0 }, e: { r: 13, c: 4 } },
-    // Totals
-    { s: { r: wsData.length - 5, c: 3 }, e: { r: wsData.length - 5, c: 4 } },
-    { s: { r: wsData.length - 4, c: 3 }, e: { r: wsData.length - 4, c: 4 } },
+    // Totals - merge labels with empty column
+    ...Array.from({ length: totalRowsBeforeSignatures }, (_, i) => ({
+      s: { r: wsData.length - (signaturesOffset + notesOffset + totalRowsBeforeSignatures) + i, c: 3 },
+      e: { r: wsData.length - (signaturesOffset + notesOffset + totalRowsBeforeSignatures) + i, c: 4 }
+    })),
     // Signatures
-    { s: { r: wsData.length - 3, c: 0 }, e: { r: wsData.length - 3, c: 2 } },
-    { s: { r: wsData.length - 3, c: 3 }, e: { r: wsData.length - 3, c: 5 } },
-    { s: { r: wsData.length - 3, c: 6 }, e: { r: wsData.length - 3, c: 6 } },
-    { s: { r: wsData.length - 2, c: 0 }, e: { r: wsData.length - 2, c: 2 } },
-    { s: { r: wsData.length - 2, c: 3 }, e: { r: wsData.length - 2, c: 5 } },
-    { s: { r: wsData.length - 2, c: 6 }, e: { r: wsData.length - 2, c: 6 } },
+    { s: { r: wsData.length - (signaturesOffset + notesOffset) + 1, c: 0 }, e: { r: wsData.length - (signaturesOffset + notesOffset) + 1, c: 2 } },
+    { s: { r: wsData.length - (signaturesOffset + notesOffset) + 1, c: 3 }, e: { r: wsData.length - (signaturesOffset + notesOffset) + 1, c: 5 } },
+    { s: { r: wsData.length - (signaturesOffset + notesOffset) + 1, c: 6 }, e: { r: wsData.length - (signaturesOffset + notesOffset) + 1, c: 6 } },
+    { s: { r: wsData.length - (signaturesOffset + notesOffset) + 2, c: 0 }, e: { r: wsData.length - (signaturesOffset + notesOffset) + 2, c: 2 } },
+    { s: { r: wsData.length - (signaturesOffset + notesOffset) + 2, c: 3 }, e: { r: wsData.length - (signaturesOffset + notesOffset) + 2, c: 5 } },
+    { s: { r: wsData.length - (signaturesOffset + notesOffset) + 2, c: 6 }, e: { r: wsData.length - (signaturesOffset + notesOffset) + 2, c: 6 } },
     // Notes
     { s: { r: wsData.length - 1, c: 0 }, e: { r: wsData.length - 1, c: 11 } }
   ]
