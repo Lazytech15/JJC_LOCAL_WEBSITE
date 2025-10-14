@@ -1,20 +1,81 @@
-import { ArrowLeft, FileText, Download, Mail, Phone, MapPin, Calendar, Users, Briefcase } from "lucide-react"
-import { Button } from "../../ui/UiComponents"
-import { Card, CardContent } from "../../ui/UiComponents"
-import { Avatar, AvatarFallback } from "../../ui/UiComponents"
+import { useState } from "react"
+import { ArrowLeft, FileText, Download, Mail, Phone, MapPin, Calendar, Users, Briefcase, Lock, X, Eye, EyeOff } from "lucide-react"
 
+// UI Components
+const Button = ({ children, variant = "default", size = "default", onClick, disabled, className = "", ...props }) => {
+  const baseStyles = "inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+  
+  const variants = {
+    default: "bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100",
+    outline: "border border-zinc-300 bg-transparent hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800",
+    ghost: "hover:bg-zinc-100 dark:hover:bg-zinc-800",
+    destructive: "bg-red-600 text-white hover:bg-red-700"
+  }
+  
+  const sizes = {
+    default: "px-4 py-2",
+    sm: "px-3 py-1.5 text-sm",
+    lg: "px-6 py-3",
+    icon: "p-2"
+  }
+  
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
+      {...props}
+    >
+      {children}
+    </button>
+  )
+}
+
+const Card = ({ children, className = "" }) => (
+  <div className={`rounded-xl shadow-sm ${className}`}>{children}</div>
+)
+
+const CardContent = ({ children, className = "" }) => (
+  <div className={className}>{children}</div>
+)
+
+const Avatar = ({ children, className = "" }) => (
+  <div className={`relative flex shrink-0 overflow-hidden rounded-full ${className}`}>
+    {children}
+  </div>
+)
+
+const AvatarFallback = ({ children, className = "" }) => (
+  <div className={`flex h-full w-full items-center justify-center rounded-full ${className}`}>
+    {children}
+  </div>
+)
+
+// Main Profile Component
 export default function Profile({ employee, employeeData, handleLogout, profileData, profileImage, documentData, isDarkMode }) {
-  // Use employeeData which has full information from the API
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  })
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  })
+  const [passwordError, setPasswordError] = useState("")
+  const [passwordSuccess, setPasswordSuccess] = useState("")
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+
   const fullEmployee = employeeData || employee
 
-  // Format date helper
   const formatDate = (dateString) => {
     if (!dateString || dateString === "0000-00-00") return "N/A"
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   }
 
-  // Format file size helper
   const formatFileSize = (bytes) => {
     if (!bytes) return "N/A"
     if (bytes < 1024) return bytes + " B"
@@ -22,12 +83,9 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
     return (bytes / (1024 * 1024)).toFixed(1) + " MB"
   }
 
-  // Handle document download
   const handleDownload = async (doc) => {
     try {
-      // Construct the full URL if it's a relative path
       const downloadUrl = doc.url.startsWith('http') ? doc.url : `${window.location.origin}${doc.url}`
-
       const response = await fetch(downloadUrl)
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
@@ -44,15 +102,91 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
     }
   }
 
+  const handlePasswordChange = async () => {
+    setPasswordError("")
+    setPasswordSuccess("")
+
+    // Validation
+    if (!passwordForm.currentPassword) {
+      setPasswordError("Current password is required")
+      return
+    }
+
+    if (!passwordForm.newPassword || !passwordForm.confirmPassword) {
+      setPasswordError("Please fill in all password fields")
+      return
+    }
+
+    if (passwordForm.newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters long")
+      return
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError("New passwords do not match")
+      return
+    }
+
+    if (passwordForm.currentPassword === passwordForm.newPassword) {
+      setPasswordError("New password must be different from current password")
+      return
+    }
+
+    try {
+      setIsChangingPassword(true)
+
+      // TODO: Replace with actual API call
+      // const response = await apiService.auth.changePassword({
+      //   currentPassword: passwordForm.currentPassword,
+      //   newPassword: passwordForm.newPassword
+      // })
+
+      // Simulated API call
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      setPasswordSuccess("Password changed successfully!")
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      })
+
+      setTimeout(() => {
+        setIsPasswordModalOpen(false)
+        setPasswordSuccess("")
+      }, 2000)
+
+    } catch (error) {
+      setPasswordError(error.message || "Failed to change password")
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
+
+  const togglePasswordVisibility = (field) => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [field]: !prev[field]
+    }))
+  }
+
   return (
     <div className="space-y-6">
-      <h2 className={`text-3xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>My Profile</h2>
+      <div className="flex justify-between items-center">
+        <h2 className={`text-3xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>My Profile</h2>
+        <Button
+          variant="outline"
+          onClick={() => setIsPasswordModalOpen(true)}
+          className={`${isDarkMode ? "border-zinc-700 text-zinc-300 hover:bg-zinc-800" : ""}`}
+        >
+          <Lock className="w-4 h-4 mr-2" />
+          Change Password
+        </Button>
+      </div>
 
-      {/* Profile Header Card */}
       {/* Profile Header Card */}
       <Card className={`border overflow-hidden ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
         <CardContent className="p-8 relative">
-          {/* Blurred Background */}
           {profileImage && (
             <div
               className="absolute inset-0 opacity-40"
@@ -60,25 +194,24 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
                 backgroundImage: `url(${profileImage})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                filter: 'blur(05px)',
+                filter: 'blur(5px)',
                 transform: 'scale(1.1)'
               }}
             />
           )}
 
-          {/* Content */}
           <div className="relative z-10">
             <div className="flex flex-col items-center text-center mb-8">
-              <Avatar className={`w-75 h-75 ring-2 mb-10 ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}>
+              <Avatar className={`w-32 h-32 ring-4 mb-4 ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}>
                 {profileImage ? (
                   <img
-                    src={profileImage || "/placeholder.svg"}
+                    src={profileImage}
                     alt={employee?.name}
                     className="w-full h-full object-cover"
                   />
                 ) : (
                   <AvatarFallback
-                    className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-sm font-semibold`}
+                    className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-2xl font-semibold`}
                   >
                     {employee?.name
                       ?.split(" ")
@@ -320,26 +453,141 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
               <p>No documents available</p>
             </div>
           )}
-
-          {/* {documentData?.total_size && (
-            <div className={`mt-4 pt-4 border-t text-sm ${isDarkMode ? "border-zinc-800 text-zinc-400" : "border-zinc-200 text-zinc-600"}`}>
-              Total storage: {formatFileSize(documentData.total_size)}
-            </div>
-          )} */}
         </CardContent>
       </Card>
 
-      {/* Logout Button */}
-      {/* <div className="mt-6">
-        <Button
-          variant="outline"
-          onClick={handleLogout}
-          className={`w-full sm:w-auto lg:hidden ${isDarkMode ? "border-zinc-800 text-zinc-400 hover:text-white" : ""}`}
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Logout
-        </Button>
-      </div> */}
+      {/* Change Password Modal */}
+      {isPasswordModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`w-full max-w-md rounded-2xl shadow-2xl ${isDarkMode ? "bg-zinc-900" : "bg-white"}`}>
+            <div className={`p-6 border-b ${isDarkMode ? "border-zinc-800" : "border-zinc-200"}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${isDarkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
+                    <Lock className={`w-5 h-5 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`} />
+                  </div>
+                  <h2 className={`text-xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                    Change Password
+                  </h2>
+                </div>
+                <button
+                  onClick={() => setIsPasswordModalOpen(false)}
+                  className={`p-2 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-400" : "hover:bg-zinc-100 text-zinc-600"}`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {passwordError && (
+                <div className={`p-4 rounded-lg border ${isDarkMode ? "bg-red-900/20 border-red-800 text-red-400" : "bg-red-50 border-red-200 text-red-700"}`}>
+                  <p className="text-sm">{passwordError}</p>
+                </div>
+              )}
+
+              {passwordSuccess && (
+                <div className={`p-4 rounded-lg border ${isDarkMode ? "bg-green-900/20 border-green-800 text-green-400" : "bg-green-50 border-green-200 text-green-700"}`}>
+                  <p className="text-sm">{passwordSuccess}</p>
+                </div>
+              )}
+
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-zinc-300" : "text-zinc-700"}`}>
+                  Current Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.current ? "text" : "password"}
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                    placeholder="Enter current password"
+                    className={`w-full px-4 py-3 pr-10 rounded-lg border transition-colors ${isDarkMode 
+                      ? "bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500 focus:border-blue-500" 
+                      : "bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-blue-500"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisibility('current')}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDarkMode ? "text-zinc-400 hover:text-zinc-300" : "text-zinc-500 hover:text-zinc-700"}`}
+                  >
+                    {showPasswords.current ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-zinc-300" : "text-zinc-700"}`}>
+                  New Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.new ? "text" : "password"}
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                    placeholder="Minimum 8 characters"
+                    className={`w-full px-4 py-3 pr-10 rounded-lg border transition-colors ${isDarkMode 
+                      ? "bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500 focus:border-blue-500" 
+                      : "bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-blue-500"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisibility('new')}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDarkMode ? "text-zinc-400 hover:text-zinc-300" : "text-zinc-500 hover:text-zinc-700"}`}
+                  >
+                    {showPasswords.new ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-zinc-300" : "text-zinc-700"}`}>
+                  Confirm New Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.confirm ? "text" : "password"}
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                    placeholder="Re-enter new password"
+                    className={`w-full px-4 py-3 pr-10 rounded-lg border transition-colors ${isDarkMode 
+                      ? "bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500 focus:border-blue-500" 
+                      : "bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-blue-500"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisibility('confirm')}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDarkMode ? "text-zinc-400 hover:text-zinc-300" : "text-zinc-500 hover:text-zinc-700"}`}
+                  >
+                    {showPasswords.confirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className={`flex justify-end gap-3 p-6 border-t ${isDarkMode ? "border-zinc-800 bg-zinc-900/50" : "border-zinc-200 bg-zinc-50"}`}>
+              <Button
+                variant="outline"
+                onClick={() => setIsPasswordModalOpen(false)}
+                disabled={isChangingPassword}
+                className={isDarkMode ? "border-zinc-700 text-zinc-300 hover:bg-zinc-800" : ""}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handlePasswordChange}
+                disabled={isChangingPassword}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isChangingPassword ? "Updating..." : "Update Password"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -2,6 +2,7 @@
 // services/employee-service.js
 // ============================================================================
 import { BaseAPIService } from "../core/base-api.js"
+import { getStoredToken } from "../../auth.js"
 
 export class EmployeeService extends BaseAPIService {
   /**
@@ -9,11 +10,69 @@ export class EmployeeService extends BaseAPIService {
    * @param {Object} params - Query parameters (limit, offset, search, department, status, sortBy, sortOrder)
    * @returns {Promise} Response with employees, departments, pagination, and statistics
    */
-  async getEmployees(params = {}) {
-    const queryParams = new URLSearchParams(params).toString()
-    return this.request(`/api/employees?${queryParams}`)
-  }
+async getEmployees(params = {}, options = {}) {
+  try {
+    const queryParams = new URLSearchParams();
+    
+    // Add all params to query string
+    Object.keys(params).forEach(key => {
+      if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+        queryParams.append(key, params[key]);
+      }
+    });
 
+    const url = `${this.baseURL}/api/employees?${queryParams.toString()}`;
+    
+    console.log('[EmployeeService] Fetching employees:', url);
+
+    const fetchOptions = {
+      method: "GET",
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+    };
+
+    // Add abort signal if provided
+    if (options.signal) {
+      fetchOptions.signal = options.signal;
+    }
+
+    const response = await fetch(url, fetchOptions);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    return {
+      success: true,
+      employees: data.employees || data.data || [],
+      pagination: data.pagination || { total: 0, page: 1, limit: 20 },
+      statistics: data.statistics || {},
+      departments: data.departments || [],
+    };
+
+  } catch (error) {
+    // Don't log abort errors
+    if (error.name === 'AbortError') {
+      console.log('[EmployeeService] Request aborted');
+      throw error;
+    }
+    
+    console.error("Error fetching employees:", error);
+    return {
+      success: false,
+      error: error.message,
+      employees: [],
+      pagination: { total: 0, page: 1, limit: 20 },
+      statistics: {},
+      departments: [],
+    };
+  }
+}
   /**
    * Get single employee by ID
    * @param {number|string} id - Employee UID
@@ -93,6 +152,13 @@ export class EmployeeService extends BaseAPIService {
       method: "GET",
     })
   }
+
+  async updateEmployeePassword(id, passwordData) {
+  return this.request(`/api/employees/${id}/password`, {
+    method: "PUT",
+    body: JSON.stringify(passwordData),
+  })
+}
 
   /**
    * Validate employee data (email, ID, etc.)

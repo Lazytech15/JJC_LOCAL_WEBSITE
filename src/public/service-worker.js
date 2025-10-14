@@ -1,7 +1,12 @@
+// ============================================================================
+// service-worker.js - Enhanced with Profile Picture Caching
+// ============================================================================
+
 const CACHE_VERSION = "v1"
 const STATIC_CACHE = `jjc-static-${CACHE_VERSION}`
 const API_CACHE = `jjc-api-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `jjc-dynamic-${CACHE_VERSION}`
+const PROFILE_CACHE = `jjc-profiles-${CACHE_VERSION}` // New: Profile pictures cache
 
 const STATIC_ASSETS = ["/", "/offline.html", "/manifest.json"]
 
@@ -25,7 +30,11 @@ self.addEventListener("activate", (event) => {
       return Promise.all(
         cacheNames
           .filter((name) => {
-            return name.startsWith("jjc-") && name !== STATIC_CACHE && name !== API_CACHE && name !== DYNAMIC_CACHE
+            return name.startsWith("jjc-") && 
+                   name !== STATIC_CACHE && 
+                   name !== API_CACHE && 
+                   name !== DYNAMIC_CACHE &&
+                   name !== PROFILE_CACHE
           })
           .map((name) => {
             console.log("[Service Worker] Deleting old cache:", name)
@@ -44,6 +53,12 @@ self.addEventListener("fetch", (event) => {
 
   // Skip non-GET requests
   if (request.method !== "GET") {
+    return
+  }
+
+  // Profile pictures - Cache First with Long TTL
+  if (url.pathname.includes("/api/profile/")) {
+    event.respondWith(profileCacheStrategy(request, PROFILE_CACHE))
     return
   }
 
@@ -67,6 +82,49 @@ self.addEventListener("fetch", (event) => {
   // Dynamic content - Stale While Revalidate
   event.respondWith(staleWhileRevalidateStrategy(request, DYNAMIC_CACHE))
 })
+
+// Profile Cache Strategy - Cache First with long expiration
+async function profileCacheStrategy(request, cacheName) {
+  const cache = await caches.open(cacheName)
+  const cached = await cache.match(request)
+
+  // Return cached profile if exists
+  if (cached) {
+    console.log("[Service Worker] Profile from cache:", request.url)
+    
+    // Update in background (optional - for fresh data)
+    fetch(request)
+      .then((response) => {
+        if (response.ok && response.status === 200) {
+          cache.put(request, response.clone())
+          console.log("[Service Worker] Profile updated in cache:", request.url)
+        }
+      })
+      .catch(() => {
+        // Ignore background update errors
+      })
+    
+    return cached
+  }
+
+  // Fetch and cache if not in cache
+  try {
+    console.log("[Service Worker] Fetching profile:", request.url)
+    const response = await fetch(request)
+    
+    if (response.ok && response.status === 200) {
+      // Clone the response before caching
+      const responseToCache = response.clone()
+      cache.put(request, responseToCache)
+      console.log("[Service Worker] Profile cached:", request.url)
+    }
+    
+    return response
+  } catch (error) {
+    console.error("[Service Worker] Profile fetch failed:", error)
+    return new Response("Profile not available", { status: 503 })
+  }
+}
 
 // Cache First Strategy
 async function cacheFirstStrategy(request, cacheName) {
@@ -138,7 +196,6 @@ self.addEventListener("sync", (event) => {
 })
 
 async function syncData() {
-  // Implement sync logic here
   console.log("[Service Worker] Syncing data...")
 }
 
@@ -159,4 +216,33 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close()
   event.waitUntil(clients.openWindow(event.notification.data))
+})
+
+// Message handler for clearing profile cache
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "CLEAR_PROFILE_CACHE") {
+    event.waitUntil(
+      caches.delete(PROFILE_CACHE).then(() => {
+        console.log("[Service Worker] Profile cache cleared")
+        return caches.open(PROFILE_CACHE)
+      })
+    )
+  }
+  
+  if (event.data && event.data.type === "CLEAR_PROFILE") {
+    const uid = event.data.uid
+    event.waitUntil(
+      caches.open(PROFILE_CACHE).then((cache) => {
+        // Remove specific profile from cache
+        cache.keys().then((requests) => {
+          requests.forEach((request) => {
+            if (request.url.includes(`/api/profile/${uid}`)) {
+              cache.delete(request)
+              console.log("[Service Worker] Cleared profile cache for UID:", uid)
+            }
+          })
+        })
+      })
+    )
+  }
 })
