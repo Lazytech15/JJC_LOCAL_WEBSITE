@@ -301,7 +301,13 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       ...prev,
       selectedItems: prev.selectedItems.map(item => {
         if (item.item_no === itemNo) {
-          const updated = { ...item, [field]: value }
+          // Convert numeric fields to numbers
+          let processedValue = value
+          if (field === 'quantity' || field === 'price_per_unit') {
+            processedValue = Number(value) || 0
+          }
+          
+          const updated = { ...item, [field]: processedValue }
           
           // Recalculate amount if quantity or price changes
           if (field === 'quantity' || field === 'price_per_unit') {
