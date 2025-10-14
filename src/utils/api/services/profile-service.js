@@ -11,49 +11,120 @@ export class ProfileService extends BaseAPIService {
   }
 
   async getProfileByUid(uid) {
-    if (this.profileCache.has(uid)) {
-      return this.profileCache.get(uid)
+  try {
+    const response = await fetch(`${this.baseURL}/api/profile/${uid}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+    })
+
+    if (response.status === 404) {
+      return { success: false, error: "No profile picture found" }
     }
 
-    try {
-      const response = await fetch(`${this.baseURL}/api/profile/${uid}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${getStoredToken()}`,
-        },
-      })
-
-      if (response.status === 404) {
-        const result = { success: false, error: "No profile picture found" }
-        this.profileCache.set(uid, result)
-        return result
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        const error = new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
-        const result = { success: false, error: error.message }
-        this.profileCache.set(uid, result)
-        throw error
-      }
-
-      const blob = await response.blob()
-      const result = {
-        success: true,
-        blob,
-        url: URL.createObjectURL(blob)
-      }
-
-      this.profileCache.set(uid, result)
-      return result
-
-    } catch (error) {
-      console.error("Profile picture fetch error:", error)
-      const result = { success: false, error: error.message }
-      this.profileCache.set(uid, result)
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      const error = new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       throw error
     }
+
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    
+    return {
+      success: true,
+      blob,
+      url
+    }
+
+  } catch (error) {
+    console.error("Profile picture fetch error:", error)
+    return { success: false, error: error.message }
   }
+}
+
+// Simplified method to just get the URL without fetching
+getProfileUrlByUid(uid) {
+  // Returns the direct URL that will be cached by service worker
+  return `${this.baseURL}/api/profile/${uid}`
+}
+
+// Method to check if profile exists
+async checkProfileExists(uid) {
+  try {
+    const response = await fetch(`${this.baseURL}/api/profile/${uid}/info`, {
+      method: "HEAD", // Just check headers, don't download
+      headers: {
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+    })
+
+    return response.ok
+  } catch (error) {
+    return false
+  }
+}
+
+// Clear specific profile from service worker cache
+clearProfileFromServiceWorker(uid) {
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'CLEAR_PROFILE',
+      uid: uid
+    })
+  }
+}
+
+// Clear all profiles from service worker cache
+clearAllProfilesFromServiceWorker() {
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'CLEAR_PROFILE_CACHE'
+    })
+  }
+}
+
+// Updated clearProfileFromCache to also clear service worker
+clearProfileFromCache(uid) {
+  // Clear from local cache if exists
+  if (this.profileCache.has(uid)) {
+    const cached = this.profileCache.get(uid)
+    if (cached.success && cached.url && cached.url.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(cached.url)
+      } catch (error) {
+        console.warn('Failed to revoke blob URL:', error)
+      }
+    }
+    this.profileCache.delete(uid)
+  }
+
+  // Clear from service worker cache
+  this.clearProfileFromServiceWorker(uid)
+}
+
+// Preload profile picture (triggers service worker caching)
+async preloadProfile(uid) {
+  try {
+    const url = this.getProfileUrlByUid(uid)
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+    })
+    
+    if (response.ok) {
+      console.log(`[ProfileService] Preloaded profile for UID: ${uid}`)
+      return true
+    }
+    return false
+  } catch (error) {
+    console.error(`[ProfileService] Failed to preload profile for UID ${uid}:`, error)
+    return false
+  }
+}
 
   async getProfileInfoByUid(uid) {
     try {

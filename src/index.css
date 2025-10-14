@@ -68,3 +68,86 @@ html {
   animation: shimmer 3s infinite;
 }
 
+/* Custom scrollbar for suggestions dropdown */
+.autocomplete-suggestions::-webkit-scrollbar {
+  width: 8px;
+}
+
+.autocomplete-suggestions::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.autocomplete-suggestions::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.autocomplete-suggestions::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Dark mode scrollbar */
+.dark .autocomplete-suggestions::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dark .autocomplete-suggestions::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark .autocomplete-suggestions::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Smooth transitions for suggestions */
+.autocomplete-suggestion {
+  transition: all 0.15s ease-in-out;
+}
+
+.autocomplete-suggestion:hover {
+  transform: translateX(4px);
+}
+
+/* Loading animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Highlight styles */
+mark {
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* Fade in animation for suggestions */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.suggestion-dropdown {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Focus ring enhancement */
+.search-input:focus {
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.1);
+}
+
+.dark .search-input:focus {
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.1);
+}
+
