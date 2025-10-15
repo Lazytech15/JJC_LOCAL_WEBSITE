@@ -8,7 +8,7 @@ import PWAStatusIndicator from "../public/PWAStatusIndicator"
 import GearLoadingSpinner  from "../public/LoadingGear"
 import { ProcurementDepartmentSkeleton } from "./components/skeletons/ProcurementSkeletons"
 import './index.css'
-
+//addedsomething here
 // Lazy load department components for better performance
 const HRDepartment = lazy(() => import("./components/department/HRDepartment"))
 const OperationsDepartment = lazy(() => import("./components/department/OperationsDepartment"))
