@@ -259,8 +259,7 @@ export default function EmployeeDashboard() {
 
       {/* Top Header */}
       <header
-        className={`sticky top-0 z-40 backdrop-blur-lg ${isDarkMode ? "bg-zinc-900/80 border-zinc-800" : "bg-white/80 border-zinc-200"
-          }`}
+        className={`sticky top-0 z-40 backdrop-blur-lg`}
       >
         <div className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
