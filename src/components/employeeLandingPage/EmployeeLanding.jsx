@@ -2,6 +2,10 @@ import { Link } from "react-router-dom"
 import { Wrench, Cog, Building2, Truck, Factory, Phone, Mail, MapPin, Clock, ChevronRight, Menu, X, ChevronLeft } from "lucide-react"
 import { useState, useEffect } from "react"
 import logo from "../../assets/companyLogo.jpg"
+const images = import.meta.glob('../../assets/LandingPagePicture/*.{jpg,JPG}', { eager: true })
+const localImages = Object.values(images).map(mod => mod.default)
+
+
 
 const Button = ({ children, className = "", size = "default", ...props }) => {
   const sizeClasses = {
@@ -31,12 +35,7 @@ export default function EmployeeLanding() {
   const [currentSlide, setCurrentSlide] = useState(0)
 
   // Carousel images - replace these URLs with your actual images
-  const carouselImages = [
-    "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=1920&q=80", 
-    "https://images.unsplash.com/photo-1565043666747-69f6646db940?w=1920&q=80", 
-    "https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?w=1920&q=80", 
-    "https://images.unsplash.com/photo-1513828583688-c52646db42da?w=1920&q=80", 
-  ]
+  const carouselImages = [ ...localImages ]
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -149,11 +148,11 @@ export default function EmployeeLanding() {
               </div>
               <div className="flex justify-center text-white drop-shadow-lg">
                 <div className="flex gap-2 text-center items-center">
-                  <h1 className="text-5xl font-extrabold tracking-wide">JJC</h1>
-                  <div className="text-left mt-2">
-                    <p className="text-sm font-semibold uppercase leading-tight">Engineering Works</p>
+                  <h1 className="text-5xl califoniaFont tracking-wide">JJC</h1>
+                  <div className="text-left">
+                    <p className="text-sm califoniaFont font-semibold uppercase leading-tight">Engineering Works</p>
                     <hr className=" border-white/70" />
-                    <p className="text-sm font-semibold uppercase text-white">& General Services</p>
+                    <p className="text-sm font-semibold califoniaFont uppercase text-white">& General Services</p>
                   </div>
                 </div>
               </div>

@@ -6,6 +6,10 @@ import { AuthService } from "../../utils/api/services/auth-service"
 import { useAuth } from "../../contexts/AuthContext"
 import logo from "../../assets/companyLogo.jpg"
 import GearLoadingSpinner from "../../../public/LoadingGear"
+import IMG18 from "../../assets/LandingPagePicture/IMG18.JPG"
+import IMG22 from "../../assets/LandingPagePicture/IMG22.JPG"
+import IMG16 from "../../assets/LandingPagePicture/IMG16.JPG"
+import IMG45 from "../../assets/LandingPagePicture/IMG45.JPG"
 
 const Button = ({ children, className = "", disabled = false, type = "button", onClick, isDarkMode = false, ...props }) => (
   <button
@@ -118,22 +122,22 @@ export default function EmployeeLogin() {
 
   const carouselImages = [
     {
-      url: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=1920&q=80",
+      url: IMG18,
       title: "Precision Engineering",
       description: "State-of-the-art machinery and equipment"
     },
     {
-      url: "https://images.unsplash.com/photo-1565043666747-69f6646db940?w=1920&q=80",
-      title: "Modern Facilities",
-      description: "Advanced manufacturing capabilities"
+      url: IMG22,
+      title: "Friendly Employee",
+      description: "Employee love their works"
     },
     {
-      url: "https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?w=1920&q=80",
+      url: IMG16,
       title: "Expert Craftsmanship",
       description: "Decades of engineering excellence"
     },
     {
-      url: "https://images.unsplash.com/photo-1513828583688-c52646db42da?w=1920&q=80",
+      url: IMG45,
       title: "Quality Fabrication",
       description: "Industrial solutions you can trust"
     },
@@ -382,11 +386,11 @@ export default function EmployeeLogin() {
           </div>
           <div className="flex justify-center text-white drop-shadow-lg">
             <div className="flex gap-2 text-center items-center">
-              <h1 className="text-5xl font-extrabold tracking-wide">JJC</h1>
-              <div className="text-left mt-2">
-                <p className="text-sm font-semibold uppercase leading-tight">Engineering Works</p>
+              <h1 className="text-5xl califoniaFont font-extrabold tracking-wide">JJC</h1>
+              <div className="text-left">
+                <p className="text-sm font-semibold califoniaFont uppercase leading-tight">Engineering Works</p>
                 <hr className="border-white/70" />
-                <p className="text-sm font-semibold uppercase text-white">& General Services</p>
+                <p className="text-sm font-semibold califoniaFont uppercase text-white">& General Services</p>
               </div>
             </div>
           </div>

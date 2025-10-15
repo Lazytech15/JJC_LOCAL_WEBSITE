@@ -151,3 +151,25 @@ mark {
   box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.1);
 }
 
+
+/* font */
+
+.califoniaFont {
+  font-family: 'CalifoniaFB';
+  src: url('./assets/CustomFont/californian-fb.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+}
+
+/* @font-face {
+  font-family: 'YourFontName';
+  src: url('./assets/fonts/YourFont-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+} */
+
+/* Apply globally if you want */
+/* body {
+  font-family: 'YourFontName', sans-serif;
+} */
+
