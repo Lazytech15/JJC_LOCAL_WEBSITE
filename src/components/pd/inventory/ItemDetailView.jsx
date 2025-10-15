@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeft, Plus, Minus } from "lucide-react"
 import { items as itemsService } from "../../../utils/api/api-service.js"
-import { getStoredToken } from "../../../utils/auth"
 
 export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
   const [quantity, setQuantity] = useState(1)
@@ -12,9 +11,6 @@ export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
   const [images, setImages] = useState([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const rotationTimer = useRef(null)
-
-  // Image cache like HR Department
-  const [imageCache, setImageCache] = useState(new Map())
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -86,76 +82,37 @@ export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
 
   const status = deriveStatus(item)
 
-  // Load images individually like HR Department for faster loading
-  const loadImagesIndividually = async () => {
-    if (!item?.item_no) return
-
-    try {
-      // First try to get the image list
-      const res = await itemsService.getItemImages(item.item_no)
-      if (!res?.success) throw new Error('Failed to load images')
-
-      const imageList = res.data || []
-
-      // Load each image individually
-      imageList.forEach((img) => {
-        (async () => {
-          try {
-            const imageUrl = itemsService.getItemImageUrl(item.item_no, img.filename)
-
-            // Test if the image exists by fetching it
-            const response = await fetch(imageUrl, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${getStoredToken()}`
-              }
-            })
-
-            if (response.ok) {
-              // Cache the URL
-              setImageCache(prev => new Map(prev).set(img.filename, imageUrl))
-            }
-          } catch (err) {
-            console.log(`[ItemDetailView] ✗ Error loading image ${img.filename}:`, err.message)
-          }
-        })()
-      })
-
-      // Set images list
-      setImages(imageList)
-      setCurrentIndex(0)
-
-    } catch (e) {
-      console.error('[ItemDetailView] Failed to load images list:', e)
-      // Fallback to latest image
-      try {
-        const latestUrl = itemsService.getItemLatestImageUrl(item.item_no)
-        const response = await fetch(latestUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${getStoredToken()}`
-          }
-        })
-
-        if (response.ok) {
-          setImageCache(prev => new Map(prev).set('latest', latestUrl))
-          setImages([{ filename: 'latest', url: latestUrl }])
-        }
-      } catch (fallbackErr) {
-        console.log('[ItemDetailView] No images available')
-      }
-    }
-  }
-
   useEffect(() => {
     setImageError(false)
-    setImageCache(new Map()) // Clear cache for new item
-    setImages([])
-    setImageUrl(null)
-
-    if (item?.item_no) {
-      loadImagesIndividually()
+    if (!item?.item_no) {
+      setImageUrl(null)
+      return
     }
+    // Load images list
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await itemsService.getItemImages(item.item_no)
+        if (!res?.success) throw new Error('Failed to load images')
+        const list = (res.data || []).map(img => ({
+          ...img,
+          url: `${itemsService.getItemImageUrl(item.item_no, img.filename)}?t=${Date.now()}`,
+        }))
+        if (!cancelled) {
+          setImages(list)
+          setCurrentIndex(0)
+          setImageUrl(list[0]?.url || null)
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setImages([])
+          // Fallback to latest endpoint if listing fails
+          const url = itemsService.getItemLatestImageUrl(item.item_no)
+          setImageUrl(`${url}?t=${Date.now()}`)
+        }
+      }
+    })()
+    return () => { cancelled = true }
   }, [item?.item_no])
 
   // Auto-rotate when multiple images
@@ -175,17 +132,11 @@ export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
   }, [images.length])
 
   useEffect(() => {
-    if (images.length > 0 && currentIndex < images.length) {
-      const currentImage = images[currentIndex]
-      if (currentImage) {
-        const cachedUrl = imageCache.get(currentImage.filename)
-        setImageUrl(cachedUrl || null)
-        setImageError(false)
-      }
-    } else {
-      setImageUrl(null)
+    if (images.length > 0) {
+      setImageUrl(images[currentIndex]?.url || null)
+      setImageError(false)
     }
-  }, [currentIndex, images, imageCache])
+  }, [currentIndex, images])
 
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-6">

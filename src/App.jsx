@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext"
 import { lazy, Suspense } from "react"
 import DepartmentSelector from "./components/DepartmentSelector"
 import LoginForm from "./components/LoginForm"
-import { ProcurementDepartmentSkeleton } from "./components/skeletons/ProcurementSkeletons"
 import './index.css'
 
 // Lazy load department components for better performance
@@ -148,9 +147,7 @@ function RoutesWrapper() {
                 path="/jjcewgsaccess/procurement"
                 element={
                   <AdminProtectedRoute department="Procurement">
-                    <Suspense fallback={<ProcurementDepartmentSkeleton />}>
-                      <ProcurementDepartment />
-                    </Suspense>
+                    <ProcurementDepartment />
                   </AdminProtectedRoute>
                 }
               />
