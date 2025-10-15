@@ -32,10 +32,10 @@ export default function EmployeeLanding() {
 
   // Carousel images - replace these URLs with your actual images
   const carouselImages = [
-    "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=1920&q=80", // Industrial machinery
-    "https://images.unsplash.com/photo-1565043666747-69f6646db940?w=1920&q=80", // Factory floor
-    "https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?w=1920&q=80", // Engineering work
-    "https://images.unsplash.com/photo-1513828583688-c52646db42da?w=1920&q=80", // Metal fabrication
+    "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=1920&q=80", 
+    "https://images.unsplash.com/photo-1565043666747-69f6646db940?w=1920&q=80", 
+    "https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?w=1920&q=80", 
+    "https://images.unsplash.com/photo-1513828583688-c52646db42da?w=1920&q=80", 
   ]
 
   useEffect(() => {
