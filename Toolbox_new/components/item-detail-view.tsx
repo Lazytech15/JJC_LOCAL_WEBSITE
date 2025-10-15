@@ -19,9 +19,79 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [imageCache, setImageCache] = useState<Map<string, string>>(new Map())
   const [images, setImages] = useState<any[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const rotationTimer = useRef<NodeJS.Timeout | null>(null)
+
+  // Load images individually like HR/PD departments for better error handling
+  const loadImagesIndividually = async () => {
+    if (!product?.id) return
+
+    const itemId = typeof product.id === 'number' ? product.id : parseInt(product.id, 10)
+    if (isNaN(itemId)) return
+
+    try {
+      // First try to get the image list
+      const res = await apiService.getItemImages(itemId)
+      if (!res?.success) throw new Error('Failed to load images')
+
+      const imageList = res.data || []
+
+      // Load each image individually with existence check
+      imageList.forEach((img: any) => {
+        (async () => {
+          try {
+            const imageUrl = apiService.getItemImageUrl(itemId, img.filename)
+
+            // Test if the image exists by fetching it
+            const response = await fetch(imageUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
+              }
+            })
+
+            if (response.ok) {
+              // Cache the URL
+              setImageCache(prev => new Map(prev).set(img.filename, imageUrl))
+            }
+          } catch (err) {
+            console.log(`[Toolbox ItemDetailView] ✗ Error loading image ${img.filename}:`, (err as Error).message)
+          }
+        })()
+      })
+
+      // Set images list and initial image
+      const validImages = imageList.filter((img: any) => imageCache.has(img.filename))
+      setImages(validImages)
+      setCurrentIndex(0)
+      if (validImages.length > 0) {
+        setImageUrl(imageCache.get(validImages[0].filename) || null)
+      }
+
+    } catch (e) {
+      console.error('[Toolbox ItemDetailView] Failed to load images list:', e)
+      // Fallback to latest image
+      try {
+        const latestUrl = apiService.getItemLatestImageUrl(itemId)
+        const response = await fetch(latestUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
+          }
+        })
+
+        if (response.ok) {
+          setImageCache(prev => new Map(prev).set('latest', latestUrl))
+          setImages([{ filename: 'latest', url: latestUrl }])
+          setImageUrl(latestUrl)
+        }
+      } catch (fallbackErr) {
+        console.log('[Toolbox ItemDetailView] No images available')
+      }
+    }
+  }
 
   const getStatusColor = (status: Product["status"]) => {
     switch (status) {
@@ -74,41 +144,14 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
       setImageUrl(null)
       return
     }
-    
+
     const itemId = typeof product.id === 'number' ? product.id : parseInt(product.id, 10)
     if (isNaN(itemId)) {
       setImageUrl(null)
       return
     }
-    
-    // Load images list
-    let cancelled = false
-    ;(async () => {
-      try {
-        const res = await apiService.getItemImages(itemId)
-        if (!res?.success) throw new Error('Failed to load images')
-        
-        const list = (res.data || []).map((img: any) => ({
-          ...img,
-          url: `${apiService.getItemImageUrl(itemId, img.filename)}?t=${Date.now()}`,
-        }))
-        
-        if (!cancelled) {
-          setImages(list)
-          setCurrentIndex(0)
-          setImageUrl(list[0]?.url || null)
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setImages([])
-          // Fallback to latest endpoint if listing fails
-          const url = apiService.getItemLatestImageUrl(itemId)
-          setImageUrl(`${url}?t=${Date.now()}`)
-        }
-      }
-    })()
-    
-    return () => { cancelled = true }
+
+    loadImagesIndividually()
   }, [product?.id])
 
   // Auto-rotate when multiple images
