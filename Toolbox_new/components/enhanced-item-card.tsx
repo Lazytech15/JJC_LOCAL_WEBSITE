@@ -6,9 +6,6 @@ import { Briefcase, Eye, Package, TrendingUp, TrendingDown, AlertTriangle } from
 import type { Product } from '../lib/barcode-scanner'
 import { apiService } from '../lib/api_service'
 
-// Global image cache for faster loading
-const imageCache = new Map<string, string>()
-
 interface EnhancedItemCardProps {
   product: Product
   onAddToCart: (product: Product, quantity?: number) => void
@@ -26,7 +23,7 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   
-  // Fetch image URL with caching like HR Department
+  // Fetch image URL from API
   useEffect(() => {
     setImageError(false)
     setImageLoaded(false)
@@ -41,44 +38,10 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
       setImageUrl(null)
       return
     }
-
-    const cacheKey = `item_${itemId}`
     
-    // Check cache first
-    if (imageCache.has(cacheKey)) {
-      setImageUrl(imageCache.get(cacheKey)!)
-      setImageLoaded(true)
-      return
-    }
-    
-    // Load image individually
-    const loadImage = async () => {
-      try {
-        const url = apiService.getItemLatestImageUrl(itemId)
-        
-        // Test if image exists
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
-          }
-        })
-        
-        if (response.ok) {
-          // Cache the URL
-          imageCache.set(cacheKey, url)
-          setImageUrl(url)
-          setImageLoaded(true)
-        } else {
-          setImageError(true)
-        }
-      } catch (err) {
-        console.log(`[EnhancedItemCard] Error loading image for item ${itemId}:`, err)
-        setImageError(true)
-      }
-    }
-    
-    loadImage()
+    // Use latest image URL
+    const url = apiService.getItemLatestImageUrl(itemId)
+    setImageUrl(`${url}?t=${Date.now()}`)
   }, [product?.id])
   
   const getStockStatus = (balance: number) => {

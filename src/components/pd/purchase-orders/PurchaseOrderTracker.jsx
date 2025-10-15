@@ -3,7 +3,6 @@ import { useAuth } from "../../../contexts/AuthContext"
 import apiService from "../../../utils/api/api-service"
 import { ModalPortal, useToast } from "../shared"
 import CreatePurchaseOrderWizard from "./CreatePurchaseOrderWizard"
-import { PurchaseOrderTrackerSkeleton } from "../../skeletons/ProcurementSkeletons"
 import { exportPurchaseOrderToPDF, exportPurchaseOrderToExcel } from "../../../utils/purchase-order-export"
 
 function PurchaseOrderTracker() {
@@ -486,10 +485,6 @@ function PurchaseOrderTracker() {
         showError("Error", err.message || "Failed to delete purchase order")
       }
     }
-  }
-
-  if (loading) {
-    return <PurchaseOrderTrackerSkeleton />
   }
 
   return (

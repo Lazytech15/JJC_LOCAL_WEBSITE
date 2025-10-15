@@ -25,12 +25,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     // Step 2 - Items
     selectedItems: [],
     
-    // Step 3 - Tax & Discount
-    tax_type: "goods", // goods (1%), services (2%), rental (5%)
-    has_discount: false,
-    discount_percentage: 0,
-    
-    // Step 4 - Details
+    // Step 3 - Details
     attention_person: "",
     terms: "",
     po_date: new Date().toISOString().split('T')[0],
@@ -301,13 +296,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       ...prev,
       selectedItems: prev.selectedItems.map(item => {
         if (item.item_no === itemNo) {
-          // Convert numeric fields to numbers
-          let processedValue = value
-          if (field === 'quantity' || field === 'price_per_unit') {
-            processedValue = Number(value) || 0
-          }
-          
-          const updated = { ...item, [field]: processedValue }
+          const updated = { ...item, [field]: value }
           
           // Recalculate amount if quantity or price changes
           if (field === 'quantity' || field === 'price_per_unit') {
@@ -323,42 +312,6 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
   const calculateTotal = () => {
     return formData.selectedItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
-  }
-
-  // Tax calculation functions
-  const getTaxRate = () => {
-    switch(formData.tax_type) {
-      case 'goods': return 0.01 // 1%
-      case 'services': return 0.02 // 2%
-      case 'rental': return 0.05 // 5%
-      default: return 0.01
-    }
-  }
-
-  const calculateTaxBreakdown = () => {
-    const totalBeforeWithholdingTax = calculateTotal() // TBWT
-    const subtotal = totalBeforeWithholdingTax / 1.12 // Remove 12% VAT to get subtotal
-    const taxRate = getTaxRate()
-    const withholdingTax = subtotal * taxRate
-    const totalAfterWithholdingTax = totalBeforeWithholdingTax - withholdingTax
-    
-    // Calculate discount
-    const discountAmount = formData.has_discount 
-      ? totalAfterWithholdingTax * (Number(formData.discount_percentage) / 100)
-      : 0
-    
-    const grandTotal = totalAfterWithholdingTax - discountAmount
-
-    return {
-      totalBeforeWithholdingTax,
-      subtotal,
-      taxRate: taxRate * 100, // Convert to percentage for display
-      withholdingTax,
-      totalAfterWithholdingTax,
-      discountPercentage: formData.has_discount ? Number(formData.discount_percentage) : 0,
-      discountAmount,
-      grandTotal
-    }
   }
 
   const handleNext = () => {
@@ -386,14 +339,6 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     }
     
     if (currentStep === 3) {
-      // Tax & discount validation
-      if (formData.has_discount && (!formData.discount_percentage || formData.discount_percentage <= 0)) {
-        setError("Please enter a valid discount percentage")
-        return
-      }
-    }
-    
-    if (currentStep === 4) {
       if (!formData.prepared_by || !formData.verified_by || !formData.approved_by) {
         setError("Please fill in all signature fields")
         return
@@ -415,10 +360,6 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       if (!formData.selectedItems || formData.selectedItems.length === 0) return false
     }
     if (step === 3) {
-      // Tax & discount step - always valid as defaults are set
-      return true
-    }
-    if (step === 4) {
       // partial checks for details
       // allow navigation if prepared_by exists (array) and terms present
       if (!formData.prepared_by || formData.prepared_by.filter(p => p && p.trim()).length === 0) return false
@@ -444,9 +385,6 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       setLoading(true)
       setError(null)
       
-      // Calculate tax breakdown for submission
-      const taxBreakdown = calculateTaxBreakdown()
-      
       const orderData = {
         po_number: formData.po_number,
         supplier_name: formData.supplier_name,
@@ -459,15 +397,6 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         verified_by: formData.verified_by,
         approved_by: formData.approved_by,
         notes: formData.notes,
-        // Tax and discount information
-        tax_type: formData.tax_type,
-        has_discount: formData.has_discount,
-        discount_percentage: formData.has_discount ? formData.discount_percentage : 0,
-        // Tax breakdown
-        subtotal: taxBreakdown.subtotal,
-        withholding_tax_amount: taxBreakdown.withholdingTax,
-        discount_amount: taxBreakdown.discountAmount,
-        grand_total: taxBreakdown.grandTotal,
         items: formData.selectedItems.map(item => ({
           item_no: item.item_no,
           quantity: item.quantity,
@@ -508,9 +437,6 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       po_number: "",
       po_sequence: "",
       selectedItems: [],
-      tax_type: "goods",
-      has_discount: false,
-      discount_percentage: 0,
       attention_person: "",
       terms: "",
       po_date: new Date().toISOString().split('T')[0],
@@ -531,9 +457,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   const steps = [
     { number: 1, title: "PO Number & Supplier", icon: "🏭" },
     { number: 2, title: "Select Items", icon: "📦" },
-    { number: 3, title: "Tax & Discount", icon: "💰" },
-    { number: 4, title: "PO Details", icon: "📝" },
-    { number: 5, title: "Review & Submit", icon: "✅" }
+    { number: 3, title: "PO Details", icon: "📝" },
+    { number: 4, title: "Review & Submit", icon: "✅" }
   ]
 
   return (
@@ -894,156 +819,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                   </div>
                 )}
 
-                {/* Step 3: Tax & Discount */}
+                {/* Step 3: PO Details */}
                 {currentStep === 3 && (
-                  <div className="space-y-6">
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                      <h3 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-                        💰 Tax Calculation & Discounts
-                      </h3>
-                      <p className="text-yellow-700 dark:text-yellow-300 text-sm">
-                        Configure withholding tax type and optional discounts for this purchase order
-                      </p>
-                    </div>
-
-                    {/* Tax Type Selection */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                        Withholding Tax Type *
-                      </label>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {[
-                          { value: 'goods', label: 'Goods', rate: '1%', description: 'For physical goods and materials' },
-                          { value: 'services', label: 'Services', rate: '2%', description: 'For service-based transactions' },
-                          { value: 'rental', label: 'Rental', rate: '5%', description: 'For rental and lease agreements' }
-                        ].map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => setFormData(prev => ({ ...prev, tax_type: option.value }))}
-                            className={`p-4 rounded-lg border-2 transition-all text-left ${
-                              formData.tax_type === option.value
-                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-400'
-                                : 'border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-semibold text-gray-900 dark:text-gray-100">{option.label}</span>
-                              <span className="text-xl font-bold text-blue-600 dark:text-blue-400">{option.rate}</span>
-                            </div>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">{option.description}</p>
-                            {formData.tax_type === option.value && (
-                              <div className="mt-2 flex items-center gap-1 text-blue-600 dark:text-blue-400 text-sm">
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                </svg>
-                                Selected
-                              </div>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Tax Calculation Preview */}
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-                      <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Tax Calculation Breakdown</h4>
-                      <div className="space-y-3">
-                        {(() => {
-                          const breakdown = calculateTaxBreakdown()
-                          return (
-                            <>
-                              <div className="flex justify-between items-center pb-2 border-b border-gray-300 dark:border-gray-600">
-                                <span className="text-sm text-gray-700 dark:text-gray-300">Total Before Withholding Tax (TBWT)</span>
-                                <span className="font-semibold text-gray-900 dark:text-gray-100">₱{breakdown.totalBeforeWithholdingTax.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between items-center text-sm">
-                                <span className="text-gray-600 dark:text-gray-400">÷ 1.12 (Remove 12% VAT)</span>
-                                <span></span>
-                              </div>
-                              <div className="flex justify-between items-center pb-2 border-b border-gray-300 dark:border-gray-600">
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Subtotal (Gross Total)</span>
-                                <span className="font-semibold text-gray-900 dark:text-gray-100">₱{breakdown.subtotal.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-700 dark:text-gray-300">Withholding Tax ({breakdown.taxRate}%)</span>
-                                <span className="font-semibold text-red-600 dark:text-red-400">- ₱{breakdown.withholdingTax.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between items-center pb-2 border-b-2 border-gray-400 dark:border-gray-500">
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Total After Withholding Tax</span>
-                                <span className="font-semibold text-gray-900 dark:text-gray-100">₱{breakdown.totalAfterWithholdingTax.toFixed(2)}</span>
-                              </div>
-                              {breakdown.discountAmount > 0 && (
-                                <>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">Discount ({breakdown.discountPercentage}%)</span>
-                                    <span className="font-semibold text-red-600 dark:text-red-400">- ₱{breakdown.discountAmount.toFixed(2)}</span>
-                                  </div>
-                                </>
-                              )}
-                              <div className="flex justify-between items-center pt-2 border-t-2 border-gray-400 dark:border-gray-500">
-                                <span className="text-lg font-bold text-gray-900 dark:text-gray-100">Grand Total</span>
-                                <span className="text-2xl font-bold text-green-600 dark:text-green-400">₱{breakdown.grandTotal.toFixed(2)}</span>
-                              </div>
-                            </>
-                          )
-                        })()}
-                      </div>
-                    </div>
-
-                    {/* Discount Section */}
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border-2 border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center gap-3 mb-4">
-                        <input
-                          type="checkbox"
-                          id="hasDiscount"
-                          checked={formData.has_discount}
-                          onChange={(e) => setFormData(prev => ({ 
-                            ...prev, 
-                            has_discount: e.target.checked,
-                            discount_percentage: e.target.checked ? prev.discount_percentage : 0
-                          }))}
-                          className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                        />
-                        <label htmlFor="hasDiscount" className="font-semibold text-gray-900 dark:text-gray-100 cursor-pointer">
-                          Apply Discount
-                        </label>
-                      </div>
-                      
-                      {formData.has_discount && (
-                        <div className="mt-4">
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                            Discount Percentage (%)
-                          </label>
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              value={formData.discount_percentage}
-                              onChange={(e) => setFormData(prev => ({ 
-                                ...prev, 
-                                discount_percentage: Math.max(0, Math.min(100, Number(e.target.value)))
-                              }))}
-                              className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                                bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-lg font-semibold
-                                focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                              placeholder="Enter discount percentage (0-100)"
-                            />
-                            <span className="text-2xl font-bold text-gray-600 dark:text-gray-400">%</span>
-                          </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                            Enter a value between 0 and 100
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 4: PO Details */}
-                {currentStep === 4 && (
                   <div className="space-y-6">
                     <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
                       <h3 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">
@@ -1193,8 +970,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                   </div>
                 )}
 
-                {/* Step 5: Review & Submit */}
-                {currentStep === 5 && (
+                {/* Step 4: Review & Submit */}
+                {currentStep === 4 && (
                   <div className="space-y-6">
                     {/* Receipt Preview */}
                     <div className="bg-white border-4 border-gray-900 rounded-lg p-8 shadow-lg">
@@ -1255,64 +1032,18 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                               <td className="border border-gray-900 px-3 py-2 text-center text-sm text-gray-900">{item.quantity}</td>
                               <td className="border border-gray-900 px-3 py-2 text-center text-sm text-gray-900">{item.unit}</td>
                               <td className="border border-gray-900 px-3 py-2 text-sm text-gray-900">{item.item_name}</td>
-                              <td className="border border-gray-900 px-3 py-2 text-right text-sm text-gray-900">{item.price_per_unit.toFixed(2)}</td>
-                              <td className="border border-gray-900 px-3 py-2 text-right text-sm font-semibold text-gray-900">{item.amount.toFixed(2)}</td>
+                              <td className="border border-gray-900 px-3 py-2 text-right text-sm text-gray-900">₱{item.price_per_unit.toFixed(2)}</td>
+                              <td className="border border-gray-900 px-3 py-2 text-right text-sm font-semibold text-gray-900">₱{item.amount.toFixed(2)}</td>
                             </tr>
                           ))}
-                          {(() => {
-                            const breakdown = calculateTaxBreakdown()
-                            return (
-                              <>
-                                {/* Subtotal Row */}
-                                <tr className="bg-gray-100">
-                                  <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right font-semibold text-gray-900">
-                                    GROSS TOTAL (with 12% VAT):
-                                  </td>
-                                  <td className="border border-gray-900 px-3 py-2 text-right font-bold text-gray-900">
-                                    ₱{breakdown.totalBeforeWithholdingTax.toFixed(2)}
-                                  </td>
-                                </tr>
-                                {/* Subtotal after VAT removal */}
-                                <tr className="bg-white">
-                                  <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right text-sm text-gray-700">
-                                    Subtotal (Gross Total ÷ 1.12):
-                                  </td>
-                                  <td className="border border-gray-900 px-3 py-2 text-right font-semibold text-gray-900">
-                                    ₱{breakdown.subtotal.toFixed(2)}
-                                  </td>
-                                </tr>
-                                {/* Withholding Tax */}
-                                <tr className="bg-white">
-                                  <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right text-sm text-gray-700">
-                                    Less: Withholding Tax ({breakdown.taxRate}% - {formData.tax_type.charAt(0).toUpperCase() + formData.tax_type.slice(1)}):
-                                  </td>
-                                  <td className="border border-gray-900 px-3 py-2 text-right font-semibold text-red-700">
-                                    (₱{breakdown.withholdingTax.toFixed(2)})
-                                  </td>
-                                </tr>
-                                {/* Discount if applicable */}
-                                {breakdown.discountAmount > 0 && (
-                                  <tr className="bg-white">
-                                    <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right text-sm text-gray-700">
-                                      Less: Discount ({breakdown.discountPercentage}%):
-                                    </td>
-                                    <td className="border border-gray-900 px-3 py-2 text-right font-semibold text-red-700">
-                                      (₱{breakdown.discountAmount.toFixed(2)})
-                                    </td>
-                                  </tr>
-                                )}
-                                {/* Grand Total */}
-                                <tr className="bg-gray-200">
-                                  <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right font-bold text-gray-900">
-                                    GRAND TOTAL:
-                                  </td>
-                                  <td className="border border-gray-900 px-3 py-2 text-right font-bold text-lg text-green-700">
-                                    ₱{breakdown.grandTotal.toFixed(2)}
-                                  </td>
-                                </tr>
-                              </>
-                            )
-                          })()}
+                          <tr className="bg-gray-200">
+                            <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right font-bold text-gray-900">
+                              TOTAL:
+                            </td>
+                            <td className="border border-gray-900 px-3 py-2 text-right font-bold text-lg text-gray-900">
+                              ₱{calculateTotal().toFixed(2)}
+                            </td>
+                          </tr>
                         </tbody>
                       </table>
 
@@ -1380,7 +1111,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                     {/* Action Buttons */}
                     <div className="flex items-center justify-center gap-4">
                       <button
-                        onClick={() => setCurrentStep(4)}
+                        onClick={() => setCurrentStep(3)}
                         className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                       >
                         ← Edit Details
@@ -1412,7 +1143,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
           </div>
 
           {/* Footer Navigation */}
-          {currentStep < 5 && !loading && (
+          {currentStep < 4 && !loading && (
             <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between bg-gray-50 dark:bg-gray-800">
               <button
                 onClick={currentStep === 1 ? handleClose : handleBack}
@@ -1422,7 +1153,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
               </button>
               
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                Step {currentStep} of 5
+                Step {currentStep} of 4
               </div>
               
               <button

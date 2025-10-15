@@ -2,7 +2,6 @@ import { useState, useEffect } from "react"
 import { useAuth } from "../../contexts/AuthContext"
 import apiService from "../../utils/api/api-service"
 import { useToast } from "./shared/ToastNotification"
-import { SupplierManagementSkeleton } from "../skeletons/ProcurementSkeletons"
 
 function SupplierManagement() {
   const { isDarkMode } = useAuth()
@@ -12,7 +11,6 @@ function SupplierManagement() {
   const [supplierMetrics, setSupplierMetrics] = useState(null)
   const [suppliers, setSuppliers] = useState([])
   const [loading, setLoading] = useState(false)
-  const [initialLoading, setInitialLoading] = useState(true)
   
   // Supplier management modal states
   const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false)
@@ -65,14 +63,14 @@ function SupplierManagement() {
 
   const fetchSuppliers = async () => {
     try {
-      setInitialLoading(true)
+      setLoading(true)
       const result = await apiService.suppliers.getSuppliers()
       setSuppliers(result.suppliers || [])
     } catch (error) {
       console.error("Error fetching suppliers:", error)
       showError("Failed to fetch suppliers")
     } finally {
-      setInitialLoading(false)
+      setLoading(false)
     }
   }
 
@@ -215,10 +213,6 @@ function SupplierManagement() {
     } finally {
       setLoading(false)
     }
-  }
-
-  if (initialLoading) {
-    return <SupplierManagementSkeleton />
   }
 
   return (
