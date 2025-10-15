@@ -12,6 +12,7 @@ import { useServiceWorker } from "../../hooks/use-service-worker"
 import { getStoredToken, verifyToken, clearTokens } from "../../utils/auth"
 import logo from "../../assets/companyLogo.jpg"
 import apiService from "../../utils/api/api-service"
+import GearLoadingSpinner from "../../../public/LoadingGear"
 // Import the components
 import DashboardHome from "./DashboardComponents/DashboardHome"
 import Announcements from "./DashboardComponents/Announcements"
@@ -237,12 +238,7 @@ export default function EmployeeDashboard() {
 
   if (loading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-zinc-950" : "bg-zinc-50"}`}>
-        <div className="text-center">
-          <Loader2 className={`w-8 h-8 animate-spin mx-auto mb-4 ${isDarkMode ? "text-white" : "text-zinc-900"}`} />
-          <p className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>Loading dashboard...</p>
-        </div>
-      </div>
+      <GearLoadingSpinner isDarkMode={isDarkMode} />
     )
   }
 
