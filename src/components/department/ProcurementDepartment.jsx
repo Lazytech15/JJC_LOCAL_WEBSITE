@@ -211,9 +211,8 @@ function ProcurementDepartment() {
         }}/>
       </div>
       
-      {/* Enhanced Interactive Header - Moved to top level */}
       <div className="relative z-50">
-        <div className="bg-gradient-to-r from-slate-800 via-zinc-800 to-slate-800 dark:from-slate-900 dark:via-zinc-900 dark:to-slate-900 rounded-xl shadow-xl p-4 sm:p-6 mb-4 border-l-4 border-amber-500 dark:border-amber-400 relative overflow-hidden group mx-2 sm:mx-3 md:mx-4">
+            <div className="bg-gradient-to-r from-slate-800 via-zinc-800 to-slate-800 dark:from-slate-900 dark:via-zinc-900 dark:to-slate-900 rounded-xl shadow-xl p-4 sm:p-6 mb-4 border-l-4 border-amber-500 dark:border-amber-400 relative group mx-2 sm:mx-3 md:mx-4">
           {/* Animated Background Pattern */}
           <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]">
             <div className="absolute inset-0" style={{
@@ -464,17 +463,16 @@ function ProcurementDepartment() {
           </div>
         )}
 
-        {/* Enhanced Modern Navigation Bar (stabilized) */}
         <div className={`
-          sticky top-0 z-60 w-full mb-3
-          transition-shadow duration-150 ease-in-out
-        `}>
-          <div className={`
-            relative overflow-hidden mx-auto max-w-[1600px] px-4
+            sticky top-0 z-10 w-full mb-3
             transition-shadow duration-150 ease-in-out
-            ${isScrolled ? 'rounded-full shadow-xl border-2' : 'rounded-xl shadow-lg border'}
-            bg-slate-900 border-slate-800/60 dark:border-slate-700/60
           `}>
+            <div className={`
+              relative mx-auto max-w-[1600px] px-4
+              transition-shadow duration-150 ease-in-out
+              ${isScrolled ? 'rounded-full shadow-xl border-2' : 'rounded-xl shadow-lg border'}
+              bg-slate-900 border-slate-800/60 dark:border-slate-700/60
+            `}>
             <div
               className={`flex overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent justify-center w-full transition-transform duration-150 ${isScrolled ? 'px-3 py-2' : 'px-4 py-3'}`}
               style={{ transform: isScrolled ? 'scale(0.985)' : 'scale(1)' }}
@@ -593,9 +591,8 @@ function ProcurementDepartment() {
           </div>
         )}
 
-        {/* Content - Compact */}
-        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-lg shadow-lg border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
-          <div className="p-3 sm:p-4">
+          <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-lg shadow-lg border border-slate-200/50 dark:border-slate-700/50">
+            <div className="p-3 sm:p-4">
             {activeTab === "dashboard" && <AdminDashboard onNavigate={setActiveTab} />}
             {activeTab === "inventory" && <InventoryManagement />}
             {activeTab === "orders" && <PurchaseOrderTracker />}
