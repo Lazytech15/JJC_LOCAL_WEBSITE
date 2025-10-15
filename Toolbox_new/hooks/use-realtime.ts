@@ -10,42 +10,142 @@ interface RealtimeEvent {
   timestamp: number
 }
 
-// Polling-based manager for Toolbox (replaces websocket with simple periodic refresh)
+// Toolbox-specific polling manager (adapted from JJC website polling system)
 class ToolboxPollingManager {
-  private isConnected = false
-  private eventListeners: Map<string, ((data: any) => void)[]> = new Map()
-  private pollingTimer: NodeJS.Timeout | null = null
-  private pollingInterval = 5000 // Poll every 5 seconds for data refresh
+  private listenerManager: Map<string, ((data: any) => void)[]> = new Map()
+  private eventHandlers: any[] = []
+  private pollingInterval: NodeJS.Timeout | null = null
+  private lastTimestamp = 0
+  private isPolling = false
+  private pollingRate = 3000 // 3 seconds for Toolbox
+  private rooms: Set<string> = new Set()
+  private connectionState = 'disconnected'
+  private processedEventIds: Set<string> = new Set()
+  private apiUrl: string
+  private _internalHandlers: Map<string, ((data: any) => void)[]> | undefined
 
-  constructor(_apiUrl: string) {
-    // apiUrl not needed for simple polling
+  constructor(apiUrl: string) {
+    this.apiUrl = apiUrl
   }
 
   initialize() {
-    if (this.isConnected) return
-
-    console.log('[Toolbox] Initializing polling manager')
-    this.isConnected = true
-    this.startPolling()
+    if (!this.isPolling) {
+      this.setupEventHandlers()
+      this.startPolling()
+      this.connectionState = 'connected'
+      this.notifyListeners('connection', { status: 'connected' })
+    }
+    return this
   }
 
-  private startPolling() {
-    if (this.pollingTimer) return
+  setupEventHandlers() {
+    // Create mock socket interface for handlers
+    const mockSocket = this.createMockSocketInterface()
 
-    const poll = () => {
-      // Trigger refresh events for all subscribed listeners
-      this.triggerRefreshEvents()
+    // Initialize event handlers for Toolbox
+    this.eventHandlers = []
 
-      // Schedule next poll
-      this.pollingTimer = setTimeout(poll, this.pollingInterval)
+    // Setup all handlers
+    this.eventHandlers.forEach(handler => {
+      handler.setupHandlers(mockSocket)
+    })
+  }
+
+  createMockSocketInterface() {
+    const internalHandlers = new Map()
+
+    return {
+      on: (event: string, callback: (data: any) => void) => {
+        if (!internalHandlers.has(event)) {
+          internalHandlers.set(event, [])
+        }
+        internalHandlers.get(event).push(callback)
+        this._internalHandlers = internalHandlers
+      },
+      emit: (event: string, data: any) => {
+        console.log('[Toolbox Socket Mock] Emit:', event, data)
+      },
+      connected: true,
+      id: 'toolbox-polling-' + Date.now()
+    }
+  }
+
+  async startPolling() {
+    if (this.pollingInterval) {
+      return
     }
 
-    // Start polling immediately
-    poll()
+    this.isPolling = true
+
+    // Initial poll
+    await this.poll()
+
+    // Set up interval
+    this.pollingInterval = setInterval(() => {
+      this.poll()
+    }, this.pollingRate)
+
+    console.log(`📡 Toolbox polling started (every ${this.pollingRate}ms)`)
   }
 
-  private triggerRefreshEvents() {
-    // Trigger refresh events for different data types
+  async poll() {
+    try {
+      // Try to poll for events from API
+      await this.pollForEvents()
+
+      // Update connection state
+      if (this.connectionState !== 'connected') {
+        this.connectionState = 'connected'
+        this.notifyListeners('connection', { status: 'connected' })
+      }
+
+    } catch (error) {
+      console.error('[Toolbox] Polling error:', error)
+
+      if (this.connectionState !== 'error') {
+        this.connectionState = 'error'
+        this.notifyListeners('connection', { status: 'error', error })
+      }
+    }
+  }
+
+  async pollForEvents() {
+    try {
+      // Try the events endpoint first (if it exists)
+      const eventsUrl = `${this.apiUrl}/api/events/poll?since=${this.lastTimestamp}`
+      const response = await fetch(eventsUrl)
+
+      if (response.ok) {
+        const data = await response.json()
+
+        if (data.success && data.events && data.events.length > 0) {
+          data.events.forEach((event: any) => {
+            if (!this.processedEventIds.has(event.id)) {
+              this.processedEventIds.add(event.id)
+              this.handleIncomingEvent(event)
+            }
+          })
+
+          this.lastTimestamp = data.timestamp || Date.now()
+
+          // Clean up old processed IDs
+          if (this.processedEventIds.size > 200) {
+            const idsArray = Array.from(this.processedEventIds)
+            this.processedEventIds = new Set(idsArray.slice(-200))
+          }
+        }
+        return
+      }
+    } catch (error) {
+      // Events endpoint doesn't exist, fall back to simple refresh polling
+    }
+
+    // Fallback: Simple periodic refresh (like the original implementation)
+    this.triggerPeriodicRefresh()
+  }
+
+  triggerPeriodicRefresh() {
+    // Trigger refresh events for all subscribed listeners (like original implementation)
     this.notifyListeners('data_refresh', { type: 'items', timestamp: Date.now() })
     this.notifyListeners('data_refresh', { type: 'transactions', timestamp: Date.now() })
     this.notifyListeners('data_refresh', { type: 'inventory', timestamp: Date.now() })
@@ -56,8 +156,75 @@ class ToolboxPollingManager {
     this.notifyListeners('inventory_updated', { refresh: true, timestamp: Date.now() })
   }
 
-  private notifyListeners(event: string, data: any) {
-    const listeners = this.eventListeners.get(event) || []
+  handleIncomingEvent(event: any) {
+    console.log('📨 [Toolbox] Received event:', event.event, event.data)
+
+    // Call internal handlers first
+    if (this._internalHandlers && this._internalHandlers.has(event.event)) {
+      const handlers = this._internalHandlers.get(event.event)
+      if (handlers) {
+        handlers.forEach((handler: (data: any) => void) => {
+          try {
+            handler(event.data)
+          } catch (error) {
+            console.error(`[Toolbox] Error in handler for ${event.event}:`, error)
+          }
+        })
+      }
+    }
+
+    // Notify external listeners
+    this.notifyListeners(event.event, event.data)
+
+    // Also notify generic 'event' listener
+    this.notifyListeners('event', event)
+  }
+
+  stopPolling() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval)
+      this.pollingInterval = null
+      this.isPolling = false
+      this.connectionState = 'disconnected'
+      this.notifyListeners('connection', { status: 'disconnected' })
+      console.log('📡 Toolbox polling stopped')
+    }
+  }
+
+  // Room management
+  joinRoom(room: string) {
+    this.rooms.add(room)
+    console.log(`📌 [Toolbox] Joined room: ${room}`)
+  }
+
+  joinAllRooms() {
+    const defaultRooms = ['items', 'transactions', 'inventory']
+    defaultRooms.forEach(room => this.joinRoom(room))
+  }
+
+  leaveRoom(room: string) {
+    this.rooms.delete(room)
+    console.log(`📌 [Toolbox] Left room: ${room}`)
+  }
+
+  // Listener management
+  subscribeToUpdates(event: string, callback: (data: any) => void) {
+    if (!this.listenerManager.has(event)) {
+      this.listenerManager.set(event, [])
+    }
+    this.listenerManager.get(event)!.push(callback)
+
+    return () => {
+      const listeners = this.listenerManager.get(event) || []
+      const index = listeners.indexOf(callback)
+      if (index > -1) {
+        listeners.splice(index, 1)
+      }
+    }
+  }
+
+  notifyListeners(event: string, data: any) {
+    const listeners = this.listenerManager.get(event) || []
     listeners.forEach(callback => {
       try {
         callback(data)
@@ -67,32 +234,45 @@ class ToolboxPollingManager {
     })
   }
 
-  subscribeToUpdates(event: string, callback: (data: any) => void) {
-    if (!this.eventListeners.has(event)) {
-      this.eventListeners.set(event, [])
+  unsubscribe(unsubscribeFn: (() => void) | undefined) {
+    if (typeof unsubscribeFn === 'function') {
+      unsubscribeFn()
     }
-    this.eventListeners.get(event)!.push(callback)
+  }
 
-    return () => {
-      const listeners = this.eventListeners.get(event) || []
-      const index = listeners.indexOf(callback)
-      if (index > -1) {
-        listeners.splice(index, 1)
-      }
-    }
+  // Utility methods
+  ping() {
+    this.poll()
   }
 
   disconnect() {
-    this.isConnected = false
-    if (this.pollingTimer) {
-      clearTimeout(this.pollingTimer)
-      this.pollingTimer = null
-    }
-    this.eventListeners.clear()
+    this.stopPolling()
+    this.listenerManager.clear()
+    this.eventHandlers = []
+    this.rooms.clear()
+    this.lastTimestamp = 0
+    this.processedEventIds.clear()
   }
 
-  get isSocketConnected() {
-    return this.isConnected
+  get isConnected() {
+    return this.connectionState === 'connected'
+  }
+
+  getListenerCount(event: string) {
+    return this.listenerManager.get(event)?.length || 0
+  }
+
+  getAllSubscribedEvents() {
+    return Array.from(this.listenerManager.keys())
+  }
+
+  setPollingRate(milliseconds: number) {
+    this.pollingRate = milliseconds
+
+    if (this.isPolling) {
+      this.stopPolling()
+      this.startPolling()
+    }
   }
 }
 
@@ -121,7 +301,7 @@ export function useRealtimeEvent(
   useEffect(() => {
     const manager = getToolboxPollingManager(apiUrl || 'http://localhost:3000')
 
-    if (!manager.isSocketConnected) {
+    if (!manager.isConnected) {
       manager.initialize()
     }
 
@@ -145,7 +325,7 @@ export function useRealtimeEvents(
   useEffect(() => {
     const manager = getToolboxPollingManager(apiUrl || 'http://localhost:3000')
 
-    if (!manager.isSocketConnected) {
+    if (!manager.isConnected) {
       manager.initialize()
     }
 
@@ -197,7 +377,7 @@ export function useConnectionStatus(apiUrl?: string) {
   useEffect(() => {
     const manager = getToolboxPollingManager(apiUrl || 'http://localhost:3000')
     setStatus({
-      connected: manager.isSocketConnected,
+      connected: manager.isConnected,
       error: null
     })
   }, [apiUrl])
@@ -297,7 +477,7 @@ export function useAutoRefresh(
     if (!enabled) return
 
     const manager = getToolboxPollingManager(apiUrl || 'http://localhost:3000')
-    if (!manager.isSocketConnected) {
+    if (!manager.isConnected) {
       manager.initialize()
     }
 
