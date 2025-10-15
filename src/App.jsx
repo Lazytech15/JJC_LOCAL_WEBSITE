@@ -3,7 +3,9 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext"
 import { lazy, Suspense } from "react"
 import DepartmentSelector from "./components/DepartmentSelector"
 import LoginForm from "./components/LoginForm"
-import { ProcurementDepartmentSkeleton } from "./components/skeletons/ProcurementSkeletons"
+import PWAInstallPrompt from "../public/PWAInstallPrompt"
+import PWAStatusIndicator from "../public/PWAStatusIndicator"
+import GearLoadingSpinner  from "../public/LoadingGear"
 import './index.css'
 //addedsomething here
 // Lazy load department components for better performance
@@ -20,13 +22,9 @@ const ToolboxWrapper = lazy(() => import("./components/ToolboxWrapper"))
 
 // Loading component for lazy-loaded routes
 function LoadingFallback() {
+  const { isDarkMode } = useAuth()
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50 dark:from-gray-900 dark:via-slate-900 dark:to-zinc-900">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-lg font-medium text-gray-900 dark:text-gray-100">Loading...</p>
-      </div>
-    </div>
+    <GearLoadingSpinner isDarkMode={isDarkMode} />
   )
 }
 
@@ -45,10 +43,11 @@ function AppContent() {
   if (isLoading) {
     return (
       <div
-        className={`min-h-screen flex items-center justify-center transition-all duration-300 ${isDarkMode
+        className={`min-h-screen flex items-center justify-center transition-all duration-300 ${
+          isDarkMode
             ? "bg-gradient-to-br from-gray-900 via-slate-900 to-zinc-900 text-gray-100"
             : "bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50 text-gray-900"
-          }`}
+        }`}
       >
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -60,6 +59,9 @@ function AppContent() {
 
   return (
     <Router>
+      {/* PWA Components - Available throughout the app */}
+      <PWAInstallPrompt />
+      <PWAStatusIndicator />
       <RoutesWrapper />
     </Router>
   )
@@ -70,13 +72,8 @@ function RoutesWrapper() {
   const { isDarkMode } = useAuth()
   const isToolboxRoute = location.pathname === "/jjctoolbox"
 
-  console.log("Current pathname:", location.pathname)
-  console.log("Is Toolbox route?", isToolboxRoute)
-  console.log("AuthContext isDarkMode:", isDarkMode)
-
   // For toolbox route, don't apply main app styling
   if (isToolboxRoute) {
-    console.log("Rendering Toolbox with ThemeProvider")
     return (
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
@@ -87,84 +84,82 @@ function RoutesWrapper() {
   }
 
   // For all other routes, apply main app styling
-  console.log("Rendering main app routes with AuthContext styling")
   return (
     <div
-      className={`min-h-screen transition-all duration-300 ${isDarkMode
+      className={`min-h-screen transition-all duration-300 ${
+        isDarkMode
           ? "bg-gradient-to-br from-gray-900 via-slate-900 to-zinc-900 text-gray-100"
           : "bg-gradient-to-br from-slate-50 via-gray-50 to-stone-50 text-gray-900"
-        }`}
+      }`}
     >
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
-                {/* Employee Routes (Main/Public) */}
-                <Route path="/" element={<EmployeeLanding />} />
-                <Route path="/employee/login" element={<EmployeeLogin />} />
-                <Route
-                  path="/employee/dashboard"
-                element={
-                  <EmployeeProtectedRoute>
-                    <EmployeeDashboard />
-                  </EmployeeProtectedRoute>
-                }
-              />
+          {/* Employee Routes (Main/Public) */}
+          <Route path="/" element={<EmployeeLanding />} />
+          <Route path="/employee/login" element={<EmployeeLogin />} />
+          <Route
+            path="/employee/dashboard"
+            element={
+              <EmployeeProtectedRoute>
+                <EmployeeDashboard />
+              </EmployeeProtectedRoute>
+            }
+          />
 
-              {/* Admin/Department Routes (Protected with special URL) */}
-              <Route path="/jjcewgsaccess" element={<DepartmentSelector />} />
-              <Route path="/jjcewgsaccess/login/:department" element={<LoginForm />} />
-              <Route
-                path="/jjcewgsaccess/super-admin"
-                element={
-                  <AdminProtectedRoute department="super-admin" requireSuperAdmin={true}>
-                    <SuperAdminDashboard />
-                  </AdminProtectedRoute>
-                }
-              />
-              <Route
-                path="/jjcewgsaccess/hr"
-                element={
-                  <AdminProtectedRoute department="Human Resources">
-                    <HRDepartment />
-                  </AdminProtectedRoute>
-                }
-              />
-              <Route
-                path="/jjcewgsaccess/operations"
-                element={
-                  <AdminProtectedRoute department="Operation">
-                    <OperationsDepartment />
-                  </AdminProtectedRoute>
-                }
-              />
-              <Route
-                path="/jjcewgsaccess/finance"
-                element={
-                  <AdminProtectedRoute department="Finance">
-                    <FinancePayrollDepartment />
-                  </AdminProtectedRoute>
-                }
-              />
-              <Route
-                path="/jjcewgsaccess/procurement"
-                element={
-                  <AdminProtectedRoute department="Procurement">
-                    <Suspense fallback={<ProcurementDepartmentSkeleton />}>
-                      <ProcurementDepartment />
-                    </Suspense>
-                  </AdminProtectedRoute>
-                }
-              />
-              <Route
-                path="/jjcewgsaccess/engineering"
-                element={
-                  <AdminProtectedRoute department="Engineering">
-                    <EngineeringDepartment />
-                  </AdminProtectedRoute>
-                }
-              />
+          {/* Admin/Department Routes (Protected with special URL) */}
+          <Route path="/jjcewgsaccess" element={<DepartmentSelector />} />
+          <Route path="/jjcewgsaccess/login/:department" element={<LoginForm />} />
+          <Route
+            path="/jjcewgsaccess/super-admin"
+            element={
+              <AdminProtectedRoute department="super-admin" requireSuperAdmin={true}>
+                <SuperAdminDashboard />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewgsaccess/hr"
+            element={
+              <AdminProtectedRoute department="Human Resources">
+                <HRDepartment />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewgsaccess/operations"
+            element={
+              <AdminProtectedRoute department="Operation">
+                <OperationsDepartment />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewgsaccess/finance"
+            element={
+              <AdminProtectedRoute department="Finance">
+                <FinancePayrollDepartment />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewgsaccess/procurement"
+            element={
+              <AdminProtectedRoute department="Procurement">
+                <ProcurementDepartment />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewgsaccess/engineering"
+            element={
+              <AdminProtectedRoute department="Engineering">
+                <EngineeringDepartment />
+              </AdminProtectedRoute>
+            }
+          />
 
-              {/* Catch all - redirect to employee landing */}
-              <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Catch all - redirect to employee landing */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </div>
@@ -177,9 +172,7 @@ function EmployeeProtectedRoute({ children }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
+      <GearLoadingSpinner isDarkMode={isDarkMode} />
     )
   }
 
@@ -196,9 +189,7 @@ function AdminProtectedRoute({ children, department, requireSuperAdmin = false }
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
+      <GearLoadingSpinner/>
     )
   }
 

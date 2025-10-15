@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
 import { createToken, storeTokens, getStoredToken, clearTokens, isTokenExpired, verifyToken } from "../utils/auth"
 import apiService from "../../src/utils/api/api-service"
+import GearLoadingSpinner from "../../public/LoadingGear"
 
 // Department slug to name mapping
 const DEPARTMENT_SLUG_TO_NAME = {
@@ -74,12 +75,13 @@ const defaultDepartmentInfo = {
 function LoginForm() {
   const { department: deptSlug } = useParams() // Gets URL slug like "hr", "operations", etc.
   const navigate = useNavigate()
-  const { login, isDarkMode, toggleDarkMode } = useAuth()
+  const { login, isDarkMode = false, toggleDarkMode } = useAuth()
   const [formData, setFormData] = useState({ username: "", password: "" })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
   const [hasValidToken, setHasValidToken] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(true)
 
   // Convert URL slug to department name
   const departmentName = DEPARTMENT_SLUG_TO_NAME[deptSlug] || deptSlug
@@ -228,8 +230,11 @@ function LoginForm() {
   }
 
   // Check for existing valid token on component mount
-  useEffect(() => {
-    if (!isValidDepartment) return
+   useEffect(() => {
+    if (!isValidDepartment) {
+      setIsInitializing(false)
+      return
+    }
 
     const existingToken = getStoredToken()
     if (existingToken) {
@@ -238,12 +243,12 @@ function LoginForm() {
         setHasValidToken(true)
       } else {
         setHasValidToken(false)
-        // Clear invalid or expired tokens
         clearTokens()
       }
     } else {
       setHasValidToken(false)
     }
+    setIsInitializing(false)
   }, [departmentName, isValidDepartment])
 
   const handleContinueWithToken = () => {
@@ -253,6 +258,11 @@ function LoginForm() {
       const urlSlug = DEPARTMENT_NAME_TO_SLUG[departmentName] || deptSlug
       navigate(`/jjcewgsaccess/${urlSlug}`, { replace: true })
     }
+  }
+
+  // Show loading spinner while initializing
+  if (isInitializing) {
+    return <GearLoadingSpinner isDarkMode={isDarkMode} />
   }
 
  return (
