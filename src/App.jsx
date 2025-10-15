@@ -189,7 +189,7 @@ function AdminProtectedRoute({ children, department, requireSuperAdmin = false }
 
   if (isLoading) {
     return (
-      <GearLoadingSpinner/>
+      <GearLoadingSpinner isDarkMode={isDarkMode}/>
     )
   }
 

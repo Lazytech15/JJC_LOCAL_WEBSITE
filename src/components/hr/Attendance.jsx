@@ -20,9 +20,10 @@ import {
 } from "recharts";
 import AttendanceEdit from "./AttendanceEdit"
 import FaceRecognitionModal from './FaceRecognitionDetection';
+import GearLoadingSpinner from "../../../public/LoadingGear";
 
 function Attendance() {
-  const { user } = useAuth();
+  const { user, isDarkMode } = useAuth();
   const [attendanceData, setAttendanceData] = useState([]);
   const [profilePictures, setProfilePictures] = useState({});
   const [profileLoadingState, setProfileLoadingState] = useState("idle"); // 'idle', 'loading', 'loaded', 'error'
@@ -1396,6 +1397,23 @@ function Attendance() {
 
     setConnectionStatus("connecting");
 
+     // Load initial data before showing UI
+  const loadInitialData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        fetchAttendanceData(),
+        fetchAttendanceStats()
+      ]);
+    } catch (error) {
+      console.error("Error loading initial data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  loadInitialData();
+
     // Subscribe to attendance events
     const unsubscribeAttendanceCreated = pollingManager.subscribeToUpdates(
       "attendance_created",
@@ -1706,11 +1724,7 @@ function Attendance() {
     // Show loading state
     if (isLoading) {
       return (
-        <div
-          className={`${size} rounded-2xl bg-gradient-to-br from-slate-200 via-slate-300 to-slate-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 flex items-center justify-center ring-4 ring-white/50 dark:ring-gray-700/50 shadow-lg animate-pulse`}
-        >
-          <div className="w-6 h-6 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-        </div>
+        <GearLoadingSpinner isDarkMode={isDarkMode}/>
       );
     }
 
@@ -2661,16 +2675,33 @@ function Attendance() {
 
   return (
     <div className="space-y-8">
+      {/* Full-screen Loading State */}
+    {loading && attendanceData.length === 0 ? (
+      <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center ${
+        isDarkMode 
+          ? "bg-slate-900" 
+          : "bg-white"
+      }`}>
+        <GearLoadingSpinner isDarkMode={isDarkMode} />
+      </div>
+    ) : (
+      <>
       {/* Employee Details Modal */}
       <EmployeeDetailsModal />
 
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 dark:from-slate-100 dark:to-slate-300 bg-clip-text text-transparent">
+          <h1 className={`text-4xl font-bold bg-gradient-to-r bg-clip-text text-transparent ${
+            isDarkMode 
+              ? "from-slate-100 to-slate-300" 
+              : "from-slate-800 to-slate-600"
+          }`}>
             Attendance Management
           </h1>
-          <p className="text-slate-600 dark:text-slate-400 text-lg mt-2">
+          <p className={`text-lg mt-2 ${
+            isDarkMode ? "text-slate-400" : "text-slate-600"
+          }`}>
             Track employee attendance and working hours in real-time
           </p>
         </div>
@@ -2678,38 +2709,58 @@ function Attendance() {
           {/* Export Button with Tooltip */}
           <div className="relative group">
             {/* Tooltip */}
-            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-4 py-2 bg-slate-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+            <div className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-4 py-2 text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10 ${
+              isDarkMode ? "bg-slate-800 text-white" : "bg-slate-800 text-white"
+            }`}>
               <div className="text-center">
                 <div className="font-semibold">Export includes:</div>
                 <div>
                   Summary, Detailed Records, Employee Summary, Time Analysis
                 </div>
               </div>
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-800"></div>
+              <div className={`absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent ${
+                isDarkMode ? "border-t-slate-800" : "border-t-slate-800"
+              }`}></div>
             </div>
           </div>
 
           {/* Profile Loading Indicator */}
           {profileLoadingState === "loading" && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 backdrop-blur-sm rounded-xl border border-blue-200/30 dark:border-blue-800/30">
-              <div className="w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+            <div className={`flex items-center gap-2 px-3 py-2 backdrop-blur-sm rounded-xl border ${
+              isDarkMode 
+                ? "bg-blue-900/20 border-blue-800/30" 
+                : "bg-blue-50 border-blue-200/30"
+            }`}>
+              <div className={`w-3 h-3 border rounded-full animate-spin ${
+                isDarkMode 
+                  ? "border-blue-500 border-t-transparent" 
+                  : "border-blue-500 border-t-transparent"
+              }`}></div>
+              <span className={`text-sm font-medium ${
+                isDarkMode ? "text-blue-300" : "text-blue-700"
+              }`}>
                 Loading profiles...
               </span>
             </div>
           )}
 
           {/* Connection Status */}
-          <div className="flex items-center gap-3 px-4 py-2 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl border border-white/30 dark:border-gray-700/30">
+          <div className={`flex items-center gap-3 px-4 py-2 backdrop-blur-sm rounded-xl border ${
+            isDarkMode 
+              ? "bg-gray-800/70 border-gray-700/30" 
+              : "bg-white/70 border-white/30"
+          }`}>
             <div
               className={`w-3 h-3 rounded-full ${connectionStatus === "connected"
                 ? "bg-emerald-500 shadow-lg shadow-emerald-500/50"
                 : connectionStatus === "connecting"
                   ? "bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50"
                   : "bg-red-500 shadow-lg shadow-red-500/50"
-                }`}
+              }`}
             ></div>
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            <span className={`text-sm font-medium ${
+              isDarkMode ? "text-slate-300" : "text-slate-700"
+            }`}>
               {connectionStatus === "connected"
                 ? "Live Updates"
                 : connectionStatus === "connecting"
@@ -2717,7 +2768,9 @@ function Attendance() {
                   : "Disconnected"}
             </span>
             {lastUpdate && (
-              <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">
+              <span className={`text-xs ml-2 ${
+                isDarkMode ? "text-slate-400" : "text-slate-500"
+              }`}>
                 {lastUpdate.toLocaleTimeString()}
               </span>
             )}
@@ -2725,32 +2778,31 @@ function Attendance() {
         </div>
       </div>
 
-      {/* Loading State */}
-      {loading && attendanceData.length === 0 && (
-        <div className="text-center py-16">
-          <div className="relative">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-slate-200 dark:border-slate-700 mx-auto"></div>
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-transparent border-t-slate-600 dark:border-t-slate-400 absolute top-0 left-1/2 transform -translate-x-1/2"></div>
-          </div>
-          <p className="text-slate-600 dark:text-slate-400 mt-6 text-lg">
-            Loading attendance data...
-          </p>
-        </div>
-      )}
-
       {/* Error State */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 backdrop-blur-sm border border-red-200 dark:border-red-800/50 rounded-2xl p-6">
+        <div className={`backdrop-blur-sm border rounded-2xl p-6 ${
+          isDarkMode 
+            ? "bg-red-900/20 border-red-800/50" 
+            : "bg-red-50 border-red-200"
+        }`}>
           <div className="flex items-center gap-3">
             <span className="text-2xl">❌</span>
             <div>
-              <h3 className="text-red-800 dark:text-red-300 font-semibold">
+              <h3 className={`font-semibold ${
+                isDarkMode ? "text-red-300" : "text-red-800"
+              }`}>
                 Error Loading Data
               </h3>
-              <p className="text-red-600 dark:text-red-400 mt-1">{error}</p>
+              <p className={`mt-1 ${
+                isDarkMode ? "text-red-400" : "text-red-600"
+              }`}>{error}</p>
               <button
                 onClick={fetchAttendanceData}
-                className="mt-3 px-4 py-2 bg-red-100 hover:bg-red-200 dark:bg-red-800 dark:hover:bg-red-700 text-red-700 dark:text-red-300 rounded-lg font-medium transition-colors"
+                className={`mt-3 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  isDarkMode 
+                    ? "bg-red-800 hover:bg-red-700 text-red-300" 
+                    : "bg-red-100 hover:bg-red-200 text-red-700"
+                }`}
               >
                 Try Again
               </button>
@@ -2762,78 +2814,126 @@ function Attendance() {
       {/* Statistics Cards */}
       {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="group bg-gradient-to-br from-white/80 to-white/60 dark:from-slate-800/80 dark:to-slate-900/60 backdrop-blur-xl rounded-3xl p-6 border border-white/40 dark:border-slate-700/40 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1">
+          <div className={`group backdrop-blur-xl rounded-3xl p-6 border shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1 ${
+            isDarkMode 
+              ? "bg-gradient-to-br from-slate-800/80 to-slate-900/60 border-slate-700/40" 
+              : "bg-gradient-to-br from-white/80 to-white/60 border-white/40"
+          }`}>
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl">
+              <div className={`p-3 rounded-2xl ${
+                isDarkMode ? "bg-slate-800" : "bg-slate-100"
+              }`}>
                 <span className="text-2xl">📊</span>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-bold text-slate-800 dark:text-slate-200">
+                <p className={`text-3xl font-bold ${
+                  isDarkMode ? "text-slate-200" : "text-slate-800"
+                }`}>
                   {stats.total_records || 0}
                 </p>
-                <p className="text-slate-600 dark:text-slate-400 text-sm font-medium">
+                <p className={`text-sm font-medium ${
+                  isDarkMode ? "text-slate-400" : "text-slate-600"
+                }`}>
                   Total Records
                 </p>
               </div>
             </div>
-            <p className="text-slate-500 dark:text-slate-500 text-sm">
+            <p className={`text-sm ${
+              isDarkMode ? "text-slate-500" : "text-slate-500"
+            }`}>
               {filters.date ? `Today (${filters.date})` : "All Dates"}
             </p>
           </div>
 
-          <div className="group bg-gradient-to-br from-emerald-50/80 to-emerald-100/60 dark:from-emerald-900/20 dark:to-emerald-800/20 backdrop-blur-xl rounded-3xl p-6 border border-emerald-200/40 dark:border-emerald-800/40 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1">
+          <div className={`group backdrop-blur-xl rounded-3xl p-6 border shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1 ${
+            isDarkMode 
+              ? "bg-gradient-to-br from-emerald-900/20 to-emerald-800/20 border-emerald-800/40" 
+              : "bg-gradient-to-br from-emerald-50/80 to-emerald-100/60 border-emerald-200/40"
+          }`}>
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-2xl">
+              <div className={`p-3 rounded-2xl ${
+                isDarkMode ? "bg-emerald-900/30" : "bg-emerald-100"
+              }`}>
                 <span className="text-2xl">👥</span>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-300">
+                <p className={`text-3xl font-bold ${
+                  isDarkMode ? "text-emerald-300" : "text-emerald-700"
+                }`}>
                   {stats.unique_employees || 0}
                 </p>
-                <p className="text-emerald-600 dark:text-emerald-400 text-sm font-medium">
+                <p className={`text-sm font-medium ${
+                  isDarkMode ? "text-emerald-400" : "text-emerald-600"
+                }`}>
                   Active Employees
                 </p>
               </div>
             </div>
-            <p className="text-emerald-500 dark:text-emerald-500 text-sm">
+            <p className={`text-sm ${
+              isDarkMode ? "text-emerald-500" : "text-emerald-500"
+            }`}>
               Clocked in today
             </p>
           </div>
 
-          <div className="group bg-gradient-to-br from-orange-50/80 to-orange-100/60 dark:from-orange-900/20 dark:to-orange-800/20 backdrop-blur-xl rounded-3xl p-6 border border-orange-200/40 dark:border-orange-800/40 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1">
+          <div className={`group backdrop-blur-xl rounded-3xl p-6 border shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1 ${
+            isDarkMode 
+              ? "bg-gradient-to-br from-orange-900/20 to-orange-800/20 border-orange-800/40" 
+              : "bg-gradient-to-br from-orange-50/80 to-orange-100/60 border-orange-200/40"
+          }`}>
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-2xl">
+              <div className={`p-3 rounded-2xl ${
+                isDarkMode ? "bg-orange-900/30" : "bg-orange-100"
+              }`}>
                 <span className="text-2xl">⏱️</span>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-bold text-orange-700 dark:text-orange-300">
+                <p className={`text-3xl font-bold ${
+                  isDarkMode ? "text-orange-300" : "text-orange-700"
+                }`}>
                   {(stats.total_regular_hours || 0).toFixed(1)}h
                 </p>
-                <p className="text-orange-600 dark:text-orange-400 text-sm font-medium">
+                <p className={`text-sm font-medium ${
+                  isDarkMode ? "text-orange-400" : "text-orange-600"
+                }`}>
                   Regular Hours
                 </p>
               </div>
             </div>
-            <p className="text-orange-500 dark:text-orange-500 text-sm">
+            <p className={`text-sm ${
+              isDarkMode ? "text-orange-500" : "text-orange-500"
+            }`}>
               Total for today
             </p>
           </div>
 
-          <div className="group bg-gradient-to-br from-red-50/80 to-red-100/60 dark:from-red-900/20 dark:to-red-800/20 backdrop-blur-xl rounded-3xl p-6 border border-red-200/40 dark:border-red-800/40 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1">
+          <div className={`group backdrop-blur-xl rounded-3xl p-6 border shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1 ${
+            isDarkMode 
+              ? "bg-gradient-to-br from-red-900/20 to-red-800/20 border-red-800/40" 
+              : "bg-gradient-to-br from-red-50/80 to-red-100/60 border-red-200/40"
+          }`}>
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-2xl">
+              <div className={`p-3 rounded-2xl ${
+                isDarkMode ? "bg-red-900/30" : "bg-red-100"
+              }`}>
                 <span className="text-2xl">⚠️</span>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-bold text-red-700 dark:text-red-300">
+                <p className={`text-3xl font-bold ${
+                  isDarkMode ? "text-red-300" : "text-red-700"
+                }`}>
                   {stats.late_count || 0}
                 </p>
-                <p className="text-red-600 dark:text-red-400 text-sm font-medium">
+                <p className={`text-sm font-medium ${
+                  isDarkMode ? "text-red-400" : "text-red-600"
+                }`}>
                   Late Arrivals
                 </p>
               </div>
             </div>
-            <p className="text-red-500 dark:text-red-500 text-sm">Today</p>
+            <p className={`text-sm ${
+              isDarkMode ? "text-red-500" : "text-red-500"
+            }`}>Today</p>
           </div>
         </div>
       )}
@@ -2841,48 +2941,78 @@ function Attendance() {
       {/* Additional Stats Row */}
       {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gradient-to-br from-blue-50/80 to-blue-100/60 dark:from-blue-900/20 dark:to-blue-800/20 backdrop-blur-xl rounded-2xl p-6 border border-blue-200/40 dark:border-blue-800/40">
+          <div className={`backdrop-blur-xl rounded-2xl p-6 border ${
+            isDarkMode 
+              ? "bg-gradient-to-br from-blue-900/20 to-blue-800/20 border-blue-800/40" 
+              : "bg-gradient-to-br from-blue-50/80 to-blue-100/60 border-blue-200/40"
+          }`}>
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
+              <div className={`p-3 rounded-xl ${
+                isDarkMode ? "bg-blue-900/30" : "bg-blue-100"
+              }`}>
                 <span className="text-xl">📥</span>
               </div>
               <div>
-                <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                <p className={`text-2xl font-bold ${
+                  isDarkMode ? "text-blue-300" : "text-blue-700"
+                }`}>
                   {stats.clock_ins || 0}
                 </p>
-                <p className="text-blue-600 dark:text-blue-400 text-sm font-medium">
+                <p className={`text-sm font-medium ${
+                  isDarkMode ? "text-blue-400" : "text-blue-600"
+                }`}>
                   Clock Ins
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-purple-50/80 to-purple-100/60 dark:from-purple-900/20 dark:to-purple-800/20 backdrop-blur-xl rounded-2xl p-6 border border-purple-200/40 dark:border-purple-800/40">
+          <div className={`backdrop-blur-xl rounded-2xl p-6 border ${
+            isDarkMode 
+              ? "bg-gradient-to-br from-purple-900/20 to-purple-800/20 border-purple-800/40" 
+              : "bg-gradient-to-br from-purple-50/80 to-purple-100/60 border-purple-200/40"
+          }`}>
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl">
+              <div className={`p-3 rounded-xl ${
+                isDarkMode ? "bg-purple-900/30" : "bg-purple-100"
+              }`}>
                 <span className="text-xl">📤</span>
               </div>
               <div>
-                <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">
+                <p className={`text-2xl font-bold ${
+                  isDarkMode ? "text-purple-300" : "text-purple-700"
+                }`}>
                   {stats.clock_outs || 0}
                 </p>
-                <p className="text-purple-600 dark:text-purple-400 text-sm font-medium">
+                <p className={`text-sm font-medium ${
+                  isDarkMode ? "text-purple-400" : "text-purple-600"
+                }`}>
                   Clock Outs
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-yellow-50/80 to-yellow-100/60 dark:from-yellow-900/20 dark:to-yellow-800/20 backdrop-blur-xl rounded-2xl p-6 border border-yellow-200/40 dark:border-yellow-800/40">
+          <div className={`backdrop-blur-xl rounded-2xl p-6 border ${
+            isDarkMode 
+              ? "bg-gradient-to-br from-yellow-900/20 to-yellow-800/20 border-yellow-800/40" 
+              : "bg-gradient-to-br from-yellow-50/80 to-yellow-100/60 border-yellow-200/40"
+          }`}>
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl">
+              <div className={`p-3 rounded-xl ${
+                isDarkMode ? "bg-yellow-900/30" : "bg-yellow-100"
+              }`}>
                 <span className="text-xl">🌙</span>
               </div>
               <div>
-                <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">
+                <p className={`text-2xl font-bold ${
+                  isDarkMode ? "text-yellow-300" : "text-yellow-700"
+                }`}>
                   {(stats.total_overtime_hours || 0).toFixed(1)}h
                 </p>
-                <p className="text-yellow-600 dark:text-yellow-400 text-sm font-medium">
+                <p className={`text-sm font-medium ${
+                  isDarkMode ? "text-yellow-400" : "text-yellow-600"
+                }`}>
                   Overtime Hours
                 </p>
               </div>
@@ -2894,21 +3024,33 @@ function Attendance() {
       {/* Combined Filters and Export Section */}
       <div className="space-y-6">
         {/* Main Container - Filters and Export */}
-        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl p-8 border border-white/40 dark:border-gray-700/40 shadow-2xl">
+        <div className={`backdrop-blur-xl rounded-3xl p-8 border shadow-2xl ${
+          isDarkMode 
+            ? "bg-gray-800/70 border-gray-700/40" 
+            : "bg-white/70 border-white/40"
+        }`}>
           {/* Header with Filters and Export */}
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl">
+              <div className={`p-2 rounded-xl ${
+                isDarkMode ? "bg-slate-800" : "bg-slate-100"
+              }`}>
                 <span className="text-xl">🔍</span>
               </div>
-              <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">
+              <h2 className={`text-2xl font-bold ${
+                isDarkMode ? "text-slate-200" : "text-slate-800"
+              }`}>
                 Filters
               </h2>
             </div>
             <button
               onClick={exportToExcel}
               disabled={isExporting}
-              className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:from-slate-400 disabled:to-slate-500 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl disabled:hover:translate-y-0 disabled:hover:shadow-none disabled:cursor-not-allowed"
+              className={`flex items-center gap-2 px-5 py-3 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl disabled:hover:translate-y-0 disabled:hover:shadow-none disabled:cursor-not-allowed ${
+                isDarkMode 
+                  ? "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:from-slate-600 disabled:to-slate-700" 
+                  : "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:from-slate-400 disabled:to-slate-500"
+              }`}
             >
               {isExporting ? (
                 <>
@@ -2936,7 +3078,11 @@ function Attendance() {
             </button>
             <button
               onClick={() => setShowEditModal(true)}
-              className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl flex items-center gap-2"
+              className={`px-5 py-3 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl flex items-center gap-2 ${
+                isDarkMode 
+                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700" 
+                  : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+              }`}
             >
               <span>✏️</span>
               <span>Edit Records ({stats.unsynced_count || 0})</span>
@@ -2944,7 +3090,11 @@ function Attendance() {
 
             <button
               onClick={() => setShowFaceRecognition(true)}
-              className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl"
+              className={`flex items-center gap-2 px-5 py-3 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl ${
+                isDarkMode 
+                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700" 
+                  : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+              }`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -2967,9 +3117,15 @@ function Attendance() {
                     endDate: e.target.checked ? prev.endDate : "",
                   }))
                 }
-                className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                className={`w-4 h-4 rounded focus:ring-2 ${
+                  isDarkMode 
+                    ? "text-indigo-600 bg-gray-700 border-gray-600 focus:ring-indigo-600 ring-offset-gray-800" 
+                    : "text-indigo-600 bg-gray-100 border-gray-300 focus:ring-indigo-500"
+                }`}
               />
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              <span className={`text-sm font-medium ${
+                isDarkMode ? "text-slate-300" : "text-slate-700"
+              }`}>
                 Use date range instead of single date
               </span>
             </label>
@@ -2983,7 +3139,9 @@ function Attendance() {
             {filters.useRange ? (
               <>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  <label className={`block text-sm font-semibold mb-2 ${
+                    isDarkMode ? "text-slate-300" : "text-slate-700"
+                  }`}>
                     Start Date
                   </label>
                   <input
@@ -2995,11 +3153,17 @@ function Attendance() {
                         startDate: e.target.value,
                       }))
                     }
-                    className="w-full px-4 py-3 bg-white/60 dark:bg-gray-700/60 rounded-xl border border-white/40 dark:border-gray-600/40 text-slate-800 dark:text-slate-200 backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                    className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all ${
+                      isDarkMode 
+                        ? "bg-gray-700/60 border-gray-600/40 text-slate-200" 
+                        : "bg-white/60 border-white/40 text-slate-800"
+                    }`}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  <label className={`block text-sm font-semibold mb-2 ${
+                    isDarkMode ? "text-slate-300" : "text-slate-700"
+                  }`}>
                     End Date
                   </label>
                   <input
@@ -3012,13 +3176,19 @@ function Attendance() {
                       }))
                     }
                     min={filters.startDate}
-                    className="w-full px-4 py-3 bg-white/60 dark:bg-gray-700/60 rounded-xl border border-white/40 dark:border-gray-600/40 text-slate-800 dark:text-slate-200 backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                    className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all ${
+                      isDarkMode 
+                        ? "bg-gray-700/60 border-gray-600/40 text-slate-200" 
+                        : "bg-white/60 border-white/40 text-slate-800"
+                    }`}
                   />
                 </div>
               </>
             ) : (
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                <label className={`block text-sm font-semibold mb-2 ${
+                  isDarkMode ? "text-slate-300" : "text-slate-700"
+                }`}>
                   Date
                 </label>
                 <input
@@ -3027,7 +3197,11 @@ function Attendance() {
                   onChange={(e) =>
                     setFilters((prev) => ({ ...prev, date: e.target.value }))
                   }
-                  className="w-full px-4 py-3 bg-white/60 dark:bg-gray-700/60 rounded-xl border border-white/40 dark:border-gray-600/40 text-slate-800 dark:text-slate-200 backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                  className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all ${
+                    isDarkMode 
+                      ? "bg-gray-700/60 border-gray-600/40 text-slate-200" 
+                      : "bg-white/60 border-white/40 text-slate-800"
+                  }`}
                 />
               </div>
             )}
@@ -3039,8 +3213,14 @@ function Attendance() {
               filters.startDate &&
               filters.endDate &&
               new Date(filters.startDate) > new Date(filters.endDate) && (
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 rounded-lg mb-4">
-                  <p className="text-sm text-red-600 dark:text-red-400">
+                <div className={`p-3 border rounded-lg mb-4 ${
+                  isDarkMode 
+                    ? "bg-red-900/20 border-red-800/30" 
+                    : "bg-red-50 border-red-200"
+                }`}>
+                  <p className={`text-sm ${
+                    isDarkMode ? "text-red-400" : "text-red-600"
+                  }`}>
                     ⚠️ Start date cannot be later than end date.
                   </p>
                 </div>
@@ -3050,8 +3230,14 @@ function Attendance() {
               filters.startDate &&
               filters.endDate &&
               new Date(filters.startDate) <= new Date(filters.endDate) && (
-                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-lg">
-                  <p className="text-sm text-blue-600 dark:text-blue-400">
+                <div className={`p-3 border rounded-lg ${
+                  isDarkMode 
+                    ? "bg-blue-900/20 border-blue-800/30" 
+                    : "bg-blue-50 border-blue-200"
+                }`}>
+                  <p className={`text-sm ${
+                    isDarkMode ? "text-blue-400" : "text-blue-600"
+                  }`}>
                     📅 Selected range:{" "}
                     {new Date(filters.startDate).toLocaleDateString()} -{" "}
                     {new Date(filters.endDate).toLocaleDateString()}(
@@ -3068,12 +3254,20 @@ function Attendance() {
         </div>
 
         {/* Display Options & Actions Section */}
-        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl p-8 border border-white/40 dark:border-gray-700/40 shadow-2xl">
+        <div className={`backdrop-blur-xl rounded-3xl p-8 border shadow-2xl ${
+          isDarkMode 
+            ? "bg-gray-800/70 border-gray-700/40" 
+            : "bg-white/70 border-white/40"
+        }`}>
           <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-xl">
+            <div className={`p-2 rounded-xl ${
+              isDarkMode ? "bg-blue-900" : "bg-blue-100"
+            }`}>
               <span className="text-xl">⚙️</span>
             </div>
-            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">
+            <h3 className={`text-xl font-bold ${
+              isDarkMode ? "text-slate-200" : "text-slate-800"
+            }`}>
               Display Options & Actions
             </h3>
           </div>
@@ -3081,7 +3275,9 @@ function Attendance() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
             {/* Clock Type Filter */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+              <label className={`block text-sm font-semibold mb-3 ${
+                isDarkMode ? "text-slate-300" : "text-slate-700"
+              }`}>
                 Clock Type
               </label>
               <select
@@ -3092,7 +3288,11 @@ function Attendance() {
                     clock_type: e.target.value,
                   }))
                 }
-                className="w-full px-4 py-3 bg-white/60 dark:bg-gray-700/60 rounded-xl border border-white/40 dark:border-gray-600/40 text-slate-800 dark:text-slate-200 backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all ${
+                  isDarkMode 
+                    ? "bg-gray-700/60 border-gray-600/40 text-slate-200" 
+                    : "bg-white/60 border-white/40 text-slate-800"
+                }`}
               >
                 <option value="">All Types</option>
                 <option value="morning_in">Morning In</option>
@@ -3106,7 +3306,9 @@ function Attendance() {
 
             {/* Records Per Page Filter */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+              <label className={`block text-sm font-semibold mb-3 ${
+                isDarkMode ? "text-slate-300" : "text-slate-700"
+              }`}>
                 Records per page
               </label>
               <select
@@ -3117,7 +3319,11 @@ function Attendance() {
                     limit: parseInt(e.target.value),
                   }))
                 }
-                className="w-full px-4 py-3 bg-white/60 dark:bg-gray-700/60 rounded-xl border border-white/40 dark:border-gray-600/40 text-slate-800 dark:text-slate-200 backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all ${
+                  isDarkMode 
+                    ? "bg-gray-700/60 border-gray-600/40 text-slate-200" 
+                    : "bg-white/60 border-white/40 text-slate-800"
+                }`}
               >
                 <option value="10">10</option>
                 <option value="20">20</option>
@@ -3133,7 +3339,11 @@ function Attendance() {
                   fetchAttendanceData();
                   fetchAttendanceStats();
                 }}
-                className="w-full px-6 py-3 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl"
+                className={`w-full px-6 py-3 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl ${
+                  isDarkMode 
+                    ? "bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800" 
+                    : "bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800"
+                }`}
               >
                 Refresh Data
               </button>
@@ -3146,24 +3356,38 @@ function Attendance() {
       {!loading && (
         <div className="space-y-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl">
+            <div className={`p-2 rounded-xl ${
+              isDarkMode ? "bg-slate-800" : "bg-slate-100"
+            }`}>
               <span className="text-xl">👤</span>
             </div>
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">
+            <h2 className={`text-2xl font-bold ${
+              isDarkMode ? "text-slate-200" : "text-slate-800"
+            }`}>
               Employee Attendance
             </h2>
-            <div className="text-sm text-slate-500 dark:text-slate-400">
+            <div className={`text-sm ${
+              isDarkMode ? "text-slate-400" : "text-slate-500"
+            }`}>
               Click on any card to view detailed statistics
             </div>
           </div>
 
           {groupedAttendance.length === 0 ? (
-            <div className="text-center py-16 bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl rounded-3xl border border-white/40 dark:border-gray-700/40">
+            <div className={`text-center py-16 backdrop-blur-xl rounded-3xl border ${
+              isDarkMode 
+                ? "bg-gray-800/40 border-gray-700/40" 
+                : "bg-white/40 border-white/40"
+            }`}>
               <div className="text-6xl mb-4">📭</div>
-              <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">
+              <h3 className={`text-xl font-semibold mb-2 ${
+                isDarkMode ? "text-slate-300" : "text-slate-700"
+              }`}>
                 No Records Found
               </h3>
-              <p className="text-slate-500 dark:text-slate-400">
+              <p className={`${
+                isDarkMode ? "text-slate-400" : "text-slate-500"
+              }`}>
                 No attendance records found for the selected filters.
               </p>
             </div>
@@ -3177,7 +3401,6 @@ function Attendance() {
 
                 return (
                   <div
-                    // Add unique key that will change when records update
                     key={`${employee.employee_uid}-${employee.date}-${employee.records.length}-${employee.latest_clock_time}`}
                     onClick={() =>
                       loadEmployeeDetails(
@@ -3185,10 +3408,15 @@ function Attendance() {
                         employee.employee_info
                       )
                     }
-                    className={`group relative overflow-hidden rounded-3xl border transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl cursor-pointer ${hasNewRecords
-                      ? "bg-gradient-to-br from-emerald-50/90 to-emerald-100/70 dark:from-emerald-900/30 dark:to-emerald-800/20 border-emerald-300/60 dark:border-emerald-700/60 shadow-2xl animate-pulse shadow-emerald-500/20"
-                      : "bg-gradient-to-br from-white/80 to-white/60 dark:from-slate-800/80 dark:to-slate-900/60 border-white/40 dark:border-slate-700/40 hover:shadow-xl backdrop-blur-xl hover:border-indigo-300/60 dark:hover:border-indigo-700/60"
-                      }`}
+                    className={`group relative overflow-hidden rounded-3xl border transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl cursor-pointer ${
+                      hasNewRecords
+                        ? isDarkMode
+                          ? "bg-gradient-to-br from-emerald-900/30 to-emerald-800/20 border-emerald-700/60 shadow-2xl animate-pulse shadow-emerald-500/20"
+                          : "bg-gradient-to-br from-emerald-50/90 to-emerald-100/70 border-emerald-300/60 shadow-2xl animate-pulse shadow-emerald-500/20"
+                        : isDarkMode
+                          ? "bg-gradient-to-br from-slate-800/80 to-slate-900/60 border-slate-700/40 hover:shadow-xl backdrop-blur-xl hover:border-indigo-700/60"
+                          : "bg-gradient-to-br from-white/80 to-white/60 border-white/40 hover:shadow-xl backdrop-blur-xl hover:border-indigo-300/60"
+                    }`}
                   >
                     {/* New Record Indicator */}
                     {hasNewRecords && (
@@ -3198,7 +3426,11 @@ function Attendance() {
                     )}
 
                     {/* Click to View Details Indicator */}
-                    <div className="absolute top-4 right-4 px-3 py-1 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-medium rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className={`absolute top-4 right-4 px-3 py-1 text-xs font-medium rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
+                      isDarkMode 
+                        ? "bg-indigo-500/10 text-indigo-400" 
+                        : "bg-indigo-500/10 text-indigo-600"
+                    }`}>
                       Click for details
                     </div>
 
@@ -3215,29 +3447,45 @@ function Attendance() {
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 truncate">
+                            <h3 className={`text-lg font-bold truncate ${
+                              isDarkMode ? "text-slate-200" : "text-slate-800"
+                            }`}>
                               {employeeName}
                             </h3>
                             {employee.is_late ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/30">
+                              <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full border ${
+                                isDarkMode 
+                                  ? "bg-red-900/20 text-red-300 border-red-800/30" 
+                                  : "bg-red-50 text-red-700 border-red-200"
+                              }`}>
                                 <span className="w-2 h-2 bg-red-500 rounded-full"></span>
                                 Late
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800/30">
+                              <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full border ${
+                                isDarkMode 
+                                  ? "bg-emerald-900/20 text-emerald-300 border-emerald-800/30" 
+                                  : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              }`}>
                                 <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
                                 On Time
                               </span>
                             )}
                             {employee.has_unsynced && (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800/30">
+                              <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full border ${
+                                isDarkMode 
+                                  ? "bg-amber-900/20 text-amber-300 border-amber-800/30" 
+                                  : "bg-amber-50 text-amber-700 border-amber-200"
+                              }`}>
                                 <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
                                 Unsynced
                               </span>
                             )}
                           </div>
 
-                          <div className="text-sm text-slate-600 dark:text-slate-400 space-y-1">
+                          <div className={`text-sm space-y-1 ${
+                            isDarkMode ? "text-slate-400" : "text-slate-600"
+                          }`}>
                             <p>
                               <span className="font-medium">ID:</span>{" "}
                               {employee.employee_info.id_number ||
@@ -3261,8 +3509,14 @@ function Attendance() {
                       </div>
 
                       {/* Clock Records Section */}
-                      <div className="bg-white/50 dark:bg-slate-700/30 backdrop-blur-sm rounded-2xl p-4 mb-4">
-                        <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+                      <div className={`backdrop-blur-sm rounded-2xl p-4 mb-4 ${
+                        isDarkMode 
+                          ? "bg-slate-700/30" 
+                          : "bg-white/50"
+                      }`}>
+                        <h4 className={`text-sm font-semibold mb-3 ${
+                          isDarkMode ? "text-slate-300" : "text-slate-700"
+                        }`}>
                           Clock Records ({employee.records.length})
                         </h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -3312,26 +3566,42 @@ function Attendance() {
 
                       {/* Hours Summary Section */}
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-slate-50/50 dark:bg-slate-800/30 backdrop-blur-sm rounded-xl p-3">
+                        <div className={`backdrop-blur-sm rounded-xl p-3 ${
+                          isDarkMode 
+                            ? "bg-slate-800/30" 
+                            : "bg-slate-50/50"
+                        }`}>
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-lg">⏰</span>
-                            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                            <span className={`text-sm font-medium ${
+                              isDarkMode ? "text-slate-400" : "text-slate-600"
+                            }`}>
                               Regular Hours
                             </span>
                           </div>
-                          <p className="text-xl font-bold text-slate-800 dark:text-slate-200">
+                          <p className={`text-xl font-bold ${
+                            isDarkMode ? "text-slate-200" : "text-slate-800"
+                          }`}>
                             {employee.total_regular_hours.toFixed(1)}h
                           </p>
                         </div>
 
-                        <div className="bg-orange-50/50 dark:bg-orange-900/20 backdrop-blur-sm rounded-xl p-3">
+                        <div className={`backdrop-blur-sm rounded-xl p-3 ${
+                          isDarkMode 
+                            ? "bg-orange-900/20" 
+                            : "bg-orange-50/50"
+                        }`}>
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-lg">🌙</span>
-                            <span className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                            <span className={`text-sm font-medium ${
+                              isDarkMode ? "text-orange-400" : "text-orange-600"
+                            }`}>
                               Overtime Hours
                             </span>
                           </div>
-                          <p className="text-xl font-bold text-orange-700 dark:text-orange-300">
+                          <p className={`text-xl font-bold ${
+                            isDarkMode ? "text-orange-300" : "text-orange-700"
+                          }`}>
                             {employee.total_overtime_hours.toFixed(1)}h
                           </p>
                         </div>
@@ -3339,7 +3609,11 @@ function Attendance() {
                     </div>
 
                     {/* Hover Effect Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                    <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none ${
+                      isDarkMode 
+                        ? "bg-gradient-to-r from-transparent via-white/5 to-transparent" 
+                        : "bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                    }`}></div>
 
                     {/* Interactive Indicator */}
                     <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -3369,12 +3643,20 @@ function Attendance() {
 
       {/* Recent Activity */}
       {recentActivity.length > 0 && (
-        <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl p-8 border border-white/40 dark:border-gray-700/40 shadow-2xl">
+        <div className={`backdrop-blur-xl rounded-3xl p-8 border shadow-2xl ${
+          isDarkMode 
+            ? "bg-gray-800/70 border-gray-700/40" 
+            : "bg-white/70 border-white/40"
+        }`}>
           <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl">
+            <div className={`p-2 rounded-xl ${
+              isDarkMode ? "bg-slate-800" : "bg-slate-100"
+            }`}>
               <span className="text-xl">🔄</span>
             </div>
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">
+            <h2 className={`text-2xl font-bold ${
+              isDarkMode ? "text-slate-200" : "text-slate-800"
+            }`}>
               Recent Activity
             </h2>
           </div>
@@ -3395,7 +3677,11 @@ function Attendance() {
                       position: activity.position,
                     })
                   }
-                  className="group bg-white/60 dark:bg-slate-700/60 backdrop-blur-sm rounded-2xl p-4 border border-white/40 dark:border-slate-600/40 hover:bg-white/80 dark:hover:bg-slate-700/80 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer hover:border-indigo-300/60 dark:hover:border-indigo-700/60"
+                  className={`group backdrop-blur-sm rounded-2xl p-4 border transition-all duration-300 hover:-translate-y-1 hover:shadow-lg cursor-pointer ${
+                    isDarkMode 
+                      ? "bg-slate-700/60 border-slate-600/40 hover:bg-slate-700/80 hover:border-indigo-700/60" 
+                      : "bg-white/60 border-white/40 hover:bg-white/80 hover:border-indigo-300/60"
+                  }`}
                 >
                   <div className="flex items-center gap-3">
                     <ProfilePicture
@@ -3404,18 +3690,24 @@ function Attendance() {
                       size="w-12 h-12"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                      <p className={`font-semibold truncate ${
+                        isDarkMode ? "text-slate-200" : "text-slate-800"
+                      }`}>
                         {activityName}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-sm">
                           {getClockTypeIcon(activity.clock_type)}
                         </span>
-                        <span className="text-sm text-slate-600 dark:text-slate-400">
+                        <span className={`text-sm ${
+                          isDarkMode ? "text-slate-400" : "text-slate-600"
+                        }`}>
                           {formatClockType(activity.clock_type)}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                      <p className={`text-xs mt-1 ${
+                        isDarkMode ? "text-slate-500" : "text-slate-500"
+                      }`}>
                         {formatTime(activity.clock_time)}
                       </p>
                     </div>
@@ -3429,16 +3721,26 @@ function Attendance() {
 
       {/* Unsynced Alert */}
       {stats.unsynced_count > 0 && (
-        <div className="bg-gradient-to-r from-amber-50/90 to-orange-50/90 dark:from-amber-900/20 dark:to-orange-900/20 backdrop-blur-xl border border-amber-200/60 dark:border-amber-700/60 rounded-2xl p-6 shadow-xl">
+        <div className={`backdrop-blur-xl border rounded-2xl p-6 shadow-xl ${
+          isDarkMode 
+            ? "bg-gradient-to-r from-amber-900/20 to-orange-900/20 border-amber-700/60" 
+            : "bg-gradient-to-r from-amber-50/90 to-orange-50/90 border-amber-200/60"
+        }`}>
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
+            <div className={`p-3 rounded-xl ${
+              isDarkMode ? "bg-amber-900/30" : "bg-amber-100"
+            }`}>
               <span className="text-2xl">⚠️</span>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-amber-800 dark:text-amber-300">
+              <h3 className={`text-lg font-semibold ${
+                isDarkMode ? "text-amber-300" : "text-amber-800"
+              }`}>
                 Attention Required
               </h3>
-              <p className="text-amber-700 dark:text-amber-400">
+              <p className={`${
+                isDarkMode ? "text-amber-400" : "text-amber-700"
+              }`}>
                 There are{" "}
                 <span className="font-bold">{stats.unsynced_count}</span>{" "}
                 unsynced attendance records that need attention.
@@ -3451,9 +3753,15 @@ function Attendance() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 overflow-y-auto">
           <div className="min-h-screen p-4">
             <div className="max-w-7xl mx-auto my-8">
-              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl">
+              <div className={`rounded-3xl shadow-2xl ${
+                isDarkMode ? "bg-slate-900" : "bg-white"
+              }`}>
                 {/* Optional: Add a header bar with close button (alternative placement) */}
-                <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 p-4 rounded-t-3xl flex justify-between items-center z-10">
+                <div className={`sticky top-0 p-4 rounded-t-3xl flex justify-between items-center z-10 ${
+                  isDarkMode 
+                    ? "bg-gradient-to-r from-indigo-600 to-purple-600" 
+                    : "bg-gradient-to-r from-indigo-600 to-purple-600"
+                }`}>
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">✏️</span>
                     <h2 className="text-2xl font-bold text-white">
@@ -3491,6 +3799,8 @@ function Attendance() {
           onEmployeeIdentified={handleEmployeeIdentified}
         />
       )}
+      </>
+    )}
     </div>
   );
 }

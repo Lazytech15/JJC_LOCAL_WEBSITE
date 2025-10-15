@@ -75,7 +75,7 @@ const defaultDepartmentInfo = {
 function LoginForm() {
   const { department: deptSlug } = useParams() // Gets URL slug like "hr", "operations", etc.
   const navigate = useNavigate()
-  const { login, isDarkMode = false, toggleDarkMode } = useAuth()
+  const { login, isDarkMode, toggleDarkMode } = useAuth()
   const [formData, setFormData] = useState({ username: "", password: "" })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
