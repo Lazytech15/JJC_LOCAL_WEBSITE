@@ -7,6 +7,7 @@ import { ItemDetailView } from "./ItemDetailView"
 import InventoryListView from "./InventoryListView"
 import { useToast } from "../shared/ToastNotification"
 import ConfirmationModal from "../shared/ConfirmationModal"
+import { InventoryManagementSkeleton } from "../../skeletons/ProcurementSkeletons"
 import {
   exportToCSV,
   exportToExcel,
@@ -972,10 +973,7 @@ function InventoryManagement() {
 
       {/* Loading State */}
       {loading ? (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-zinc-600 dark:border-zinc-400 mx-auto"></div>
-          <p className="text-gray-600 dark:text-gray-400 mt-4">Loading inventory...</p>
-        </div>
+        <InventoryManagementSkeleton />
       ) : sortedItems.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-12 shadow-lg border border-gray-200 dark:border-gray-700">
           <div className="text-center">
