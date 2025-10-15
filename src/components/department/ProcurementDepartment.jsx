@@ -212,7 +212,7 @@ function ProcurementDepartment() {
       </div>
       
       {/* Enhanced Interactive Header - Moved to top level */}
-      <div className="relative z-50">
+      <div className="relative z-40">
         <div className="bg-gradient-to-r from-slate-800 via-zinc-800 to-slate-800 dark:from-slate-900 dark:via-zinc-900 dark:to-slate-900 rounded-xl shadow-xl p-4 sm:p-6 mb-4 border-l-4 border-amber-500 dark:border-amber-400 relative overflow-hidden group mx-2 sm:mx-3 md:mx-4">
           {/* Animated Background Pattern */}
           <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]">
@@ -275,7 +275,7 @@ function ProcurementDepartment() {
 
                 {/* Notifications Dropdown Panel */}
                 {showNotifications && (
-                  <div className="fixed top-20 right-4 w-80 sm:w-96 bg-slate-800/95 backdrop-blur-md rounded-lg shadow-2xl border border-slate-700/50 z-[9999] max-h-[calc(100vh-6rem)] overflow-y-auto notifications-menu">
+                  <div className="fixed top-20 right-4 w-80 sm:w-96 bg-slate-800/95 backdrop-blur-md rounded-lg shadow-2xl border border-slate-700/50 z-[60] max-h-[calc(100vh-6rem)] overflow-y-auto notifications-menu">
                     <div className="p-4">
                       <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-700/50 sticky top-0 bg-slate-800/95 backdrop-blur-md z-10">
                         <h3 className="text-white font-semibold">Notifications</h3>
@@ -380,7 +380,7 @@ function ProcurementDepartment() {
 
                 {/* Profile Dropdown Menu */}
                 {showProfileMenu && (
-                  <div className="fixed top-20 right-4 w-72 bg-slate-800/95 backdrop-blur-md rounded-lg shadow-2xl border border-slate-700/50 z-[9999] profile-menu">
+                  <div className="fixed top-20 right-4 w-72 bg-slate-800/95 backdrop-blur-md rounded-lg shadow-2xl border border-slate-700/50 z-[60] profile-menu">
                     <div className="p-4 space-y-2">
                       <button 
                         onClick={() => setShowProfileMenu(false)}
@@ -466,7 +466,7 @@ function ProcurementDepartment() {
 
         {/* Enhanced Modern Navigation Bar (stabilized) */}
         <div className={`
-          sticky top-0 z-60 w-full mb-3
+          sticky top-0 z-[70] w-full mb-3
           transition-shadow duration-150 ease-in-out
         `}>
           <div className={`
@@ -610,7 +610,7 @@ function ProcurementDepartment() {
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           aria-label="Back to top"
-          className="fixed right-4 bottom-6 z-[9999] bg-amber-500 hover:bg-amber-600 text-white p-3 rounded-full shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-300"
+          className="fixed right-4 bottom-6 z-[50] bg-amber-500 hover:bg-amber-600 text-white p-3 rounded-full shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-300"
           title="Back to top"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

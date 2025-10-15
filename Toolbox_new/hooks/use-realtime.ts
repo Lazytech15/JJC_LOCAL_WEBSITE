@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { io, Socket } from 'socket.io-client'
 
 interface RealtimeEventData {
   [key: string]: any
@@ -11,74 +10,50 @@ interface RealtimeEvent {
   timestamp: number
 }
 
-// Simple polling manager for Toolbox
+// Polling-based manager for Toolbox (replaces websocket with simple periodic refresh)
 class ToolboxPollingManager {
-  private socket: Socket | null = null
   private isConnected = false
   private eventListeners: Map<string, ((data: any) => void)[]> = new Map()
-  private reconnectTimer: NodeJS.Timeout | null = null
-  private apiUrl: string
+  private pollingTimer: NodeJS.Timeout | null = null
+  private pollingInterval = 5000 // Poll every 5 seconds for data refresh
 
-  constructor(apiUrl: string) {
-    this.apiUrl = apiUrl
+  constructor(_apiUrl: string) {
+    // apiUrl not needed for simple polling
   }
 
   initialize() {
     if (this.isConnected) return
 
-    try {
-      // Connect to socket.io server
-      this.socket = io(this.apiUrl, {
-        transports: ['websocket', 'polling'],
-        timeout: 20000,
-      })
+    console.log('[Toolbox] Initializing polling manager')
+    this.isConnected = true
+    this.startPolling()
+  }
 
-      this.socket.on('connect', () => {
-        console.log('[Toolbox] Connected to realtime server')
-        this.isConnected = true
-        if (this.reconnectTimer) {
-          clearTimeout(this.reconnectTimer)
-          this.reconnectTimer = null
-        }
-      })
+  private startPolling() {
+    if (this.pollingTimer) return
 
-      this.socket.on('disconnect', () => {
-        console.log('[Toolbox] Disconnected from realtime server')
-        this.isConnected = false
-        this.scheduleReconnect()
-      })
+    const poll = () => {
+      // Trigger refresh events for all subscribed listeners
+      this.triggerRefreshEvents()
 
-      this.socket.on('connect_error', (error) => {
-        console.error('[Toolbox] Socket connection error:', error)
-        this.isConnected = false
-        this.scheduleReconnect()
-      })
-
-      // Listen for custom events
-      this.socket.on('item_updated', (data) => {
-        this.notifyListeners('item_updated', data)
-      })
-
-      this.socket.on('item_created', (data) => {
-        this.notifyListeners('item_created', data)
-      })
-
-      this.socket.on('item_deleted', (data) => {
-        this.notifyListeners('item_deleted', data)
-      })
-
-      this.socket.on('inventory_updated', (data) => {
-        this.notifyListeners('inventory_updated', data)
-      })
-
-      this.socket.on('transaction_created', (data) => {
-        this.notifyListeners('transaction_created', data)
-      })
-
-    } catch (error) {
-      console.error('[Toolbox] Failed to initialize socket connection:', error)
-      this.scheduleReconnect()
+      // Schedule next poll
+      this.pollingTimer = setTimeout(poll, this.pollingInterval)
     }
+
+    // Start polling immediately
+    poll()
+  }
+
+  private triggerRefreshEvents() {
+    // Trigger refresh events for different data types
+    this.notifyListeners('data_refresh', { type: 'items', timestamp: Date.now() })
+    this.notifyListeners('data_refresh', { type: 'transactions', timestamp: Date.now() })
+    this.notifyListeners('data_refresh', { type: 'inventory', timestamp: Date.now() })
+
+    // Also trigger specific events for backward compatibility
+    this.notifyListeners('item_updated', { refresh: true, timestamp: Date.now() })
+    this.notifyListeners('transaction_created', { refresh: true, timestamp: Date.now() })
+    this.notifyListeners('inventory_updated', { refresh: true, timestamp: Date.now() })
   }
 
   private notifyListeners(event: string, data: any) {
@@ -90,15 +65,6 @@ class ToolboxPollingManager {
         console.error(`[Toolbox] Error in event listener for ${event}:`, error)
       }
     })
-  }
-
-  private scheduleReconnect() {
-    if (this.reconnectTimer) return
-
-    this.reconnectTimer = setTimeout(() => {
-      console.log('[Toolbox] Attempting to reconnect...')
-      this.initialize()
-    }, 5000)
   }
 
   subscribeToUpdates(event: string, callback: (data: any) => void) {
@@ -117,15 +83,12 @@ class ToolboxPollingManager {
   }
 
   disconnect() {
-    if (this.socket) {
-      this.socket.disconnect()
-      this.socket = null
-    }
     this.isConnected = false
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer)
-      this.reconnectTimer = null
+    if (this.pollingTimer) {
+      clearTimeout(this.pollingTimer)
+      this.pollingTimer = null
     }
+    this.eventListeners.clear()
   }
 
   get isSocketConnected() {
@@ -223,25 +186,13 @@ export function useRealtimeEventHistory(
 }
 
 /**
- * Hook to track connection status
+ * Hook to track connection status (for polling, always connected)
  */
 export function useConnectionStatus(apiUrl?: string) {
   const [status, setStatus] = useState({
-    connected: false,
+    connected: true, // Polling is always "connected"
     error: null as string | null
   })
-
-  useRealtimeEvent('connect', () => {
-    setStatus({ connected: true, error: null })
-  }, [], apiUrl)
-
-  useRealtimeEvent('disconnect', () => {
-    setStatus({ connected: false, error: null })
-  }, [], apiUrl)
-
-  useRealtimeEvent('connect_error', (error) => {
-    setStatus({ connected: false, error: error?.message || 'Connection failed' })
-  }, [], apiUrl)
 
   useEffect(() => {
     const manager = getToolboxPollingManager(apiUrl || 'http://localhost:3000')
