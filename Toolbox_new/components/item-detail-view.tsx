@@ -373,4 +373,3 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
     </div>
   )
 }
-
