@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext"
 import { lazy, Suspense } from "react"
 import DepartmentSelector from "./components/DepartmentSelector"
 import LoginForm from "./components/LoginForm"
-import { ProcurementDepartmentSkeleton } from "./components/skeletons/ProcurementSkeletons"
 import PWAInstallPrompt from "../public/PWAInstallPrompt"
 import PWAStatusIndicator from "../public/PWAStatusIndicator"
 import GearLoadingSpinner  from "../public/LoadingGear"
@@ -107,57 +106,57 @@ function RoutesWrapper() {
             }
           />
 
-              {/* Admin/Department Routes (Protected with special URL) */}
-              <Route path="/jjcewgsaccess" element={<DepartmentSelector />} />
-              <Route path="/jjcewgsaccess/login/:department" element={<LoginForm />} />
-              <Route
-                path="/jjcewgsaccess/super-admin"
-                element={
-                  <AdminProtectedRoute department="super-admin" requireSuperAdmin={true}>
-                    <SuperAdminDashboard />
-                  </AdminProtectedRoute>
-                }
-              />
-              <Route
-                path="/jjcewgsaccess/hr"
-                element={
-                  <AdminProtectedRoute department="Human Resources">
-                    <HRDepartment />
-                  </AdminProtectedRoute>
-                }
-              />
-              <Route
-                path="/jjcewgsaccess/operations"
-                element={
-                  <AdminProtectedRoute department="Operation">
-                    <OperationsDepartment />
-                  </AdminProtectedRoute>
-                }
-              />
-              <Route
-                path="/jjcewgsaccess/finance"
-                element={
-                  <AdminProtectedRoute department="Finance">
-                    <FinancePayrollDepartment />
-                  </AdminProtectedRoute>
-                }
-              />
-              <Route
-                path="/jjcewgsaccess/procurement"
-                element={
-                  <AdminProtectedRoute department="Procurement">
-                    <ProcurementDepartment />
-                  </AdminProtectedRoute>
-                }
-              />
-              <Route
-                path="/jjcewgsaccess/engineering"
-                element={
-                  <AdminProtectedRoute department="Engineering">
-                    <EngineeringDepartment />
-                  </AdminProtectedRoute>
-                }
-              />
+          {/* Admin/Department Routes (Protected with special URL) */}
+          <Route path="/jjcewgsaccess" element={<DepartmentSelector />} />
+          <Route path="/jjcewgsaccess/login/:department" element={<LoginForm />} />
+          <Route
+            path="/jjcewgsaccess/super-admin"
+            element={
+              <AdminProtectedRoute department="super-admin" requireSuperAdmin={true}>
+                <SuperAdminDashboard />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewgsaccess/hr"
+            element={
+              <AdminProtectedRoute department="Human Resources">
+                <HRDepartment />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewgsaccess/operations"
+            element={
+              <AdminProtectedRoute department="Operation">
+                <OperationsDepartment />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewgsaccess/finance"
+            element={
+              <AdminProtectedRoute department="Finance">
+                <FinancePayrollDepartment />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewgsaccess/procurement"
+            element={
+              <AdminProtectedRoute department="Procurement">
+                <ProcurementDepartment />
+              </AdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/jjcewgsaccess/engineering"
+            element={
+              <AdminProtectedRoute department="Engineering">
+                <EngineeringDepartment />
+              </AdminProtectedRoute>
+            }
+          />
 
           {/* Catch all - redirect to employee landing */}
           <Route path="*" element={<Navigate to="/" replace />} />
