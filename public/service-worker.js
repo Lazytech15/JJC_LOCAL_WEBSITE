@@ -1,23 +1,45 @@
 // ============================================================================
-// service-worker.js - Enhanced with Profile Picture Caching
+// service-worker.js - Enhanced with Profile Picture & UI Caching
 // ============================================================================
 
-const CACHE_VERSION = "v1"
+const CACHE_VERSION = "v2" // Increment version for UI caching
 const STATIC_CACHE = `jjc-static-${CACHE_VERSION}`
 const API_CACHE = `jjc-api-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `jjc-dynamic-${CACHE_VERSION}`
-const PROFILE_CACHE = `jjc-profiles-${CACHE_VERSION}` // New: Profile pictures cache
+const PROFILE_CACHE = `jjc-profiles-${CACHE_VERSION}`
+const UI_CACHE = `jjc-ui-${CACHE_VERSION}` // New: UI assets cache
 
-const STATIC_ASSETS = ["/", "/offline.html", "/manifest.json"]
+// Core assets to cache immediately on install
+const CORE_ASSETS = [
+  "/",
+  "/index.html"
+]
 
-// Install event - cache static assets
+// Optional assets (fail gracefully if not available)
+const OPTIONAL_ASSETS = [
+  "/offline.html",
+  "/manifest.json"
+]
+
+// Install event - cache static and UI assets
 self.addEventListener("install", (event) => {
   console.log("[Service Worker] Installing...")
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => {
-      console.log("[Service Worker] Caching static assets")
-      return cache.addAll(STATIC_ASSETS)
-    }),
+    Promise.all([
+      // Cache static assets
+      caches.open(STATIC_CACHE).then((cache) => {
+        console.log("[Service Worker] Caching static assets")
+        return cache.addAll(STATIC_ASSETS)
+      }),
+      // Cache UI assets
+      caches.open(UI_CACHE).then((cache) => {
+        console.log("[Service Worker] Caching UI assets")
+        return cache.addAll(UI_ASSETS).catch((err) => {
+          console.warn("[Service Worker] Some UI assets failed to cache:", err)
+          // Don't fail the entire installation if some UI assets are missing
+        })
+      })
+    ])
   )
   self.skipWaiting()
 })
@@ -34,7 +56,8 @@ self.addEventListener("activate", (event) => {
                    name !== STATIC_CACHE && 
                    name !== API_CACHE && 
                    name !== DYNAMIC_CACHE &&
-                   name !== PROFILE_CACHE
+                   name !== PROFILE_CACHE &&
+                   name !== UI_CACHE
           })
           .map((name) => {
             console.log("[Service Worker] Deleting old cache:", name)
@@ -68,14 +91,24 @@ self.addEventListener("fetch", (event) => {
     return
   }
 
-  // Static assets - Cache First
+  // UI Assets (CSS, JS, Images, Fonts) - Cache First with Network Fallback
+  // This handles all Vite-built assets with hash names
   if (
     request.destination === "style" ||
     request.destination === "script" ||
     request.destination === "image" ||
-    request.destination === "font"
+    request.destination === "font" ||
+    request.destination === "manifest" ||
+    url.pathname.startsWith("/assets/") || // Vite puts built files in /assets/
+    url.pathname.match(/\.(css|js|png|jpg|jpeg|gif|svg|webp|woff|woff2|ttf|eot|ico|json)$/)
   ) {
-    event.respondWith(cacheFirstStrategy(request, STATIC_CACHE))
+    event.respondWith(cacheFirstStrategy(request, UI_CACHE))
+    return
+  }
+
+  // HTML pages - Network First with Cache Fallback (for fresh content)
+  if (request.destination === "document" || url.pathname.endsWith(".html")) {
+    event.respondWith(networkFirstStrategy(request, UI_CACHE))
     return
   }
 
@@ -113,7 +146,6 @@ async function profileCacheStrategy(request, cacheName) {
     const response = await fetch(request)
     
     if (response.ok && response.status === 200) {
-      // Clone the response before caching
       const responseToCache = response.clone()
       cache.put(request, responseToCache)
       console.log("[Service Worker] Profile cached:", request.url)
@@ -126,16 +158,18 @@ async function profileCacheStrategy(request, cacheName) {
   }
 }
 
-// Cache First Strategy
+// Cache First Strategy - Try cache first, then network
 async function cacheFirstStrategy(request, cacheName) {
   const cache = await caches.open(cacheName)
   const cached = await cache.match(request)
 
   if (cached) {
+    console.log("[Service Worker] Serving from cache:", request.url)
     return cached
   }
 
   try {
+    console.log("[Service Worker] Fetching and caching:", request.url)
     const response = await fetch(request)
     if (response.ok) {
       cache.put(request, response.clone())
@@ -143,26 +177,37 @@ async function cacheFirstStrategy(request, cacheName) {
     return response
   } catch (error) {
     console.error("[Service Worker] Fetch failed:", error)
+    // Return offline page for documents
+    if (request.destination === "document") {
+      return cache.match("/offline.html") || new Response("Offline", { status: 503 })
+    }
     return new Response("Offline", { status: 503 })
   }
 }
 
-// Network First Strategy
+// Network First Strategy - Try network first, fallback to cache
 async function networkFirstStrategy(request, cacheName) {
   const cache = await caches.open(cacheName)
 
   try {
     const response = await fetch(request)
     if (response.ok) {
+      console.log("[Service Worker] Network response, updating cache:", request.url)
       cache.put(request, response.clone())
     }
     return response
   } catch (error) {
-    console.log("[Service Worker] Network failed, trying cache")
+    console.log("[Service Worker] Network failed, trying cache:", request.url)
     const cached = await cache.match(request)
     if (cached) {
       return cached
     }
+    
+    // Return offline page for documents
+    if (request.destination === "document") {
+      return cache.match("/offline.html") || new Response("Offline", { status: 503 })
+    }
+    
     return new Response(JSON.stringify({ error: "Offline" }), {
       status: 503,
       headers: { "Content-Type": "application/json" },
@@ -170,7 +215,7 @@ async function networkFirstStrategy(request, cacheName) {
   }
 }
 
-// Stale While Revalidate Strategy
+// Stale While Revalidate Strategy - Return cache immediately, update in background
 async function staleWhileRevalidateStrategy(request, cacheName) {
   const cache = await caches.open(cacheName)
   const cached = await cache.match(request)
@@ -178,6 +223,7 @@ async function staleWhileRevalidateStrategy(request, cacheName) {
   const fetchPromise = fetch(request)
     .then((response) => {
       if (response.ok) {
+        console.log("[Service Worker] Background update:", request.url)
         cache.put(request, response.clone())
       }
       return response
@@ -218,8 +264,19 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(clients.openWindow(event.notification.data))
 })
 
-// Message handler for clearing profile cache
+// Message handler for cache management
 self.addEventListener("message", (event) => {
+  // Clear all UI cache
+  if (event.data && event.data.type === "CLEAR_UI_CACHE") {
+    event.waitUntil(
+      caches.delete(UI_CACHE).then(() => {
+        console.log("[Service Worker] UI cache cleared")
+        return caches.open(UI_CACHE)
+      })
+    )
+  }
+  
+  // Clear profile cache
   if (event.data && event.data.type === "CLEAR_PROFILE_CACHE") {
     event.waitUntil(
       caches.delete(PROFILE_CACHE).then(() => {
@@ -229,11 +286,11 @@ self.addEventListener("message", (event) => {
     )
   }
   
+  // Clear specific profile
   if (event.data && event.data.type === "CLEAR_PROFILE") {
     const uid = event.data.uid
     event.waitUntil(
       caches.open(PROFILE_CACHE).then((cache) => {
-        // Remove specific profile from cache
         cache.keys().then((requests) => {
           requests.forEach((request) => {
             if (request.url.includes(`/api/profile/${uid}`)) {
@@ -244,5 +301,10 @@ self.addEventListener("message", (event) => {
         })
       })
     )
+  }
+  
+  // Skip waiting and activate new service worker
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting()
   }
 })
