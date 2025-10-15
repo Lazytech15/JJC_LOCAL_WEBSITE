@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from "../../contexts/AuthContext"
 import apiService from "../../utils/api/api-service"
+import { EmployeeLogsSkeleton } from "../skeletons/ProcurementSkeletons"
 
 function EmployeeLogs() {
   const { isDarkMode } = useAuth()
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [dateFilter, setDateFilter] = useState({
@@ -75,6 +77,7 @@ function EmployeeLogs() {
       console.error("Employee logs fetch error:", err)
     } finally {
       setLoading(false)
+      setInitialLoading(false)
     }
   }
 
@@ -134,6 +137,10 @@ function EmployeeLogs() {
   }
 
   const totalPages = Math.ceil(totalLogs / logsPerPage)
+
+  if (initialLoading) {
+    return <EmployeeLogsSkeleton />
+  }
 
   return (
     <div className="space-y-6">
