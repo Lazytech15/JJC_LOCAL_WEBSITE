@@ -93,4 +93,35 @@ export class EmployeeLogsService extends BaseAPIService {
       params
     )
   }
+
+  // DELETE /api/employee-logs/:id - Delete a specific employee log
+  async deleteEmployeeLog(id) {
+    return this.request(`/api/employee-logs/${id}`, {
+      method: "DELETE",
+    })
+  }
+
+  // PUT /api/employee-logs/:id - Update a specific employee log
+  async updateEmployeeLog(id, logData) {
+    return this.request(`/api/employee-logs/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(logData),
+    })
+  }
+
+  // DELETE /api/employee-logs/bulk - Bulk delete logs
+  async bulkDeleteLogs(deleteData) {
+    return this.request("/api/employee-logs/bulk", {
+      method: "DELETE",
+      body: JSON.stringify(deleteData),
+    })
+  }
+
+  // POST /api/employee-logs/bulk - Bulk operations (review, archive, etc.)
+  async bulkUpdateLogs(updateData) {
+    return this.request("/api/employee-logs/bulk", {
+      method: "POST",
+      body: JSON.stringify(updateData),
+    })
+  }
 }
