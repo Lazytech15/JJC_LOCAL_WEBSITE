@@ -3,7 +3,7 @@ import React from 'react'
 // Base skeleton component with shimmer animation
 const Skeleton = ({ className = '', ...props }) => (
   <div
-    className={`animate-pulse bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 bg-[length:200%_100%] animate-shimmer rounded ${className}`}
+    className={`animate-pulse bg-slate-200 dark:bg-slate-700 rounded ${className}`}
     {...props}
   />
 )
