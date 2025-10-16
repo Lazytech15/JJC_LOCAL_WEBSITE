@@ -12,7 +12,7 @@ function EmployeeLogs() {
     dateFilter: { dateFrom: "", dateTo: "" },
     currentPage: 1,
     totalLogs: 0,
-    filters: { username: "", hasDetails: false, status: "" },
+    filters: { hasDetails: false },
     visibleCount: 50,
     selectedLogs: [],
     showFilters: false
@@ -37,9 +37,7 @@ function EmployeeLogs() {
         ...(searchTerm.trim() && { search: searchTerm.trim() }),
         ...(dateFilter.dateFrom && { date_from: dateFilter.dateFrom }),
         ...(dateFilter.dateTo && { date_to: dateFilter.dateTo }),
-        ...(filters.username.trim() && { username: filters.username.trim() }),
-        ...(filters.hasDetails && { has_details: true }),
-        ...(filters.status && { status: filters.status })
+        ...(filters.hasDetails && { has_details: true })
       }
 
       const result = await apiService.employeeLogs.getEmployeeLogs(params)
@@ -84,7 +82,7 @@ function EmployeeLogs() {
     ...prev,
     searchTerm: "",
     dateFilter: { dateFrom: "", dateTo: "" },
-    filters: { username: "", hasDetails: false, status: "" },
+    filters: { hasDetails: false },
     currentPage: 1
   }))
 
@@ -188,18 +186,8 @@ function EmployeeLogs() {
     return "📋"
   }
 
-  const getStatusBadge = (status) => {
-    const badges = {
-      success: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300",
-      warning: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300",
-      error: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300",
-      info: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-    }
-    return badges[status] || "bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300"
-  }
-
   const totalPages = Math.ceil(totalLogs / logsPerPage)
-  const hasActiveFilters = searchTerm || dateFilter.dateFrom || dateFilter.dateTo || filters.username || filters.hasDetails || filters.status
+  const hasActiveFilters = searchTerm || dateFilter.dateFrom || dateFilter.dateTo || filters.hasDetails
 
   if (initialLoading) {
     return <EmployeeLogsSkeleton />
@@ -281,9 +269,9 @@ function EmployeeLogs() {
               <span className="text-base">🎛️</span>
               <span>Filters</span>
               {hasActiveFilters && (
-                <span className="ml-0.5 px-1.5 py-0.5 bg-white/20 rounded-full text-xs">
-                  {[searchTerm, dateFilter.dateFrom, dateFilter.dateTo, filters.username, filters.hasDetails, filters.status].filter(Boolean).length}
-                </span>
+              <span className="ml-0.5 px-1.5 py-0.5 bg-white/20 rounded-full text-xs">
+                {[searchTerm, dateFilter.dateFrom, dateFilter.dateTo, filters.hasDetails].filter(Boolean).length}
+              </span>
               )}
             </button>
 
@@ -301,18 +289,7 @@ function EmployeeLogs() {
           {/* Expandable Filters */}
           {showFilters && (
             <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
-                  <input
-                    type="text"
-                    value={filters.username}
-                    onChange={(e) => handleFilterChange("username", e.target.value)}
-                    placeholder="Filter by username..."
-                    className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Date From</label>
                   <input
@@ -331,21 +308,6 @@ function EmployeeLogs() {
                     onChange={(e) => handleDateFilterChange("dateTo", e.target.value)}
                     className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
-                  <select
-                    value={filters.status}
-                    onChange={(e) => handleFilterChange("status", e.target.value)}
-                    className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900/50 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">All Status</option>
-                    <option value="success">Success</option>
-                    <option value="warning">Warning</option>
-                    <option value="error">Error</option>
-                    <option value="info">Info</option>
-                  </select>
                 </div>
               </div>
 
@@ -477,11 +439,6 @@ function EmployeeLogs() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{log.username || "N/A"}</div>
-                        {log.status && (
-                          <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(log.status)}`}>
-                            {log.status}
-                          </span>
-                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-gray-900 dark:text-gray-100 font-medium text-sm">{formatDateTime(log.log_date, log.log_time)}</div>
