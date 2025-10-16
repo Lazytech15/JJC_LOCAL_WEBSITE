@@ -22,11 +22,98 @@ function EmployeeLogs() {
     selectedLog: null,
     employeeDetails: null,
     associatedItems: [],
+    profileMap: {}, // uid -> url or null
+    logProfileMap: {}, // logId -> url or null
     detailsLoading: false
   })
 
   const logsPerPage = 10
   const { logs, loading, initialLoading, error, searchTerm, dateFilter, currentPage, totalLogs, filters, visibleCount, selectedLogs, showFilters, showDetailedView, selectedLog, employeeDetails, associatedItems, detailsLoading } = state
+
+  // Preload profiles for visible logs (cache by uid and map to log id)
+  useEffect(() => {
+    let cancelled = false
+
+    const preload = async () => {
+      if (!logs || logs.length === 0) return
+
+      const visible = logs.slice(0, visibleCount)
+      // Copy maps from state to update
+      const profileMap = { ...(state.profileMap || {}) }
+      const logProfileMap = { ...(state.logProfileMap || {}) }
+
+      for (const log of visible) {
+        if (cancelled) return
+
+        // Skip if we already have a profile URL for this log
+        if (logProfileMap[log.id] !== undefined) continue
+
+        try {
+          // Resolve employee to get uid (uses existing helper)
+          const employee = await fetchEmployeeDetails(log)
+          if (employee && employee.id) {
+            const uid = employee.id
+
+            // If we've already fetched for this uid, reuse
+            if (profileMap[uid] !== undefined) {
+              logProfileMap[log.id] = profileMap[uid]
+              continue
+            }
+
+            // Try profile service (returns cached blob/url)
+            try {
+              const profileResult = await apiService.profiles.getProfileByUid(uid)
+              if (profileResult && profileResult.success && profileResult.url) {
+                profileMap[uid] = profileResult.url
+                logProfileMap[log.id] = profileResult.url
+                continue
+              }
+            } catch (e) {
+              // ignore and try fallback
+            }
+
+            // Fallback: check existence and construct URL
+            try {
+              const hasProfile = await apiService.profiles.hasProfileByUid(uid)
+              if (hasProfile) {
+                const profileUrl = apiService.profiles.getProfileUrlByUid(uid)
+                try {
+                  const resp = await fetch(profileUrl, { method: 'GET', headers: { Authorization: `Bearer ${getStoredToken()}` } })
+                  if (resp.ok) {
+                    profileMap[uid] = profileUrl
+                    logProfileMap[log.id] = profileUrl
+                    continue
+                  }
+                } catch (e) {
+                  // network failed, mark as null
+                }
+              }
+            } catch (e) {
+              // ignore
+            }
+
+            // No profile found
+            profileMap[uid] = null
+            logProfileMap[log.id] = null
+          } else {
+            // couldn't resolve employee, mark as null to avoid retrying constantly
+            logProfileMap[log.id] = null
+          }
+        } catch (err) {
+          console.warn('Preload profile failed for log', log.id, err)
+          logProfileMap[log.id] = null
+        }
+      }
+
+      if (!cancelled) {
+        setState(prev => ({ ...prev, profileMap, logProfileMap }))
+      }
+    }
+
+    preload()
+
+    return () => { cancelled = true }
+  }, [logs, visibleCount])
 
   useEffect(() => {
     fetchEmployeeLogs()
@@ -276,38 +363,49 @@ function EmployeeLogs() {
     const detailsText = log?.details ? log.details.trim() : ''
     const lowerDetails = detailsText.toLowerCase()
     const hasCheckoutText = lowerDetails.includes('checkout')
-
+    // If there are associated items, render a full, detailed item list inline with details.
     if (items && items.length > 0) {
       return (
-        <div className="space-y-3">
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white text-lg">📦</span>
-              </div>
-              <span className="font-semibold text-blue-900 dark:text-blue-100">
-                {items.length} Item{items.length > 1 ? 's' : ''} Taken
-              </span>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+              <span className="text-white text-lg">📦</span>
             </div>
-            <div className="space-y-2">
-              {items.map((it, idx) => (
-                <div key={idx} className="bg-white dark:bg-slate-800 rounded-lg p-3 border border-blue-100 dark:border-blue-900">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="font-semibold text-slate-900 dark:text-white">{it.item_name || 'Unknown item'}</div>
-                      <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                        {it.item_no && <span className="font-mono">#{it.item_no}</span>}
-                        {it.brand && <span className="ml-2">• {it.brand}</span>}
-                      </div>
-                    </div>
-                    <div className="ml-3 px-3 py-1 bg-blue-100 dark:bg-blue-900/50 rounded-full text-blue-700 dark:text-blue-300 font-semibold text-sm">
-                      1x
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div>
+              <div className="font-semibold text-blue-900 dark:text-blue-100">{items.length} Item{items.length > 1 ? 's' : ''} Referenced</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">Below are the referenced item(s) with full metadata.</div>
             </div>
           </div>
+
+          <div className="grid gap-3">
+            {items.map((it) => (
+              <div key={it.item_no || Math.random()} className="bg-gradient-to-r from-slate-50 to-purple-50 dark:from-slate-900/50 dark:to-purple-900/20 rounded-xl p-4 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded">#{it.item_no}</span>
+                      <div className="font-bold text-slate-900 dark:text-white">{it.item_name || 'Unknown item'}</div>
+                    </div>
+                    <div className="text-sm text-slate-600 dark:text-slate-400">
+                      {it.brand && <span className="font-medium">{it.brand}</span>}
+                      {it.location && <span className="ml-2">• {it.location}</span>}
+                      {it.category && <span className="ml-2">• {it.category}</span>}
+                    </div>
+                    {it.description && (
+                      <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{it.description}</div>
+                    )}
+                  </div>
+
+                  <div className="ml-4 text-right">
+                    <div className="text-lg font-bold text-green-600 dark:text-green-400">₱{it.price_per_unit ? Number(it.price_per_unit).toFixed(2) : '0.00'}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">per unit</div>
+                    {it.quantity && <div className="text-xs text-slate-500 mt-1">Qty: {it.quantity}</div>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
           {detailsText !== '' && !hasCheckoutText && (
             <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
               <div className="text-sm text-slate-700 dark:text-slate-300">{detailsText}</div>
@@ -367,12 +465,45 @@ function EmployeeLogs() {
     if (!itemNos || itemNos.trim() === '') return []
     
     try {
-      const itemNumbers = itemNos.split(';').map(no => no.trim()).filter(no => no !== '')
-      if (itemNumbers.length === 0) return []
+      // Accept multiple formats for quantity, e.g. "123:2", "123x2", "123(2)" or just "123"
+      const tokens = itemNos.split(';').map(t => t.trim()).filter(t => t !== '')
+      if (tokens.length === 0) return []
 
-      const promises = itemNumbers.map(itemNo => apiService.items.getItem(itemNo).catch(err => ({ success: false, error: err })))
+      const parsed = tokens.map(tok => {
+        let itemNo = tok
+        let qty = 1
+
+        // 1) colon format: 123:2
+        if (tok.includes(':')) {
+          const [a, b] = tok.split(':').map(s => s.trim())
+          itemNo = a
+          qty = parseInt(b, 10) || 1
+        }
+        // 2) x format: 123x2 or 123X2
+        else if (tok.toLowerCase().includes('x')) {
+          const parts = tok.toLowerCase().split('x').map(s => s.trim())
+          itemNo = parts[0]
+          qty = parseInt(parts[1], 10) || 1
+        }
+        // 3) parentheses: 123(2)
+        else {
+          const m = tok.match(/^(.*)\((\d+)\)\s*$/)
+          if (m) {
+            itemNo = m[1].trim()
+            qty = parseInt(m[2], 10) || 1
+          }
+        }
+
+        return { itemNo, qty }
+      })
+
+      const promises = parsed.map(p => apiService.items.getItem(p.itemNo).then(res => ({ res, qty: p.qty })).catch(err => ({ res: { success: false, error: err }, qty: p.qty })))
       const results = await Promise.all(promises)
-      return results.filter(r => r && r.success).map(r => r.data)
+
+      // Attach quantity to each successful item result
+      return results
+        .filter(r => r && r.res && r.res.success)
+        .map(r => ({ ...(r.res.data || {}), quantity: r.qty }))
     } catch (error) {
       console.error('Error fetching associated items:', error)
       return []
@@ -392,17 +523,28 @@ function EmployeeLogs() {
       try {
         if (!finalEmployee) finalEmployee = null
         if (finalEmployee && !finalEmployee.profilePicture && finalEmployee.id) {
-          const hasProfile = await apiService.profiles.hasProfileByUid(finalEmployee.id)
-          if (hasProfile) {
-            const profileUrl = apiService.profiles.getProfileUrlByUid(finalEmployee.id)
-            try {
-              const resp = await fetch(profileUrl, { method: 'GET', headers: { Authorization: `Bearer ${getStoredToken()}` } })
-              if (resp.ok) {
-                finalEmployee = { ...finalEmployee, profilePicture: profileUrl }
+          // Follow HR pattern: try the profile service helper which returns a cached blob/url when available
+          try {
+            const profileResult = await apiService.profiles.getProfileByUid(finalEmployee.id)
+            if (profileResult && profileResult.success && profileResult.url) {
+              finalEmployee = { ...finalEmployee, profilePicture: profileResult.url }
+            } else {
+              // Fallback: check info endpoint then construct direct profile URL and verify it
+              const hasProfile = await apiService.profiles.hasProfileByUid(finalEmployee.id)
+              if (hasProfile) {
+                const profileUrl = apiService.profiles.getProfileUrlByUid(finalEmployee.id)
+                try {
+                  const resp = await fetch(profileUrl, { method: 'GET', headers: { Authorization: `Bearer ${getStoredToken()}` } })
+                  if (resp.ok) {
+                    finalEmployee = { ...finalEmployee, profilePicture: profileUrl }
+                  }
+                } catch (e) {
+                  console.warn('Profile image fetch failed (fallback):', e)
+                }
               }
-            } catch (e) {
-              console.warn('Profile image fetch failed:', e)
             }
+          } catch (e) {
+            console.warn('Profile image lookup failed:', e)
           }
         }
       } catch (err) {
@@ -690,8 +832,12 @@ function EmployeeLogs() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold shadow-md">
-                            {(log.username || 'N')[0].toUpperCase()}
+                          <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center text-white font-bold shadow-md bg-gradient-to-br from-blue-500 to-indigo-500">
+                            {state.logProfileMap && state.logProfileMap[log.id] ? (
+                              <img src={state.logProfileMap[log.id]} alt={log.username || 'profile'} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-white text-base">{(log.username || 'N')[0].toUpperCase()}</div>
+                            )}
                           </div>
                           <div>
                             <div className="font-semibold text-slate-900 dark:text-white">{log.username || 'N/A'}</div>
@@ -930,47 +1076,7 @@ function EmployeeLogs() {
                       </div>
 
                       {/* Associated Items */}
-                      {associatedItems.length > 0 && (
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border-2 border-slate-200 dark:border-slate-700 shadow-lg">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center">
-                              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                              </svg>
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-lg text-slate-900 dark:text-white">Associated Items</h4>
-                              <p className="text-sm text-slate-600 dark:text-slate-400">{associatedItems.length} item{associatedItems.length > 1 ? 's' : ''} referenced</p>
-                            </div>
-                          </div>
-                          <div className="space-y-3">
-                            {associatedItems.map((item) => (
-                              <div key={item.item_no} className="bg-gradient-to-r from-slate-50 to-purple-50 dark:from-slate-900/50 dark:to-purple-900/20 rounded-xl p-4 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <span className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded">
-                                        #{item.item_no}
-                                      </span>
-                                      <span className="font-bold text-slate-900 dark:text-white">{item.item_name}</span>
-                                    </div>
-                                    <div className="text-sm text-slate-600 dark:text-slate-400">
-                                      {item.brand && <span className="font-medium">{item.brand}</span>}
-                                      {item.location && <span className="ml-2">• {item.location}</span>}
-                                    </div>
-                                  </div>
-                                  <div className="ml-4 text-right">
-                                    <div className="text-lg font-bold text-green-600 dark:text-green-400">
-                                      ₱{item.price_per_unit ? Number(item.price_per_unit).toFixed(2) : '0.00'}
-                                    </div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400">per unit</div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      {/* Associated items are now rendered inline within Activity Details */}
                     </div>
                   </div>
                 )}
