@@ -1255,7 +1255,7 @@ function Attendance() {
         const historyRecord = employeeHistory.find(h => h.id === historyId);
         if (historyRecord) {
           // Fetch attendance records for this date
-          const result = await apiService.attendance.getAttendanceRecords({
+          const result = await apiService.attendance.getAttendanceRecordsWithCleanup({
             employee_uid: selectedEmployee.uid,
             date: historyRecord.date,
             limit: "100"
@@ -1548,40 +1548,48 @@ function Attendance() {
   filters.employee_uid, filters.clock_type, filters.limit]);
 
   const fetchAttendanceData = async () => {
-    try {
-      setLoading(true);
-      const params = {
-        limit: filters.limit.toString(),
-        offset: filters.offset.toString(),
-        sort_by: "clock_time",
-        sort_order: "DESC",
-      };
+  try {
+    setLoading(true);
+    const params = {
+      limit: filters.limit.toString(),
+      offset: filters.offset.toString(),
+      sort_by: "clock_time",
+      sort_order: "DESC",
+    };
 
-      if (filters.employee_uid) params.employee_uid = filters.employee_uid;
-      if (filters.clock_type) params.clock_type = filters.clock_type;
-      if (filters.date) params.date = filters.date;
+    if (filters.employee_uid) params.employee_uid = filters.employee_uid;
+    if (filters.clock_type) params.clock_type = filters.clock_type;
+    if (filters.date) params.date = filters.date;
 
-      const result = await apiService.attendance.getAttendanceRecords(params);
+    // ✅ CHANGED: Use getAttendanceRecordsWithCleanup instead of getAttendanceRecords
+    const result = await apiService.attendance.getAttendanceRecordsWithCleanup(params);
 
-      if (result.success) {
-        setAttendanceData(result.data);
-        setError(null);
+    if (result.success) {
+      setAttendanceData(result.data);
+      setError(null);
 
-        // Load profile pictures individually for the fetched records
-        const uniqueUids = getUniqueUids(result.data);
-        if (uniqueUids.length > 0) {
-          await loadProfilePictures(uniqueUids);
-        }
-      } else {
-        throw new Error(result.error || "Failed to fetch attendance data");
+      // ✅ NEW: Show notification if duplicates were removed
+      if (result.duplicates_removed && result.duplicates_removed.removed_count > 0) {
+        console.log(`✅ Removed ${result.duplicates_removed.removed_count} duplicate entries`);
+        // Optional: Show a toast notification
+        // toast.success(`Cleaned up ${result.duplicates_removed.removed_count} duplicate entries`);
       }
-    } catch (err) {
-      setError(err.message);
-      console.error("Error fetching attendance data:", err);
-    } finally {
-      setLoading(false);
+
+      // Load profile pictures individually for the fetched records
+      const uniqueUids = getUniqueUids(result.data);
+      if (uniqueUids.length > 0) {
+        await loadProfilePictures(uniqueUids);
+      }
+    } else {
+      throw new Error(result.error || "Failed to fetch attendance data");
     }
-  };
+  } catch (err) {
+    setError(err.message);
+    console.error("Error fetching attendance data:", err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const fetchAttendanceStats = async () => {
     try {
@@ -3642,7 +3650,7 @@ function Attendance() {
       )}
 
       {/* Recent Activity */}
-      {recentActivity.length > 0 && (
+      {!loading && recentActivity.length > 0 && (
         <div className={`backdrop-blur-xl rounded-3xl p-8 border shadow-2xl ${
           isDarkMode 
             ? "bg-gray-800/70 border-gray-700/40" 
