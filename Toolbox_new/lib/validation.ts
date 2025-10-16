@@ -59,7 +59,7 @@ export const SearchQuerySchema = z.string()
 // API response validation schemas
 // Note: balance and item_status are calculated by the database and should be trusted as-is
 export const ApiItemSchema = z.object({
-  item_no: z.union([z.string(), z.number()]).transform(String),
+  item_no: z.union([z.string().max(255, "Item number too long"), z.number()]).transform(String),
   item_name: z.string().min(1, "Item name is required"),
   brand: z.string().optional().default("Unknown Brand"),
   item_type: z.string().optional().default("General"),

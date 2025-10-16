@@ -205,7 +205,28 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
             }
 
             // Collect item numbers with separators
-            const itemNumbers = items.map(item => item.id).join('|')
+            let itemNumbers = items.map(item => item.id).join(';')
+            
+            // Limit item_no to 255 characters to prevent database truncation errors
+            if (itemNumbers.length > 255) {
+              // Take as many complete item IDs as possible, leaving room for "..."
+              const maxLength = 252 // Leave room for "..."
+              const itemIds = items.map(item => item.id)
+              let truncatedIds = []
+              let currentLength = 0
+              
+              for (const id of itemIds) {
+                const separatorLength = truncatedIds.length > 0 ? 1 : 0 // ';' separator
+                if (currentLength + id.length + separatorLength <= maxLength) {
+                  truncatedIds.push(id)
+                  currentLength += id.length + separatorLength
+                } else {
+                  break
+                }
+              }
+              
+              itemNumbers = truncatedIds.join(';') + (truncatedIds.length < itemIds.length ? '...' : '')
+            }
 
             const now = new Date()
             const transactionData: any = {
