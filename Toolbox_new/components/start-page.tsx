@@ -395,7 +395,7 @@ export function StartPage({
       </Card>
 
       {/* Custom Animations */}
-      <style jsx>{`
+      <style>{`
         @keyframes slideRight {
           0%, 100% { left: -100%; }
           50% { left: 100%; }

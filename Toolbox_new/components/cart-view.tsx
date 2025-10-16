@@ -134,7 +134,7 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
     setIsCheckoutOpen(true)
   }
 
-  const handleConfirmCheckout = async (employee: Employee) => {
+  const handleConfirmCheckout = async (employee: Employee, purpose?: string) => {
     setIsCommitting(true)
 
     try {
@@ -204,13 +204,26 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
               detailsText = detailsText.substring(0, 252) + '...'
             }
 
+            // Collect item numbers with separators
+            const itemNumbers = items.map(item => item.id).join('|')
+
             const now = new Date()
-            await apiService.logTransaction({
+            const transactionData: any = {
               username: employee.fullName,
               details: detailsText,
+              id_number: employee.idNumber,
+              id_barcode: employee.idBarcode,
+              item_no: itemNumbers,
               log_date: now.toISOString().split('T')[0] || '', // YYYY-MM-DD
               log_time: now.toTimeString().split(' ')[0] || ''  // HH:MM:SS
-            })
+            }
+
+            // Only include purpose if provided
+            if (purpose && purpose.trim()) {
+              transactionData.purpose = purpose.trim()
+            }
+
+            await apiService.logTransaction(transactionData)
             console.log("[v0] Successfully logged enhanced transaction details")
           } catch (transactionError) {
             console.log("[v0] Transaction logging failed (non-critical):", transactionError)

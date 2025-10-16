@@ -3,11 +3,15 @@ import { API_ENDPOINTS } from '../api-config'
 
 /**
  * Transaction Log Data interface matching the database schema
- * Database fields: id (auto), log_date, log_time, username, details, created_at (auto)
+ * Database fields: id (auto), log_date, log_time, username, details, purpose, id_number, id_barcode, item_no, created_at (auto)
  */
 export interface TransactionLogData {
   username: string
   details: string
+  purpose?: string  // Optional field for checkout purpose/reason
+  id_number?: string  // Employee's ID number
+  id_barcode?: string  // Employee's barcode
+  item_no?: string  // Item numbers (can be single or multiple with separators)
   log_date?: string  // YYYY-MM-DD format, optional (database defaults to curdate())
   log_time?: string  // HH:MM:SS format, optional (database defaults to curtime())
 }

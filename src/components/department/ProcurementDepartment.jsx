@@ -1,6 +1,7 @@
 import { useAuth } from "../../contexts/AuthContext"
 import { useState, useEffect } from "react"
 import apiService from "../../utils/api/api-service"
+import { getStoredToken, verifyToken } from "../../utils/auth"
 import {
   InventoryManagement,
   PurchaseOrderTracker,
@@ -31,6 +32,8 @@ function ProcurementDepartment() {
   const [notifications, setNotifications] = useState([])
   const [showNotifications, setShowNotifications] = useState(false)
   const [showBackToTop, setShowBackToTop] = useState(false)
+  const [notificationsLoading, setNotificationsLoading] = useState(false)
+  const [notificationsError, setNotificationsError] = useState(null)
   // Keyboard navigation for tabs
   const tabs = [
     { key: "dashboard", label: "Dashboard", icon: "📊", color: "amber", description: "Overview & Analytics" },
@@ -89,40 +92,103 @@ function ProcurementDepartment() {
     }
   }
 
-  // Load notifications
+  // Load notifications (announcements)
   const loadNotifications = async () => {
+    setNotificationsLoading(true)
+    setNotificationsError(null)
+
     try {
-      // This would typically fetch from an API
-      // For now, we'll create some sample notifications
-      const sampleNotifications = [
-        {
-          id: 1,
-          type: 'warning',
-          title: 'Low Stock Alert',
-          message: 'Item "Steel Rods 10mm" is running low (5 units remaining)',
-          time: '2 hours ago',
-          read: false
-        },
-        {
-          id: 2,
-          type: 'info',
-          title: 'Purchase Order Approved',
-          message: 'PO #1234 has been approved and is ready for processing',
-          time: '4 hours ago',
-          read: false
-        },
-        {
-          id: 3,
-          type: 'success',
-          title: 'Supplier Payment Due',
-          message: 'Payment for ABC Suppliers is due in 3 days',
-          time: '1 day ago',
-          read: true
-        }
-      ]
-      setNotifications(sampleNotifications)
+      console.log("Loading notifications...")
+      console.log("Current user from auth:", user)
+
+      // Get employee ID from token
+      const token = getStoredToken()
+      if (!token) {
+        console.error("No authentication token found")
+        setNotificationsError("Authentication required")
+        setNotificationsLoading(false)
+        return
+      }
+
+      console.log("Token found, verifying...")
+
+      const payload = verifyToken(token)
+      console.log("Token payload:", payload)
+      let uid = payload?.userId
+
+      // Fallback to user.id from auth context if token doesn't have userId
+      if (!uid && user?.id) {
+        console.log("Using user.id from auth context as fallback:", user.id)
+        uid = user.id
+      }
+
+      if (!uid) {
+        console.error("No user ID found in token or auth context")
+        setNotificationsError("Invalid session")
+        setNotificationsLoading(false)
+        return
+      }
+
+      console.log("User ID from token:", uid)
+
+      // Fetch announcements for the employee
+      console.log("Fetching announcements from API...")
+      const response = await apiService.announcements.getEmployeeAnnouncements(uid)
+
+      console.log("API Response:", response)
+
+      if (response?.data) {
+        const formattedAnnouncements = response.data.map((ann) => ({
+          id: ann.id,
+          title: ann.title || ann.message || "Announcement",
+          description: ann.description || ann.content || "",
+          time: new Date(ann.created_at || ann.date).toLocaleDateString(),
+          read: ann.is_read || ann.read || false,
+          priority: ann.priority || "normal",
+          fullData: ann,
+        }))
+        console.log("Formatted announcements:", formattedAnnouncements)
+        setNotifications(formattedAnnouncements)
+      } else {
+        console.log("No data in response")
+        setNotifications([])
+      }
     } catch (error) {
-      console.error('Failed to load notifications:', error)
+      console.error("Error fetching announcements:", error)
+      setNotificationsError("Failed to load announcements")
+      setNotifications([])
+    } finally {
+      setNotificationsLoading(false)
+    }
+  }
+
+  // Mark announcement as read
+  const markAnnouncementAsRead = async (announcementId) => {
+    try {
+      // Get employee ID from token
+      const token = getStoredToken()
+      if (!token) return
+
+      const payload = verifyToken(token)
+      let uid = payload?.userId
+
+      // Fallback to user.id from auth context if token doesn't have userId
+      if (!uid && user?.id) {
+        uid = user.id
+      }
+
+      if (!uid) return
+
+      await apiService.announcements.markAnnouncementAsRead(announcementId, uid)
+
+      // Update local state
+      setNotifications((prev) =>
+        prev.map((ann) =>
+          ann.id === announcementId ? { ...ann, read: true } : ann
+        )
+      )
+    } catch (error) {
+      console.error('Failed to mark announcement as read:', error)
     }
   }
 
@@ -274,61 +340,105 @@ function ProcurementDepartment() {
 
                 {/* Notifications Dropdown Panel */}
                 {showNotifications && (
-                  <div className="fixed top-20 right-4 w-80 sm:w-96 bg-slate-800/95 backdrop-blur-md rounded-lg shadow-2xl border border-slate-700/50 z-[9999] max-h-[calc(100vh-6rem)] overflow-y-auto notifications-menu">
+                  <div className="absolute top-16 left-1/2 transform -translate-x-1/2 w-80 sm:w-96 bg-slate-800/95 backdrop-blur-md rounded-lg shadow-2xl border border-slate-700/50 z-[9999] max-h-[calc(100vh-6rem)] overflow-y-auto notifications-menu">
                     <div className="p-4">
                       <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-700/50 sticky top-0 bg-slate-800/95 backdrop-blur-md z-10">
                         <h3 className="text-white font-semibold">Notifications</h3>
-                        <button 
-                          onClick={() => setShowNotifications(false)}
-                          className="text-slate-400 hover:text-white transition-colors"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => loadNotifications()}
+                            disabled={notificationsLoading}
+                            className="text-slate-400 hover:text-amber-400 transition-colors disabled:opacity-50"
+                            title="Refresh notifications"
+                          >
+                            <svg className={`w-4 h-4 ${notificationsLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                          </button>
+                          <button 
+                            onClick={() => setShowNotifications(false)}
+                            className="text-slate-400 hover:text-white transition-colors"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="space-y-3">
-                        {notifications.length > 0 ? (
-                          notifications.map((notification) => (
-                            <div 
-                              key={notification.id} 
-                              className={`p-3 rounded-lg border transition-all duration-200 cursor-pointer hover:bg-slate-700/60 ${
-                                notification.read 
-                                  ? 'bg-slate-700/30 border-slate-600/30' 
-                                  : 'bg-slate-700/50 border-slate-600/50'
-                              }`}
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-2 ${
-                                  notification.type === 'warning' ? 'bg-yellow-500' :
-                                  notification.type === 'success' ? 'bg-green-500' :
-                                  notification.type === 'info' ? 'bg-blue-500' : 'bg-gray-500'
-                                }`}></div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <h4 className="text-white font-medium text-sm truncate">{notification.title}</h4>
-                                    {!notification.read && (
-                                      <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></div>
-                                    )}
+                      {/* Loading State */}
+                      {notificationsLoading && (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="text-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-600 border-t-amber-500 mx-auto mb-3"></div>
+                            <p className="text-slate-400 text-sm">Loading announcements...</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Error State */}
+                      {notificationsError && !notificationsLoading && (
+                        <div className="p-4 rounded-lg border border-red-500/30 bg-red-500/10 mb-4">
+                          <div className="flex items-center gap-2">
+                            <svg className="w-5 h-5 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                            <p className="text-red-400 text-sm font-medium">{notificationsError}</p>
+                          </div>
+                          <button 
+                            onClick={() => loadNotifications()}
+                            className="mt-2 text-amber-400 hover:text-amber-300 text-xs underline"
+                          >
+                            Try Again
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Notifications List */}
+                      {!notificationsLoading && !notificationsError && (
+                        <div className="space-y-3">
+                          {notifications.length > 0 ? (
+                            notifications.map((notification) => (
+                              <div 
+                                key={notification.id} 
+                                className={`p-3 rounded-lg border transition-all duration-200 cursor-pointer hover:bg-slate-700/60 ${
+                                  notification.read 
+                                    ? 'bg-slate-700/30 border-slate-600/30' 
+                                    : 'bg-slate-700/50 border-slate-600/50'
+                                }`}
+                                onClick={() => !notification.read && markAnnouncementAsRead(notification.id)}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-2 ${
+                                    notification.priority === 'high' ? 'bg-red-500' :
+                                    notification.priority === 'medium' ? 'bg-yellow-500' :
+                                    notification.priority === 'low' ? 'bg-green-500' : 'bg-blue-500'
+                                  }`}></div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <h4 className="text-white font-medium text-sm truncate">{notification.title}</h4>
+                                      {!notification.read && (
+                                        <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></div>
+                                      )}
+                                    </div>
+                                    <p className="text-slate-300 text-xs mt-1 leading-relaxed">{notification.description}</p>
+                                    <p className="text-slate-500 text-xs mt-2">{notification.time}</p>
                                   </div>
-                                  <p className="text-slate-300 text-xs mt-1 leading-relaxed">{notification.message}</p>
-                                  <p className="text-slate-500 text-xs mt-2">{notification.time}</p>
                                 </div>
                               </div>
+                            ))
+                          ) : (
+                            <div className="text-center py-8">
+                              <svg className="w-12 h-12 text-slate-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM21 5a2 2 0 00-2-2H5a2 2 0 00-2 2v14l7-7h10z" />
+                              </svg>
+                              <p className="text-slate-400 text-sm">No announcements available</p>
                             </div>
-                          ))
-                        ) : (
-                          <div className="text-center py-8">
-                            <svg className="w-12 h-12 text-slate-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM21 5a2 2 0 00-2-2H5a2 2 0 00-2 2v14l7-7h10z" />
-                            </svg>
-                            <p className="text-slate-400 text-sm">No notifications</p>
-                          </div>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      )}
 
-                      {notifications.length > 0 && (
+                      {notifications.length > 0 && !notificationsLoading && !notificationsError && (
                         <div className="mt-4 pt-3 border-t border-slate-700/50 sticky bottom-0 bg-slate-800/95 backdrop-blur-md">
                           <button className="w-full text-center text-amber-400 hover:text-amber-300 text-sm font-medium transition-colors py-2">
                             View All Notifications
