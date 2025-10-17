@@ -10,10 +10,10 @@ import companyLogo from "../assets/companyLogo.jpg"
 // Company Information
 const COMPANY_INFO = {
   name: "JJC ENGINEERING WORKS & GENERAL SERVICES",
-  address: "B-3 L-11, South Carolina St., Jouyous Hts, Subdivision",
+  address: "B-3 L-11, South Carolina St., Joyous Hts, Subdivision",
   address2: "Sitio Hinapao, Brgy. San Jose, Antipolo City",
   phone: "Tel #: (632) 8288-2686 / (632) 7004-9842",
-  email: "e-mail: jjcenggworks@yahoo.com",
+  email: "E-mail: jjcenggworks@yahoo.com",
   logo: companyLogo
 }
 
@@ -51,7 +51,8 @@ export const exportPurchaseOrderToPDF = (poData) => {
     section: 9,
     body: 8,
     small: 7,
-    tiny: 6
+    tiny: 6,
+    large: 12  // Added large font size for GRAND TOTAL emphasis
   }
 
   let yPos = margin
@@ -81,6 +82,7 @@ export const exportPurchaseOrderToPDF = (poData) => {
 
   // Tax calculation
   const getTaxRate = () => {
+    if (!poData.apply_tax) return 0 // No tax when apply_tax is false
     switch(poData.tax_type) {
       case 'goods': return 0.01 // 1%
       case 'services': return 0.02 // 2%
@@ -91,7 +93,7 @@ export const exportPurchaseOrderToPDF = (poData) => {
 
   const calculateTaxBreakdown = () => {
     const totalBeforeWithholdingTax = totalAmount
-    const subtotal = totalBeforeWithholdingTax / 1.12 // Remove 12% VAT
+    const subtotal = poData.apply_tax ? totalBeforeWithholdingTax / 1.12 : totalBeforeWithholdingTax // Remove 12% VAT only if tax is applied
     const taxRate = getTaxRate()
     const withholdingTax = subtotal * taxRate
     const totalAfterWithholdingTax = totalBeforeWithholdingTax - withholdingTax
@@ -110,7 +112,8 @@ export const exportPurchaseOrderToPDF = (poData) => {
       totalAfterWithholdingTax,
       discountPercentage: poData.has_discount ? Number(poData.discount_percentage) : 0,
       discountAmount,
-      grandTotal
+      grandTotal,
+      applyTax: poData.apply_tax // Include flag for consistency
     }
   }
 
@@ -374,6 +377,7 @@ export const exportPurchaseOrderToPDF = (poData) => {
     })
     
     yPos = doc.lastAutoTable.finalY + sectionSpacing
+    
     // ============================================================================
     // TOTAL AMOUNT - ONLY ON LAST PAGE
     // ============================================================================
@@ -381,48 +385,71 @@ export const exportPurchaseOrderToPDF = (poData) => {
     if (pageIndex === totalPages - 1) {
       const totalBoxWidth = 75
       const totalBoxX = pageWidth - rightMargin - totalBoxWidth - 1
-      const labelColumnWidth = 48
       
-      // Calculate exact height based on content
+      // Fixed container dimensions for consistency
       const rowHeight = 5
-      const numberOfRows = taxBreakdown.discountAmount > 0 ? 5 : 4
       const topPadding = 3
+      const bottomPadding = 2
       const dividerSpace = 1.5
-      const grandTotalSpace = 5.5
-      const totalBoxHeight = topPadding + (numberOfRows * rowHeight) + dividerSpace + grandTotalSpace
+      const grandTotalRowHeight = 8  // Increased from 5.5 to 8 for better GRAND TOTAL padding
+      
+      // Calculate rows dynamically
+      let contentRows = 0
+      if (poData.apply_tax) {
+        contentRows = 3 // Gross Total, Subtotal, Withholding Tax
+      } else {
+        contentRows = 1 // Total Amount only
+      }
+      if (taxBreakdown.discountAmount > 0) {
+        contentRows += 1 // Discount row
+      }
+      
+      // Fixed total box height regardless of content
+      const totalBoxHeight = topPadding + (contentRows * rowHeight) + dividerSpace + grandTotalRowHeight + bottomPadding
       
       doc.setLineWidth(LINE_WEIGHTS.divider)
       doc.rect(totalBoxX, yPos, totalBoxWidth, totalBoxHeight)
       
       let rowY = yPos + topPadding + 3.5
       
-      // Gross Total (with VAT)
-      doc.setFont("helvetica", "normal")
-      doc.setFontSize(FONT_SIZES.small)
-      doc.text("GROSS TOTAL (with 12% VAT) =", totalBoxX + 2, rowY)
-      doc.setFontSize(FONT_SIZES.section)
-      doc.text(formatPesoWithPrefix(taxBreakdown.totalBeforeWithholdingTax), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
-      
-      rowY += rowHeight
-      
-      // Subtotal (after VAT removal)
-      doc.setFont("helvetica", "normal")
-      doc.setFontSize(FONT_SIZES.tiny)
-      doc.text("Subtotal (Gross ÷ 1.12) =", totalBoxX + 2, rowY)
-      doc.setFontSize(FONT_SIZES.body)
-      doc.text(formatPesoWithPrefix(taxBreakdown.subtotal), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
-      
-      rowY += rowHeight
-      
-      // Withholding Tax
-      const taxTypeLabel = poData.tax_type ? poData.tax_type.charAt(0).toUpperCase() + poData.tax_type.slice(1) : 'Goods'
-      doc.setFont("helvetica", "normal")
-      doc.setFontSize(FONT_SIZES.tiny)
-      doc.text(`Less: Withholding Tax (${taxBreakdown.taxRate}% - ${taxTypeLabel}) =`, totalBoxX + 2, rowY)
-      doc.setFontSize(FONT_SIZES.body)
-      doc.text(`(${formatPesoWithPrefix(taxBreakdown.withholdingTax)})`, totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
-      
-      rowY += rowHeight
+      if (poData.apply_tax) {
+        // Gross Total (with VAT) - only show when tax is applied
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(FONT_SIZES.small)
+        doc.text("GROSS TOTAL (with 12% VAT) =", totalBoxX + 2, rowY)
+        doc.setFontSize(FONT_SIZES.section)
+        doc.text(formatPesoWithPrefix(taxBreakdown.totalBeforeWithholdingTax), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
+        
+        rowY += rowHeight
+        
+        // Subtotal (after VAT removal)
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(FONT_SIZES.tiny)
+        doc.text("Subtotal (Gross ÷ 1.12) =", totalBoxX + 2, rowY)
+        doc.setFontSize(FONT_SIZES.body)
+        doc.text(formatPesoWithPrefix(taxBreakdown.subtotal), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
+        
+        rowY += rowHeight
+        
+        // Withholding Tax
+        const taxTypeLabel = poData.tax_type ? poData.tax_type.charAt(0).toUpperCase() + poData.tax_type.slice(1) : 'Goods'
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(FONT_SIZES.tiny)
+        doc.text(`Less: Withholding Tax (${taxBreakdown.taxRate}% - ${taxTypeLabel}) =`, totalBoxX + 2, rowY)
+        doc.setFontSize(FONT_SIZES.body)
+        doc.text(`(${formatPesoWithPrefix(taxBreakdown.withholdingTax)})`, totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
+        
+        rowY += rowHeight
+      } else {
+        // Simple Total Amount - when tax is not applied
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(FONT_SIZES.small)
+        doc.text("TOTAL AMOUNT =", totalBoxX + 2, rowY)
+        doc.setFontSize(FONT_SIZES.section)
+        doc.text(formatPesoWithPrefix(taxBreakdown.totalBeforeWithholdingTax), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
+        
+        rowY += rowHeight
+      }
       
       // Discount if applicable
       if (taxBreakdown.discountAmount > 0) {
@@ -439,14 +466,14 @@ export const exportPurchaseOrderToPDF = (poData) => {
       doc.setLineWidth(LINE_WEIGHTS.divider)
       doc.line(totalBoxX + 1, rowY + 0.5, totalBoxX + totalBoxWidth - 1, rowY + 0.5)
       
-      rowY += dividerSpace + 3
+      rowY += dividerSpace + 3  // Increased spacing after divider for better GRAND TOTAL padding
       
-      // Grand Total
+      // Grand Total - Enhanced styling for better prominence
       doc.setFont("helvetica", "bold")
-      doc.setFontSize(FONT_SIZES.small)
+      doc.setFontSize(FONT_SIZES.body)  // Increased from small to body for better visibility
       doc.text("GRAND TOTAL =", totalBoxX + 2, rowY)
       
-      doc.setFontSize(FONT_SIZES.section)
+      doc.setFontSize(FONT_SIZES.large)  // Increased from section to large for emphasis
       doc.text(formatPesoWithPrefix(taxBreakdown.grandTotal), totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
 
       yPos += totalBoxHeight + sectionSpacing
@@ -582,6 +609,7 @@ export const exportPurchaseOrderToExcel = (poData) => {
 
   // Tax calculation functions
   const getTaxRate = () => {
+    if (!poData.apply_tax) return 0 // No tax when apply_tax is false
     switch(poData.tax_type) {
       case 'goods': return 0.01
       case 'services': return 0.02
@@ -592,7 +620,7 @@ export const exportPurchaseOrderToExcel = (poData) => {
 
   const calculateTaxBreakdown = () => {
     const totalBeforeWithholdingTax = totalAmount
-    const subtotal = totalBeforeWithholdingTax / 1.12
+    const subtotal = poData.apply_tax ? totalBeforeWithholdingTax / 1.12 : totalBeforeWithholdingTax // Remove 12% VAT only if tax is applied
     const taxRate = getTaxRate()
     const withholdingTax = subtotal * taxRate
     const totalAfterWithholdingTax = totalBeforeWithholdingTax - withholdingTax
@@ -611,7 +639,8 @@ export const exportPurchaseOrderToExcel = (poData) => {
       totalAfterWithholdingTax,
       discountPercentage: poData.has_discount ? Number(poData.discount_percentage) : 0,
       discountAmount,
-      grandTotal
+      grandTotal,
+      applyTax: poData.apply_tax // Include flag for consistency
     }
   }
 
@@ -626,9 +655,6 @@ export const exportPurchaseOrderToExcel = (poData) => {
     [COMPANY_INFO.address2, "", "", "", "", "", "", "", "", "", "", ""],
     [COMPANY_INFO.phone, "", "", "", "", "", "", "", "", "", "", ""],
     [COMPANY_INFO.email, "", "", "", "", "", "", "", "", "", "", ""],
-    [], // Empty row
-    // Row 7: PO Number
-    ["", "", "", "", "", "", "", "", "", "", "P.O. # :", poData.po_number || "—"],
     [], // Empty row
     // Row 9-10: Information Grid Headers
     ["SUPPLIER'S NAME & ADDRESS", "", "", "", "", "ORDER INFORMATION", "", "", "", "", "", ""],
@@ -654,10 +680,14 @@ export const exportPurchaseOrderToExcel = (poData) => {
       formatPeso((item.quantity || 0) * (item.price_per_unit || 0))
     ]),
     [], // Empty row
-    // Totals with Tax Breakdown
-    ["", "", "", "GROSS TOTAL (with 12% VAT) =", "", formatPesoWithPrefix(taxBreakdown.totalBeforeWithholdingTax)],
-    ["", "", "", `Subtotal (Gross ÷ 1.12) =`, "", formatPesoWithPrefix(taxBreakdown.subtotal)],
-    ["", "", "", `Less: Withholding Tax (${taxBreakdown.taxRate}% - ${taxTypeLabel}) =`, "", `(${formatPesoWithPrefix(taxBreakdown.withholdingTax)})`],
+    // Totals with Tax Breakdown (conditional)
+    ...(poData.apply_tax ? [
+      ["", "", "", "GROSS TOTAL (with 12% VAT) =", "", formatPesoWithPrefix(taxBreakdown.totalBeforeWithholdingTax)],
+      ["", "", "", `Subtotal (Gross ÷ 1.12) =`, "", formatPesoWithPrefix(taxBreakdown.subtotal)],
+      ["", "", "", `Less: Withholding Tax (${taxBreakdown.taxRate}% - ${taxTypeLabel}) =`, "", `(${formatPesoWithPrefix(taxBreakdown.withholdingTax)})`]
+    ] : [
+      ["", "", "", "TOTAL AMOUNT =", "", formatPesoWithPrefix(taxBreakdown.totalBeforeWithholdingTax)]
+    ]),
     ...(taxBreakdown.discountAmount > 0 ? [
       ["", "", "", `Less: Discount (${taxBreakdown.discountPercentage}%) =`, "", `(${formatPesoWithPrefix(taxBreakdown.discountAmount)})`]
     ] : []),
@@ -696,7 +726,7 @@ export const exportPurchaseOrderToExcel = (poData) => {
   ]
 
   // Calculate merge indices based on actual content
-  const totalRowsBeforeSignatures = taxBreakdown.discountAmount > 0 ? 5 : 4 // Number of total rows
+  const totalRowsBeforeSignatures = 4  // Consistent with PDF: always use maximum rows for merge calculations
   const signaturesOffset = 3 // Signatures section rows
   const notesOffset = 1 // Notes section rows
   
@@ -741,4 +771,4 @@ export const exportPurchaseOrderToExcel = (poData) => {
 
   XLSX.utils.book_append_sheet(wb, ws, "Purchase Order")
   XLSX.writeFile(wb, `PO_${poData.po_number || 'PO'}_${poData.supplier_name || 'Supplier'}.xlsx`)
-}
+} 
