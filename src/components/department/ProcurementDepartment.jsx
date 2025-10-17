@@ -1,16 +1,16 @@
 import { useAuth } from "../../contexts/AuthContext"
-import { useState, useEffect } from "react"
+import { useState, useEffect, lazy, Suspense } from "react"
 import apiService from "../../utils/api/api-service"
 import { getStoredToken, verifyToken } from "../../utils/auth"
-import {
-  InventoryManagement,
-  PurchaseOrderTracker,
-  EmployeeLogs,
-  ItemDetailView,
-  AdminDashboard,
-  SupplierManagement,
-  ToastProvider
-} from "../pd"
+
+// Lazy-load heavy procurement subcomponents directly to avoid importing the whole barrel
+const AdminDashboard = lazy(() => import("../pd/AdminDashboard"))
+const InventoryManagement = lazy(() => import("../pd/inventory/InventoryManagement"))
+const PurchaseOrderTracker = lazy(() => import("../pd/purchase-orders/PurchaseOrderTracker"))
+const SupplierManagement = lazy(() => import("../pd/SuppliesManagement"))
+const EmployeeLogs = lazy(() => import("../pd/EmployeeLogs"))
+const ItemDetailView = lazy(() => import("../pd/inventory/ItemDetailView"))
+const ToastProvider = lazy(() => import("../pd/shared/ToastNotification"))
 import {
   AdminDashboardSkeleton,
   InventoryManagementSkeleton,
@@ -703,13 +703,15 @@ function ProcurementDepartment() {
 
           <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-lg shadow-lg border border-slate-200/50 dark:border-slate-700/50">
             <div className="p-3 sm:p-4">
-            {activeTab === "dashboard" && <AdminDashboard onNavigate={setActiveTab} />}
-            {activeTab === "inventory" && <InventoryManagement />}
-            {activeTab === "orders" && <PurchaseOrderTracker />}
-            {activeTab === "suppliers" && <SupplierManagement />}
-            {activeTab === "logs" && <EmployeeLogs />}
+              <Suspense fallback={<div className="py-6 text-center text-sm text-gray-600">Loading module...</div>}>
+                {activeTab === "dashboard" && <AdminDashboard onNavigate={setActiveTab} />}
+                {activeTab === "inventory" && <InventoryManagement />}
+                {activeTab === "orders" && <PurchaseOrderTracker />}
+                {activeTab === "suppliers" && <SupplierManagement />}
+                {activeTab === "logs" && <EmployeeLogs />}
+              </Suspense>
+            </div>
           </div>
-        </div>
       </div>
       </div>
       {/* Back to top button */}

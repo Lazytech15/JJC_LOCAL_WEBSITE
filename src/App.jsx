@@ -1,11 +1,12 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { AuthProvider, useAuth } from "./contexts/AuthContext"
 import { lazy, Suspense } from "react"
-import DepartmentSelector from "./components/DepartmentSelector"
-import LoginForm from "./components/LoginForm"
-import PWAInstallPrompt from "../public/PWAInstallPrompt"
-import PWAStatusIndicator from "../public/PWAStatusIndicator"
-import GearLoadingSpinner  from "../public/LoadingGear"
+// Lazy-load heavier top-level components to improve initial load
+const DepartmentSelector = lazy(() => import("./components/DepartmentSelector"))
+const LoginForm = lazy(() => import("./components/LoginForm"))
+const PWAInstallPrompt = lazy(() => import("../public/PWAInstallPrompt"))
+const PWAStatusIndicator = lazy(() => import("../public/PWAStatusIndicator"))
+const GearLoadingSpinner  = lazy(() => import("../public/LoadingGear"))
 import { ProcurementDepartmentSkeleton } from "./components/skeletons/ProcurementSkeletons"
 import './index.css'
 //addedsomething here
@@ -61,8 +62,10 @@ function AppContent() {
   return (
     <Router>
       {/* PWA Components - Available throughout the app */}
-      <PWAInstallPrompt />
-      <PWAStatusIndicator />
+      <Suspense fallback={null}>
+        <PWAInstallPrompt />
+        <PWAStatusIndicator />
+      </Suspense>
       <RoutesWrapper />
     </Router>
   )
