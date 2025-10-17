@@ -15,11 +15,10 @@ const CACHE_DURATIONS = {
 // Critical resources to cache for offline functionality
 const STATIC_ASSETS = [
   '/',
-  '/favicon.ico',
-  '/_next/static/css/',
-  '/_next/static/js/',
+  '/index.html',
   '/ToolBoxlogo.png',
-  '/placeholder-user.jpg',
+  '/manifest.json',
+  '/favicon.ico'
 ]
 
 // API endpoints to cache
@@ -35,10 +34,18 @@ self.addEventListener('install', (event) => {
   
   event.waitUntil(
     Promise.all([
-      // Cache static assets
+      // Cache static assets with error handling
       caches.open(STATIC_CACHE_NAME).then((cache) => {
         console.log('[SW] Caching static assets')
-        return cache.addAll(STATIC_ASSETS.filter(asset => asset))
+        // Cache assets individually to handle failures gracefully
+        return Promise.allSettled(
+          STATIC_ASSETS.map(asset => 
+            cache.add(asset).catch(error => {
+              console.warn('[SW] Failed to cache asset:', asset, error.message)
+              return null // Continue with other assets
+            })
+          )
+        )
       }),
       
       // Initialize API cache

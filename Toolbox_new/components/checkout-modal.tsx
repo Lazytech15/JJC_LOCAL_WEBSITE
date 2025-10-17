@@ -17,7 +17,7 @@ interface CheckoutModalProps {
   isOpen: boolean
   onClose: () => void
   items: CartItem[]
-  onConfirmCheckout: (employee: Employee) => void
+  onConfirmCheckout: (employee: Employee, purpose?: string) => void
   isCommitting?: boolean
 }
 
@@ -29,6 +29,7 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
   const [isScanning, setIsScanning] = useState(false)
   const [loadingEmployees, setLoadingEmployees] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [purpose, setPurpose] = useState("")
 
   // Load employees when modal opens
   useEffect(() => {
@@ -85,6 +86,7 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
       setUserInput("")
       setError(null)
       setIsScanning(false)
+      setPurpose("")
     }
   }, [isOpen])
 
@@ -155,9 +157,8 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
     try {
       console.log("[CheckoutModal] Processing checkout for employee:", selectedEmployee.fullName)
       
-      // Pass the employee object directly (not wrapped in userId)
-      // Note: Actual logging will happen in cart-view.tsx to avoid duplicates
-      onConfirmCheckout(selectedEmployee)
+      // Pass the employee object and purpose directly
+      onConfirmCheckout(selectedEmployee, purpose.trim() || undefined)
     } catch (error) {
       console.error("[CheckoutModal] Failed to log transaction:", error)
       setError("Failed to save transaction log. Please try again.")
@@ -363,6 +364,33 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
                 </div>
               </div>
             )}
+          </div>
+
+          <Separator />
+
+          {/* Purpose/Reason Field */}
+          <div className="space-y-4">
+            <Label className="text-base font-semibold dark:text-slate-100">
+              Purpose/Reason <span className="text-sm font-normal text-slate-500 dark:text-slate-400">(Optional)</span>
+            </Label>
+
+            <div className="space-y-2">
+              <Label htmlFor="purpose" className="text-sm text-slate-600 dark:text-slate-400">
+                Please provide a reason or purpose for this checkout
+              </Label>
+              <Input
+                id="purpose"
+                placeholder="e.g., Maintenance work, Project requirement, Replacement needed..."
+                value={purpose}
+                onChange={(e) => setPurpose(e.target.value)}
+                className="dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600"
+                disabled={isCommitting}
+                maxLength={255}
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-500">
+                This helps track why items are being checked out. Maximum 255 characters.
+              </p>
+            </div>
           </div>
 
           {/* Action Buttons */}

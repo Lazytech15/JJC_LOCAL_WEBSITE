@@ -134,7 +134,7 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
     setIsCheckoutOpen(true)
   }
 
-  const handleConfirmCheckout = async (employee: Employee) => {
+  const handleConfirmCheckout = async (employee: Employee, purpose?: string) => {
     setIsCommitting(true)
 
     try {
@@ -204,13 +204,47 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
               detailsText = detailsText.substring(0, 252) + '...'
             }
 
+            // Collect item numbers with separators
+            let itemNumbers = items.map(item => item.id).join(';')
+            
+            // Limit item_no to 255 characters to prevent database truncation errors
+            if (itemNumbers.length > 255) {
+              // Take as many complete item IDs as possible, leaving room for "..."
+              const maxLength = 252 // Leave room for "..."
+              const itemIds = items.map(item => item.id)
+              let truncatedIds = []
+              let currentLength = 0
+              
+              for (const id of itemIds) {
+                const separatorLength = truncatedIds.length > 0 ? 1 : 0 // ';' separator
+                if (currentLength + id.length + separatorLength <= maxLength) {
+                  truncatedIds.push(id)
+                  currentLength += id.length + separatorLength
+                } else {
+                  break
+                }
+              }
+              
+              itemNumbers = truncatedIds.join(';') + (truncatedIds.length < itemIds.length ? '...' : '')
+            }
+
             const now = new Date()
-            await apiService.logTransaction({
+            const transactionData: any = {
               username: employee.fullName,
               details: detailsText,
+              id_number: employee.idNumber,
+              id_barcode: employee.idBarcode,
+              item_no: itemNumbers,
               log_date: now.toISOString().split('T')[0] || '', // YYYY-MM-DD
               log_time: now.toTimeString().split(' ')[0] || ''  // HH:MM:SS
-            })
+            }
+
+            // Only include purpose if provided
+            if (purpose && purpose.trim()) {
+              transactionData.purpose = purpose.trim()
+            }
+
+            await apiService.logTransaction(transactionData)
             console.log("[v0] Successfully logged enhanced transaction details")
           } catch (transactionError) {
             console.log("[v0] Transaction logging failed (non-critical):", transactionError)

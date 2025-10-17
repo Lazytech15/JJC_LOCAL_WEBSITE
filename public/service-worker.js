@@ -21,6 +21,20 @@ const OPTIONAL_ASSETS = [
   "/manifest.json"
 ]
 
+// Static assets to cache
+const STATIC_ASSETS = [
+  "/",
+  "/index.html",
+  "/ToolBoxlogo.png",
+  "/manifest.json",
+  "/favicon.ico"
+]
+
+// UI assets (will be populated dynamically)
+const UI_ASSETS = [
+  // These will be added dynamically during runtime
+]
+
 // Install event - cache static and UI assets
 self.addEventListener("install", (event) => {
   console.log("[Service Worker] Installing...")
@@ -29,15 +43,19 @@ self.addEventListener("install", (event) => {
       // Cache static assets
       caches.open(STATIC_CACHE).then((cache) => {
         console.log("[Service Worker] Caching static assets")
-        return cache.addAll(STATIC_ASSETS)
+        return cache.addAll(CORE_ASSETS)
       }),
-      // Cache UI assets
+      // Cache UI assets (optional)
       caches.open(UI_CACHE).then((cache) => {
         console.log("[Service Worker] Caching UI assets")
-        return cache.addAll(UI_ASSETS).catch((err) => {
-          console.warn("[Service Worker] Some UI assets failed to cache:", err)
-          // Don't fail the entire installation if some UI assets are missing
-        })
+        return Promise.allSettled(
+          UI_ASSETS.map(asset => 
+            cache.add(asset).catch(err => {
+              console.warn("[Service Worker] Failed to cache UI asset:", asset, err.message)
+              return null
+            })
+          )
+        )
       })
     ])
   )
