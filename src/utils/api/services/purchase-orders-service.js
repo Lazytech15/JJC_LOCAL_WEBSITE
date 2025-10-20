@@ -25,7 +25,13 @@ export class PurchaseOrdersService extends BaseAPIService {
   }
 
   // PUT /api/items/purchase-orders/:id/status - Update purchase order status
-  // (update endpoints removed) - updating purchase orders is no longer supported
+  async updatePurchaseOrderStatus(id, statusPayload, options = {}) {
+    return this.request(`/api/items/purchase-orders/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify(statusPayload),
+      ...options
+    })
+  }
 
   // DELETE /api/items/purchase-orders/:id - Delete a purchase order
   async deletePurchaseOrder(id) {

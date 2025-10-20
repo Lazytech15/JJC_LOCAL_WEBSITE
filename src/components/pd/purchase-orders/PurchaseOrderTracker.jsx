@@ -456,8 +456,32 @@ function PurchaseOrderTracker() {
   }
 
   const handleUpdateStatus = async () => {
-    // Status updates for purchase orders have been removed.
-    showError('Update Disabled', 'Updating purchase order status is no longer supported.')
+    try {
+      if (!selectedOrder) {
+        showError('No Order Selected', 'Please open a purchase order to update its status.')
+        return
+      }
+
+      const payload = {
+        status: (statusUpdate.new_status || 'received').toLowerCase(),
+        actual_delivery_date: statusUpdate.actual_delivery_date || undefined,
+        notes: statusUpdate.notes || undefined
+      }
+
+      const result = await apiService.purchaseOrders.updatePurchaseOrderStatus(selectedOrder.id, payload)
+
+      if (result && result.success) {
+        success('Updated', result.message || 'Purchase order status updated')
+        // Refresh orders and selected order
+        fetchPurchaseOrders()
+        // Close details modal (optional)
+        setShowOrderDetails(false)
+      } else {
+        showError('Failed', (result && (result.message || result.error)) || 'Failed to update purchase order status')
+      }
+    } catch (err) {
+      showError('Error', err.message || 'Failed to update purchase order status')
+    }
   }
 
   const handleViewOrderDetails = (order) => {
