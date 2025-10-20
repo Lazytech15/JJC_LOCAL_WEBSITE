@@ -10,6 +10,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   
   // Available data from API
   const [suppliers, setSuppliers] = useState([])
+  // Map supplier name => full supplier record (from API) for exact lookup by name or id
+  const [supplierLookup, setSupplierLookup] = useState({})
   const [availableItems, setAvailableItems] = useState([])
   const [poPrefix, setPoPrefix] = useState("")
   
@@ -17,6 +19,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   const [formData, setFormData] = useState({
     // Step 1 - PO Number & Supplier
     supplier_name: "",
+    supplier_id: "",
     supplier_address: "",
   supplier_details: null,
     po_number: "",
@@ -39,6 +42,14 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     verified_by: "",
     approved_by: "",
     notes: ""
+  })
+
+  // Track which fields were auto-filled so we can show a badge and clear it on user edit
+  const [autofilledFields, setAutofilledFields] = useState({
+    supplier_address: false,
+    attention_person: false,
+    terms: false,
+    notes: false
   })
   
   // Validation states
@@ -116,11 +127,34 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         })
         
         // Convert to array, filter out zero counts, and sort by item count
-        const suppliersList = Array.from(supplierMap.values())
+        let suppliersList = Array.from(supplierMap.values())
           .filter(s => s.item_count > 0)
           .sort((a, b) => b.item_count - a.item_count)
-        
+
         console.log("Suppliers needing restock:", suppliersList)
+
+        // Fetch full suppliers from API to get IDs and additional info, then merge IDs where names match exactly
+        try {
+          const apiSuppliersResp = await apiService.suppliers.getSuppliers()
+          if (apiSuppliersResp.success && Array.isArray(apiSuppliersResp.suppliers)) {
+            const apiSuppliers = apiSuppliersResp.suppliers
+            const lookup = {}
+            apiSuppliers.forEach(s => {
+              if (s && s.name) lookup[s.name] = s
+            })
+
+            // Attach id (if available) to suppliersList entries
+            suppliersList = suppliersList.map(s => ({
+              ...s,
+              id: lookup[s.name] ? lookup[s.name].id : undefined
+            }))
+
+            setSupplierLookup(lookup)
+          }
+        } catch (err) {
+          console.warn('Failed to fetch full suppliers for lookup', err)
+        }
+
         setSuppliers(suppliersList)
       }
       
@@ -141,12 +175,14 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
   // Fetch items when supplier is selected
   useEffect(() => {
-    if (formData.supplier_name) {
-      fetchSupplierItems(formData.supplier_name)
+    const supplierForFetch = formData.supplier_name || formData.supplier_id
+    if (supplierForFetch) {
+      // fetchSupplierItems expects supplier name; prefer supplier_name if available
+      fetchSupplierItems(formData.supplier_name || supplierForFetch)
     } else {
       setAvailableItems([])
     }
-  }, [formData.supplier_name])
+  }, [formData.supplier_name, formData.supplier_id])
 
   const fetchSupplierItems = async (supplier) => {
     try {
@@ -234,31 +270,86 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     }
   }
 
-  const handleSupplierSelect = async (supplierName) => {
-    const supplier = suppliers.find(s => s.name === supplierName)
-    
-    // Fetch full supplier details from suppliers API
+  const handleSupplierSelect = async (selectedValue) => {
+    // selectedValue may be an id (if available) or a supplier name
+    let supplier = null
+    if (!selectedValue) {
+      supplier = null
+    } else {
+      // Try to find by id first
+      supplier = suppliers.find(s => String(s.id) === String(selectedValue))
+      if (!supplier) {
+        // fallback to name match
+        supplier = suppliers.find(s => s.name === selectedValue)
+      }
+    }
+
+    // Prepare placeholders
     let supplierAddress = ""
+    let attentionPerson = ""
+    let terms = ""
+    let notes = ""
+
     try {
-      const suppliersData = await apiService.suppliers.getSuppliers({ name: supplierName })
-      if (suppliersData.success && suppliersData.suppliers && suppliersData.suppliers.length > 0) {
-        const supplierDetails = suppliersData.suppliers[0]
-        // Build full address from supplier record
-        supplierAddress = apiService.suppliers.getFullAddress(supplierDetails)
-        // Save supplier details into form data
-        setFormData(prev => ({ ...prev, supplier_details: supplierDetails }))
+      let supplierDetails = null
+
+      // Prefer fetching by ID when available (most precise)
+      if (supplier && supplier.id) {
+        const resp = await apiService.suppliers.getSupplier(supplier.id)
+        if (resp && resp.success) supplierDetails = resp
+        // Some services return object directly
+        if (resp && resp.data) supplierDetails = resp.data
+      }
+
+      // Fallback: try supplierLookup (populated during init) by name
+      const lookupKey = supplier && supplier.name ? supplier.name : selectedValue
+      if (!supplierDetails && supplierLookup[lookupKey]) {
+        supplierDetails = supplierLookup[lookupKey]
+      }
+
+      // Final fallback: query by name (less reliable)
+      if (!supplierDetails) {
+        const queryName = supplier && supplier.name ? supplier.name : selectedValue
+        const suppliersData = await apiService.suppliers.getSuppliers({ name: queryName })
+        if (suppliersData.success && suppliersData.suppliers && suppliersData.suppliers.length > 0) {
+          supplierDetails = suppliersData.suppliers.find(s => s.name === queryName) || suppliersData.suppliers[0]
+        }
+      }
+
+      if (supplierDetails) {
+        // supplierDetails may be wrapped or raw depending on API service; normalize
+        const s = supplierDetails.data || supplierDetails || {}
+        supplierAddress = apiService.suppliers.getFullAddress(s)
+        attentionPerson = s.contact_person || s.attention_person || ""
+        terms = s.payment_terms || s.terms || ""
+        notes = s.notes || s.additional_information || s.notes || ""
+
+        setFormData(prev => ({ ...prev, supplier_details: s }))
       }
     } catch (err) {
       console.error("Error fetching supplier details:", err)
-      // Fallback to supplier object if available
       supplierAddress = supplier?.supplier_address || ""
     }
-    
+
     setFormData(prev => ({
       ...prev,
-      supplier_name: supplierName,
+      supplier_id: supplier && supplier.id ? supplier.id : (supplierDetails && (supplierDetails.id || (supplierDetails.data && supplierDetails.data.id))) || '',
+      supplier_name: (supplier && supplier.name) || (supplierDetails && (supplierDetails.name || (supplierDetails.data && supplierDetails.data.name))) || selectedValue,
       supplier_address: supplierAddress,
+      // Only overwrite attention_person/terms/notes if we have values from supplier details
+      attention_person: attentionPerson || prev.attention_person,
+      terms: terms || prev.terms,
+      notes: notes || prev.notes,
       selectedItems: [] // Clear items when changing supplier
+    }))
+
+    // Update autofilled flags depending on which values were applied
+    setAutofilledFields(prev => ({
+      ...prev,
+      supplier_address: !!supplierAddress,
+      attention_person: !!attentionPerson,
+      terms: !!terms,
+      notes: !!notes
     }))
   }
 
@@ -366,8 +457,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
   const handleNext = () => {
     // Validate current step before proceeding
-    if (currentStep === 1) {
-      if (!formData.supplier_name) {
+      if (currentStep === 1) {
+      if (!(formData.supplier_id || formData.supplier_name)) {
         setError("Please select a supplier")
         return
       }
@@ -410,7 +501,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   // Validation helper used for guarded breadcrumb navigation
   const validateForStep = (step) => {
     if (step === 1) {
-      if (!formData.supplier_name) return false
+      if (!(formData.supplier_id || formData.supplier_name)) return false
       if (!formData.po_number) return false
       if (poNumberStatus.exists) return false
     }
@@ -546,7 +637,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
+          <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold">Create Purchase Order</h2>
@@ -645,7 +736,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                         Select Supplier *
                       </label>
                       <select
-                        value={formData.supplier_name}
+                        value={formData.supplier_id || formData.supplier_name}
                         onChange={(e) => handleSupplierSelect(e.target.value)}
                         className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
                           bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
@@ -653,7 +744,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       >
                         <option value="">-- Choose a supplier --</option>
                         {suppliers.map((supplier, index) => (
-                          <option key={`${supplier.name}-${index}`} value={supplier.name}>
+                          <option key={`${supplier.name}-${index}`} value={supplier.id || supplier.name}>
                             {supplier.name} ({supplier.item_count} items)
                           </option>
                         ))}
@@ -661,7 +752,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                     </div>
 
                     {/* PO Number Generation */}
-                    {formData.supplier_name && (
+                    {(formData.supplier_id || formData.supplier_name) && (
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -1097,30 +1188,47 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                           Attention Person
                         </label>
-                        <input
-                          type="text"
-                          value={formData.attention_person}
-                          onChange={(e) => setFormData(prev => ({ ...prev, attention_person: e.target.value }))}
-                          className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                            bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                            focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                          placeholder="Contact person name"
-                        />
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={formData.attention_person}
+                            onChange={(e) => {
+                              setFormData(prev => ({ ...prev, attention_person: e.target.value }))
+                              // clear autofill badge when user edits
+                              setAutofilledFields(prev => ({ ...prev, attention_person: false }))
+                            }}
+                            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                              bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                              focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                            placeholder="Contact person name"
+                          />
+                          {autofilledFields.attention_person && (
+                            <span className="absolute top-1 right-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">Autofilled</span>
+                          )}
+                        </div>
                       </div>
 
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                           Terms *
                         </label>
-                        <input
-                          type="text"
-                          value={formData.terms}
-                          onChange={(e) => setFormData(prev => ({ ...prev, terms: e.target.value }))}
-                          className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                            bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                            focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                          placeholder="e.g., 30-DAYS, 60-DAYS, 90-DAYS, COD"
-                        />
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={formData.terms}
+                            onChange={(e) => {
+                              setFormData(prev => ({ ...prev, terms: e.target.value }))
+                              setAutofilledFields(prev => ({ ...prev, terms: false }))
+                            }}
+                            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                              bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                              focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                            placeholder="e.g., 30-DAYS, 60-DAYS, 90-DAYS, COD"
+                          />
+                          {autofilledFields.terms && (
+                            <span className="absolute top-1 right-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">Autofilled</span>
+                          )}
+                        </div>
                       </div>
 
                       <div>
@@ -1218,15 +1326,23 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                         Notes / Additional Information
                       </label>
-                      <textarea
-                        value={formData.notes}
-                        onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                        rows="4"
-                        className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                          bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                          focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                        placeholder="Any additional notes or special instructions..."
-                      />
+                      <div className="relative">
+                        <textarea
+                          value={formData.notes}
+                          onChange={(e) => {
+                            setFormData(prev => ({ ...prev, notes: e.target.value }))
+                            setAutofilledFields(prev => ({ ...prev, notes: false }))
+                          }}
+                          rows="4"
+                          className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                            bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                            focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                          placeholder="Any additional notes or special instructions..."
+                        />
+                        {autofilledFields.notes && (
+                          <span className="absolute top-1 right-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">Autofilled</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1488,7 +1604,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
         {/* Overwrite Confirmation Modal */}
         {showOverwriteModal && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-sm">
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full mx-4 p-6">
               <div className="text-center mb-4">
                 <div className="text-5xl mb-3">⚠️</div>

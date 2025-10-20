@@ -727,10 +727,10 @@ function PurchaseOrderTracker() {
       {/* Order Details Modal */}
       {showOrderDetails && selectedOrder && (
         <ModalPortal>
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-1000">
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
               {/* Header with Gradient */}
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
+              <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
                 <div>
                   <h3 className="text-2xl font-bold text-white">Purchase Order Details</h3>
                   <p className="text-blue-100 text-sm mt-1">{selectedOrder.id}</p>
@@ -799,7 +799,7 @@ function PurchaseOrderTracker() {
                     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
-                          <thead className="bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700">
+                          <thead className="bg-linear-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700">
                             <tr>
                               <th className="px-4 py-3 text-left font-bold text-gray-700 dark:text-gray-200 border-b-2 border-gray-300 dark:border-gray-600">Item</th>
                               <th className="px-4 py-3 text-center font-bold text-gray-700 dark:text-gray-200 border-b-2 border-gray-300 dark:border-gray-600">Quantity</th>
@@ -834,7 +834,7 @@ function PurchaseOrderTracker() {
                               </tr>
                             ))}
                             {/* Total Row */}
-                            <tr className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 font-bold">
+                            <tr className="bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 font-bold">
                               <td colSpan="3" className="px-4 py-3 text-right text-gray-900 dark:text-gray-100 uppercase text-sm">
                                 Total Amount:
                               </td>
@@ -907,7 +907,7 @@ function PurchaseOrderTracker() {
                 <button
                   onClick={handleUpdateStatus}
                   disabled={!statusUpdate.new_status}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span className="flex items-center justify-center gap-2">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
