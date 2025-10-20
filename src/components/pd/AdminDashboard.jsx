@@ -221,7 +221,7 @@ function AdminDashboard({ onNavigate }) {
     return (
       <div className="bg-red-50 dark:bg-red-950/30 border-2 border-red-300 dark:border-red-800 rounded-xl p-4 sm:p-6 shadow-lg">
         <div className="flex items-start gap-3">
-          <svg className="w-6 h-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-6 h-6 text-red-600 dark:text-red-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
           </svg>
           <div className="flex-1">
@@ -244,7 +244,7 @@ function AdminDashboard({ onNavigate }) {
       {/* Enhanced Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-slate-700 to-slate-800 dark:from-slate-800 dark:to-slate-900 rounded-lg border border-slate-600 dark:border-slate-700">
+          <div className="p-2 bg-linear-to-br from-slate-700 to-slate-800 dark:from-slate-800 dark:to-slate-900 rounded-lg border border-slate-600 dark:border-slate-700">
             <svg className="w-6 h-6 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
               <path d="M3,13H15V11H3M3,6V8H21V6M3,18H9V16H3V18Z" />
             </svg>
@@ -258,7 +258,7 @@ function AdminDashboard({ onNavigate }) {
         </div>
         <button
           onClick={handleRefreshData}
-          className="px-4 py-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 dark:from-slate-700 dark:to-slate-800 dark:hover:from-slate-600 dark:hover:to-slate-700 text-white rounded-lg transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg text-sm font-medium"
+          className="px-4 py-2 bg-linear-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 dark:from-slate-700 dark:to-slate-800 dark:hover:from-slate-600 dark:hover:to-slate-700 text-white rounded-lg transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg text-sm font-medium"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -269,7 +269,7 @@ function AdminDashboard({ onNavigate }) {
 
       {/* Enhanced Stats Cards - Industrial Theme */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-        <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-900/50 rounded-xl p-4 sm:p-6 border-2 border-slate-300 dark:border-slate-700 relative overflow-hidden group hover:shadow-xl transition-shadow">
+        <div className="bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-900/50 rounded-xl p-4 sm:p-6 border-2 border-slate-300 dark:border-slate-700 relative overflow-hidden group hover:shadow-xl transition-shadow">
           <div className="absolute top-0 right-0 w-20 h-20 opacity-5">
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-slate-700">
               <path d="M19,15H17V13H19M19,19H17V17H19M13,7H11V5H13M13,11H11V9H13M13,15H11V13H13M13,19H11V17H13M7,11H5V9H7M7,15H5V13H7M7,19H5V17H7M15,11V5L12,2L9,5V7H3V21H21V11H15Z" />
@@ -291,7 +291,7 @@ function AdminDashboard({ onNavigate }) {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-4 sm:p-6 border-2 border-blue-300 dark:border-blue-800 relative overflow-hidden group hover:shadow-xl transition-shadow">
+        <div className="bg-linear-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-4 sm:p-6 border-2 border-blue-300 dark:border-blue-800 relative overflow-hidden group hover:shadow-xl transition-shadow">
           <div className="absolute top-0 right-0 w-20 h-20 opacity-5">
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-blue-700">
               <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
@@ -313,7 +313,7 @@ function AdminDashboard({ onNavigate }) {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-800/20 rounded-xl p-4 sm:p-6 border-2 border-green-300 dark:border-green-800 relative overflow-hidden group hover:shadow-xl transition-shadow">
+        <div className="bg-linear-to-br from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-800/20 rounded-xl p-4 sm:p-6 border-2 border-green-300 dark:border-green-800 relative overflow-hidden group hover:shadow-xl transition-shadow">
           <div className="absolute top-0 right-0 w-20 h-20 opacity-5">
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-green-700">
               <path d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
@@ -335,7 +335,7 @@ function AdminDashboard({ onNavigate }) {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-amber-50 to-yellow-100 dark:from-amber-900/20 dark:to-yellow-800/20 rounded-xl p-4 sm:p-6 border-2 border-amber-300 dark:border-amber-800 relative overflow-hidden group hover:shadow-xl transition-shadow">
+        <div className="bg-linear-to-br from-amber-50 to-yellow-100 dark:from-amber-900/20 dark:to-yellow-800/20 rounded-xl p-4 sm:p-6 border-2 border-amber-300 dark:border-amber-800 relative overflow-hidden group hover:shadow-xl transition-shadow">
           <div className="absolute top-0 right-0 w-20 h-20 opacity-5">
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-amber-700">
               <path d="M7,15H9C9,16.08 10.37,17 12,17C13.63,17 15,16.08 15,15C15,13.9 13.96,13.5 11.76,12.97C9.64,12.44 7,11.78 7,9C7,7.21 8.47,5.69 10.5,5.18V3H13.5V5.18C15.53,5.69 17,7.21 17,9H15C15,7.92 13.63,7 12,7C10.37,7 9,7.92 9,9C9,10.1 10.04,10.5 12.24,11.03C14.36,11.56 17,12.22 17,15C17,16.79 15.53,18.31 13.5,18.82V21H10.5V18.82C8.47,18.31 7,16.79 7,15Z" />
@@ -565,7 +565,7 @@ function AdminDashboard({ onNavigate }) {
               <div key={item.item_no} className="p-2.5 bg-red-50/50 dark:bg-red-900/20 rounded-md border border-red-200/30 dark:border-red-800/30">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-800 dark:text-gray-200 text-sm leading-tight mb-1 break-words">
+                    <div className="font-medium text-gray-800 dark:text-gray-200 text-sm leading-tight mb-1 wrap-break-words">
                       {item.item_name}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
@@ -579,7 +579,7 @@ function AdminDashboard({ onNavigate }) {
                       )}
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
+                  <div className="text-right shrink-0">
                     <div className="flex items-center gap-2">
                       <div className="font-bold text-red-600 dark:text-red-400 text-base">
                         {item.balance || 0}
