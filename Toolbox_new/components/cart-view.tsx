@@ -351,7 +351,7 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
       {/* Industrial Header */}
       <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-slate-700 relative">
         {/* Decorative accent line */}
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-blue-500/50 to-transparent"></div>
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-linear-to-r from-transparent via-blue-500/50 to-transparent"></div>
         
         <div className="flex items-center space-x-4">
           <div className="flex items-center gap-3">
@@ -368,7 +368,7 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
               </div>
             </div>
             <div>
-              <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-200 via-slate-100 to-slate-300">
+              <h1 className="text-2xl font-black text-transparent bg-clip-text bg-linear-to-r from-slate-200 via-slate-100 to-slate-300">
                 CART
               </h1>
               <div className="text-xs text-slate-500 font-mono">Work Order Items</div>
@@ -463,7 +463,7 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
                     <p className="text-xs text-muted-foreground">Available</p>
                   </div>
 
-                  {/* Quantity Controls */}
+                  {/* Quantity Controls with direct numeric input */}
                   <div className="flex items-center space-x-2">
                     <Button
                       variant="outline"
@@ -475,9 +475,49 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
                       <Minus className="w-4 h-4" />
                     </Button>
 
-                    <div className="w-12 text-center font-medium text-foreground">
-                      {item.quantity.toString().padStart(2, "0")}
-                    </div>
+                    {/* Direct entry input */}
+                    <input
+                      aria-label={`Quantity for ${item.name}`}
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={item.quantity}
+                      onChange={(e) => {
+                        // Real-time sanitization: remove non-digits and clamp to integer
+                        const raw = e.target.value
+                        // Allow empty string while typing, but treat as 0 for parsing
+                        const numeric = raw === '' ? '' : raw.replace(/[^0-9]/g, '')
+                        // If emptied, update to '' locally via onUpdateQuantity? Keep UI controlled by parent value
+                        // Parse to integer and apply bounds
+                        if (numeric === '') {
+                          // do not call onUpdateQuantity with empty; let blur handler correct if needed
+                          // but for responsiveness, set to 1 immediately
+                          onUpdateQuantity(item.id, 1)
+                          return
+                        }
+
+                        const parsed = parseInt(numeric, 10)
+                        if (isNaN(parsed)) {
+                          onUpdateQuantity(item.id, 1)
+                          return
+                        }
+
+                        const clamped = Math.max(1, Math.min(parsed, item.balance))
+                        if (clamped !== item.quantity) {
+                          onUpdateQuantity(item.id, clamped)
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // Ensure value is at least 1 on blur
+                        const raw = e.target.value
+                        const parsed = parseInt(String(raw).replace(/[^0-9]/g, ''), 10)
+                        const finalVal = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, item.balance)
+                        if (finalVal !== item.quantity) {
+                          onUpdateQuantity(item.id, finalVal)
+                        }
+                      }}
+                      className="w-16 text-center font-medium text-foreground bg-transparent border border-slate-700 rounded px-2 py-1"
+                    />
 
                     <Button
                       variant="outline"
