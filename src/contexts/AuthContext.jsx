@@ -16,21 +16,21 @@ export const useAuth = () => {
 // Department slug to name mapping
 export const DEPARTMENT_MAP = {
   "hr": "Human Resources",
-  "operations": "Operation",
+  "operations": "Operations",
   "finance": "Finance",
   "procurement": "Procurement",
   "engineering": "Engineering",
-  "super-admin": "super-admin"
+  "superadmin": "superAdmin"
 }
 
 // Reverse mapping for name to slug
 export const DEPARTMENT_SLUG_MAP = {
   "Human Resources": "hr",
-  "Operation": "operations",
+  "Operations": "operations",
   "Finance": "finance",
   "Procurement": "procurement",
   "Engineering": "engineering",
-  "super-admin": "super-admin"
+  "superAdmin": "superadmin"
 }
 
 export function AuthProvider({ children }) {
@@ -173,7 +173,7 @@ export function AuthProvider({ children }) {
     isEmployeeAuthenticated: !!employee,
     isDarkMode,
     toggleDarkMode,
-    isSuperAdmin: user?.role === "super-admin",
+    isSuperAdmin: user?.role === "admin",
     isLoading,
   }
 

@@ -1,5 +1,3 @@
-import React from 'react';
-
 const GearLoadingSpinner = ({ isDarkMode = false }) => {
   return (
     <div className={`min-h-screen flex items-center justify-center transition-all duration-300 ${

@@ -7,11 +7,11 @@ import { useAuth } from "../contexts/AuthContext"
 // Map department IDs to URL-safe slugs
 const departmentSlugMap = {
   "Human Resources": "hr",
-  "Operation": "operations",
+  "Operations": "operations",
   "Finance": "finance",
   "Procurement": "procurement",
   "Engineering": "engineering",
-  "super-admin": "super-admin"
+  "superAdmin": "superadmin"
 }
 
 const departments = [
@@ -26,7 +26,7 @@ const departments = [
     darkHoverColor: "dark:hover:from-slate-600 dark:hover:to-slate-700",
   },
   {
-    id: "Operation",
+    id: "Operations",
     name: "Operations",
     icon: "⚙️",
     description: "Daily operations at administrative functions",
@@ -68,7 +68,7 @@ const departments = [
 ]
 
 const superAdmin = {
-  id: "super-admin",
+  id: "superAdmin",
   name: "Super Admin",
   icon: "👑",
   description: "Complete system administration at management",

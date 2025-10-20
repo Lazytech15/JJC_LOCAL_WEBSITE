@@ -114,9 +114,9 @@ function RoutesWrapper() {
           <Route path="/jjcewgsaccess" element={<DepartmentSelector />} />
           <Route path="/jjcewgsaccess/login/:department" element={<LoginForm />} />
           <Route
-            path="/jjcewgsaccess/super-admin"
+            path="/jjcewgsaccess/superadmin"
             element={
-              <AdminProtectedRoute department="super-admin" requireSuperAdmin={true}>
+              <AdminProtectedRoute department="superAdmin" requireSuperAdmin={true}>
                 <SuperAdminDashboard />
               </AdminProtectedRoute>
             }
@@ -132,7 +132,7 @@ function RoutesWrapper() {
           <Route
             path="/jjcewgsaccess/operations"
             element={
-              <AdminProtectedRoute department="Operation">
+              <AdminProtectedRoute department="Operations">
                 <OperationsDepartment />
               </AdminProtectedRoute>
             }
@@ -203,11 +203,11 @@ function AdminProtectedRoute({ children, department, requireSuperAdmin = false }
     // Map department names to URL slugs for login redirect
     const slugMap = {
       "Human Resources": "hr",
-      "Operation": "operations",
+      "Operations": "operations",
       "Finance": "finance",
       "Procurement": "procurement",
       "Engineering": "engineering",
-      "super-admin": "super-admin"
+      "superAdmin": "superadmin"
     }
     const slug = slugMap[department] || department.toLowerCase().replace(/\s+/g, '-')
     return <Navigate to={`/jjcewgsaccess/login/${slug}`} replace />
@@ -220,10 +220,11 @@ function AdminProtectedRoute({ children, department, requireSuperAdmin = false }
   if (!requireSuperAdmin && selectedDepartment !== department && !isSuperAdmin) {
     const slugMap = {
       "Human Resources": "hr",
-      "Operation": "operations",
+      "Operations": "operations",
       "Finance": "finance",
       "Procurement": "procurement",
-      "Engineering": "engineering"
+      "Engineering": "engineering",
+      "superAdmin": "superadmin"
     }
     const slug = slugMap[department] || department.toLowerCase().replace(/\s+/g, '-')
     return <Navigate to={`/jjcewgsaccess/login/${slug}`} replace />

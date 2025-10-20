@@ -1,11 +1,9 @@
 import { Link } from "react-router-dom"
-import { Wrench, Cog, Building2, Truck, Factory, Phone, Mail, MapPin, Clock, ChevronRight, Menu, X, ChevronLeft } from "lucide-react"
+import { Wrench, Cog, Building2, Truck, Factory, Phone, Mail, MapPin, Clock, ChevronRight, Menu, X, ChevronLeft, ArrowUp } from "lucide-react"
 import { useState, useEffect } from "react"
 import logo from "../../assets/companyLogo.jpg"
-const images = import.meta.glob('../../assets/LandingPagePicture/*.{jpg,JPG}', { eager: true })
-const localImages = Object.values(images).map(mod => mod.default)
-
-
+import Gallery from "./Gallery"
+import apiService from '../../utils/api/api-service'
 
 const Button = ({ children, className = "", size = "default", ...props }) => {
   const sizeClasses = {
@@ -33,16 +31,110 @@ const CardContent = ({ children }) => <div className="p-6 pt-0">{children}</div>
 export default function EmployeeLanding() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [currentSlide, setCurrentSlide] = useState(0)
+  const [carouselImages, setCarouselImages] = useState([])
+  const [galleryImages, setGalleryImages] = useState([])
+  const [isLoadingCarousel, setIsLoadingCarousel] = useState(true)
+  const [isLoadingGallery, setIsLoadingGallery] = useState(true)
+  const [showScrollTop, setShowScrollTop] = useState(false)
+  
 
-  // Carousel images - replace these URLs with your actual images
-  const carouselImages = [ ...localImages ]
+  // Load landing page images for carousel
+    useEffect(() => {
+    const loadCarouselImages = async () => {
+      try {
+        setIsLoadingCarousel(true)
+        
+        // Get list of images (cached automatically)
+        const response = await apiService.profiles.getLandingImages()
+        
+        if (response.success && response.data.images.length > 0) {
+          // Load each image blob with direct caching
+          const imagePromises = response.data.images.map(async (img) => {
+            const blobResult = await apiService.profiles.getLandingImageBlob(img.filename)
+            return blobResult.success ? blobResult.url : null
+          })
+          
+          const imageUrls = await Promise.all(imagePromises)
+          const validUrls = imageUrls.filter(url => url !== null)
+          
+          setCarouselImages(validUrls)
+          console.log(`[Landing] Loaded ${validUrls.length} carousel images (cached)`)
+        } else {
+          setCarouselImages([])
+        }
+      } catch (error) {
+        console.error("Error loading carousel images:", error)
+        setCarouselImages([])
+      } finally {
+        setIsLoadingCarousel(false)
+      }
+    }
 
+    loadCarouselImages()
+  }, [])
+
+  // Load gallery images
   useEffect(() => {
+    const loadGalleryImages = async () => {
+      try {
+        setIsLoadingGallery(true)
+        
+        // Get list of images (cached automatically)
+        const response = await apiService.profiles.getGalleryImages()
+        
+        if (response.success && response.data.images.length > 0) {
+          // Load each image blob with direct caching
+          const imagePromises = response.data.images.map(async (img) => {
+            const blobResult = await apiService.profiles.getGalleryImageBlob(img.filename)
+            return blobResult.success ? blobResult.url : null
+          })
+          
+          const imageUrls = await Promise.all(imagePromises)
+          const validUrls = imageUrls.filter(url => url !== null)
+          
+          setGalleryImages(validUrls)
+          console.log(`[Landing] Loaded ${validUrls.length} gallery images (cached)`)
+        }
+      } catch (error) {
+        console.error("Error loading gallery images:", error)
+      } finally {
+        setIsLoadingGallery(false)
+      }
+    }
+
+    loadGalleryImages()
+  }, [])
+
+  // Auto-advance carousel
+  useEffect(() => {
+    if (carouselImages.length === 0) return
+    
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % carouselImages.length)
     }, 5000)
     return () => clearInterval(timer)
+  }, [carouselImages.length])
+
+  // Scroll to top button visibility
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 400) {
+        setShowScrollTop(true)
+      } else {
+        setShowScrollTop(false)
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    })
+  }
 
   const nextSlide = () => {
     setCurrentSlide((prev) => (prev + 1) % carouselImages.length)
@@ -163,6 +255,9 @@ export default function EmployeeLanding() {
               <a href="#services" className="text-white hover:text-white/80 transition-colors font-medium drop-shadow-lg">
                 Services
               </a>
+              <a href="#gallery" className="text-white hover:text-white/80 transition-colors font-medium drop-shadow-lg">
+                Gallery
+              </a>
               <a href="#about" className="text-white hover:text-white/80 transition-colors font-medium drop-shadow-lg">
                 About
               </a>
@@ -188,6 +283,9 @@ export default function EmployeeLanding() {
               <a href="#services" className="block text-white hover:text-white/80 transition-colors font-medium">
                 Services
               </a>
+              <a href="#gallery" className="block text-white hover:text-white/80 transition-colors font-medium">
+                Gallery
+              </a>
               <a href="#about" className="block text-white hover:text-white/80 transition-colors font-medium">
                 About
               </a>
@@ -208,48 +306,46 @@ export default function EmployeeLanding() {
       <section className="relative h-screen overflow-hidden">
         {/* Carousel Images */}
         <div className="absolute inset-0">
-          {carouselImages.map((image, index) => (
-            <div
-              key={index}
-              className={`absolute inset-0 transition-opacity duration-1000 ${index === currentSlide ? "opacity-100" : "opacity-0"
-                }`}
-            >
-              <img
-                src={image}
-                alt={`Slide ${index + 1}`}
-                className="w-full h-full object-cover"
-              />
-              {/* Darker overlay with blur for text readability backdrop-blur-sm*/}
-              <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80 " />
+          {isLoadingCarousel ? (
+            <div className="absolute inset-0 bg-zinc-900 flex items-center justify-center">
+              <div className="text-white text-xl">Loading...</div>
             </div>
-          ))}
+          ) : carouselImages.length === 0 ? (
+            <div className="absolute inset-0 bg-zinc-900" />
+          ) : (
+            carouselImages.map((image, index) => (
+              <div
+                key={index}
+                className={`absolute inset-0 transition-opacity duration-1000 ${
+                  index === currentSlide ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                <img
+                  src={image}
+                  alt={`Slide ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+                {/* Darker overlay with blur for text readability */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+              </div>
+            ))
+          )}
         </div>
-
-        {/* Carousel Controls */}
-        {/* <button
-          onClick={prevSlide}
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-30 w-12 h-12 bg-white/20 backdrop-blur-sm hover:bg-white/30 rounded-full flex items-center justify-center transition-all border border-white/30 shadow-lg"
-        >
-          <ChevronLeft className="w-6 h-6 text-white" />
-        </button>
-        <button
-          onClick={nextSlide}
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-30 w-12 h-12 bg-white/20 backdrop-blur-sm hover:bg-white/30 rounded-full flex items-center justify-center transition-all border border-white/30 shadow-lg"
-        >
-          <ChevronRight className="w-6 h-6 text-white" />
-        </button> */}
 
         {/* Carousel Indicators */}
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30 flex gap-2">
-          {carouselImages.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentSlide(index)}
-              className={`h-2 rounded-full transition-all ${index === currentSlide ? "w-8 bg-white" : "w-2 bg-white/50 hover:bg-white/75"
+        {carouselImages.length > 1 && (
+          <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30 flex gap-2">
+            {carouselImages.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentSlide(index)}
+                className={`h-2 rounded-full transition-all ${
+                  index === currentSlide ? "w-8 bg-white" : "w-2 bg-white/50 hover:bg-white/75"
                 }`}
-            />
-          ))}
-        </div>
+              />
+            ))}
+          </div>
+        )}
 
         {/* Hero Content */}
         <div className="relative z-20 h-full flex items-center">
@@ -374,7 +470,12 @@ export default function EmployeeLanding() {
         </div>
       </section>
 
-      <section className="py-20 bg-zinc-50">
+      {/* Gallery Section */}
+      <section id="gallery" className="bg-zinc-50">
+        <Gallery images={galleryImages} isLoading={isLoadingGallery} />
+      </section>
+
+      <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h3 className="text-4xl font-bold text-zinc-900 mb-4">Plant Capabilities</h3>
@@ -399,7 +500,7 @@ export default function EmployeeLanding() {
         </div>
       </section>
 
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-zinc-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h3 className="text-4xl font-bold text-zinc-900 mb-4">Industries We Serve</h3>
@@ -410,7 +511,7 @@ export default function EmployeeLanding() {
             {industries.map((industry, index) => (
               <div
                 key={index}
-                className="px-8 py-4 rounded-full border-2 border-zinc-300 bg-zinc-50 hover:border-zinc-900 hover:bg-zinc-100 text-zinc-900 transition-all cursor-default font-semibold"
+                className="px-8 py-4 rounded-full border-2 border-zinc-300 bg-white hover:border-zinc-900 hover:bg-zinc-100 text-zinc-900 transition-all cursor-default font-semibold"
               >
                 <p>{industry}</p>
               </div>
@@ -494,6 +595,17 @@ export default function EmployeeLanding() {
           </div>
         </div>
       </footer>
+
+      {/* Scroll to Top Button */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 z-40 w-14 h-14 bg-zinc-900 hover:bg-zinc-800 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+          aria-label="Scroll to top"
+        >
+          <ArrowUp className="w-6 h-6" />
+        </button>
+      )}
     </div>
   )
 }

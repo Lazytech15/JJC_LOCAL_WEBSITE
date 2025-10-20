@@ -2,12 +2,14 @@
 // service-worker.js - Enhanced with Profile Picture & UI Caching
 // ============================================================================
 
-const CACHE_VERSION = "v2" // Increment version for UI caching
+const CACHE_VERSION = "v3" // Increment version for UI caching
 const STATIC_CACHE = `jjc-static-${CACHE_VERSION}`
 const API_CACHE = `jjc-api-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `jjc-dynamic-${CACHE_VERSION}`
 const PROFILE_CACHE = `jjc-profiles-${CACHE_VERSION}`
 const UI_CACHE = `jjc-ui-${CACHE_VERSION}` // New: UI assets cache
+const LANDING_CACHE = `jjc-landing-${CACHE_VERSION}` // NEW
+const GALLERY_CACHE = `jjc-gallery-${CACHE_VERSION}` // NEW
 
 // Core assets to cache immediately on install
 const CORE_ASSETS = [
@@ -75,7 +77,9 @@ self.addEventListener("activate", (event) => {
                    name !== API_CACHE && 
                    name !== DYNAMIC_CACHE &&
                    name !== PROFILE_CACHE &&
-                   name !== UI_CACHE
+                   name !== UI_CACHE &&
+                   name !== LANDING_CACHE &&
+                   name !== GALLERY_CACHE
           })
           .map((name) => {
             console.log("[Service Worker] Deleting old cache:", name)
@@ -94,6 +98,18 @@ self.addEventListener("fetch", (event) => {
 
   // Skip non-GET requests
   if (request.method !== "GET") {
+    return
+  }
+
+    // Landing page images - Cache First
+  if (url.pathname.includes("/api/profile/landing/")) {
+    event.respondWith(imageCacheStrategy(request, LANDING_CACHE))
+    return
+  }
+
+  // Gallery images - Cache First
+  if (url.pathname.includes("/api/profile/gallery/")) {
+    event.respondWith(imageCacheStrategy(request, GALLERY_CACHE))
     return
   }
 
@@ -133,6 +149,36 @@ self.addEventListener("fetch", (event) => {
   // Dynamic content - Stale While Revalidate
   event.respondWith(staleWhileRevalidateStrategy(request, DYNAMIC_CACHE))
 })
+
+// New image cache strategy
+async function imageCacheStrategy(request, cacheName) {
+  const cache = await caches.open(cacheName)
+  const cached = await cache.match(request)
+
+  if (cached) {
+    console.log(`[Service Worker] Image from cache (${cacheName}):`, request.url)
+    return cached
+  }
+
+  try {
+    console.log(`[Service Worker] Fetching image for ${cacheName}:`, request.url)
+    const response = await fetch(request)
+    
+    if (response.ok && response.status === 200) {
+      const responseToCache = response.clone()
+      cache.put(request, responseToCache)
+      console.log(`[Service Worker] Image cached in ${cacheName}:`, request.url)
+    }
+    
+    return response
+  } catch (error) {
+    console.error(`[Service Worker] Image fetch failed (${cacheName}):`, error)
+    return new Response("Image not available", { 
+      status: 503,
+      headers: { "Content-Type": "text/plain" }
+    })
+  }
+}
 
 // Profile Cache Strategy - Cache First with long expiration
 async function profileCacheStrategy(request, cacheName) {

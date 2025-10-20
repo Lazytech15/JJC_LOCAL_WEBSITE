@@ -6,10 +6,7 @@ import { AuthService } from "../../utils/api/services/auth-service"
 import { useAuth } from "../../contexts/AuthContext"
 import logo from "../../assets/companyLogo.jpg"
 import GearLoadingSpinner from "../../../public/LoadingGear"
-import IMG18 from "../../assets/LandingPagePicture/IMG18.JPG"
-import IMG22 from "../../assets/LandingPagePicture/IMG22.JPG"
-import IMG16 from "../../assets/LandingPagePicture/IMG16.JPG"
-import IMG45 from "../../assets/LandingPagePicture/IMG45.JPG"
+import apiService from '../../utils/api/api-service'
 
 const Button = ({ children, className = "", disabled = false, type = "button", onClick, isDarkMode = false, ...props }) => (
   <button
@@ -105,6 +102,8 @@ export default function EmployeeLogin() {
   const [currentSlide, setCurrentSlide] = useState(0)
   const [hasValidToken, setHasValidToken] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
+  const [carouselImages, setCarouselImages] = useState([])
+  const [isLoadingImages, setIsLoadingImages] = useState(true)
 
   const navigate = useNavigate()
   const { employeeLogin, isEmployeeAuthenticated, isDarkMode, toggleDarkMode } = useAuth()
@@ -120,35 +119,78 @@ export default function EmployeeLogin() {
     { value: "super-admin", label: "Super Admin" }
   ]
 
-  const carouselImages = [
+  const defaultCarouselData = [
     {
-      url: IMG18,
       title: "Precision Engineering",
       description: "State-of-the-art machinery and equipment"
     },
     {
-      url: IMG22,
       title: "Friendly Employee",
       description: "Employee love their works"
     },
     {
-      url: IMG16,
       title: "Expert Craftsmanship",
       description: "Decades of engineering excellence"
     },
     {
-      url: IMG45,
       title: "Quality Fabrication",
       description: "Industrial solutions you can trust"
     },
   ]
 
+  // Load landing page images for carousel
   useEffect(() => {
+  const loadCarouselImages = async () => {
+    try {
+      setIsLoadingImages(true)
+      
+      // Get list of images (cached automatically)
+      const response = await apiService.profiles.getLandingImages()
+      
+      if (response.success && response.data.images.length > 0) {
+        // Load each image blob with direct caching
+        const imagePromises = response.data.images.map(async (img, index) => {
+          const blobResult = await apiService.profiles.getLandingImageBlob(img.filename)
+          
+          return {
+            // Use cached blob URL instead of direct server URL
+            url: blobResult.success ? blobResult.url : apiService.profiles.getLandingImageUrl(img.filename),
+            title: defaultCarouselData[index]?.title || "JJC Engineering Works",
+            description: defaultCarouselData[index]?.description || "Excellence in engineering",
+            filename: img.filename, // Keep filename for reference
+            cached: blobResult.success // Track if from cache
+          }
+        })
+        
+        const loadedImages = await Promise.all(imagePromises)
+        setCarouselImages(loadedImages)
+        
+        // Log cache usage
+        const cachedCount = loadedImages.filter(img => img.cached).length
+        console.log(`[Carousel] Loaded ${loadedImages.length} images (${cachedCount} from cache)`)
+      } else {
+        // No images available from server
+        setCarouselImages([])
+      }
+    } catch (error) {
+      console.error("Error loading carousel images:", error)
+      setCarouselImages([])
+    } finally {
+      setIsLoadingImages(false)
+    }
+  }
+
+  loadCarouselImages()
+}, [])
+
+  useEffect(() => {
+    if (carouselImages.length === 0) return
+
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % carouselImages.length)
     }, 5000)
     return () => clearInterval(timer)
-  }, [])
+  }, [carouselImages.length])
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
@@ -319,7 +361,7 @@ export default function EmployeeLogin() {
     navigate("/")
   }
 
-  if (isInitializing) {
+  if (isInitializing || isLoadingImages) {
     return <GearLoadingSpinner isDarkMode={isDarkMode} />
   }
 
@@ -331,50 +373,65 @@ export default function EmployeeLogin() {
     }`}>
       {/* Left Side - Carousel (Desktop) */}
       <div className="hidden lg:flex lg:w-[58%] relative overflow-hidden">
-        <div className="absolute inset-0">
-          {carouselImages.map((item, index) => (
-            <div
-              key={index}
-              className={`absolute inset-0 transition-opacity duration-1000 ${
-                index === currentSlide ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              <img
-                src={item.url}
-                alt={item.title}
-                className="w-full h-full object-cover"
-              />
-              <div className={`absolute inset-0 bg-gradient-to-br ${
-                isDarkMode 
-                  ? "from-black/80 via-gray-900/70 to-black/80"
-                  : "from-zinc-900/60 via-zinc-900/40 to-zinc-900/60"
-              }`} />
+        {carouselImages.length > 0 ? (
+          <>
+            <div className="absolute inset-0">
+              {carouselImages.map((item, index) => (
+                <div
+                  key={index}
+                  className={`absolute inset-0 transition-opacity duration-1000 ${
+                    index === currentSlide ? "opacity-100" : "opacity-0"
+                  }`}
+                >
+                  <img
+                    src={item.url}
+                    alt={item.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className={`absolute inset-0 bg-gradient-to-br ${
+                    isDarkMode 
+                      ? "from-black/80 via-gray-900/70 to-black/80"
+                      : "from-zinc-900/60 via-zinc-900/40 to-zinc-900/60"
+                  }`} />
 
-              <div className="absolute inset-0 flex flex-col justify-end p-12">
-                <div className="max-w-2xl">
-                  <h2 className="text-5xl font-bold text-white mb-4 drop-shadow-lg">
-                    {item.title}
-                  </h2>
-                  <p className="text-xl text-white/90 drop-shadow-lg">
-                    {item.description}
-                  </p>
+                  <div className="absolute inset-0 flex flex-col justify-end p-12">
+                    <div className="max-w-2xl">
+                      <h2 className="text-5xl font-bold text-white mb-4 drop-shadow-lg">
+                        {item.title}
+                      </h2>
+                      <p className="text-xl text-white/90 drop-shadow-lg">
+                        {item.description}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex gap-2">
-          {carouselImages.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentSlide(index)}
-              className={`h-2 rounded-full transition-all ${
-                index === currentSlide ? "w-8 bg-white" : "w-2 bg-white/50 hover:bg-white/75"
-              }`}
-            />
-          ))}
-        </div>
+            {carouselImages.length > 1 && (
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex gap-2">
+                {carouselImages.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentSlide(index)}
+                    className={`h-2 rounded-full transition-all ${
+                      index === currentSlide ? "w-8 bg-white" : "w-2 bg-white/50 hover:bg-white/75"
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className={`absolute inset-0 flex items-center justify-center ${
+            isDarkMode ? "bg-gray-900" : "bg-zinc-900"
+          }`}>
+            <div className="text-center">
+              <h2 className="text-4xl font-bold text-white mb-4">JJC Engineering Works</h2>
+              <p className="text-xl text-white/80">Excellence in Industrial Solutions</p>
+            </div>
+          </div>
+        )}
 
         <div className="absolute top-8 left-8 z-30 flex items-center gap-3">
           <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg border border-white/20">
@@ -400,14 +457,16 @@ export default function EmployeeLogin() {
       {/* Right Side - Login Form & Mobile Background */}
       <div className="w-full lg:w-[42%] flex flex-col items-center justify-center p-6 lg:p-12 relative min-h-screen">
         {/* Mobile Background with Blur */}
-        <div className="lg:hidden absolute inset-0 z-0">
-          <img
-            src={currentImage.url}
-            alt={currentImage.title}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 backdrop-blur-md bg-black/40" />
-        </div>
+        {currentImage && (
+          <div className="lg:hidden absolute inset-0 z-0">
+            <img
+              src={currentImage.url}
+              alt={currentImage.title}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 backdrop-blur-md bg-black/40" />
+          </div>
+        )}
 
         {/* Dark Mode Toggle */}
         <button
