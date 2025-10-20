@@ -166,8 +166,18 @@ async function imageCacheStrategy(request, cacheName) {
     
     if (response.ok && response.status === 200) {
       const responseToCache = response.clone()
-      cache.put(request, responseToCache)
-      console.log(`[Service Worker] Image cached in ${cacheName}:`, request.url)
+      try { 
+        // Only cache http(s) requests; skip extensions or unsupported schemes
+        const proto = new URL(request.url).protocol
+        if (proto === 'http:' || proto === 'https:') {
+          await cache.put(request, responseToCache)
+          console.log(`[Service Worker] Image cached in ${cacheName}:`, request.url)
+        } else {
+          console.log(`[Service Worker] Skipping cache for unsupported scheme (${proto}):`, request.url)
+        }
+      } catch (putErr) {
+        console.warn(`[Service Worker] Failed to put image in cache:`, putErr)
+      }
     }
     
     return response
@@ -236,7 +246,16 @@ async function cacheFirstStrategy(request, cacheName) {
     console.log("[Service Worker] Fetching and caching:", request.url)
     const response = await fetch(request)
     if (response.ok) {
-      cache.put(request, response.clone())
+      try {
+        const proto = new URL(request.url).protocol
+        if (proto === 'http:' || proto === 'https:') {
+          await cache.put(request, response.clone())
+        } else {
+          console.log(`[Service Worker] Skipping cache for unsupported scheme (${proto}):`, request.url)
+        }
+      } catch (putErr) {
+        console.warn('[Service Worker] cache.put failed:', putErr)
+      }
     }
     return response
   } catch (error) {

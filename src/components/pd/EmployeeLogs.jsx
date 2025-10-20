@@ -3,6 +3,7 @@ import apiService from "../../utils/api/api-service"
 import { getStoredToken } from "../../utils/auth"
 import { ModalPortal } from "./shared"
 import { EmployeeLogsSkeleton } from "../skeletons/ProcurementSkeletons"
+import { useAuth } from "../../contexts/AuthContext"
 
 function EmployeeLogs() {
   const [state, setState] = useState({
@@ -29,6 +30,8 @@ function EmployeeLogs() {
 
   const logsPerPage = 10
   const { logs, loading, initialLoading, error, searchTerm, dateFilter, currentPage, totalLogs, filters, visibleCount, selectedLogs, showFilters, showDetailedView, selectedLog, employeeDetails, associatedItems, detailsLoading } = state
+  const [isEditWizardOpen, setIsEditWizardOpen] = useState(false)
+  const [editTargetLog, setEditTargetLog] = useState(null)
 
   // Preload profiles for visible logs (cache by uid and map to log id)
   useEffect(() => {
@@ -118,6 +121,20 @@ function EmployeeLogs() {
   useEffect(() => {
     fetchEmployeeLogs()
   }, [currentPage, searchTerm, dateFilter, filters])
+
+  // Refresh after an external edit event
+  useEffect(() => {
+    const handler = (e) => {
+      fetchEmployeeLogs()
+      // Optionally show audit: e.detail contains originalId and newId
+      if (e && e.detail && e.detail.originalId) {
+        // Could open audit viewer or notify user
+        console.log('Log edited', e.detail)
+      }
+    }
+    window.addEventListener('employeeLogEdited', handler)
+    return () => window.removeEventListener('employeeLogEdited', handler)
+  }, [])
 
   const fetchEmployeeLogs = async () => {
     try {
@@ -511,7 +528,7 @@ function EmployeeLogs() {
   }
 
   const openDetailedView = async (log) => {
-    setState(prev => ({ ...prev, showDetailedView: true, selectedLog: log, detailsLoading: true, employeeDetails: null, associatedItems: [] }))
+  setState(prev => ({ ...prev, showDetailedView: true, selectedLog: log, detailsLoading: true, employeeDetails: null, associatedItems: [] }))
 
     try {
       const [employeeResult, associatedItems] = await Promise.all([
@@ -579,6 +596,9 @@ function EmployeeLogs() {
   if (initialLoading) {
     return <EmployeeLogsSkeleton />
   }
+  // Render EditLogWizard modal
+  // Note: placed after main component return to ensure modal can mount when state set
+  // This render is included by returning the component from the main function's JSX
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 p-4">
@@ -616,6 +636,7 @@ function EmployeeLogs() {
               >
                 Export CSV
               </button>
+              {/* Edit Selected moved to bulk actions bar when multiple logs are selected */}
             </div>
           </div>
         </div>
@@ -767,6 +788,31 @@ function EmployeeLogs() {
                 <button onClick={() => handleBulkAction('archive')} className="px-4 py-2 bg-linear-to-r from-yellow-600 to-amber-600 hover:from-yellow-700 hover:to-amber-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">📦 Archive</button>
                 <button onClick={() => handleBulkAction('export')} className="px-4 py-2 bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">📤 Export</button>
                 <button onClick={() => handleBulkAction('delete')} className="px-4 py-2 bg-linear-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">🗑️ Delete</button>
+                <button
+                  onClick={() => {
+                    // Determine target: prefer single selection, else selectedLog
+                    let id = null
+                    if (selectedLogs && selectedLogs.length === 1) id = selectedLogs[0]
+                    else if (selectedLog && selectedLog.id) id = selectedLog.id
+
+                    if (!id) {
+                      alert('Please select one log (checkbox) or open a log first to edit.')
+                      return
+                    }
+
+                    const target = logs.find(l => l.id === id) || selectedLog
+                    if (!target) {
+                      alert('Selected log not found in current list. Try refreshing.')
+                      return
+                    }
+
+                    setEditTargetLog(target)
+                    setIsEditWizardOpen(true)
+                  }}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all shadow-md font-semibold text-sm"
+                >
+                  ✏️ Edit Selected
+                </button>
               </div>
             </div>
           </div>
@@ -994,6 +1040,8 @@ function EmployeeLogs() {
                               <div className="text-slate-900 dark:text-white font-mono font-semibold mt-1">
                                 {employeeDetails?.id_number || selectedLog.id_number || '—'}
                               </div>
+
+                              {/* Edit controls removed from detailed view; use header "Edit Selected" button instead */}
                             </div>
                             <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
                               <div className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Barcode</div>
@@ -1072,6 +1120,11 @@ function EmployeeLogs() {
                         <div>
                           <h5 className="text-sm font-bold text-slate-800 dark:text-white mb-3 uppercase tracking-wide">Activity Details</h5>
                           {renderDetailsContent(selectedLog, associatedItems)}
+
+                          <div className="mt-6">
+                            <h5 className="text-sm font-bold text-slate-800 dark:text-white mb-3 uppercase tracking-wide">Edit History</h5>
+                            <AuditViewer logId={selectedLog?.id} />
+                          </div>
                         </div>
                       </div>
 
@@ -1096,8 +1149,651 @@ function EmployeeLogs() {
         </ModalPortal>
       )}
 
+      {/* Edit Log Wizard Modal (separate from detailed view) */}
+      {isEditWizardOpen && (
+        <EditLogWizard
+          isOpen={isEditWizardOpen}
+          onClose={() => { setIsEditWizardOpen(false); setEditTargetLog(null); }}
+          log={editTargetLog}
+          onSaved={(res) => { fetchEmployeeLogs(); setIsEditWizardOpen(false); setEditTargetLog(null); }}
+        />
+      )}
+
+    </div>
+  )
+}
+
+// EditControls removed — edits are handled via the header Edit Selected → EditLogWizard
+
+// AuditViewer: displays audit records for a selected log
+function AuditViewer({ logId }) {
+  const [audits, setAudits] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [expandedAudits, setExpandedAudits] = useState({})
+
+  useEffect(() => {
+    if (!logId) return
+    let cancelled = false
+    const load = async () => {
+      setLoading(true)
+      try {
+        const res = await apiService.employeeLogs.getAuditForLog(logId)
+        if (!cancelled) setAudits(res.data || [])
+      } catch (err) {
+        console.error('Failed to load audits', err)
+        if (!cancelled) setAudits([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [logId])
+
+  const toggleAudit = (auditId) => {
+    setExpandedAudits(prev => ({ ...prev, [auditId]: !prev[auditId] }))
+  }
+
+  const parseJsonSafely = (jsonStr) => {
+    try {
+      return JSON.parse(jsonStr)
+    } catch (e) {
+      return null
+    }
+  }
+
+  const renderChanges = (changesJson, originalJson, newJson) => {
+    const changes = parseJsonSafely(changesJson)
+    const original = parseJsonSafely(originalJson)
+    const newData = parseJsonSafely(newJson)
+
+    if (!changes || Object.keys(changes).length === 0) {
+      return <div className="text-sm text-slate-400 italic">No field changes recorded</div>
+    }
+
+    const fieldLabels = {
+      username: { label: 'Username', icon: '👤' },
+      details: { label: 'Activity Details', icon: '📝' },
+      item_no: { label: 'Item Numbers', icon: '📦' },
+      id_number: { label: 'ID Number', icon: '🔢' },
+      id_barcode: { label: 'ID Barcode', icon: '📱' },
+      purpose: { label: 'Purpose', icon: '🎯' },
+      log_date: { label: 'Activity Date', icon: '📅' },
+      log_time: { label: 'Activity Time', icon: '⏰' }
+    }
+
+    return (
+      <div className="space-y-3">
+        {Object.entries(changes).map(([field, change]) => {
+          const fieldInfo = fieldLabels[field] || { label: field, icon: '📋' }
+          const oldValue = change.old !== undefined ? change.old : (original && original[field])
+          const newValue = change.new !== undefined ? change.new : (newData && newData[field])
+          
+          return (
+            <div key={field} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">{fieldInfo.icon}</span>
+                <span className="font-semibold text-slate-900 dark:text-white text-sm">{fieldInfo.label}</span>
+              </div>
+              <div className="space-y-1 text-xs ml-7">
+                <div className="flex items-start gap-2">
+                  <span className="text-red-500 font-semibold shrink-0">−</span>
+                  <span className="text-red-600 dark:text-red-400 break-all">
+                    {oldValue || '(empty)'}
+                  </span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-500 font-semibold shrink-0">+</span>
+                  <span className="text-green-600 dark:text-green-400 break-all">
+                    {newValue || '(empty)'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  if (!logId) return null
+  
+  if (loading) {
+    return (
+      <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+        <div className="animate-spin w-5 h-5 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full"></div>
+        <span className="text-sm text-slate-600 dark:text-slate-400">Loading edit history...</span>
+      </div>
+    )
+  }
+  
+  if (!audits || audits.length === 0) {
+    return (
+      <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center">
+            <span className="text-2xl">📜</span>
+          </div>
+          <div>
+            <div className="font-semibold text-slate-700 dark:text-slate-300">No Edit History</div>
+            <div className="text-sm text-slate-500 dark:text-slate-400">This log has not been modified</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {audits.map((audit, index) => {
+        const isExpanded = expandedAudits[audit.id]
+        const editDate = new Date(audit.created_at)
+        const formattedDate = editDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+        const formattedTime = editDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+        
+        return (
+          <div key={audit.id} className="bg-white dark:bg-slate-800 rounded-xl border-2 border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition-shadow">
+            {/* Audit Header */}
+            <div className="bg-linear-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-4 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3 flex-1">
+                  <div className="w-10 h-10 bg-linear-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center shadow-md shrink-0">
+                    <span className="text-white font-bold text-sm">#{audits.length - index}</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-slate-900 dark:text-white">Edit Record</span>
+                      <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full text-xs font-semibold">
+                        ID: {audit.id}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
+                      <div className="flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span>{formattedDate} at {formattedTime}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        <span>Admin ID: {audit.admin_id}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => toggleAudit(audit.id)}
+                  className="px-3 py-1.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-all text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 shrink-0"
+                >
+                  <span>{isExpanded ? 'Hide' : 'Show'} Changes</span>
+                  <svg className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Reason */}
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex items-start gap-2">
+                <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shrink-0">
+                  <span className="text-white text-lg">💬</span>
+                </div>
+                <div className="flex-1">
+                  <div className="text-xs font-semibold text-blue-900 dark:text-blue-100 uppercase mb-1">Edit Reason</div>
+                  <div className="text-sm text-slate-700 dark:text-slate-300">{audit.reason || 'No reason provided'}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Changes Details */}
+            {isExpanded && (
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-lg">📝</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">Modified Fields</span>
+                </div>
+                {renderChanges(audit.changes_json, audit.original_json, audit.new_json)}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
 
 export default EmployeeLogs
+
+// Multi-step Edit Log Wizard (separate modal)
+function EditLogWizard({ isOpen, onClose, log, onSaved }) {
+  const { user } = useAuth()
+  const [step, setStep] = useState(1)
+  const [form, setForm] = useState(null)
+  const [selectedFields, setSelectedFields] = useState([])
+  const [reason, setReason] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (log) {
+      setForm({
+        username: log.username || '',
+        details: log.details || '',
+        log_date: log.log_date || '',
+        log_time: log.log_time || '',
+        purpose: log.purpose || '',
+        id_number: log.id_number || '',
+        id_barcode: log.id_barcode || '',
+        item_no: log.item_no || ''
+      })
+      setSelectedFields([])
+      setReason('')
+      setStep(1)
+    }
+  }, [log])
+
+  if (!isOpen || !log) return null
+
+  const fieldList = [
+    { key: 'username', label: 'Username', icon: '👤' },
+    { key: 'details', label: 'Activity Details', icon: '📝' },
+    { key: 'item_no', label: 'Item Numbers', icon: '📦' },
+    { key: 'id_number', label: 'ID Number', icon: '🔢' },
+    { key: 'id_barcode', label: 'ID Barcode', icon: '📱' },
+    { key: 'purpose', label: 'Purpose', icon: '🎯' },
+    { key: 'log_date', label: 'Activity Date', icon: '📅' },
+    { key: 'log_time', label: 'Activity Time', icon: '⏰' }
+  ]
+
+  const toggleField = (k) => {
+    setSelectedFields(prev => prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k])
+  }
+
+  const canProceedStep1 = selectedFields.length > 0
+  const canProceedStep2 = selectedFields.length > 0
+  const canProceedStep3 = reason.trim() !== ''
+
+  const doSave = async () => {
+    if (!user) { alert('Only admins may edit logs'); return }
+    if (selectedFields.length === 0) { alert('No fields selected'); return }
+    if (!reason || reason.trim() === '') { alert('Reason required'); return }
+
+    const payload = { admin_id: user.id, reason }
+    // Normalize and only include fields that differ from original
+    for (const k of selectedFields) {
+      let val = form[k]
+      if (typeof val === 'string') val = val.trim()
+      if (k === 'item_no' && typeof val === 'string') {
+        // Normalize semicolon-separated IDs: remove spaces after semicolons
+        val = val.split(';').map(s => s.trim()).filter(Boolean).join(';')
+      }
+
+      // Only include if actually changed from original (normalized comparison)
+      const orig = (log[k] || '')
+      const origNorm = (typeof orig === 'string') ? orig.trim().split(';').map(s=>s.trim()).filter(Boolean).join(';') : orig
+      if (val !== origNorm) payload[k] = val
+    }
+    console.debug('EditLogWizard payload:', payload)
+
+    setSaving(true)
+    try {
+      const res = await apiService.employeeLogs.updateEmployeeLog(log.id, payload)
+      if (res && res.success) {
+        if (typeof onSaved === 'function') onSaved(res)
+        onClose()
+      } else {
+        throw new Error(res?.message || 'Save failed')
+      }
+    } catch (err) {
+      console.error('Edit failed', err)
+      alert('Failed to save: ' + (err.message || err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <ModalPortal>
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
+        <div className="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border-2 border-slate-200 dark:border-slate-700 animate-scaleIn">
+          {/* Modal Header */}
+          <div className="bg-linear-to-r from-amber-600 via-orange-600 to-red-600 p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-2xl">Edit Activity Log</h3>
+                  <p className="text-orange-100 text-sm mt-1">Log ID: #{log.id} • {log.username || 'N/A'}</p>
+                </div>
+              </div>
+              <button 
+                onClick={onClose} 
+                className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-all"
+              >
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Progress Steps */}
+          <div className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between max-w-2xl mx-auto">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-all ${
+                  step === 1 
+                    ? 'bg-linear-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
+                    : step > 1 
+                      ? 'bg-green-500 text-white' 
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                }`}>
+                  {step > 1 ? '✓' : '1'}
+                </div>
+                <div>
+                  <div className="font-semibold text-slate-900 dark:text-white text-sm">Select Fields</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Choose what to edit</div>
+                </div>
+              </div>
+
+              <div className="flex-1 h-0.5 bg-slate-200 dark:bg-slate-700 mx-4"></div>
+
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-all ${
+                  step === 2 
+                    ? 'bg-linear-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
+                    : step > 2 
+                      ? 'bg-green-500 text-white' 
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                }`}>
+                  {step > 2 ? '✓' : '2'}
+                </div>
+                <div>
+                  <div className="font-semibold text-slate-900 dark:text-white text-sm">Edit Values</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Update information</div>
+                </div>
+              </div>
+
+              <div className="flex-1 h-0.5 bg-slate-200 dark:bg-slate-700 mx-4"></div>
+
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-all ${
+                  step === 3 
+                    ? 'bg-linear-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
+                    : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                }`}>
+                  3
+                </div>
+                <div>
+                  <div className="font-semibold text-slate-900 dark:text-white text-sm">Confirm</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Provide reason</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Modal Content */}
+          <div className="p-6 overflow-y-auto max-h-[calc(90vh-280px)]">
+            {step === 1 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
+                    <span className="text-2xl">✅</span>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg text-slate-900 dark:text-white">Select Fields to Edit</h4>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Choose which fields you want to modify</p>
+                  </div>
+                </div>
+
+                {selectedFields.length > 0 && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 mb-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-blue-700 dark:text-blue-300 font-semibold">
+                        {selectedFields.length} field{selectedFields.length > 1 ? 's' : ''} selected
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {fieldList.map(f => (
+                    <label 
+                      key={f.key} 
+                      className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-md ${
+                        selectedFields.includes(f.key)
+                          ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50'
+                      }`}
+                    >
+                      <input 
+                        type="checkbox" 
+                        checked={selectedFields.includes(f.key)} 
+                        onChange={() => toggleField(f.key)}
+                        className="w-5 h-5 rounded border-slate-300 dark:border-slate-600 text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-2xl">{f.icon}</span>
+                      <span className="font-semibold text-slate-900 dark:text-white">{f.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
+                    <span className="text-2xl">✏️</span>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg text-slate-900 dark:text-white">Edit Values</h4>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Update the selected fields with new information</p>
+                  </div>
+                </div>
+
+                {selectedFields.length === 0 ? (
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">⚠️</span>
+                      <div>
+                        <h5 className="font-semibold text-yellow-800 dark:text-yellow-300">No fields selected</h5>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">Please go back and select at least one field to edit.</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {selectedFields.map(k => {
+                      const field = fieldList.find(f => f.key === k)
+                      const originalValue = log[k] || ''
+                      const hasChanged = form[k] !== originalValue
+                      
+                      return (
+                        <div key={k} className="bg-white dark:bg-slate-800 rounded-xl p-4 border-2 border-slate-200 dark:border-slate-700">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xl">{field.icon}</span>
+                            <label className="block text-sm font-bold text-slate-900 dark:text-white">{field.label}</label>
+                            {hasChanged && (
+                              <span className="ml-auto text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full font-semibold">Modified</span>
+                            )}
+                          </div>
+                          
+                          <div className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+                            Original: <span className="font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">{originalValue || '(empty)'}</span>
+                          </div>
+
+                          {k === 'details' || k === 'purpose' ? (
+                            <textarea 
+                              value={form[k]} 
+                              onChange={(e) => setForm(prev => ({...prev, [k]: e.target.value}))} 
+                              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                              rows={3}
+                            />
+                          ) : k === 'log_date' ? (
+                            <input 
+                              type="date"
+                              value={form[k]} 
+                              onChange={(e) => setForm(prev => ({...prev, [k]: e.target.value}))} 
+                              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                            />
+                          ) : k === 'log_time' ? (
+                            <input 
+                              type="time"
+                              value={form[k]} 
+                              onChange={(e) => setForm(prev => ({...prev, [k]: e.target.value}))} 
+                              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                            />
+                          ) : (
+                            <input 
+                              type="text"
+                              value={form[k]} 
+                              onChange={(e) => setForm(prev => ({...prev, [k]: e.target.value}))} 
+                              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                            />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {step === 3 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
+                    <span className="text-2xl">📝</span>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg text-slate-900 dark:text-white">Confirm Changes & Provide Reason</h4>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Review your changes and explain why you're making this edit</p>
+                  </div>
+                </div>
+
+                {/* Summary of Changes */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-4">
+                  <h5 className="font-bold text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
+                    <span>📋</span>
+                    Summary of Changes
+                  </h5>
+                  <div className="space-y-2">
+                    {selectedFields.map(k => {
+                      const field = fieldList.find(f => f.key === k)
+                      const originalValue = log[k] || '(empty)'
+                      const newValue = form[k] || '(empty)'
+                      const hasChanged = form[k] !== log[k]
+                      
+                      return (
+                        <div key={k} className={`text-sm ${hasChanged ? 'font-semibold' : 'opacity-60'}`}>
+                          <div className="flex items-start gap-2">
+                            <span>{field.icon}</span>
+                            <div className="flex-1">
+                              <div className="font-semibold text-blue-900 dark:text-blue-100">{field.label}</div>
+                              <div className="text-xs mt-1">
+                                <span className="text-red-600 dark:text-red-400">- {originalValue}</span>
+                              </div>
+                              <div className="text-xs">
+                                <span className="text-green-600 dark:text-green-400">+ {newValue}</span>
+                              </div>
+                            </div>
+                            {hasChanged && <span className="text-amber-500">✏️</span>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Reason Input */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-900 dark:text-white mb-2">
+                    Reason for Edit <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-3">
+                    This reason will be stored in the audit log for compliance and tracking purposes. Be specific about why this edit is necessary.
+                  </p>
+                  <textarea 
+                    value={reason} 
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="E.g., Correcting data entry error, updating information per employee request, etc."
+                    className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all"
+                    rows={4}
+                  />
+                  {reason.trim() === '' && (
+                    <p className="text-xs text-red-500 mt-2">⚠️ Reason is required to proceed</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Modal Footer */}
+          <div className="bg-slate-50 dark:bg-slate-800 p-6 flex justify-between gap-3 border-t-2 border-slate-200 dark:border-slate-700">
+            <div className="flex gap-3">
+              {step > 1 && (
+                <button 
+                  onClick={() => setStep(step - 1)} 
+                  className="px-6 py-3 bg-white dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-all font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Back</span>
+                </button>
+              )}
+              <button 
+                onClick={onClose} 
+                className="px-6 py-3 bg-white dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-all font-semibold shadow-md hover:shadow-lg"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="flex gap-3">
+              {step < 3 ? (
+                <button 
+                  onClick={() => setStep(step + 1)}
+                  disabled={(step === 1 && !canProceedStep1) || (step === 2 && !canProceedStep2)}
+                  className="px-6 py-3 bg-linear-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <span>Continue</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ) : (
+                <button 
+                  onClick={doSave}
+                  disabled={!canProceedStep3 || saving}
+                  className="px-6 py-3 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {saving ? (
+                    <>
+                      <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Save Changes</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </ModalPortal>
+  )
+}
