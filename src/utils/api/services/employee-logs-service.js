@@ -101,6 +101,11 @@ export class EmployeeLogsService extends BaseAPIService {
     })
   }
 
+  // GET /api/employee-logs/audit/:id - Get audit records for a log
+  async getAuditForLog(id) {
+    return this.request(`/api/employee-logs/audit/${id}`)
+  }
+
   // PUT /api/employee-logs/:id - Update a specific employee log
   async updateEmployeeLog(id, logData) {
     return this.request(`/api/employee-logs/${id}`, {

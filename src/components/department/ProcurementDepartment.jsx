@@ -3,7 +3,7 @@ import { useState, useEffect, lazy, Suspense } from "react"
 import apiService from "../../utils/api/api-service"
 import { getStoredToken, verifyToken } from "../../utils/auth"
 
-// Lazy-load heavy procurement subcomponents directly to avoid importing the whole barrel
+// Lazy-load heavy procurement sub-components directly to avoid importing the whole barrel
 const AdminDashboard = lazy(() => import("../pd/AdminDashboard"))
 const InventoryManagement = lazy(() => import("../pd/inventory/InventoryManagement"))
 const PurchaseOrderTracker = lazy(() => import("../pd/purchase-orders/PurchaseOrderTracker"))
@@ -11,13 +11,6 @@ const SupplierManagement = lazy(() => import("../pd/SuppliesManagement"))
 const EmployeeLogs = lazy(() => import("../pd/EmployeeLogs"))
 const ItemDetailView = lazy(() => import("../pd/inventory/ItemDetailView"))
 const ToastProvider = lazy(() => import("../pd/shared/ToastNotification"))
-import {
-  AdminDashboardSkeleton,
-  InventoryManagementSkeleton,
-  PurchaseOrderTrackerSkeleton,
-  SupplierManagementSkeleton,
-  EmployeeLogsSkeleton
-} from "../skeletons/ProcurementSkeletons"
 
 function ProcurementDepartment() {
   const { user, logout, isDarkMode, toggleDarkMode } = useAuth()
@@ -269,7 +262,7 @@ function ProcurementDepartment() {
 
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-zinc-50 to-gray-100 dark:from-slate-950 dark:via-zinc-950 dark:to-gray-950 transition-colors duration-300">
+      <div className="min-h-screen bg-linear-to-br from-slate-50 via-zinc-50 to-gray-100 dark:from-slate-950 dark:via-zinc-950 dark:to-gray-950 transition-colors duration-300">
       {/* Industrial Background Pattern */}
       <div className="fixed inset-0 opacity-[0.02] dark:opacity-[0.03] pointer-events-none">
         <div className="absolute inset-0" style={{
@@ -278,7 +271,7 @@ function ProcurementDepartment() {
       </div>
       
       <div className="relative z-50">
-            <div className="bg-gradient-to-r from-slate-800 via-zinc-800 to-slate-800 dark:from-slate-900 dark:via-zinc-900 dark:to-slate-900 rounded-xl shadow-xl p-4 sm:p-6 mb-4 border-l-4 border-amber-500 dark:border-amber-400 relative group mx-2 sm:mx-3 md:mx-4">
+            <div className="bg-linear-to-r from-slate-800 via-zinc-800 to-slate-800 dark:from-slate-900 dark:via-zinc-900 dark:to-slate-900 rounded-xl shadow-xl p-4 sm:p-6 mb-4 border-l-4 border-amber-500 dark:border-amber-400 relative group mx-2 sm:mx-3 md:mx-4">
           {/* Animated Background Pattern */}
           <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]">
             <div className="absolute inset-0" style={{
@@ -297,7 +290,7 @@ function ProcurementDepartment() {
             {/* Left Section - Department Info & User Profile */}
             <div className="flex items-center gap-4 flex-1 min-w-0">
               {/* Department Icon */}
-              <div className="p-3 bg-amber-500/20 rounded-xl border border-amber-500/30 group-hover:bg-amber-500/30 transition-colors duration-300 flex-shrink-0">
+              <div className="p-3 bg-amber-500/20 rounded-xl border border-amber-500/30 group-hover:bg-amber-500/30 transition-colors duration-300 shrink-0">
                 <svg className="w-6 h-6 sm:w-7 sm:h-7 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                 </svg>
@@ -340,7 +333,7 @@ function ProcurementDepartment() {
 
                 {/* Notifications Dropdown Panel */}
                 {showNotifications && (
-                  <div className="absolute top-16 left-1/2 transform -translate-x-1/2 w-80 sm:w-96 bg-slate-800/95 backdrop-blur-md rounded-lg shadow-2xl border border-slate-700/50 z-[9999] max-h-[calc(100vh-6rem)] overflow-y-auto notifications-menu">
+                  <div className="absolute top-16 left-1/2 transform -translate-x-1/2 w-80 sm:w-96 bg-slate-800/95 backdrop-blur-md rounded-lg shadow-2xl border border-slate-700/50 z-9999 max-h-[calc(100vh-6rem)] overflow-y-auto notifications-menu">
                     <div className="p-4">
                       <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-700/50 sticky top-0 bg-slate-800/95 backdrop-blur-md z-10">
                         <h3 className="text-white font-semibold">Notifications</h3>
@@ -380,7 +373,7 @@ function ProcurementDepartment() {
                       {notificationsError && !notificationsLoading && (
                         <div className="p-4 rounded-lg border border-red-500/30 bg-red-500/10 mb-4">
                           <div className="flex items-center gap-2">
-                            <svg className="w-5 h-5 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-5 h-5 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                             </svg>
                             <p className="text-red-400 text-sm font-medium">{notificationsError}</p>
@@ -409,7 +402,7 @@ function ProcurementDepartment() {
                                 onClick={() => !notification.read && markAnnouncementAsRead(notification.id)}
                               >
                                 <div className="flex items-start gap-3">
-                                  <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-2 ${
+                                  <div className={`w-2 h-2 rounded-full shrink-0 mt-2 ${
                                     notification.priority === 'high' ? 'bg-red-500' :
                                     notification.priority === 'medium' ? 'bg-yellow-500' :
                                     notification.priority === 'low' ? 'bg-green-500' : 'bg-blue-500'
@@ -418,7 +411,7 @@ function ProcurementDepartment() {
                                     <div className="flex items-start justify-between gap-2">
                                       <h4 className="text-white font-medium text-sm truncate">{notification.title}</h4>
                                       {!notification.read && (
-                                        <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></div>
+                                        <div className="w-2 h-2 bg-blue-500 rounded-full shrink-0 mt-1"></div>
                                       )}
                                     </div>
                                     <p className="text-slate-300 text-xs mt-1 leading-relaxed">{notification.description}</p>
@@ -456,7 +449,7 @@ function ProcurementDepartment() {
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
                   className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-700/50 transition-all duration-300 group/profile"
                 >
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-full overflow-hidden bg-slate-600 border-2 border-amber-400/50 group-hover/profile:border-amber-400 transition-colors duration-300 flex-shrink-0">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-full overflow-hidden bg-slate-600 border-2 border-amber-400/50 group-hover/profile:border-amber-400 transition-colors duration-300 shrink-0">
                     {getProfilePictureUrl(user) ? (
                       <img
                         src={getProfilePictureUrl(user)}
@@ -482,14 +475,14 @@ function ProcurementDepartment() {
                     </p>
                   </div>
 
-                  <svg className={`w-4 h-4 text-slate-400 transition-transform duration-200 flex-shrink-0 ${showProfileMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ${showProfileMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
 
                 {/* Profile Dropdown Menu */}
                 {showProfileMenu && (
-                  <div className="fixed top-20 right-4 w-72 bg-slate-800/95 backdrop-blur-md rounded-lg shadow-2xl border border-slate-700/50 z-[9999] profile-menu">
+                  <div className="fixed top-20 right-4 w-72 bg-slate-800/95 backdrop-blur-md rounded-lg shadow-2xl border border-slate-700/50 z-9999 profile-menu">
                     <div className="p-4 space-y-2">
                       <button 
                         onClick={() => setShowProfileMenu(false)}
@@ -557,7 +550,7 @@ function ProcurementDepartment() {
         {error && (
           <div className="bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded-lg p-3 mb-3 shadow-md">
             <div className="flex items-start gap-2">
-              <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
               <div className="flex-1">
@@ -592,7 +585,7 @@ function ProcurementDepartment() {
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
                   className={`
-                    relative flex-shrink-0 font-semibold
+                    relative shrink-0 font-semibold
                     flex items-center gap-2 group
                     transition-all duration-500 ease-out
                     focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${tab.color}-500
@@ -602,7 +595,7 @@ function ProcurementDepartment() {
                       : 'px-4 sm:px-6 py-3 sm:py-4 text-sm sm:text-base rounded-xl mx-1 min-h-[48px] sm:min-h-[56px]'
                     }
                     ${activeTab === tab.key
-                      ? `text-white bg-gradient-to-r from-${tab.color}-500 to-${tab.color}-600 shadow-lg shadow-${tab.color}-500/30 transform scale-105 ${keyboardNavigated ? 'ring-2 ring-white/50 animate-pulse' : ''}`
+                      ? `text-white bg-linear-to-r from-${tab.color}-500 to-${tab.color}-600 shadow-lg shadow-${tab.color}-500/30 transform scale-105 ${keyboardNavigated ? 'ring-2 ring-white/50 animate-pulse' : ''}`
                       : `text-slate-600 dark:text-slate-400 bg-transparent hover:bg-slate-50/50 dark:hover:bg-slate-800/30 hover:text-slate-800 dark:hover:text-slate-200 active:bg-slate-100/70 dark:active:bg-slate-700/50`
                     }
                   `}
@@ -611,7 +604,7 @@ function ProcurementDepartment() {
                 >
                   {/* Active tab glow effect */}
                   {activeTab === tab.key && (
-                    <div className={`absolute inset-0 bg-gradient-to-r from-${tab.color}-400/20 to-${tab.color}-600/20 rounded-full blur-xl -z-10`}></div>
+                    <div className={`absolute inset-0 bg-linear-to-r from-${tab.color}-400/20 to-${tab.color}-600/20 rounded-full blur-xl -z-10`}></div>
                   )}
                   
                   <span className={`
@@ -639,7 +632,7 @@ function ProcurementDepartment() {
         {/* Quick Stats Panel */}
         {showQuickStats && (
           <div className="mb-4 transform transition-all duration-300 ease-out">
-            <div className="bg-gradient-to-r from-slate-800/90 via-zinc-800/90 to-slate-800/90 backdrop-blur-md rounded-xl shadow-xl border border-slate-700/50 p-4 sm:p-6">
+            <div className="bg-linear-to-r from-slate-800/90 via-zinc-800/90 to-slate-800/90 backdrop-blur-md rounded-xl shadow-xl border border-slate-700/50 p-4 sm:p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg sm:text-xl font-bold text-white">Quick Statistics</h2>
                 <button
@@ -719,7 +712,7 @@ function ProcurementDepartment() {
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           aria-label="Back to top"
-          className="fixed right-4 bottom-6 z-[9999] bg-amber-500 hover:bg-amber-600 text-white p-3 rounded-full shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-300"
+          className="fixed right-4 bottom-6 z-9999 bg-amber-500 hover:bg-amber-600 text-white p-3 rounded-full shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-300"
           title="Back to top"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

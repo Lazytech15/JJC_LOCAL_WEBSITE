@@ -59,9 +59,42 @@ export const exportPurchaseOrderToPDF = (poData) => {
 
   // Get items and calculate total
   const items = poData.items || poData.selectedItems || []
-  const totalAmount = items.reduce((sum, item) => 
-    sum + ((item.quantity || 0) * (item.price_per_unit || 0)), 0
-  )
+
+  // Helper to resolve unit price from various possible field names
+  const resolveUnitPrice = (item) => {
+    // Prefer explicit unit_price (DB), then price_per_unit (frontend), then unitPrice
+    if (item == null) return 0
+    const candidates = [item.unit_price, item.price_per_unit, item.unitPrice, item.unitPriceRaw]
+    for (const v of candidates) {
+      if (typeof v === 'number' && !isNaN(v)) return v
+      if (typeof v === 'string' && v.trim() !== '') {
+        const parsed = Number(v)
+        if (!isNaN(parsed)) return parsed
+      }
+    }
+    // If item.amount exists and quantity present, derive unit price
+    if (item.amount && item.quantity) {
+      const q = Number(item.quantity) || 0
+      if (q > 0) return Number(item.amount) / q
+    }
+    return 0
+  }
+
+  const resolveAmount = (item) => {
+    if (item == null) return 0
+    if (typeof item.amount === 'number') return item.amount
+    if (typeof item.amount === 'string' && item.amount.trim() !== '') {
+      const parsed = Number(item.amount)
+      if (!isNaN(parsed)) return parsed
+    }
+    const qty = Number(item.quantity) || 0
+    const up = resolveUnitPrice(item)
+    return qty * up
+  }
+
+  // Prefer total_value from the PO if present (server may precompute), otherwise compute from items
+  const computedItemsTotal = items.reduce((sum, item) => sum + resolveAmount(item), 0)
+  const totalAmount = (typeof poData.total_value === 'number' && !isNaN(poData.total_value)) ? poData.total_value : computedItemsTotal
 
   // Format currency - Remove "PHP" prefix and peso sign from unit price and amount
   const formatPeso = (amount) => {
@@ -137,8 +170,8 @@ export const exportPurchaseOrderToPDF = (poData) => {
     qty: item.quantity || 0,
     unit: item.unit || "pcs",
     description: item.item_name || item.description || "",
-    unitPrice: formatPeso(item.price_per_unit || 0),
-    amount: formatPeso((item.quantity || 0) * (item.price_per_unit || 0))
+    unitPrice: formatPeso(resolveUnitPrice(item) || 0),
+    amount: formatPeso(resolveAmount(item) || 0)
   }))
 
   // ============================================================================
@@ -208,7 +241,8 @@ export const exportPurchaseOrderToPDF = (poData) => {
     doc.text("P.O. # :", titleX + 5, titleBlockY + 16)
     doc.setFont("helvetica", "bold")
     doc.setFontSize(FONT_SIZES.header)
-    doc.text(poData.po_number || "—", titleX + 26, titleBlockY + 22, { align: "center" })
+  // Prefer po_number but fallback to id for older saved POs
+  doc.text(poData.po_number || poData.id || "—", titleX + 26, titleBlockY + 22, { align: "center" })
 
     yPos = titleBlockY + titleBlockHeight + 2
 
@@ -372,7 +406,8 @@ export const exportPurchaseOrderToPDF = (poData) => {
         })
         
         doc.text(`GENERATED: ${genDate}`, margin + 1, pageFooterY + 2.5)
-        doc.text(`PO-${poData.po_number || ""}`, pageWidth / 2, pageFooterY + 2.5, { align: "center" })
+  // Footer uses the canonical PO identifier; prefer po_number then id
+  doc.text(`PO-${poData.po_number || poData.id || ""}`, pageWidth / 2, pageFooterY + 2.5, { align: "center" })
       }
     })
     
@@ -574,7 +609,7 @@ export const exportPurchaseOrderToPDF = (poData) => {
     }
   }
 
-  const fileName = `PO_${poData.po_number || 'PO'}_${poData.supplier_name || 'Supplier'}.pdf`
+  const fileName = `PO_${poData.po_number || poData.id || 'PO'}_${poData.supplier_name || 'Supplier'}.pdf`
   doc.save(fileName)
 }
 
@@ -770,5 +805,5 @@ export const exportPurchaseOrderToExcel = (poData) => {
   ]
 
   XLSX.utils.book_append_sheet(wb, ws, "Purchase Order")
-  XLSX.writeFile(wb, `PO_${poData.po_number || 'PO'}_${poData.supplier_name || 'Supplier'}.xlsx`)
+  XLSX.writeFile(wb, `PO_${poData.po_number || poData.id || 'PO'}_${poData.supplier_name || 'Supplier'}.xlsx`)
 } 
