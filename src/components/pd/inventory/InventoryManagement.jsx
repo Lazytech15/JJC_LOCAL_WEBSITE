@@ -367,52 +367,51 @@ function InventoryManagement() {
           }
           .barcode-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
           }
           .barcode-item {
             border: 2px dashed #000;
-            padding: 20px;
+            padding: 12px 8px;
             text-align: center;
             break-inside: avoid;
             background: white;
-            margin-bottom: 10px;
+            margin-bottom: 0;
+            min-width: 0;
           }
           .barcode-svg {
-            margin: 15px 0;
+            margin: 8px 0 4px 0;
             background: white;
           }
-          .item-name {
-            font-size: 16px;
+          .barcode-id {
+            font-size: 22px;
             font-weight: bold;
-            margin: 8px 0;
+            margin: 6px 0 2px 0;
+            letter-spacing: 2px;
+          }
+          .item-name {
+            font-size: 15px;
+            font-weight: bold;
+            margin: 2px 0 2px 0;
             word-wrap: break-word;
           }
-          .item-details {
-            font-size: 12px;
-            color: #333;
-            margin: 4px 0;
+          .item-brand {
+            font-size: 13px;
+            font-weight: 600;
+            margin: 2px 0;
+            color: #222;
           }
-          .item-id {
-            font-size: 14px;
-            font-weight: bold;
-            margin: 8px 0;
-            background: #f0f0f0;
-            padding: 4px 8px;
-            border-radius: 4px;
-          }
-          .instructions {
-            background: #fffacd;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 8px;
-            border: 1px solid #ddd;
+          .item-location {
+            font-size: 13px;
+            font-weight: 600;
+            margin: 2px 0;
+            color: #222;
           }
           @media print {
             .no-print { display: none; }
             .barcode-item { 
               page-break-inside: avoid; 
-              margin-bottom: 5px;
+              margin-bottom: 0;
             }
             body { background: white !important; }
           }
@@ -425,23 +424,8 @@ function InventoryManagement() {
           <p>Generated on: ${new Date().toLocaleDateString()}</p>
           <p>Total Items: ${items.length}</p>
           <p><strong>Format:</strong> ITM001, ITM002, ITM003...</p>
-          
-          <div class="instructions">
-            <h3>CODE-128 Scanner Setup Instructions:</h3>
-            <ol style="text-align: left; max-width: 600px; margin: 0 auto;">
-              <li><strong>Check Scanner Settings:</strong> Make sure CODE-128 is enabled on your scanner</li>
-              <li><strong>Barcode Format:</strong> These barcodes use ITM prefix format (ITM001, ITM002, etc.)</li>
-              <li><strong>Print Quality:</strong> Use high quality print settings (600 DPI minimum)</li>
-              <li><strong>Paper:</strong> Use white paper with good contrast</li>
-              <li><strong>Size:</strong> Don't resize - print at 100%</li>
-              <li><strong>Lighting:</strong> Ensure good lighting when scanning</li>
-              <li><strong>Distance:</strong> Hold scanner 4-8 inches from barcode</li>
-            </ol>
-          </div>
-          
-          <button onclick="window.print()" style="padding: 15px 30px; font-size: 18px; margin: 15px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">Print Barcodes</button>
+          <button onclick="window.print()" style="padding: 12px 24px; font-size: 16px; margin: 12px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">Print Barcodes</button>
         </div>
-        
         <div class="barcode-grid">
     `
 
@@ -453,11 +437,10 @@ function InventoryManagement() {
         htmlContent += `
         <div class="barcode-item">
           <svg id="barcode-${index}" class="barcode-svg"></svg>
-          <div class="item-id">ID: ${barcodeId}</div>
+          <div class="barcode-id">${barcodeId}</div>
           <div class="item-name">${item.item_name}</div>
-          <div class="item-details"><strong>Brand:</strong> ${item.brand || 'No Brand'}</div>
-          <div class="item-details"><strong>Location:</strong> ${item.location || 'No Location'}</div>
-          <div class="item-details"><strong>Balance:</strong> ${item.balance || 0}</div>
+          <div class="item-brand">${item.brand || 'No Brand'}</div>
+          <div class="item-location">${item.location || 'No Location'}</div>
         </div>
       `
       })
