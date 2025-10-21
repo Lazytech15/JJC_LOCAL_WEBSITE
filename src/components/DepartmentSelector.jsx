@@ -95,8 +95,8 @@ function DepartmentSelector() {
   <div
     className={`min-h-screen flex items-center justify-center p-8 transition-colors duration-300 ${
       isDarkMode
-        ? "bg-gradient-to-br from-gray-900 via-slate-900 to-stone-900"
-        : "bg-gradient-to-br from-gray-50 via-slate-50 to-stone-50"
+        ? "bg-linear-to-br from-gray-900 via-slate-900 to-stone-900"
+        : "bg-linear-to-br from-gray-50 via-slate-50 to-stone-50"
     }`}
   >
     <div className="max-w-6xl w-full">
@@ -115,7 +115,7 @@ function DepartmentSelector() {
 
       <div className="text-center mb-12">
         <h1
-          className={`text-5xl font-bold mb-4 bg-gradient-to-r bg-clip-text text-transparent ${
+          className={`text-5xl font-bold mb-4 bg-linear-to-r bg-clip-text text-transparent ${
             isDarkMode
               ? "from-slate-300 to-stone-300"
               : "from-slate-700 to-stone-700"
@@ -131,7 +131,7 @@ function DepartmentSelector() {
           Select a department to access
         </p>
         <div
-          className={`mt-4 w-24 h-1 bg-gradient-to-r mx-auto rounded-full ${
+          className={`mt-4 w-24 h-1 bg-linear-to-r mx-auto rounded-full ${
             isDarkMode
               ? "from-slate-400 to-stone-400"
               : "from-slate-600 to-stone-600"
@@ -166,7 +166,7 @@ function DepartmentSelector() {
                 ${
                   isDarkMode
                     ? `${superAdmin.color} ${superAdmin.hoverColor} border-red-700/50 shadow-2xl group-hover:shadow-3xl`
-                    : "bg-gradient-to-br from-white to-gray-100 hover:from-gray-50 hover:to-gray-200 border-red-200"
+                    : "bg-linear-to-br from-white to-gray-100 hover:from-gray-50 hover:to-gray-200 border-red-200"
                 }
                 ${
                   selectedDept === superAdmin.id
@@ -219,7 +219,7 @@ function DepartmentSelector() {
                 ${
                   isDarkMode
                     ? `${superAdmin.color} ${superAdmin.darkColor} group-hover:opacity-30`
-                    : "bg-gradient-to-br from-red-300 to-red-400 group-hover:opacity-20"
+                    : "bg-linear-to-br from-red-300 to-red-400 group-hover:opacity-20"
                 }
               `}
             ></div>
@@ -266,7 +266,7 @@ function DepartmentSelector() {
                 ${
                   isDarkMode
                     ? `${dept.color} ${dept.hoverColor} border-gray-700/20 shadow-2xl group-hover:shadow-3xl`
-                    : "bg-gradient-to-br from-white to-gray-100 hover:from-gray-50 hover:to-gray-200 border-gray-200"
+                    : "bg-linear-to-br from-white to-gray-100 hover:from-gray-50 hover:to-gray-200 border-gray-200"
                 }
                 ${
                   selectedDept === dept.id
@@ -319,7 +319,7 @@ function DepartmentSelector() {
                 ${
                   isDarkMode
                     ? `${dept.color} ${dept.darkColor} group-hover:opacity-30`
-                    : "bg-gradient-to-br from-gray-300 to-gray-400 group-hover:opacity-20"
+                    : "bg-linear-to-br from-gray-300 to-gray-400 group-hover:opacity-20"
                 }
               `}
             ></div>

@@ -24,8 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { exportToCSV, exportToXLSX, exportToJSON, prepareExportData, exportLogsToXLSX } from "../lib/export-utils"
 import { EnhancedItemCard } from "./enhanced-item-card"
 import { BulkOperationsBar, useBulkSelection } from "./bulk-operations"
-import useGlobalBarcodeScanner from "../hooks/use-global-barcode-scanner"
-import BarcodeModal from "./barcode-modal"
+// Global barcode scanner is started at the app layout level by GlobalBarcodeListener
 
 
 interface DashboardViewProps {
@@ -100,10 +99,7 @@ export function DashboardView({
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   const [isExporting, setIsExporting] = useState(false)
-  // Modal state for global barcode flow
-  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false)
-  const [detectedBarcode, setDetectedBarcode] = useState<string | null>(null)
-  const [detectedProduct, setDetectedProduct] = useState<Product | null>(null)
+  // Barcode detection state handled via global events; no local modal state needed
   const [logs, setLogs] = useState<any[]>([])
   const [useEnhancedCards] = useState(true)
 
@@ -646,23 +642,8 @@ export function DashboardView({
     return () => window.removeEventListener('scanned-barcode', handler as EventListener)
   }, [processBarcodeSubmit])
 
-  // When modal triggers add, call onAddToCart
-  const handleModalAdd = useCallback((product: Product, quantity: number) => {
-    onAddToCart(product, quantity, true)
-    toast({ title: '✅ Item Added', description: `${product.name} x${quantity} added to cart` })
-  }, [onAddToCart, toast])
-
-  // Called by global scanner when a barcode is detected
-  const onGlobalBarcodeDetected = useCallback((barcode: string) => {
-    // Look up product synchronously from loaded products
-    const result = processBarcodeInput(barcode, products)
-    setDetectedBarcode(barcode)
-    setDetectedProduct(result.product ?? null)
-    setIsBarcodeModalOpen(true)
-  }, [products])
-
-  // Start global scanner
-  useGlobalBarcodeScanner(onGlobalBarcodeDetected, { minLength: 3, interKeyMs: 80 })
+  // Modal-related handlers and local scanner start removed — scanning is handled
+  // centrally by GlobalBarcodeListener which dispatches 'scanned-barcode' events.
 
   // Update local search when header search changes
   useEffect(() => {
@@ -870,21 +851,6 @@ export function DashboardView({
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Global Barcode Modal */}
-      <BarcodeModal
-        open={isBarcodeModalOpen}
-        initialValue={detectedBarcode ?? ''}
-        onClose={() => setIsBarcodeModalOpen(false)}
-        onConfirm={(barcodeValue: string, qty?: number) => {
-          // If a product was detected earlier, add that. Otherwise try processing barcode string.
-          if (detectedProduct) {
-            handleModalAdd(detectedProduct, qty ?? 1)
-          } else {
-            // try to process by barcode string
-            processBarcodeSubmit(barcodeValue)
-          }
-        }}
-      />
       {/* Mobile Sidebar Overlay */}
       {isMobileSidebarOpen && (
         <>
@@ -900,7 +866,7 @@ export function DashboardView({
             <div className="p-6 border-b border-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
+                  <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
                     <Filter className="w-4 h-4 text-white" />
                   </div>
                   <div>
@@ -926,7 +892,7 @@ export function DashboardView({
               <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <div className="w-5 h-5 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
+                    <div className="w-5 h-5 bg-linear-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
                       <Wifi className="w-3 h-3 text-white" />
                     </div>
                     System Status
@@ -985,7 +951,7 @@ export function DashboardView({
                   className="w-full flex items-center justify-between mb-2 group"
                 >
                   <h3 className="text-xs font-semibold text-foreground flex items-center gap-2">
-                    <div className="w-4 h-4 bg-gradient-to-br from-purple-400 to-pink-500 rounded flex items-center justify-center">
+                    <div className="w-4 h-4 bg-linear-to-br from-purple-400 to-pink-500 rounded flex items-center justify-center">
                       <Filter className="w-2.5 h-2.5 text-white" />
                     </div>
                     Categories
@@ -1029,7 +995,7 @@ export function DashboardView({
               {/* Availability Filters */}
               <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
                 <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-                  <div className="w-5 h-5 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-md flex items-center justify-center">
+                  <div className="w-5 h-5 bg-linear-to-br from-blue-400 to-cyan-500 rounded-md flex items-center justify-center">
                     <Package className="w-3 h-3 text-white" />
                   </div>
                   Availability
@@ -1072,7 +1038,7 @@ export function DashboardView({
           <div className="p-6 border-b border-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
+              <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
                 <Filter className="w-4 h-4 text-white" />
               </div>
               <div>
@@ -1109,7 +1075,7 @@ export function DashboardView({
           <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                <div className="w-5 h-5 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
+                <div className="w-5 h-5 bg-linear-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
                   <Wifi className="w-3 h-3 text-white" />
                 </div>
                 System Status
@@ -1349,12 +1315,12 @@ export function DashboardView({
                               {logs.map((l, idx) => (
                                 <tr key={idx} className={`${idx % 2 === 0 ? 'bg-slate-800/50' : 'bg-slate-700/50'} text-slate-100 hover:bg-slate-600/30 transition-colors`}>
                                   <td className="p-2 align-top border-b border-slate-700/50 w-24">
-                                    <div className="break-words font-medium text-slate-200 text-xs">
+                                    <div className="wrap-break-words font-medium text-slate-200 text-xs">
                                       {l.username}
                                     </div>
                                   </td>
                                   <td className="p-2 align-top border-b border-slate-700/50">
-                                    <div className="break-words text-slate-300 text-xs leading-relaxed">
+                                    <div className="wrap-break-words text-slate-300 text-xs leading-relaxed">
                                       {l.details}
                                     </div>
                                   </td>
@@ -1391,7 +1357,7 @@ export function DashboardView({
           <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                <div className="w-5 h-5 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-md flex items-center justify-center">
+                <div className="w-5 h-5 bg-linear-to-br from-blue-400 to-indigo-500 rounded-md flex items-center justify-center">
                   <Scan className="w-3 h-3 text-white" />
                 </div>
                 Barcode Scanner
@@ -1409,7 +1375,7 @@ export function DashboardView({
                 
                 <Button
                   size="sm"
-                  className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white border-0 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                  className="w-full bg-linear-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white border-0 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
                   onClick={handleBarcodeSubmit}
                   disabled={!barcodeInput.trim()}
                 >
@@ -1430,7 +1396,7 @@ export function DashboardView({
                 className="w-full flex items-center justify-between group hover:bg-muted -mx-1 px-1 py-1 rounded-lg transition-all duration-200"
               >
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-gradient-to-br from-purple-400 to-pink-500 rounded flex items-center justify-center">
+                  <div className="w-4 h-4 bg-linear-to-br from-purple-400 to-pink-500 rounded flex items-center justify-center">
                     <Package className="w-2.5 h-2.5 text-white" />
                   </div>
                   <h3 className="text-xs font-semibold text-foreground">
@@ -1454,7 +1420,7 @@ export function DashboardView({
                       key={category}
                       className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-all duration-200 ${
                         selectedCategory === category
-                          ? "bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-100 dark:to-slate-200 text-white dark:text-slate-900 shadow-sm font-semibold"
+                          ? "bg-linear-to-r from-slate-900 to-slate-800 dark:from-slate-100 dark:to-slate-200 text-white dark:text-slate-900 shadow-sm font-semibold"
                           : "text-foreground hover:bg-muted font-medium"
                       }`}
                       onClick={() => setSelectedCategory(category)}
@@ -1478,7 +1444,7 @@ export function DashboardView({
           <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                <div className="w-5 h-5 bg-gradient-to-br from-emerald-400 to-green-500 rounded-md flex items-center justify-center">
+                <div className="w-5 h-5 bg-linear-to-br from-emerald-400 to-green-500 rounded-md flex items-center justify-center">
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
                 Availability
