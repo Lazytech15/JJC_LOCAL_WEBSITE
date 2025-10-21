@@ -177,9 +177,18 @@ async function lazyImageCacheStrategy(request, cacheName, maxAge) {
     if (response.ok && response.status === 200) {
       // Cache in background, don't block response
       const responseToCache = response.clone()
-      
-      // Don't await - cache asynchronously
-      cacheResponse(cache, request, responseToCache)
+      try { 
+        // Only cache http(s) requests; skip extensions or unsupported schemes
+        const proto = new URL(request.url).protocol
+        if (proto === 'http:' || proto === 'https:') {
+          await cache.put(request, responseToCache)
+          console.log(`[Service Worker] Image cached in ${cacheName}:`, request.url)
+        } else {
+          console.log(`[Service Worker] Skipping cache for unsupported scheme (${proto}):`, request.url)
+        }
+      } catch (putErr) {
+        console.warn(`[Service Worker] Failed to put image in cache:`, putErr)
+      }
     }
     
     return response
@@ -214,8 +223,44 @@ async function cacheResponse(cache, request, response) {
   }
 }
 
-// Network First with Timeout - Don't wait too long for network
-async function networkFirstWithTimeout(request, cacheName, timeout = 3000) {
+// Cache First Strategy - Try cache first, then network
+async function cacheFirstStrategy(request, cacheName) {
+  const cache = await caches.open(cacheName)
+  const cached = await cache.match(request)
+
+  if (cached) {
+    console.log("[Service Worker] Serving from cache:", request.url)
+    return cached
+  }
+
+  try {
+    console.log("[Service Worker] Fetching and caching:", request.url)
+    const response = await fetch(request)
+    if (response.ok) {
+      try {
+        const proto = new URL(request.url).protocol
+        if (proto === 'http:' || proto === 'https:') {
+          await cache.put(request, response.clone())
+        } else {
+          console.log(`[Service Worker] Skipping cache for unsupported scheme (${proto}):`, request.url)
+        }
+      } catch (putErr) {
+        console.warn('[Service Worker] cache.put failed:', putErr)
+      }
+    }
+    return response
+  } catch (error) {
+    console.error("[Service Worker] Fetch failed:", error)
+    // Return offline page for documents
+    if (request.destination === "document") {
+      return cache.match("/offline.html") || new Response("Offline", { status: 503 })
+    }
+    return new Response("Offline", { status: 503 })
+  }
+}
+
+// Network First Strategy - Try network first, fallback to cache
+async function networkFirstStrategy(request, cacheName) {
   const cache = await caches.open(cacheName)
   
   try {
