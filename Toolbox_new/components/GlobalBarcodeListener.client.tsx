@@ -1,16 +1,27 @@
 "use client"
 
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import useGlobalBarcodeScanner from '../hooks/use-global-barcode-scanner'
+import BarcodeModal from './barcode-modal'
 
 export default function GlobalBarcodeListener() {
-  // When a barcode is detected, dispatch a global event immediately.
+  const [modalOpen, setModalOpen] = useState(false)
+  const [pendingValue, setPendingValue] = useState('')
+
   const handleDetected = useCallback((value: string) => {
-    // Send barcode and default quantity of 1 (consumers can override if needed)
-    window.dispatchEvent(new CustomEvent('scanned-barcode', { detail: { barcode: value, quantity: 1 } }))
+    // Show modal with scanned value
+    setPendingValue(value)
+    setModalOpen(true)
   }, [])
 
   useGlobalBarcodeScanner(handleDetected, { minLength: 3, interKeyMs: 80, maxScanDurationMs: 1200 })
 
-  return null
+  const handleConfirm = (payload: any) => {
+    // Forward whatever the modal sends (single barcode or bulk items) to global listeners
+    window.dispatchEvent(new CustomEvent('scanned-barcode', { detail: payload }))
+  }
+
+  return (
+    <BarcodeModal open={modalOpen} initialValue={pendingValue} onClose={() => setModalOpen(false)} onConfirm={handleConfirm} />
+  )
 }
