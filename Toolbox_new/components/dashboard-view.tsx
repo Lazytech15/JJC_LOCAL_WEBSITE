@@ -24,6 +24,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { exportToCSV, exportToXLSX, exportToJSON, prepareExportData, exportLogsToXLSX } from "../lib/export-utils"
 import { EnhancedItemCard } from "./enhanced-item-card"
 import { BulkOperationsBar, useBulkSelection } from "./bulk-operations"
+import useGlobalBarcodeScanner from "../hooks/use-global-barcode-scanner"
+import BarcodeModal from "./barcode-modal"
 
 
 interface DashboardViewProps {
@@ -98,6 +100,10 @@ export function DashboardView({
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   const [isExporting, setIsExporting] = useState(false)
+  // Modal state for global barcode flow
+  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false)
+  const [detectedBarcode, setDetectedBarcode] = useState<string | null>(null)
+  const [detectedProduct, setDetectedProduct] = useState<Product | null>(null)
   const [logs, setLogs] = useState<any[]>([])
   const [useEnhancedCards] = useState(true)
 
@@ -622,6 +628,42 @@ export function DashboardView({
     }
   }, [products, onAddToCart, toast]);
 
+  // Listen for global scanned-barcode events dispatched by GlobalBarcodeListener
+  useEffect(() => {
+    const handler = (e: Event) => {
+      try {
+        const detail = (e as CustomEvent).detail || {}
+        const barcode = String(detail.barcode || '').trim()
+        if (barcode) {
+          processBarcodeSubmit(barcode)
+        }
+      } catch (err) {
+        console.error('scanned-barcode handler error', err)
+      }
+    }
+
+    window.addEventListener('scanned-barcode', handler as EventListener)
+    return () => window.removeEventListener('scanned-barcode', handler as EventListener)
+  }, [processBarcodeSubmit])
+
+  // When modal triggers add, call onAddToCart
+  const handleModalAdd = useCallback((product: Product, quantity: number) => {
+    onAddToCart(product, quantity, true)
+    toast({ title: '✅ Item Added', description: `${product.name} x${quantity} added to cart` })
+  }, [onAddToCart, toast])
+
+  // Called by global scanner when a barcode is detected
+  const onGlobalBarcodeDetected = useCallback((barcode: string) => {
+    // Look up product synchronously from loaded products
+    const result = processBarcodeInput(barcode, products)
+    setDetectedBarcode(barcode)
+    setDetectedProduct(result.product ?? null)
+    setIsBarcodeModalOpen(true)
+  }, [products])
+
+  // Start global scanner
+  useGlobalBarcodeScanner(onGlobalBarcodeDetected, { minLength: 3, interKeyMs: 80 })
+
   // Update local search when header search changes
   useEffect(() => {
     // Validate and sanitize search query
@@ -828,6 +870,21 @@ export function DashboardView({
 
   return (
     <div className="flex h-screen bg-background">
+      {/* Global Barcode Modal */}
+      <BarcodeModal
+        open={isBarcodeModalOpen}
+        initialValue={detectedBarcode ?? ''}
+        onClose={() => setIsBarcodeModalOpen(false)}
+        onConfirm={(barcodeValue: string, qty?: number) => {
+          // If a product was detected earlier, add that. Otherwise try processing barcode string.
+          if (detectedProduct) {
+            handleModalAdd(detectedProduct, qty ?? 1)
+          } else {
+            // try to process by barcode string
+            processBarcodeSubmit(barcodeValue)
+          }
+        }}
+      />
       {/* Mobile Sidebar Overlay */}
       {isMobileSidebarOpen && (
         <>

@@ -9,6 +9,10 @@ import { KeyboardShortcuts } from "../components/keyboard-shortcuts"
 import { LoadingProvider } from "../components/loading-context"
 import { Suspense } from "react"
 import "./globals.css"
+import dynamic from 'next/dynamic'
+
+// Client-only Global Barcode Listener
+const GlobalBarcodeListener = dynamic(() => import('../components/GlobalBarcodeListener.client'), { ssr: false })
 
 export const metadata: Metadata = {
   title: "Toolbox Inventory - Warehouse Management",
@@ -73,6 +77,7 @@ export default function RootLayout({
             <ThemeProvider defaultTheme="dark" storageKey="toolbox-theme">
               <LoadingProvider>
                 <KeyboardShortcuts />
+                <GlobalBarcodeListener />
                 {children}
               </LoadingProvider>
             </ThemeProvider>
