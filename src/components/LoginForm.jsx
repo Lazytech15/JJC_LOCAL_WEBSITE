@@ -130,6 +130,14 @@ function LoginForm() {
       })
 
       if (authData.success) {
+        // Check if user has admin access level
+        if (authData.user.access_level !== "admin") {
+          clearTokens()
+          setError("Access denied. Only administrators can log in to this system.")
+          setIsLoading(false)
+          return
+        }
+
         const userData = {
           id: authData.user.id,
           username: authData.user.username,
@@ -139,7 +147,6 @@ function LoginForm() {
           permissions: authData.user.permissions || [],
           access_level: authData.user.access_level,
         }
-
         const accessTokenExpiry = rememberMe ? "24h" : "1h"
         const refreshTokenExpiry = rememberMe ? "7d" : "24h"
 
