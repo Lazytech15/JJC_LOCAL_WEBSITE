@@ -273,21 +273,21 @@ export default function EmployeeDashboard() {
               <div className={`hidden md:flex justify-center text-white drop-shadow-lg`}>
                 <div className="flex gap-2 text-center items-center">
                   <h1
-                    className={`text-5xl font-extrabold tracking-wide ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
+                    className={`text-5xl font-extrabold califoniaFont tracking-wide ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
                       }`}
                   >
                     JJC
                   </h1>
                   <div className="text-left mt-2">
                     <p
-                      className={`text-sm font-semibold uppercase leading-tight ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
+                      className={`text-sm font-semibold uppercase califoniaFont leading-tight ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
                         }`}
                     >
                       Engineering Works
                     </p>
                     <hr className="border-white/70" />
                     <p
-                      className={`text-sm font-semibold uppercase text-white ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
+                      className={`text-sm califoniaFont font-semibold uppercase text-white ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
                         }`}
                     >
                       & General Services

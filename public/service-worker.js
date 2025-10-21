@@ -1,15 +1,23 @@
 // ============================================================================
-// service-worker.js - Enhanced with Profile Picture & UI Caching
+// service-worker.js - Optimized for Performance
 // ============================================================================
 
-const CACHE_VERSION = "v3" // Increment version for UI caching
+const CACHE_VERSION = "v4" // Increment version
 const STATIC_CACHE = `jjc-static-${CACHE_VERSION}`
 const API_CACHE = `jjc-api-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `jjc-dynamic-${CACHE_VERSION}`
 const PROFILE_CACHE = `jjc-profiles-${CACHE_VERSION}`
-const UI_CACHE = `jjc-ui-${CACHE_VERSION}` // New: UI assets cache
-const LANDING_CACHE = `jjc-landing-${CACHE_VERSION}` // NEW
-const GALLERY_CACHE = `jjc-gallery-${CACHE_VERSION}` // NEW
+const UI_CACHE = `jjc-ui-${CACHE_VERSION}`
+const LANDING_CACHE = `jjc-landing-${CACHE_VERSION}`
+const GALLERY_CACHE = `jjc-gallery-${CACHE_VERSION}`
+
+// Cache expiration times (in milliseconds)
+const CACHE_EXPIRATION = {
+  PROFILE: 24 * 60 * 60 * 1000, // 24 hours
+  LANDING: 7 * 24 * 60 * 60 * 1000, // 7 days
+  GALLERY: 7 * 24 * 60 * 60 * 1000, // 7 days
+  API: 5 * 60 * 1000, // 5 minutes
+}
 
 // Core assets to cache immediately on install
 const CORE_ASSETS = [
@@ -17,49 +25,16 @@ const CORE_ASSETS = [
   "/index.html"
 ]
 
-// Optional assets (fail gracefully if not available)
-const OPTIONAL_ASSETS = [
-  "/offline.html",
-  "/manifest.json"
-]
-
-// Static assets to cache
-const STATIC_ASSETS = [
-  "/",
-  "/index.html",
-  "/ToolBoxlogo.png",
-  "/manifest.json",
-  "/favicon.ico"
-]
-
-// UI assets (will be populated dynamically)
-const UI_ASSETS = [
-  // These will be added dynamically during runtime
-]
-
-// Install event - cache static and UI assets
+// Install event - cache only core assets
 self.addEventListener("install", (event) => {
   console.log("[Service Worker] Installing...")
   event.waitUntil(
-    Promise.all([
-      // Cache static assets
-      caches.open(STATIC_CACHE).then((cache) => {
-        console.log("[Service Worker] Caching static assets")
-        return cache.addAll(CORE_ASSETS)
-      }),
-      // Cache UI assets (optional)
-      caches.open(UI_CACHE).then((cache) => {
-        console.log("[Service Worker] Caching UI assets")
-        return Promise.allSettled(
-          UI_ASSETS.map(asset => 
-            cache.add(asset).catch(err => {
-              console.warn("[Service Worker] Failed to cache UI asset:", asset, err.message)
-              return null
-            })
-          )
-        )
+    caches.open(STATIC_CACHE).then((cache) => {
+      console.log("[Service Worker] Caching core assets only")
+      return cache.addAll(CORE_ASSETS).catch(err => {
+        console.warn("[Service Worker] Failed to cache some core assets:", err)
       })
-    ])
+    })
   )
   self.skipWaiting()
 })
@@ -91,7 +66,7 @@ self.addEventListener("activate", (event) => {
   return self.clients.claim()
 })
 
-// Fetch event - implement caching strategies
+// Fetch event - implement optimized caching strategies
 self.addEventListener("fetch", (event) => {
   const { request } = event
   const url = new URL(request.url)
@@ -101,78 +76,121 @@ self.addEventListener("fetch", (event) => {
     return
   }
 
-    // Landing page images - Cache First
+  // Landing page images - Network First (lazy cache)
   if (url.pathname.includes("/api/profile/landing/")) {
-    event.respondWith(imageCacheStrategy(request, LANDING_CACHE))
+    event.respondWith(lazyImageCacheStrategy(request, LANDING_CACHE, CACHE_EXPIRATION.LANDING))
     return
   }
 
-  // Gallery images - Cache First
+  // Gallery images - Network First (lazy cache)
   if (url.pathname.includes("/api/profile/gallery/")) {
-    event.respondWith(imageCacheStrategy(request, GALLERY_CACHE))
+    event.respondWith(lazyImageCacheStrategy(request, GALLERY_CACHE, CACHE_EXPIRATION.GALLERY))
     return
   }
 
-  // Profile pictures - Cache First with Long TTL
+  // Profile pictures - Network First (lazy cache with shorter expiration)
   if (url.pathname.includes("/api/profile/")) {
-    event.respondWith(profileCacheStrategy(request, PROFILE_CACHE))
+    event.respondWith(lazyImageCacheStrategy(request, PROFILE_CACHE, CACHE_EXPIRATION.PROFILE))
     return
   }
 
-  // API requests - Network First with Cache Fallback
+  // API requests - Network First with short cache fallback
   if (url.pathname.startsWith("/api/")) {
-    event.respondWith(networkFirstStrategy(request, API_CACHE))
+    event.respondWith(networkFirstWithTimeout(request, API_CACHE, 5000))
     return
   }
 
-  // UI Assets (CSS, JS, Images, Fonts) - Cache First with Network Fallback
-  // This handles all Vite-built assets with hash names
+  // UI Assets - Cache First for hashed assets
   if (
     request.destination === "style" ||
     request.destination === "script" ||
-    request.destination === "image" ||
     request.destination === "font" ||
     request.destination === "manifest" ||
-    url.pathname.startsWith("/assets/") || // Vite puts built files in /assets/
-    url.pathname.match(/\.(css|js|png|jpg|jpeg|gif|svg|webp|woff|woff2|ttf|eot|ico|json)$/)
+    url.pathname.startsWith("/assets/") ||
+    url.pathname.match(/\.(css|js|woff|woff2|ttf|eot)$/)
   ) {
     event.respondWith(cacheFirstStrategy(request, UI_CACHE))
     return
   }
 
-  // HTML pages - Network First with Cache Fallback (for fresh content)
-  if (request.destination === "document" || url.pathname.endsWith(".html")) {
-    event.respondWith(networkFirstStrategy(request, UI_CACHE))
+  // Images in UI - Network First (don't cache aggressively)
+  if (
+    request.destination === "image" ||
+    url.pathname.match(/\.(png|jpg|jpeg|gif|svg|webp|ico)$/)
+  ) {
+    event.respondWith(networkFirstWithTimeout(request, DYNAMIC_CACHE, 3000))
     return
   }
 
-  // Dynamic content - Stale While Revalidate
-  event.respondWith(staleWhileRevalidateStrategy(request, DYNAMIC_CACHE))
+  // HTML pages - Network First
+  if (request.destination === "document" || url.pathname.endsWith(".html")) {
+    event.respondWith(networkFirstWithTimeout(request, DYNAMIC_CACHE, 5000))
+    return
+  }
+
+  // Everything else - Network only (don't cache)
+  event.respondWith(fetch(request))
 })
 
-// New image cache strategy
-async function imageCacheStrategy(request, cacheName) {
+// Lazy Image Cache Strategy - Only cache on first successful load
+async function lazyImageCacheStrategy(request, cacheName, maxAge) {
   const cache = await caches.open(cacheName)
   const cached = await cache.match(request)
 
+  // Check if cache is still valid
   if (cached) {
-    console.log(`[Service Worker] Image from cache (${cacheName}):`, request.url)
-    return cached
+    const dateHeader = cached.headers.get('sw-cache-date')
+    if (dateHeader) {
+      const cacheDate = new Date(dateHeader).getTime()
+      const now = Date.now()
+      
+      if (now - cacheDate < maxAge) {
+        console.log(`[Service Worker] Image from cache (${cacheName}):`, request.url)
+        
+        // Update in background without blocking
+        fetch(request)
+          .then(async (response) => {
+            if (response.ok && response.status === 200) {
+              const newResponse = new Response(response.body, {
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers
+              })
+              newResponse.headers.append('sw-cache-date', new Date().toISOString())
+              await cache.put(request, newResponse)
+            }
+          })
+          .catch(() => {}) // Ignore background update errors
+        
+        return cached
+      } else {
+        // Cache expired, delete it
+        await cache.delete(request)
+      }
+    }
   }
 
+  // Fetch from network
   try {
-    console.log(`[Service Worker] Fetching image for ${cacheName}:`, request.url)
     const response = await fetch(request)
     
     if (response.ok && response.status === 200) {
+      // Cache in background, don't block response
       const responseToCache = response.clone()
-      cache.put(request, responseToCache)
-      console.log(`[Service Worker] Image cached in ${cacheName}:`, request.url)
+      
+      // Don't await - cache asynchronously
+      cacheResponse(cache, request, responseToCache)
     }
     
     return response
   } catch (error) {
     console.error(`[Service Worker] Image fetch failed (${cacheName}):`, error)
+    
+    // Return cached version even if expired as fallback
+    if (cached) {
+      return cached
+    }
+    
     return new Response("Image not available", { 
       status: 503,
       headers: { "Content-Type": "text/plain" }
@@ -180,121 +198,78 @@ async function imageCacheStrategy(request, cacheName) {
   }
 }
 
-// Profile Cache Strategy - Cache First with long expiration
-async function profileCacheStrategy(request, cacheName) {
-  const cache = await caches.open(cacheName)
-  const cached = await cache.match(request)
-
-  // Return cached profile if exists
-  if (cached) {
-    console.log("[Service Worker] Profile from cache:", request.url)
-    
-    // Update in background (optional - for fresh data)
-    fetch(request)
-      .then((response) => {
-        if (response.ok && response.status === 200) {
-          cache.put(request, response.clone())
-          console.log("[Service Worker] Profile updated in cache:", request.url)
-        }
-      })
-      .catch(() => {
-        // Ignore background update errors
-      })
-    
-    return cached
-  }
-
-  // Fetch and cache if not in cache
+// Helper function to cache response asynchronously
+async function cacheResponse(cache, request, response) {
   try {
-    console.log("[Service Worker] Fetching profile:", request.url)
-    const response = await fetch(request)
-    
-    if (response.ok && response.status === 200) {
-      const responseToCache = response.clone()
-      cache.put(request, responseToCache)
-      console.log("[Service Worker] Profile cached:", request.url)
-    }
-    
-    return response
+    const newResponse = new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers
+    })
+    newResponse.headers.append('sw-cache-date', new Date().toISOString())
+    await cache.put(request, newResponse)
+    console.log("[Service Worker] Cached in background:", request.url)
   } catch (error) {
-    console.error("[Service Worker] Profile fetch failed:", error)
-    return new Response("Profile not available", { status: 503 })
+    console.warn("[Service Worker] Failed to cache:", error)
   }
 }
 
-// Cache First Strategy - Try cache first, then network
-async function cacheFirstStrategy(request, cacheName) {
+// Network First with Timeout - Don't wait too long for network
+async function networkFirstWithTimeout(request, cacheName, timeout = 3000) {
   const cache = await caches.open(cacheName)
-  const cached = await cache.match(request)
-
-  if (cached) {
-    console.log("[Service Worker] Serving from cache:", request.url)
-    return cached
-  }
-
+  
   try {
-    console.log("[Service Worker] Fetching and caching:", request.url)
-    const response = await fetch(request)
+    // Race between fetch and timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeout)
+    
+    const response = await fetch(request, { signal: controller.signal })
+    clearTimeout(timeoutId)
+    
     if (response.ok) {
-      cache.put(request, response.clone())
+      // Cache in background
+      cache.put(request, response.clone()).catch(() => {})
     }
     return response
   } catch (error) {
-    console.error("[Service Worker] Fetch failed:", error)
-    // Return offline page for documents
-    if (request.destination === "document") {
-      return cache.match("/offline.html") || new Response("Offline", { status: 503 })
-    }
-    return new Response("Offline", { status: 503 })
-  }
-}
-
-// Network First Strategy - Try network first, fallback to cache
-async function networkFirstStrategy(request, cacheName) {
-  const cache = await caches.open(cacheName)
-
-  try {
-    const response = await fetch(request)
-    if (response.ok) {
-      console.log("[Service Worker] Network response, updating cache:", request.url)
-      cache.put(request, response.clone())
-    }
-    return response
-  } catch (error) {
-    console.log("[Service Worker] Network failed, trying cache:", request.url)
+    // Network failed or timed out, try cache
     const cached = await cache.match(request)
     if (cached) {
+      console.log("[Service Worker] Network timeout/failed, using cache:", request.url)
       return cached
     }
     
-    // Return offline page for documents
+    // Return error response
     if (request.destination === "document") {
       return cache.match("/offline.html") || new Response("Offline", { status: 503 })
     }
     
-    return new Response(JSON.stringify({ error: "Offline" }), {
+    return new Response(JSON.stringify({ error: "Network unavailable" }), {
       status: 503,
       headers: { "Content-Type": "application/json" },
     })
   }
 }
 
-// Stale While Revalidate Strategy - Return cache immediately, update in background
-async function staleWhileRevalidateStrategy(request, cacheName) {
+// Cache First Strategy - For static assets only
+async function cacheFirstStrategy(request, cacheName) {
   const cache = await caches.open(cacheName)
   const cached = await cache.match(request)
 
-  const fetchPromise = fetch(request)
-    .then((response) => {
-      if (response.ok) {
-        console.log("[Service Worker] Background update:", request.url)
-        cache.put(request, response.clone())
-      }
-      return response
-    })
-    .catch(() => cached)
+  if (cached) {
+    return cached
+  }
 
-  return cached || fetchPromise
+  try {
+    const response = await fetch(request)
+    if (response.ok) {
+      cache.put(request, response.clone()).catch(() => {})
+    }
+    return response
+  } catch (error) {
+    console.error("[Service Worker] Fetch failed:", error)
+    return new Response("Offline", { status: 503 })
+  }
 }
 
 // Background sync for failed requests
@@ -330,22 +305,25 @@ self.addEventListener("notificationclick", (event) => {
 
 // Message handler for cache management
 self.addEventListener("message", (event) => {
-  // Clear all UI cache
-  if (event.data && event.data.type === "CLEAR_UI_CACHE") {
+  // Clear specific cache
+  if (event.data && event.data.type === "CLEAR_CACHE") {
+    const cacheName = event.data.cacheName
     event.waitUntil(
-      caches.delete(UI_CACHE).then(() => {
-        console.log("[Service Worker] UI cache cleared")
-        return caches.open(UI_CACHE)
+      caches.delete(cacheName).then(() => {
+        console.log(`[Service Worker] Cache cleared: ${cacheName}`)
       })
     )
   }
   
-  // Clear profile cache
-  if (event.data && event.data.type === "CLEAR_PROFILE_CACHE") {
+  // Clear all image caches
+  if (event.data && event.data.type === "CLEAR_IMAGE_CACHES") {
     event.waitUntil(
-      caches.delete(PROFILE_CACHE).then(() => {
-        console.log("[Service Worker] Profile cache cleared")
-        return caches.open(PROFILE_CACHE)
+      Promise.all([
+        caches.delete(PROFILE_CACHE),
+        caches.delete(LANDING_CACHE),
+        caches.delete(GALLERY_CACHE)
+      ]).then(() => {
+        console.log("[Service Worker] All image caches cleared")
       })
     )
   }
@@ -371,4 +349,43 @@ self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting()
   }
+  
+  // Prefetch images (only when explicitly requested)
+  if (event.data && event.data.type === "PREFETCH_IMAGES") {
+    const urls = event.data.urls || []
+    event.waitUntil(prefetchImages(urls))
+  }
 })
+
+// Prefetch images only when requested
+async function prefetchImages(urls) {
+  console.log(`[Service Worker] Prefetching ${urls.length} images...`)
+  const cache = await caches.open(PROFILE_CACHE)
+  
+  // Prefetch in batches of 5 to avoid overwhelming the network
+  const batchSize = 5
+  for (let i = 0; i < urls.length; i += batchSize) {
+    const batch = urls.slice(i, i + batchSize)
+    await Promise.allSettled(
+      batch.map(async (url) => {
+        try {
+          const response = await fetch(url)
+          if (response.ok) {
+            const newResponse = new Response(response.body, {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers
+            })
+            newResponse.headers.append('sw-cache-date', new Date().toISOString())
+            await cache.put(url, newResponse)
+          }
+        } catch (error) {
+          console.warn(`[Service Worker] Prefetch failed for ${url}:`, error)
+        }
+      })
+    )
+    // Small delay between batches
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+  console.log("[Service Worker] Prefetch completed")
+}

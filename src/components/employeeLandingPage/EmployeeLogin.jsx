@@ -142,41 +142,39 @@ export default function EmployeeLogin() {
   useEffect(() => {
   const loadCarouselImages = async () => {
     try {
-      setIsLoadingImages(true)
+      // DON'T set loading state - let UI render immediately
       
       // Get list of images (cached automatically)
       const response = await apiService.profiles.getLandingImages()
       
       if (response.success && response.data.images.length > 0) {
-        // Load each image blob with direct caching
-        const imagePromises = response.data.images.map(async (img, index) => {
-          const blobResult = await apiService.profiles.getLandingImageBlob(img.filename)
-          
-          return {
-            // Use cached blob URL instead of direct server URL
-            url: blobResult.success ? blobResult.url : apiService.profiles.getLandingImageUrl(img.filename),
-            title: defaultCarouselData[index]?.title || "JJC Engineering Works",
-            description: defaultCarouselData[index]?.description || "Excellence in engineering",
-            filename: img.filename, // Keep filename for reference
-            cached: blobResult.success // Track if from cache
+        // Map to URLs immediately without waiting for cache
+        const images = response.data.images.map((img, index) => ({
+          // Use direct server URL first
+          url: apiService.profiles.getLandingImageUrl(img.filename),
+          title: defaultCarouselData[index]?.title || "JJC Engineering Works",
+          description: defaultCarouselData[index]?.description || "Excellence in engineering",
+          filename: img.filename
+        }))
+        
+        // Set images immediately - UI renders right away
+        setCarouselImages(images)
+        
+        // Cache in background without blocking
+        images.forEach(async (img) => {
+          try {
+            await apiService.profiles.getLandingImageBlob(img.filename)
+            console.log(`[Carousel] Cached in background: ${img.filename}`)
+          } catch (error) {
+            console.warn(`[Carousel] Background cache failed: ${img.filename}`)
           }
         })
-        
-        const loadedImages = await Promise.all(imagePromises)
-        setCarouselImages(loadedImages)
-        
-        // Log cache usage
-        const cachedCount = loadedImages.filter(img => img.cached).length
-        console.log(`[Carousel] Loaded ${loadedImages.length} images (${cachedCount} from cache)`)
       } else {
-        // No images available from server
         setCarouselImages([])
       }
     } catch (error) {
       console.error("Error loading carousel images:", error)
       setCarouselImages([])
-    } finally {
-      setIsLoadingImages(false)
     }
   }
 
@@ -361,10 +359,9 @@ export default function EmployeeLogin() {
     navigate("/")
   }
 
-  if (isInitializing || isLoadingImages) {
-    return <GearLoadingSpinner isDarkMode={isDarkMode} />
-  }
-
+if (isInitializing) {
+  return <GearLoadingSpinner isDarkMode={isDarkMode} />
+}
   const currentImage = carouselImages[currentSlide]
 
   return (

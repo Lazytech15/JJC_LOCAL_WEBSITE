@@ -236,5 +236,5 @@ export const getUserRole = (token = null) => {
 // Check if user is super admin
 export const isSuperAdmin = (token = null) => {
   const role = getUserRole(token)
-  return role === "super-admin"
+  return role === "admin"
 }
