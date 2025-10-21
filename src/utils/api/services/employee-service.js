@@ -160,6 +160,14 @@ async getEmployees(params = {}, options = {}) {
   })
 }
 
+ async addEmployeeToEmpList(employeeData) {
+    console.log("[API] Adding employee to emp_list:", employeeData)
+    return this.request("/api/employees", {
+      method: "POST",
+      body: JSON.stringify(employeeData),
+    })
+  }
+
   /**
    * Validate employee data (email, ID, etc.)
    * @param {Object} params - Validation parameters

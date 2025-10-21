@@ -40,70 +40,87 @@ export default function EmployeeLanding() {
 
   // Load landing page images for carousel
     useEffect(() => {
-    const loadCarouselImages = async () => {
-      try {
-        setIsLoadingCarousel(true)
+  const loadCarouselImages = async () => {
+    try {
+      setIsLoadingCarousel(true)
+      
+      const response = await apiService.profiles.getLandingImages()
+      
+      if (response.success && response.data.images.length > 0) {
+        // Return URLs immediately
+        const imageUrls = response.data.images.map(img => 
+          apiService.profiles.getLandingImageUrl(img.filename)
+        )
         
-        // Get list of images (cached automatically)
-        const response = await apiService.profiles.getLandingImages()
+        // Set images right away - no waiting
+        setCarouselImages(imageUrls)
+        setIsLoadingCarousel(false)
         
-        if (response.success && response.data.images.length > 0) {
-          // Load each image blob with direct caching
-          const imagePromises = response.data.images.map(async (img) => {
-            const blobResult = await apiService.profiles.getLandingImageBlob(img.filename)
-            return blobResult.success ? blobResult.url : null
-          })
-          
-          const imageUrls = await Promise.all(imagePromises)
-          const validUrls = imageUrls.filter(url => url !== null)
-          
-          setCarouselImages(validUrls)
-          console.log(`[Landing] Loaded ${validUrls.length} carousel images (cached)`)
-        } else {
-          setCarouselImages([])
-        }
-      } catch (error) {
-        console.error("Error loading carousel images:", error)
+        console.log(`[Landing] Loaded ${imageUrls.length} carousel images`)
+        
+        // Cache in background
+        response.data.images.forEach(async (img) => {
+          try {
+            await apiService.profiles.getLandingImageBlob(img.filename)
+          } catch (error) {
+            console.warn(`[Landing] Background cache failed: ${img.filename}`)
+          }
+        })
+      } else {
         setCarouselImages([])
-      } finally {
         setIsLoadingCarousel(false)
       }
+    } catch (error) {
+      console.error("Error loading carousel images:", error)
+      setCarouselImages([])
+      setIsLoadingCarousel(false)
     }
+  }
 
-    loadCarouselImages()
-  }, [])
+  loadCarouselImages()
+}, [])
 
-  // Load gallery images
-  useEffect(() => {
-    const loadGalleryImages = async () => {
-      try {
-        setIsLoadingGallery(true)
+// 3. UPDATE Gallery images - Same pattern
+useEffect(() => {
+  const loadGalleryImages = async () => {
+    try {
+      setIsLoadingGallery(true)
+      
+      const response = await apiService.profiles.getGalleryImages()
+      
+      if (response.success && response.data.images.length > 0) {
+        // Return URLs immediately
+        const imageUrls = response.data.images.map(img => 
+          apiService.profiles.getGalleryImageUrl(img.filename)
+        )
         
-        // Get list of images (cached automatically)
-        const response = await apiService.profiles.getGalleryImages()
+        // Set images right away
+        setGalleryImages(imageUrls)
+        setIsLoadingGallery(false)
         
-        if (response.success && response.data.images.length > 0) {
-          // Load each image blob with direct caching
-          const imagePromises = response.data.images.map(async (img) => {
-            const blobResult = await apiService.profiles.getGalleryImageBlob(img.filename)
-            return blobResult.success ? blobResult.url : null
-          })
-          
-          const imageUrls = await Promise.all(imagePromises)
-          const validUrls = imageUrls.filter(url => url !== null)
-          
-          setGalleryImages(validUrls)
-          console.log(`[Landing] Loaded ${validUrls.length} gallery images (cached)`)
-        }
-      } catch (error) {
-        console.error("Error loading gallery images:", error)
-      } finally {
+        console.log(`[Landing] Loaded ${imageUrls.length} gallery images`)
+        
+        // Cache in background
+        response.data.images.forEach(async (img) => {
+          try {
+            await apiService.profiles.getGalleryImageBlob(img.filename)
+          } catch (error) {
+            console.warn(`[Gallery] Background cache failed: ${img.filename}`)
+          }
+        })
+      } else {
+        setGalleryImages([])
         setIsLoadingGallery(false)
       }
+    } catch (error) {
+      console.error("Error loading gallery images:", error)
+      setGalleryImages([])
+      setIsLoadingGallery(false)
     }
+  }
 
-    loadGalleryImages()
-  }, [])
+  loadGalleryImages()
+}, [])
 
   // Auto-advance carousel
   useEffect(() => {
