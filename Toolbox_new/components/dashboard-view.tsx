@@ -24,6 +24,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { exportToCSV, exportToXLSX, exportToJSON, prepareExportData, exportLogsToXLSX } from "../lib/export-utils"
 import { EnhancedItemCard } from "./enhanced-item-card"
 import { BulkOperationsBar, useBulkSelection } from "./bulk-operations"
+import useGlobalBarcodeScanner from "../hooks/use-global-barcode-scanner"
+import BarcodeModal from "./barcode-modal"
 
 
 interface DashboardViewProps {
@@ -98,6 +100,10 @@ export function DashboardView({
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   const [isExporting, setIsExporting] = useState(false)
+  // Modal state for global barcode flow
+  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false)
+  const [detectedBarcode, setDetectedBarcode] = useState<string | null>(null)
+  const [detectedProduct, setDetectedProduct] = useState<Product | null>(null)
   const [logs, setLogs] = useState<any[]>([])
   const [useEnhancedCards] = useState(true)
 
@@ -116,6 +122,19 @@ export function DashboardView({
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const { toast } = useToast()
   const { setSearchLoading } = useLoading()
+
+  // Helper: determine if a product is available for adding
+  const isAvailable = (p: Product | null | undefined, qty = 1) => {
+    if (!p) return false
+    // Treat any status string containing "out" (case-insensitive) as unavailable
+    const status = (p.status || '').toString().toLowerCase()
+    if (status.includes('out')) return false
+    if (typeof p.balance === 'number') {
+      if (p.balance <= 0) return false
+      if (qty && p.balance < qty) return false
+    }
+    return true
+  }
 
   // Online/Offline status tracking
   useEffect(() => {
@@ -589,15 +608,14 @@ export function DashboardView({
     if (result.success && result.product) {
       console.log("[Barcode Scanner] Found item:", result.product.name);
       
-      // Check if item is out of stock
-      if (result.product.status === 'out-of-stock' || result.product.balance <= 0) {
-        console.log("[Barcode Scanner] Item is out of stock");
+      // Check availability
+      if (!isAvailable(result.product, 1)) {
+        console.log("[Barcode Scanner] Item is out of stock or insufficient balance");
         toast({
           title: "❌ Out of Stock",
-          description: `${result.product.name} (${barcodeValue}) is currently out of stock and cannot be added to cart`,
+          description: `${result.product?.name || 'Item'} (${barcodeValue}) is currently out of stock or insufficient balance and cannot be added to cart`,
           variant: "destructive",
         });
-        // Clear input after showing error
         setBarcodeInput("");
         return;
       }
@@ -621,6 +639,118 @@ export function DashboardView({
       });
     }
   }, [products, onAddToCart, toast]);
+
+  // Listen for global scanned-barcode events dispatched by GlobalBarcodeListener
+  useEffect(() => {
+    const handler = (e: Event) => {
+      try {
+        const detail = (e as CustomEvent).detail || {}
+
+        // If bulk items payload
+        if (detail.items && Array.isArray(detail.items)) {
+          // Each item is { product: Product, quantity: number }
+          try {
+            const skipped: string[] = []
+            let addedCount = 0
+            detail.items.forEach((li: any) => {
+              if (!li || !li.product) return
+              const p: Product = li.product
+              const qty = Number(li.quantity || 0)
+              if (qty <= 0) return
+
+              if (p.status === 'out-of-stock' || (typeof p.balance === 'number' && p.balance <= 0)) {
+                skipped.push(p.name || String(p.id || 'Unknown'))
+                return
+              }
+
+              onAddToCart(p, qty, true)
+              addedCount++
+            })
+
+            if (skipped.length > 0) {
+              toast({ title: 'Skipped Items', description: `${skipped.length} item(s) were skipped because they are out of stock: ${skipped.join(', ')}`, variant: 'destructive' })
+            }
+
+            if (addedCount > 0) {
+              toast({ title: '✅ Items Added', description: `${addedCount} item(s) added to cart` })
+              window.dispatchEvent(new CustomEvent('toolbox-navigate', { detail: { view: 'cart' } }))
+            }
+          } catch (err) {
+            console.error('Error adding bulk scanned items', err)
+          }
+          return
+        }
+
+        const barcode = String(detail.barcode || '').trim()
+        if (barcode) {
+          processBarcodeSubmit(barcode)
+        }
+      } catch (err) {
+        console.error('scanned-barcode handler error', err)
+      }
+    }
+
+    window.addEventListener('scanned-barcode', handler as EventListener)
+    return () => window.removeEventListener('scanned-barcode', handler as EventListener)
+  }, [processBarcodeSubmit, onAddToCart, toast])
+
+  // When modal triggers add, call onAddToCart
+  const handleModalAdd = useCallback((product: Product, quantity: number) => {
+    // Prevent adding out-of-stock or zero-balance items
+    if (!product) return
+    if (!isAvailable(product, quantity)) {
+      toast({ title: '❌ Cannot Add', description: `${product.name} is out of stock or insufficient balance and was not added`, variant: 'destructive' })
+      return
+    }
+
+    onAddToCart(product, quantity, true)
+    toast({ title: '✅ Item Added', description: `${product.name} x${quantity} added to cart` })
+  }, [onAddToCart, toast])
+
+  // Called by global scanner when a barcode is detected
+  const onGlobalBarcodeDetected = useCallback((barcode: string) => {
+    // Look up product synchronously from loaded products
+    const result = processBarcodeInput(barcode, products)
+    setDetectedBarcode(barcode)
+    setDetectedProduct(result.product ?? null)
+
+    // If modal is already open, append the detected item so continuous scanning accumulates
+      if (isBarcodeModalOpen) {
+      if (result.success && result.product) {
+        // Only queue if the product is available
+        if (isAvailable(result.product, 1)) {
+          window.dispatchEvent(new CustomEvent('scanned-barcode-append', { detail: { item: { product: result.product, quantity: 1 } } }))
+          toast({ title: '✅ Item Queued', description: `${result.product.name} queued for add` })
+        } else {
+          toast({ title: '❌ Not Available', description: `${result.product.name} is out of stock and will not be queued` })
+        }
+      } else {
+        toast({ title: '❌ Not Found', description: `Barcode ${barcode} not found` })
+      }
+      return
+    }
+
+    // Open modal and seed with the first detected product if available
+    setIsBarcodeModalOpen(true)
+    if (result.success && result.product) {
+      // When modal opens it reads detectedProduct via props (we set it above)
+      // Also append immediately so UI shows the item in the list
+      // Use a small timeout to allow modal to initialize
+      setTimeout(() => {
+        const p = result.product
+        if (p) {
+          if (isAvailable(p, 1)) {
+            window.dispatchEvent(new CustomEvent('scanned-barcode-append', { detail: { item: { product: p, quantity: 1 } } }))
+          } else {
+            toast({ title: '❌ Not Available', description: `${p.name} is out of stock and will not be queued` })
+          }
+        }
+      }, 80)
+    }
+  }, [products, isBarcodeModalOpen, toast])
+
+  // Start global scanner
+  useGlobalBarcodeScanner(onGlobalBarcodeDetected, { minLength: 3, interKeyMs: 80 })
 
   // Update local search when header search changes
   useEffect(() => {
@@ -828,6 +958,58 @@ export function DashboardView({
 
   return (
     <div className="flex h-screen bg-background">
+      {/* Global Barcode Modal */}
+      <BarcodeModal
+        open={isBarcodeModalOpen}
+        initialValue={detectedBarcode ?? ''}
+        products={detectedProduct ? [detectedProduct] : []}
+        onClose={() => setIsBarcodeModalOpen(false)}
+        onConfirm={(payload: any) => {
+          // Bulk items payload
+          if (payload && payload.items && Array.isArray(payload.items)) {
+            const skipped: string[] = []
+            const addedCount = payload.items.reduce((acc: number, li: any) => {
+              if (!li || !li.product) return acc
+              const p: Product = li.product
+              const qty = Number(li.quantity || 0)
+              if (qty <= 0) return acc
+
+              // Skip if out-of-stock or zero balance
+              if (p.status === 'out-of-stock' || (typeof p.balance === 'number' && p.balance <= 0)) {
+                skipped.push(p.name || String(p.id || 'Unknown'))
+                return acc
+              }
+
+              onAddToCart(p, qty, true)
+              return acc + 1
+            }, 0)
+
+            if (skipped.length > 0) {
+              toast({ title: 'Skipped Items', description: `${skipped.length} item(s) were skipped because they are out of stock: ${skipped.join(', ')}`, variant: 'destructive' })
+            }
+
+            if (addedCount > 0) {
+              // Open cart view only if at least one item was added
+              window.dispatchEvent(new CustomEvent('toolbox-navigate', { detail: { view: 'cart' } }))
+            }
+
+            return
+          }
+
+          // Single barcode payload
+          const barcodeValue = String(payload?.barcode || '').trim()
+          const qty = Number(payload?.quantity || 1)
+          if (barcodeValue) {
+            if (detectedProduct) {
+              handleModalAdd(detectedProduct, qty)
+              // after adding, open cart
+              window.dispatchEvent(new CustomEvent('toolbox-navigate', { detail: { view: 'cart' } }))
+            } else {
+              processBarcodeSubmit(barcodeValue)
+            }
+          }
+        }}
+      />
       {/* Mobile Sidebar Overlay */}
       {isMobileSidebarOpen && (
         <>
@@ -843,7 +1025,7 @@ export function DashboardView({
             <div className="p-6 border-b border-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
+                  <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
                     <Filter className="w-4 h-4 text-white" />
                   </div>
                   <div>
@@ -869,7 +1051,7 @@ export function DashboardView({
               <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <div className="w-5 h-5 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
+                    <div className="w-5 h-5 bg-linear-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
                       <Wifi className="w-3 h-3 text-white" />
                     </div>
                     System Status
@@ -928,7 +1110,7 @@ export function DashboardView({
                   className="w-full flex items-center justify-between mb-2 group"
                 >
                   <h3 className="text-xs font-semibold text-foreground flex items-center gap-2">
-                    <div className="w-4 h-4 bg-gradient-to-br from-purple-400 to-pink-500 rounded flex items-center justify-center">
+                    <div className="w-4 h-4 bg-linear-to-br from-purple-400 to-pink-500 rounded flex items-center justify-center">
                       <Filter className="w-2.5 h-2.5 text-white" />
                     </div>
                     Categories
@@ -972,7 +1154,7 @@ export function DashboardView({
               {/* Availability Filters */}
               <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
                 <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-                  <div className="w-5 h-5 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-md flex items-center justify-center">
+                  <div className="w-5 h-5 bg-linear-to-br from-blue-400 to-cyan-500 rounded-md flex items-center justify-center">
                     <Package className="w-3 h-3 text-white" />
                   </div>
                   Availability
@@ -1015,7 +1197,7 @@ export function DashboardView({
           <div className="p-6 border-b border-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
+              <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
                 <Filter className="w-4 h-4 text-white" />
               </div>
               <div>
@@ -1052,7 +1234,7 @@ export function DashboardView({
           <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                <div className="w-5 h-5 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
+                <div className="w-5 h-5 bg-linear-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
                   <Wifi className="w-3 h-3 text-white" />
                 </div>
                 System Status
@@ -1292,12 +1474,12 @@ export function DashboardView({
                               {logs.map((l, idx) => (
                                 <tr key={idx} className={`${idx % 2 === 0 ? 'bg-slate-800/50' : 'bg-slate-700/50'} text-slate-100 hover:bg-slate-600/30 transition-colors`}>
                                   <td className="p-2 align-top border-b border-slate-700/50 w-24">
-                                    <div className="break-words font-medium text-slate-200 text-xs">
+                                    <div className="wrap-break-words font-medium text-slate-200 text-xs">
                                       {l.username}
                                     </div>
                                   </td>
                                   <td className="p-2 align-top border-b border-slate-700/50">
-                                    <div className="break-words text-slate-300 text-xs leading-relaxed">
+                                    <div className="wrap-break-words text-slate-300 text-xs leading-relaxed">
                                       {l.details}
                                     </div>
                                   </td>
@@ -1334,7 +1516,7 @@ export function DashboardView({
           <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                <div className="w-5 h-5 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-md flex items-center justify-center">
+                <div className="w-5 h-5 bg-linear-to-br from-blue-400 to-indigo-500 rounded-md flex items-center justify-center">
                   <Scan className="w-3 h-3 text-white" />
                 </div>
                 Barcode Scanner
@@ -1352,7 +1534,7 @@ export function DashboardView({
                 
                 <Button
                   size="sm"
-                  className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white border-0 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                  className="w-full bg-linear-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white border-0 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
                   onClick={handleBarcodeSubmit}
                   disabled={!barcodeInput.trim()}
                 >
@@ -1373,7 +1555,7 @@ export function DashboardView({
                 className="w-full flex items-center justify-between group hover:bg-muted -mx-1 px-1 py-1 rounded-lg transition-all duration-200"
               >
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-gradient-to-br from-purple-400 to-pink-500 rounded flex items-center justify-center">
+                  <div className="w-4 h-4 bg-linear-to-br from-purple-400 to-pink-500 rounded flex items-center justify-center">
                     <Package className="w-2.5 h-2.5 text-white" />
                   </div>
                   <h3 className="text-xs font-semibold text-foreground">
@@ -1397,7 +1579,7 @@ export function DashboardView({
                       key={category}
                       className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-all duration-200 ${
                         selectedCategory === category
-                          ? "bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-100 dark:to-slate-200 text-white dark:text-slate-900 shadow-sm font-semibold"
+                          ? "bg-linear-to-r from-slate-900 to-slate-800 dark:from-slate-100 dark:to-slate-200 text-white dark:text-slate-900 shadow-sm font-semibold"
                           : "text-foreground hover:bg-muted font-medium"
                       }`}
                       onClick={() => setSelectedCategory(category)}
@@ -1421,7 +1603,7 @@ export function DashboardView({
           <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                <div className="w-5 h-5 bg-gradient-to-br from-emerald-400 to-green-500 rounded-md flex items-center justify-center">
+                <div className="w-5 h-5 bg-linear-to-br from-emerald-400 to-green-500 rounded-md flex items-center justify-center">
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
                 Availability
@@ -1557,11 +1739,24 @@ export function DashboardView({
             onSelectAll={(shouldSelectAll) => selectAll(products.map(p => p.id), shouldSelectAll)}
             onClearSelection={clearSelection}
             onBulkAddToCart={(bulkProducts) => {
-              bulkProducts.forEach(product => onAddToCart(product))
-              toast({
-                title: `Added ${bulkProducts.length} items to cart`,
-                description: `${bulkProducts.length} products were successfully added to your cart.`,
+              const skipped: string[] = []
+              let added = 0
+              bulkProducts.forEach(product => {
+                if (!isAvailable(product)) {
+                  skipped.push(product.name || String(product.id || 'Unknown'))
+                  return
+                }
+                onAddToCart(product)
+                added++
               })
+
+              if (skipped.length > 0) {
+                toast({ title: 'Skipped Items', description: `${skipped.length} item(s) were skipped because they are out of stock: ${skipped.join(', ')}`, variant: 'destructive' })
+              }
+
+              if (added > 0) {
+                toast({ title: `Added ${added} items to cart`, description: `${added} products were successfully added to your cart.` })
+              }
             }}
             onBulkExport={async (selectedProducts, format) => {
               try {
