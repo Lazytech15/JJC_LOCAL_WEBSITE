@@ -192,6 +192,21 @@ export default function HomePage() {
 
   const totalCartItems = cartItems.reduce((sum, item) => sum + item.quantity, 0)
 
+  // Listen for navigation requests from components (e.g., modal requesting to open cart view)
+  useEffect(() => {
+    const navHandler = (e: Event) => {
+      try {
+        const detail = (e as CustomEvent).detail || {}
+        const view = detail.view
+        if (view === 'cart') setCurrentView('cart')
+      } catch (err) {
+        console.error('navigation event handler error', err)
+      }
+    }
+    window.addEventListener('toolbox-navigate', navHandler as EventListener)
+    return () => window.removeEventListener('toolbox-navigate', navHandler as EventListener)
+  }, [])
+
   // Check if we have cached data available
   const offlineData = getOfflineData()
   const hasCachedData = offlineData.products.length > 0
