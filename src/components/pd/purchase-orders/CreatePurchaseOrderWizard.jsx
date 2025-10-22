@@ -14,6 +14,21 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   const [supplierLookup, setSupplierLookup] = useState({})
   const [availableItems, setAvailableItems] = useState([])
   const [poPrefix, setPoPrefix] = useState("")
+  // Unit of measure options populated from /api/items (unique values)
+  const [unitOptions, setUnitOptions] = useState([])
+
+  // Close any open unit dropdowns when clicking outside
+  useEffect(() => {
+    const handleDocClick = () => {
+      setFormData(prev => ({
+        ...prev,
+        selectedItems: (prev.selectedItems || []).map(i => ({ ...i, unit_dropdown_open: false }))
+      }))
+    }
+
+    document.addEventListener('click', handleDocClick)
+    return () => document.removeEventListener('click', handleDocClick)
+  }, [])
   
   // Form data
   const [formData, setFormData] = useState({
@@ -156,6 +171,19 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         }
 
         setSuppliers(suppliersList)
+        // Derive unique unit_of_measure values from all items and set as options
+        try {
+          const units = Array.from(new Set(allItems.map(i => (i.unit_of_measure || '').trim()).filter(u => u))).sort()
+          // Add a couple sensible defaults if none present
+          if (units.length === 0) {
+            setUnitOptions(['pcs', 'sets', 'box'])
+          } else {
+            setUnitOptions(units)
+          }
+          console.log('Unit options initialized:', units)
+        } catch (err) {
+          console.warn('Failed to derive unit options', err)
+        }
       }
       
       // Fetch PO prefix (MMYY) using apiService
@@ -229,6 +257,19 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         
         console.log(`Items needing restock from ${supplier}:`, filteredItems.length)
         setAvailableItems(filteredItems)
+        // Update unit options from this fetch too (merge with existing)
+        try {
+          const units = Array.from(new Set(allItems.map(i => (i.unit_of_measure || '').trim()).filter(u => u))).sort()
+          if (units.length > 0) {
+            // Merge while preserving existing order (simple union)
+            setUnitOptions(prev => {
+              const set = new Set([...(prev || []), ...units])
+              return Array.from(set)
+            })
+          }
+        } catch (err) {
+          console.warn('Failed to update unit options from supplier items', err)
+        }
       }
     } catch (err) {
       console.error("Error fetching supplier items:", err)
@@ -374,8 +415,13 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         item_name: item.item_name,
         description: item.description || "",
         quantity: 1,
-        unit: "pcs",
-        price_per_unit: Number(item.price_per_unit) || 0,
+        // Prefer unit recorded on the item; fallback to first known option or pcs
+        unit: (item.unit_of_measure && String(item.unit_of_measure).trim()) || (unitOptions && unitOptions[0]) || 'pcs',
+        // If the unit is not in unitOptions, treat it as a custom unit
+        custom_unit_active: !!(item.unit_of_measure && unitOptions && !unitOptions.includes(String(item.unit_of_measure).trim())),
+  custom_unit_value: item.unit_of_measure && String(item.unit_of_measure).trim() || '',
+  unit_dropdown_open: false,
+  price_per_unit: Number(item.price_per_unit) || 0,
         amount: Number(item.price_per_unit) || 0
       }]
     }))
@@ -394,18 +440,42 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       selectedItems: prev.selectedItems.map(item => {
         if (item.item_no === itemNo) {
           // Convert numeric fields to numbers
-          let processedValue = value
+          let updated = { ...item }
+
           if (field === 'quantity' || field === 'price_per_unit') {
-            processedValue = Number(value) || 0
-          }
-          
-          const updated = { ...item, [field]: processedValue }
-          
-          // Recalculate amount if quantity or price changes
-          if (field === 'quantity' || field === 'price_per_unit') {
+            updated[field] = Number(value) || 0
             updated.amount = (Number(updated.quantity) || 0) * (Number(updated.price_per_unit) || 0)
+            return updated
           }
-          
+
+          // Handle toggling custom unit active flag
+          if (field === 'custom_unit_active') {
+            updated.custom_unit_active = !!value
+            // if deactivating custom unit and no custom_unit_value, clear custom unit
+            if (!updated.custom_unit_active) {
+              updated.custom_unit_value = ''
+            }
+            return updated
+          }
+
+          if (field === 'custom_unit_value') {
+            updated.custom_unit_value = value
+            updated.unit = value // keep unit in sync
+            return updated
+          }
+
+          if (field === 'unit') {
+            // If value is a known option, ensure custom flag is false
+            updated.unit = value
+            if (unitOptions && unitOptions.includes(value)) {
+              updated.custom_unit_active = false
+              updated.custom_unit_value = ''
+            }
+            return updated
+          }
+
+          // Fallback for other fields
+          updated[field] = value
           return updated
         }
         return item
@@ -566,7 +636,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         items: formData.selectedItems.map(item => ({
           item_no: item.item_no,
           quantity: item.quantity,
-          unit: item.unit,
+          unit: item.custom_unit_active ? (item.custom_unit_value || item.unit) : item.unit,
           price_per_unit: item.price_per_unit
         })),
         overwrite_existing: overwriteExisting
@@ -836,7 +906,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
                     {/* Selected Items */}
                     {formData.selectedItems.length > 0 && (
-                      <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 overflow-hidden">
+                      <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 overflow-visible">
                         <div className="bg-gray-50 dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                           <h4 className="font-semibold text-gray-900 dark:text-gray-100">
                             Selected Items ({formData.selectedItems.length})
@@ -869,16 +939,66 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                     </div>
                                     <div>
                                       <label className="text-xs text-gray-600 dark:text-gray-400">Unit</label>
-                                      <select
-                                        value={item.unit}
-                                        onChange={(e) => handleUpdateItem(item.item_no, 'unit', e.target.value)}
-                                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded
-                                          bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
-                                      >
-                                        <option value="pcs">pcs</option>
-                                        <option value="pc5">pc5</option>
-                                        <option value="sets">sets</option>
-                                      </select>
+                                      <div className="relative" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleUpdateItem(item.item_no, 'unit_dropdown_open', !item.unit_dropdown_open)
+                                          }}
+                                          className="w-full text-left px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                                        >
+                                          {item.unit || (item.custom_unit_active ? item.custom_unit_value || 'Other' : 'Select unit')}
+                                        </button>
+
+                                        {item.unit_dropdown_open && (
+                                          <ul
+                                            className="absolute z-40 left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded shadow-lg overflow-y-auto"
+                                            style={{ maxHeight: '9rem' }}
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            {(unitOptions && unitOptions.length > 0 ? unitOptions : ['pcs','sets']).map(u => (
+                                              <li
+                                                key={u}
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  handleUpdateItem(item.item_no, 'custom_unit_active', false)
+                                                  handleUpdateItem(item.item_no, 'unit', u)
+                                                  handleUpdateItem(item.item_no, 'unit_dropdown_open', false)
+                                                }}
+                                                className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-900 dark:text-gray-100"
+                                              >
+                                                {u}
+                                              </li>
+                                            ))}
+                                            <li
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleUpdateItem(item.item_no, 'custom_unit_active', true)
+                                                handleUpdateItem(item.item_no, 'unit', item.custom_unit_value || '')
+                                                handleUpdateItem(item.item_no, 'unit_dropdown_open', false)
+                                              }}
+                                              className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-900 dark:text-gray-100"
+                                            >
+                                              Other (specify)
+                                            </li>
+                                          </ul>
+                                        )}
+
+                                        {item.custom_unit_active && (
+                                          <input
+                                            type="text"
+                                            value={item.custom_unit_value || item.unit || ''}
+                                            onChange={(e) => {
+                                              handleUpdateItem(item.item_no, 'custom_unit_value', e.target.value)
+                                              // keep unit in sync with custom value for downstream usage
+                                              handleUpdateItem(item.item_no, 'unit', e.target.value)
+                                            }}
+                                            placeholder="Enter custom unit (e.g., rolls, liters)"
+                                            className="mt-2 w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                                          />
+                                        )}
+                                      </div>
                                     </div>
                                     <div>
                                       <label className="text-xs text-gray-600 dark:text-gray-400">Price/Unit</label>
