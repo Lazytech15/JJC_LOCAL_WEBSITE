@@ -16,6 +16,7 @@ function PurchaseOrderTracker() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
+  // Reuse CreatePurchaseOrderWizard for editing by passing editingOrder prop
   const [restockItems, setRestockItems] = useState([])
   
   // Sorting state
@@ -243,6 +244,7 @@ function PurchaseOrderTracker() {
       notes: "",
       priority: "normal"
     })
+    setSelectedOrder(null)
     setShowCreateModal(true)
   }
 
@@ -496,6 +498,15 @@ function PurchaseOrderTracker() {
     setShowOrderDetails(true)
   }
 
+  // Open edit modal and prefill form
+  const handleOpenEdit = (order) => {
+    // Open the create wizard in editing mode with the selected order
+    setSelectedOrder(order)
+    setShowCreateModal(true)
+  }
+
+  // Note: editing uses CreatePurchaseOrderWizard by passing `editingOrder={selectedOrder}`
+
   const handleDeleteOrder = async (orderId) => {
     if (window.confirm("Are you sure you want to delete this purchase order? This action cannot be undone.")) {
       try {
@@ -692,6 +703,12 @@ function PurchaseOrderTracker() {
                         PDF
                       </button>
                       <button
+                        onClick={() => handleOpenEdit(order)}
+                        className="px-3 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-xs font-medium transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
                         onClick={() => handleExportExcel(order)}
                         className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs font-medium transition-colors"
                       >
@@ -723,7 +740,10 @@ function PurchaseOrderTracker() {
         isOpen={showCreateModal}
         onClose={() => { setShowCreateModal(false) }}
         onSuccess={(msg) => { handleWizardSuccess(msg); }}
+        editingOrder={selectedOrder}
       />
+
+      {/* Editing uses CreatePurchaseOrderWizard - open create modal with editingOrder prop */}
 
       {/* Order Details Modal */}
       {showOrderDetails && selectedOrder && (
@@ -736,14 +756,22 @@ function PurchaseOrderTracker() {
                   <h3 className="text-2xl font-bold text-white">Purchase Order Details</h3>
                   <p className="text-blue-100 text-sm mt-1">{selectedOrder.id}</p>
                 </div>
-                <button
-                  onClick={() => setShowOrderDetails(false)}
-                  className="text-white hover:text-blue-200 transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => handleOpenEdit(selectedOrder)}
+                    className="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-black rounded text-xs font-medium transition-colors"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => setShowOrderDetails(false)}
+                    className="text-white hover:text-blue-200 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               {/* Scrollable Content */}
@@ -811,7 +839,7 @@ function PurchaseOrderTracker() {
                           </thead>
                           <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
                             {selectedOrder.items.map((item, idx) => (
-                              <tr key={item.item_no} className={idx % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800/50'}>
+                              <tr key={`${item.item_no}-${idx}`} className={idx % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800/50'}>
                                 <td className="px-4 py-3">
                                   <div className="font-semibold text-gray-900 dark:text-gray-100">{item.item_name}</div>
                                   <div className="text-xs text-gray-500 dark:text-gray-400">#{item.item_no}</div>

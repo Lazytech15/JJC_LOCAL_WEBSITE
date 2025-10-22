@@ -48,6 +48,10 @@ export class BaseAPIService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
+        // If caller requests to suppress errors, return the parsed error object instead of throwing
+        if (options.suppressErrors) {
+          return { success: false, status: response.status, ...errorData }
+        }
         throw new Error(errorData.message || errorData.error || `HTTP ${response.status}`)
       }
 
