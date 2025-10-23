@@ -106,113 +106,122 @@ function LoginForm() {
   }, [deptSlug, isValidDepartment, navigate])
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+  e.preventDefault()
 
-    if (!isValidDepartment) {
-      setError("Invalid department selected. Please go back and select a valid department.")
-      return
-    }
-
-    setIsLoading(true)
-    setError("")
-
-    if (!formData.username.trim() || !formData.password.trim()) {
-      setError("Please enter both username and password")
-      setIsLoading(false)
-      return
-    }
-
-    try {
-      const authData = await apiService.auth.login({
-        username: formData.username.trim(),
-        password: formData.password,
-        department: departmentName,
-      })
-
-      if (authData.success) {
-        // Check if user has admin access level
-        if (authData.user.access_level !== "admin") {
-          clearTokens()
-          setError("Access denied. Only administrators can log in to this system.")
-          setIsLoading(false)
-          return
-        }
-
-        const userData = {
-          id: authData.user.id,
-          username: authData.user.username,
-          name: authData.user.name,
-          department: departmentName,
-          role: authData.user.role,
-          permissions: authData.user.permissions || [],
-          access_level: authData.user.access_level,
-        }
-        const accessTokenExpiry = rememberMe ? "24h" : "1h"
-        const refreshTokenExpiry = rememberMe ? "7d" : "24h"
-
-        const accessToken =
-          authData.accessToken ||
-          createToken(
-            {
-              id: userData.id,
-              username: userData.username,
-              name: userData.name,
-              department: departmentName,
-              role: userData.role,
-              permissions: userData.permissions,
-              access_level: userData.access_level,
-            },
-            accessTokenExpiry,
-          )
-
-        const refreshToken =
-          authData.refreshToken ||
-          createToken(
-            {
-              id: userData.id,
-              type: "refresh",
-              department: departmentName,
-            },
-            refreshTokenExpiry,
-          )
-
-        storeTokens(accessToken, refreshToken)
-
-        const loginData = {
-          ...userData,
-          loginTime: new Date().toISOString(),
-          tokenExpiry: rememberMe ? "24 hours" : "1 hour",
-          hasValidToken: true,
-        }
-
-        login(loginData, departmentName)
-
-        // FIXED: Navigate to correct route
-        if (departmentName === "superAdmin") {
-          navigate("/jjcewgsaccess/superadmin")
-        } else {
-          const urlSlug = DEPARTMENT_NAME_TO_SLUG[departmentName] || deptSlug
-          navigate(`/jjcewgsaccess/${urlSlug}`)
-        }
-
-        console.log("Login successful with JWT authentication")
-      } else {
-        clearTokens()
-        setError(authData.message || authData.error || "Authentication failed")
-      }
-    } catch (err) {
-      console.error("Authentication error:", err)
-      clearTokens()
-
-      if (err.name === "NetworkError" || !navigator.onLine) {
-        setError("Network connection error. Please check your internet connection.")
-      } else {
-        setError(err.message || "Unable to connect to server. Please try again later.")
-      }
-    } finally {
-      setIsLoading(false)
-    }
+  if (!isValidDepartment) {
+    setError("Invalid department selected. Please go back and select a valid department.")
+    return
   }
+
+  setIsLoading(true)
+  setError("")
+
+  if (!formData.username.trim() || !formData.password.trim()) {
+    setError("Please enter both username and password")
+    setIsLoading(false)
+    return
+  }
+
+  try {
+    const authData = await apiService.auth.login({
+      username: formData.username.trim(),
+      password: formData.password,
+      department: departmentName,
+    })
+
+    if (authData.success) {
+      // ========================================================================
+      // Verify admin access level (double-check on frontend)
+      // Backend already validates this, but we check again for security
+      // ========================================================================
+      if (authData.user.access_level !== "admin") {
+        clearTokens()
+        setError("Access denied. Only administrators can log in to this system.")
+        setIsLoading(false)
+        return
+      }
+
+      const userData = {
+        id: authData.user.id,
+        username: authData.user.username,
+        name: authData.user.name,
+        department: authData.user.department, // User's ACTUAL department
+        loginDepartment: departmentName, // Department they're logging into
+        role: authData.user.role,
+        permissions: authData.user.permissions || [],
+        access_level: authData.user.access_level,
+        isSuperAdmin: authData.user.isSuperAdmin, // True only if admin + superAdmin dept
+      }
+
+      const accessTokenExpiry = rememberMe ? "24h" : "1h"
+      const refreshTokenExpiry = rememberMe ? "7d" : "24h"
+
+      const accessToken =
+        authData.accessToken ||
+        createToken(
+          {
+            id: userData.id,
+            username: userData.username,
+            name: userData.name,
+            department: userData.department, // Use actual department
+            loginDepartment: departmentName, // Track where they logged in
+            role: userData.role,
+            permissions: userData.permissions,
+            access_level: userData.access_level,
+            isSuperAdmin: userData.isSuperAdmin,
+          },
+          accessTokenExpiry,
+        )
+
+      const refreshToken =
+        authData.refreshToken ||
+        createToken(
+          {
+            id: userData.id,
+            type: "refresh",
+            department: userData.department,
+            loginDepartment: departmentName,
+          },
+          refreshTokenExpiry,
+        )
+
+      storeTokens(accessToken, refreshToken)
+
+      const loginData = {
+        ...userData,
+        loginTime: new Date().toISOString(),
+        tokenExpiry: rememberMe ? "24 hours" : "1 hour",
+        hasValidToken: true,
+      }
+
+      login(loginData, departmentName)
+
+      // Navigate to correct route
+      if (departmentName === "superAdmin") {
+        navigate("/jjcewgsaccess/superadmin")
+      } else {
+        const urlSlug = DEPARTMENT_NAME_TO_SLUG[departmentName] || deptSlug
+        navigate(`/jjcewgsaccess/${urlSlug}`)
+      }
+
+      console.log("Login successful with JWT authentication")
+    } else {
+      clearTokens()
+      setError(authData.message || authData.error || "Authentication failed")
+    }
+  } catch (err) {
+    console.error("Authentication error:", err)
+    clearTokens()
+
+    if (err.name === "NetworkError" || !navigator.onLine) {
+      setError("Network connection error. Please check your internet connection.")
+    } else {
+      setError(err.message || "Unable to connect to server. Please try again later.")
+    }
+  } finally {
+    setIsLoading(false)
+  }
+}
 
   const handleInputChange = (e) => {
     setFormData({
