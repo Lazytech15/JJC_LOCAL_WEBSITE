@@ -20,8 +20,8 @@ function PurchaseOrderTracker() {
   const [restockItems, setRestockItems] = useState([])
   
   // Sorting state
-  const [sortField, setSortField] = useState("po_date") // Default sort by date
-  const [sortDirection, setSortDirection] = useState("desc") // desc = latest first
+  const [sortField, setSortField] = useState("priority") // Default sort by priority
+  const [sortDirection, setSortDirection] = useState("desc") // desc = highest first
 
   // Form states
   const [orderForm, setOrderForm] = useState({
@@ -29,7 +29,8 @@ function PurchaseOrderTracker() {
     items: [],
     expected_delivery_date: "",
     notes: "",
-    priority: "normal",
+    // Default to moderate priority
+    priority: "P2",
     multi_supplier_mode: false // New field for handling multiple suppliers
   })
   
@@ -83,6 +84,10 @@ function PurchaseOrderTracker() {
         case "po_date":
           aVal = new Date(a.po_date || 0)
           bVal = new Date(b.po_date || 0)
+          break
+        case "priority":
+          aVal = getPriorityRank(a.priority)
+          bVal = getPriorityRank(b.priority)
           break
         case "total_amount":
           aVal = parseFloat(a.total_amount) || 0
@@ -187,13 +192,39 @@ function PurchaseOrderTracker() {
   }
 
   const getPriorityColor = (priority) => {
-    const colors = {
-      low: "bg-green-100 text-green-800",
-      normal: "bg-blue-100 text-blue-800",
-      high: "bg-red-100 text-red-800",
-      urgent: "bg-purple-100 text-purple-800"
+    // Support new P0..P4 codes; fallback to legacy strings
+    const map = {
+      'P0': 'bg-red-100 text-red-800',    // Critical
+      'P1': 'bg-orange-100 text-orange-800',
+      'P2': 'bg-yellow-100 text-yellow-800',
+      'P3': 'bg-green-100 text-green-800',
+      'P4': 'bg-gray-100 text-gray-800',
+      // legacy
+      low: 'bg-green-100 text-green-800',
+      normal: 'bg-yellow-100 text-yellow-800',
+      high: 'bg-orange-100 text-orange-800',
+      urgent: 'bg-red-100 text-red-800'
     }
-    return colors[priority] || "bg-gray-100 text-gray-800"
+    return map[priority] || 'bg-gray-100 text-gray-800'
+  }
+
+  const getPriorityRank = (priority) => {
+    // Higher number = higher priority for sorting
+    if (!priority) return 0
+    const p = String(priority).toUpperCase()
+    const rankMap = {
+      'P0': 5,
+      'P1': 4,
+      'P2': 3,
+      'P3': 2,
+      'P4': 1,
+      // legacy mapping (in case some rows still use legacy values)
+      'URGENT': 5,
+      'HIGH': 4,
+      'NORMAL': 3,
+      'LOW': 2
+    }
+    return rankMap[p] || 0
   }
 
   const formatCurrency = (amount) => {
@@ -242,7 +273,7 @@ function PurchaseOrderTracker() {
       items: [],
       expected_delivery_date: "",
       notes: "",
-      priority: "normal"
+      priority: "P2"
     })
     setSelectedOrder(null)
     setShowCreateModal(true)
@@ -414,7 +445,7 @@ function PurchaseOrderTracker() {
             items: [],
             expected_delivery_date: "",
             notes: "",
-            priority: "normal",
+            priority: "P2",
             multi_supplier_mode: false
           })
           setOrderSplitMode("single")
@@ -444,7 +475,7 @@ function PurchaseOrderTracker() {
             items: [],
             expected_delivery_date: "",
             notes: "",
-            priority: "normal",
+            priority: "P2",
             multi_supplier_mode: false
           })
           setOrderSplitMode("single")
@@ -621,7 +652,22 @@ function PurchaseOrderTracker() {
                     </div>
                   </div>
                 </th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Priority</th>
+                <th 
+                  onClick={() => handleSort("priority")}
+                  className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-white/20 dark:hover:bg-black/30 transition-colors"
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <span>Priority</span>
+                    <div className="flex flex-col">
+                      <svg className={`w-3 h-3 ${sortField === "priority" && sortDirection === "asc" ? "text-amber-500" : "text-gray-400"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"/>
+                      </svg>
+                      <svg className={`w-3 h-3 -mt-2 ${sortField === "priority" && sortDirection === "desc" ? "text-amber-500" : "text-gray-400"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z"/>
+                      </svg>
+                    </div>
+                  </div>
+                </th>
                 <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Items</th>
                 <th 
                   onClick={() => handleSort("total_amount")}
@@ -674,9 +720,9 @@ function PurchaseOrderTracker() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(order.priority)}`}>
-                      {order.priority}
-                    </span>
+                            <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(order.priority)}`}>
+                              {order.priority?.toUpperCase()}
+                            </span>
                   </td>
                   <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">
                     {order.total_items} ({order.total_quantity} qty)
@@ -738,7 +784,7 @@ function PurchaseOrderTracker() {
       {/* Create Order Wizard */}
       <CreatePurchaseOrderWizard 
         isOpen={showCreateModal}
-        onClose={() => { setShowCreateModal(false) }}
+        onClose={() => { setShowCreateModal(false); setSelectedOrder(null); }}
         onSuccess={(msg) => { handleWizardSuccess(msg); }}
         editingOrder={selectedOrder}
       />

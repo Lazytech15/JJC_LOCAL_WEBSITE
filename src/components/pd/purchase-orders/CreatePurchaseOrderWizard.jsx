@@ -49,6 +49,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     tax_type: "goods", // goods (1%), services (2%), rental (5%)
     has_discount: false,
     discount_percentage: 0,
+  // Priority levels: P0..P4 (P2 = Moderate default)
+  priority: 'P2',
     
     // Step 4 - Details
     attention_person: "",
@@ -254,7 +256,9 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
           prepared_by: po.prepared_by ? (Array.isArray(po.prepared_by) ? po.prepared_by : [po.prepared_by]) : prev.prepared_by,
           verified_by: po.verified_by || prev.verified_by,
           approved_by: po.approved_by || prev.approved_by,
-          notes: po.notes || prev.notes
+          notes: po.notes || prev.notes,
+          // preserve priority when editing if present (support legacy values too)
+          priority: po.priority || po.priority_level || prev.priority
         }))
 
         // If editing, ensure we start at step 2
@@ -684,6 +688,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         supplier_details: formData.supplier_details || null,
         attention_person: formData.attention_person,
         terms: formData.terms,
+        // Priority level included
+        priority: formData.priority,
         po_date: formData.po_date,
         prepared_by: formData.prepared_by.filter(p => p.trim()).join(', '), // Convert array to comma-separated string
         verified_by: formData.verified_by,
@@ -752,6 +758,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       tax_type: "goods",
       has_discount: false,
       discount_percentage: 0,
+      priority: 'P2',
       attention_person: "",
       terms: "",
       po_date: new Date().toISOString().split('T')[0],
@@ -1386,6 +1393,34 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       <p className="text-purple-700 dark:text-purple-300 text-sm">
                         Fill in the required details for the purchase order
                       </p>
+                    </div>
+
+                    {/* Priority Selection (P0 - P4) */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border-2 border-gray-200 dark:border-gray-700">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Priority</label>
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                        {[
+                          { id: 'P0', title: 'P0 (Critical)', desc: 'Immediate emergency response' },
+                          { id: 'P1', title: 'P1 (High)', desc: 'High urgency and impact' },
+                          { id: 'P2', title: 'P2 (Moderate)', desc: 'Moderate urgency (default)' },
+                          { id: 'P3', title: 'P3 (Low)', desc: 'Low urgency' },
+                          { id: 'P4', title: 'P4 (Negligible)', desc: 'No urgency, backlog' }
+                        ].map(option => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, priority: option.id }))}
+                            className={`p-3 rounded-lg border-2 text-left transition-all ${formData.priority === option.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500'}`}>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-semibold text-gray-900 dark:text-gray-100">{option.title}</div>
+                                <div className="text-xs text-gray-600 dark:text-gray-400">{option.desc}</div>
+                              </div>
+                              <div className="text-sm font-bold text-blue-600">{option.id}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-6">
