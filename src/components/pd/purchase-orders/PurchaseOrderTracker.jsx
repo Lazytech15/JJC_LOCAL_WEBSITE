@@ -29,7 +29,8 @@ function PurchaseOrderTracker() {
     items: [],
     expected_delivery_date: "",
     notes: "",
-    priority: "normal",
+    // Default to moderate priority
+    priority: "P2",
     multi_supplier_mode: false // New field for handling multiple suppliers
   })
   
@@ -187,13 +188,20 @@ function PurchaseOrderTracker() {
   }
 
   const getPriorityColor = (priority) => {
-    const colors = {
-      low: "bg-green-100 text-green-800",
-      normal: "bg-blue-100 text-blue-800",
-      high: "bg-red-100 text-red-800",
-      urgent: "bg-purple-100 text-purple-800"
+    // Support new P0..P4 codes; fallback to legacy strings
+    const map = {
+      'P0': 'bg-red-100 text-red-800',    // Critical
+      'P1': 'bg-orange-100 text-orange-800',
+      'P2': 'bg-yellow-100 text-yellow-800',
+      'P3': 'bg-green-100 text-green-800',
+      'P4': 'bg-gray-100 text-gray-800',
+      // legacy
+      low: 'bg-green-100 text-green-800',
+      normal: 'bg-yellow-100 text-yellow-800',
+      high: 'bg-orange-100 text-orange-800',
+      urgent: 'bg-red-100 text-red-800'
     }
-    return colors[priority] || "bg-gray-100 text-gray-800"
+    return map[priority] || 'bg-gray-100 text-gray-800'
   }
 
   const formatCurrency = (amount) => {
@@ -242,7 +250,7 @@ function PurchaseOrderTracker() {
       items: [],
       expected_delivery_date: "",
       notes: "",
-      priority: "normal"
+      priority: "P2"
     })
     setSelectedOrder(null)
     setShowCreateModal(true)
@@ -414,7 +422,7 @@ function PurchaseOrderTracker() {
             items: [],
             expected_delivery_date: "",
             notes: "",
-            priority: "normal",
+            priority: "P2",
             multi_supplier_mode: false
           })
           setOrderSplitMode("single")
@@ -444,7 +452,7 @@ function PurchaseOrderTracker() {
             items: [],
             expected_delivery_date: "",
             notes: "",
-            priority: "normal",
+            priority: "P2",
             multi_supplier_mode: false
           })
           setOrderSplitMode("single")
@@ -674,9 +682,9 @@ function PurchaseOrderTracker() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(order.priority)}`}>
-                      {order.priority}
-                    </span>
+                            <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(order.priority)}`}>
+                              {order.priority?.toUpperCase()}
+                            </span>
                   </td>
                   <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">
                     {order.total_items} ({order.total_quantity} qty)

@@ -119,7 +119,8 @@ function createPurchaseOrder() {
         $po_date = $input['po_date'] ?? date('Y-m-d');
         $items = $input['items'] ?? null;
         $notes = $input['notes'] ?? null;
-        $priority = $input['priority'] ?? 'normal';
+    // Support new priority codes P0..P4 and legacy strings (low, normal, high, urgent)
+    $priority = $input['priority'] ?? 'P2';
         $prepared_by = $input['prepared_by'] ?? null;
         $verified_by = $input['verified_by'] ?? null;
         $approved_by = $input['approved_by'] ?? null;
@@ -148,9 +149,9 @@ function createPurchaseOrder() {
         }
         
         // Validate priority
-        $validPriorities = ['low', 'normal', 'high', 'urgent'];
+        $validPriorities = ['P0','P1','P2','P3','P4','low', 'normal', 'high', 'urgent'];
         if (!empty($priority) && !in_array($priority, $validPriorities)) {
-            sendErrorResponse('Invalid priority. Must be one of: low, normal, high, urgent', 400);
+            sendErrorResponse('Invalid priority. Must be one of: P0,P1,P2,P3,P4 (or legacy: low, normal, high, urgent)', 400);
             return;
         }
         
@@ -372,7 +373,8 @@ function updatePurchaseOrder($id)
         // Basic required validation
         $supplier_name = isset($input['supplier_name']) ? trim($input['supplier_name']) : null;
         $items = isset($input['items']) ? $input['items'] : null;
-        $priority = isset($input['priority']) ? $input['priority'] : 'normal';
+    // Support P0..P4 codes and legacy values
+    $priority = isset($input['priority']) ? $input['priority'] : 'P2';
 
         if (empty($supplier_name)) {
             sendErrorResponse('Supplier name is required', 400);
@@ -384,9 +386,9 @@ function updatePurchaseOrder($id)
             return;
         }
 
-        $validPriorities = ['low', 'normal', 'high', 'urgent'];
+        $validPriorities = ['P0','P1','P2','P3','P4','low', 'normal', 'high', 'urgent'];
         if (!empty($priority) && !in_array($priority, $validPriorities)) {
-            sendErrorResponse('Invalid priority. Must be one of: low, normal, high, urgent', 400);
+            sendErrorResponse('Invalid priority. Must be one of: P0,P1,P2,P3,P4 (or legacy: low, normal, high, urgent)', 400);
             return;
         }
 
