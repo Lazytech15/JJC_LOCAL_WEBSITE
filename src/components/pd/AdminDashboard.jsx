@@ -17,7 +17,7 @@ function AdminDashboard({ onNavigate }) {
   })
   const [analytics, setAnalytics] = useState({
     lowStockItems: [],
-    criticalStockAlerts: [],
+    recentStockAlerts: [],
     monthlyTrends: []
   })
   const [purchaseOrderSummary, setPurchaseOrderSummary] = useState({
@@ -103,19 +103,18 @@ function AdminDashboard({ onNavigate }) {
         .sort((a, b) => (a.balance || 0) - (b.balance || 0))
         .slice(0, 10)
 
-      // Calculate critical stock alerts (items with 0 balance or urgent restocking needed)
-      const criticalStockAlerts = items
+      // Calculate recent stock alerts (most recent items that got out of stock)
+      const recentStockAlerts = items
         .filter(item => {
           const balance = Number(item.balance) || 0
-          const minStock = Number(item.min_stock) || 0
-          return balance === 0 || (minStock > 0 && balance <= minStock * 0.2) // 20% of minimum stock
+          return balance === 0
         })
-        .sort((a, b) => (a.balance || 0) - (b.balance || 0))
+        .sort((a, b) => Number(b.item_no) - Number(a.item_no))
         .slice(0, 5)
 
       setAnalytics({
         lowStockItems,
-        criticalStockAlerts,
+        recentStockAlerts,
         monthlyTrends: []
       })
 
@@ -555,13 +554,13 @@ function AdminDashboard({ onNavigate }) {
           </div>
         </div>
 
-        {/* Critical Stock Alerts */}
+        {/* Recent Stock Alerts */}
         <div className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-xl p-4 border border-white/20 dark:border-gray-700/20">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
-            🚨 <span>Critical Stock Alerts</span>
+            🕒 <span>Recent Stock Alerts</span>
           </h3>
           <div className="space-y-1.5 max-h-96 overflow-y-auto">
-            {analytics.criticalStockAlerts.map((item) => (
+            {analytics.recentStockAlerts.map((item) => (
               <div key={item.item_no} className="p-2.5 bg-red-50/50 dark:bg-red-900/20 rounded-md border border-red-200/30 dark:border-red-800/30">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
@@ -596,7 +595,7 @@ function AdminDashboard({ onNavigate }) {
                 </div>
               </div>
             ))}
-            {analytics.criticalStockAlerts.length === 0 && (
+            {analytics.recentStockAlerts.length === 0 && (
               <div className="text-center py-6 text-green-600 dark:text-green-400">
                 <div className="text-xl mb-1">✅</div>
                 <div className="font-medium text-sm">No critical alerts!</div>

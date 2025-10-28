@@ -471,7 +471,13 @@ function updateEmployeeLog($id) {
             }
         }
 
-        if (count($changed) === 0) {
+        // Handle item corrections with inventory adjustments
+        $itemCorrections = [];
+        if (isset($data['item_corrections']) && is_array($data['item_corrections'])) {
+            $itemCorrections = $data['item_corrections'];
+        }
+
+        if (count($changed) === 0 && count($itemCorrections) === 0) {
             sendErrorResponse('No changes detected', 400);
             return;
         }
@@ -532,21 +538,49 @@ function updateEmployeeLog($id) {
         $insStmt->execute($values);
         $newId = $db->lastInsertId();
 
+        // 3.5) Handle inventory adjustments for item corrections
+        if (count($itemCorrections) > 0) {
+            foreach ($itemCorrections as $correction) {
+                $itemNo = $correction['item_no'];
+                $stockToRestore = $correction['stock_to_restore'];
+                
+                if ($stockToRestore !== 0) {
+                    // Get current item data
+                    $itemStmt = $db->prepare("SELECT out_qty FROM itemsdb WHERE item_no = ?");
+                    $itemStmt->execute([$itemNo]);
+                    $currentItem = $itemStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($currentItem) {
+                        $newOutQty = ($currentItem['out_qty'] ?: 0) - $stockToRestore; // Subtract because we're restoring stock
+                        
+                        // Ensure out_qty doesn't go negative
+                        $newOutQty = max(0, $newOutQty);
+                        
+                        $updateStmt = $db->prepare("UPDATE itemsdb SET out_qty = ? WHERE item_no = ?");
+                        $updateStmt->execute([$newOutQty, $itemNo]);
+                    }
+                }
+            }
+        }
+
         // 4) Insert audit record
-        $auditStmt = $db->prepare("
-            INSERT INTO employee_logs_audit 
-            (original_log_id, new_log_id, admin_id, reason, changes_json, original_json, new_json, created_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-        ");
-        $auditStmt->execute([
-            (int)$id,
-            (int)$newId,
-            (string)$adminId,
-            $reason,
-            json_encode($changed, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
-            json_encode($original, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
-            json_encode($filteredRecord, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
-        ]);
+        $auditColumns = ['original_log_id', 'new_log_id', 'admin_id', 'reason', 'changes_json', 'original_json', 'new_json', 'created_at'];
+        $auditValues = [(int)$id, (int)$newId, (string)$adminId, $reason, 
+                       json_encode($changed, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+                       json_encode($original, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+                       json_encode($filteredRecord, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+                       'NOW()'];
+        
+        if (count($itemCorrections) > 0) {
+            // Check if item_corrections_json column exists
+            $auditColumns[] = 'item_corrections_json';
+            $auditValues[] = json_encode($itemCorrections, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        }
+        
+        $auditPlaceholders = array_fill(0, count($auditColumns), '?');
+        $auditSQL = "INSERT INTO employee_logs_audit (" . implode(", ", $auditColumns) . ") VALUES (" . implode(", ", $auditPlaceholders) . ")";
+        $auditStmt = $db->prepare($auditSQL);
+        $auditStmt->execute($auditValues);
 
         $db->commit();
 
@@ -561,7 +595,8 @@ function updateEmployeeLog($id) {
             'new_id' => (int)$newId,
             'data' => $createdLog,
             'changes' => $changed,
-            'message' => 'Employee log edited and audit recorded'
+            'item_corrections' => count($itemCorrections) > 0 ? $itemCorrections : null,
+            'message' => count($itemCorrections) > 0 ? 'Employee log edited with inventory corrections and audit recorded' : 'Employee log edited and audit recorded'
         ]);
 
     } catch (Exception $e) {

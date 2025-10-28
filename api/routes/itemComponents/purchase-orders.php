@@ -105,6 +105,22 @@ function getPurchaseOrder($id) {
     }
 }
 
+// Temporary mapping function to convert P-codes to legacy values for DB compatibility
+function mapPriorityToLegacy($priority) {
+    $map = [
+        'P0' => 'low',
+        'P1' => 'low', // P1 not used, map to low
+        'P2' => 'normal',
+        'P3' => 'high',
+        'P4' => 'urgent'
+    ];
+    // If it's already a legacy value, return as-is; otherwise map P-code or default to 'normal'
+    return isset($map[$priority]) ? $map[$priority] : (in_array($priority, ['low', 'normal', 'high', 'urgent']) ? $priority : 'normal');
+}
+
+// NOTE: Temporary workaround - map P-codes to legacy values for DB constraint compatibility.
+// Once DB is migrated to accept P-codes, we can store them directly.
+
 function createPurchaseOrder() {
     try {
         $db = getConnection();
@@ -121,6 +137,9 @@ function createPurchaseOrder() {
         $notes = $input['notes'] ?? null;
     // Support new priority codes P0..P4 and legacy strings (low, normal, high, urgent)
     $priority = $input['priority'] ?? 'P2';
+
+    // Store the new priority codes (P0..P4) directly in the DB
+    $dbPriority = $priority;
         $prepared_by = $input['prepared_by'] ?? null;
         $verified_by = $input['verified_by'] ?? null;
         $approved_by = $input['approved_by'] ?? null;
@@ -287,7 +306,7 @@ function createPurchaseOrder() {
                 $totalValue,
                 $notes,
                 $terms,
-                $priority,
+                $dbPriority,
                 $prepared_by,
                 $verified_by,
                 $approved_by,
@@ -375,6 +394,9 @@ function updatePurchaseOrder($id)
         $items = isset($input['items']) ? $input['items'] : null;
     // Support P0..P4 codes and legacy values
     $priority = isset($input['priority']) ? $input['priority'] : 'P2';
+
+    // Store the new priority codes (P0..P4) directly
+    $dbPriority = $priority;
 
         if (empty($supplier_name)) {
             sendErrorResponse('Supplier name is required', 400);
@@ -518,7 +540,7 @@ function updatePurchaseOrder($id)
             $totalValue,
             $input['notes'] ?? null,
             $input['terms'] ?? null,
-            $priority,
+            $dbPriority,
             $input['prepared_by'] ?? null,
             $input['verified_by'] ?? null,
             $input['approved_by'] ?? null,
