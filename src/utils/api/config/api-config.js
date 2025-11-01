@@ -3,7 +3,7 @@
 // ============================================================================
 export const API_ENDPOINTS = {
 
-  public: "http://qxw.2ee.mytemp.website",
+  public: "https://jjcenggworks.com",
 }
 
 export const DEFAULT_HEADERS = {

@@ -57,7 +57,7 @@ export interface EnvConfig {
 
 export const env: Readonly<EnvConfig> = {
   // API Configuration
-  API_BASE_URL: getEnvVar('NEXT_PUBLIC_API_BASE_URL') || 'http://qxw.2ee.mytemp.website',
+  API_BASE_URL: getEnvVar('NEXT_PUBLIC_API_BASE_URL') || 'https://jjcenggworks.com',
   API_TIMEOUT: parseInt(getEnvVar('NEXT_PUBLIC_API_TIMEOUT') || '15000'),
   
   // App Configuration
