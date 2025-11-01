@@ -259,19 +259,20 @@ async function cacheFirstStrategy(request, cacheName) {
   }
 }
 
-// Network First Strategy - Try network first, fallback to cache with timeout
-async function networkFirstWithTimeout(request, cacheName, timeout = 5000) {
+// Network First Strategy - Try network first, fallback to cache
+// Accepts a timeout parameter (ms) to abort the fetch if it takes too long
+async function networkFirstStrategy(request, cacheName, timeout = 5000) {
   const cache = await caches.open(cacheName)
-  
+
   try {
     // Race between fetch and timeout
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeout)
-    
+
     const response = await fetch(request, { signal: controller.signal })
     clearTimeout(timeoutId)
-    
-    if (response.ok) {
+
+    if (response && response.ok) {
       // Cache in background
       cache.put(request, response.clone()).catch(() => {})
     }
@@ -283,12 +284,12 @@ async function networkFirstWithTimeout(request, cacheName, timeout = 5000) {
       console.log("[Service Worker] Network timeout/failed, using cache:", request.url)
       return cached
     }
-    
+
     // Return error response
     if (request.destination === "document") {
       return cache.match("/offline.html") || new Response("Offline", { status: 503 })
     }
-    
+
     return new Response(JSON.stringify({ error: "Network unavailable" }), {
       status: 503,
       headers: { "Content-Type": "application/json" },
@@ -296,41 +297,9 @@ async function networkFirstWithTimeout(request, cacheName, timeout = 5000) {
   }
 }
 
-// Network First Strategy - Try network first, fallback to cache (deprecated, use networkFirstWithTimeout)
-async function networkFirstStrategy(request, cacheName) {
-  const cache = await caches.open(cacheName)
-  
-  try {
-    // Race between fetch and timeout
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), timeout)
-    
-    const response = await fetch(request, { signal: controller.signal })
-    clearTimeout(timeoutId)
-    
-    if (response.ok) {
-      // Cache in background
-      cache.put(request, response.clone()).catch(() => {})
-    }
-    return response
-  } catch (error) {
-    // Network failed or timed out, try cache
-    const cached = await cache.match(request)
-    if (cached) {
-      console.log("[Service Worker] Network timeout/failed, using cache:", request.url)
-      return cached
-    }
-    
-    // Return error response
-    if (request.destination === "document") {
-      return cache.match("/offline.html") || new Response("Offline", { status: 503 })
-    }
-    
-    return new Response(JSON.stringify({ error: "Network unavailable" }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    })
-  }
+// Wrapper used by the fetch handler for clearer naming; preserved for backward compatibility
+async function networkFirstWithTimeout(request, cacheName, timeoutMs) {
+  return networkFirstStrategy(request, cacheName, timeoutMs)
 }
 
 // Cache First Strategy - For static assets only

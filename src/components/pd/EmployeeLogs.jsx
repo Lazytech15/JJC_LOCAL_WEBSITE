@@ -380,18 +380,32 @@ function EmployeeLogs() {
     const detailsText = log?.details ? log.details.trim() : ''
     const lowerDetails = detailsText.toLowerCase()
     const hasCheckoutText = lowerDetails.includes('checkout')
+    
     // If there are associated items, render a full, detailed item list inline with details.
     if (items && items.length > 0) {
       return (
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white text-lg">📦</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                <span className="text-white text-lg">📦</span>
+              </div>
+              <div>
+                <div className="font-semibold text-blue-900 dark:text-blue-100">{items.length} Item{items.length > 1 ? 's' : ''} Referenced</div>
+                <div className="text-sm text-slate-500 dark:text-slate-400">Below are the referenced item(s) with quantities and edit options.</div>
+              </div>
             </div>
-            <div>
-              <div className="font-semibold text-blue-900 dark:text-blue-100">{items.length} Item{items.length > 1 ? 's' : ''} Referenced</div>
-              <div className="text-sm text-slate-500 dark:text-slate-400">Below are the referenced item(s) with full metadata.</div>
-            </div>
+            {hasCheckoutText && (
+              <button
+                onClick={() => handleEditCheckoutItems(log, items)}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-all font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit Quantities
+              </button>
+            )}
           </div>
 
           <div className="grid gap-3">
@@ -416,7 +430,9 @@ function EmployeeLogs() {
                   <div className="ml-4 text-right">
                     <div className="text-lg font-bold text-green-600 dark:text-green-400">₱{it.price_per_unit ? Number(it.price_per_unit).toFixed(2) : '0.00'}</div>
                     <div className="text-xs text-slate-500 dark:text-slate-400">per unit</div>
-                    {it.quantity && <div className="text-xs text-slate-500 mt-1">Qty: {it.quantity}</div>}
+                    <div className="text-sm font-semibold text-blue-600 dark:text-blue-400 mt-1">
+                      Qty: {it.quantity || 1}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -590,6 +606,12 @@ function EmployeeLogs() {
     }))
   }
 
+  const handleEditCheckoutItems = (log, items) => {
+    // Open a new edit wizard specifically for checkout item quantities
+    setEditTargetLog({...log, items: items}) // Pass items with the log
+    setIsEditWizardOpen(true)
+  }
+
   const totalPages = Math.ceil(totalLogs / logsPerPage)
   const hasActiveFilters = searchTerm || dateFilter.dateFrom || dateFilter.dateTo || filters.hasDetails
 
@@ -636,7 +658,7 @@ function EmployeeLogs() {
               >
                 Export CSV
               </button>
-              {/* Edit Selected moved to bulk actions bar when multiple logs are selected */}
+              {/* Checkout quantity editing is available via "Edit Checkout Items" button in detailed view */}
             </div>
           </div>
         </div>
@@ -788,31 +810,6 @@ function EmployeeLogs() {
                 <button onClick={() => handleBulkAction('archive')} className="px-4 py-2 bg-linear-to-r from-yellow-600 to-amber-600 hover:from-yellow-700 hover:to-amber-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">📦 Archive</button>
                 <button onClick={() => handleBulkAction('export')} className="px-4 py-2 bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">📤 Export</button>
                 <button onClick={() => handleBulkAction('delete')} className="px-4 py-2 bg-linear-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">🗑️ Delete</button>
-                <button
-                  onClick={() => {
-                    // Determine target: prefer single selection, else selectedLog
-                    let id = null
-                    if (selectedLogs && selectedLogs.length === 1) id = selectedLogs[0]
-                    else if (selectedLog && selectedLog.id) id = selectedLog.id
-
-                    if (!id) {
-                      alert('Please select one log (checkbox) or open a log first to edit.')
-                      return
-                    }
-
-                    const target = logs.find(l => l.id === id) || selectedLog
-                    if (!target) {
-                      alert('Selected log not found in current list. Try refreshing.')
-                      return
-                    }
-
-                    setEditTargetLog(target)
-                    setIsEditWizardOpen(true)
-                  }}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all shadow-md font-semibold text-sm"
-                >
-                  ✏️ Edit Selected
-                </button>
               </div>
             </div>
           </div>
@@ -1041,7 +1038,7 @@ function EmployeeLogs() {
                                 {employeeDetails?.id_number || selectedLog.id_number || '—'}
                               </div>
 
-                              {/* Edit controls removed from detailed view; use header "Edit Selected" button instead */}
+                              {/* Checkout quantity editing is available via "Edit Checkout Items" button */}
                             </div>
                             <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
                               <div className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Barcode</div>
@@ -1163,7 +1160,7 @@ function EmployeeLogs() {
   )
 }
 
-// EditControls removed — edits are handled via the header Edit Selected → EditLogWizard
+// Checkout quantity editing is handled via "Edit Checkout Items" button in detailed view
 
 // AuditViewer: displays audit records for a selected log
 function AuditViewer({ logId }) {
@@ -1371,71 +1368,67 @@ export default EmployeeLogs
 function EditLogWizard({ isOpen, onClose, log, onSaved }) {
   const { user } = useAuth()
   const [step, setStep] = useState(1)
-  const [form, setForm] = useState(null)
-  const [selectedFields, setSelectedFields] = useState([])
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
+  const [itemQuantities, setItemQuantities] = useState({}) // For item quantity editing
+  
+  // Check if this is a checkout log with items to edit
+  const isCheckoutEdit = log && log.items && Array.isArray(log.items) && log.items.length > 0
 
   useEffect(() => {
-    if (log) {
-      setForm({
-        username: log.username || '',
-        details: log.details || '',
-        log_date: log.log_date || '',
-        log_time: log.log_time || '',
-        purpose: log.purpose || '',
-        id_number: log.id_number || '',
-        id_barcode: log.id_barcode || '',
-        item_no: log.item_no || ''
-      })
-      setSelectedFields([])
+    if (log && isCheckoutEdit) {
       setReason('')
       setStep(1)
+      
+      // Initialize item quantities for checkout editing
+      const quantities = {}
+      log.items.forEach(item => {
+        quantities[item.item_no] = item.quantity || 1
+      })
+      setItemQuantities(quantities)
     }
-  }, [log])
+  }, [log, isCheckoutEdit])
 
-  if (!isOpen || !log) return null
+  // Only allow checkout editing
+  if (!isOpen || !log || !isCheckoutEdit) return null
 
-  const fieldList = [
-    { key: 'username', label: 'Username', icon: '👤' },
-    { key: 'details', label: 'Activity Details', icon: '📝' },
-    { key: 'item_no', label: 'Item Numbers', icon: '📦' },
-    { key: 'id_number', label: 'ID Number', icon: '🔢' },
-    { key: 'id_barcode', label: 'ID Barcode', icon: '📱' },
-    { key: 'purpose', label: 'Purpose', icon: '🎯' },
-    { key: 'log_date', label: 'Activity Date', icon: '📅' },
-    { key: 'log_time', label: 'Activity Time', icon: '⏰' }
-  ]
-
-  const toggleField = (k) => {
-    setSelectedFields(prev => prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k])
-  }
-
-  const canProceedStep1 = selectedFields.length > 0
-  const canProceedStep2 = selectedFields.length > 0
+  const canProceedStep1 = true // Always can proceed for checkout review
+  const canProceedStep2 = true // Always can proceed for quantity correction
   const canProceedStep3 = reason.trim() !== ''
 
   const doSave = async () => {
     if (!user) { alert('Only admins may edit logs'); return }
-    if (selectedFields.length === 0) { alert('No fields selected'); return }
     if (!reason || reason.trim() === '') { alert('Reason required'); return }
 
     const payload = { admin_id: user.id, reason }
-    // Normalize and only include fields that differ from original
-    for (const k of selectedFields) {
-      let val = form[k]
-      if (typeof val === 'string') val = val.trim()
-      if (k === 'item_no' && typeof val === 'string') {
-        // Normalize semicolon-separated IDs: remove spaces after semicolons
-        val = val.split(';').map(s => s.trim()).filter(Boolean).join(';')
+    
+    // Handle checkout item quantity corrections
+    const itemCorrections = []
+    let hasChanges = false
+    
+    log.items.forEach(item => {
+      const originalQty = item.quantity || 1
+      const correctedQty = itemQuantities[item.item_no] || 1
+      
+      if (originalQty !== correctedQty) {
+        hasChanges = true
+        itemCorrections.push({
+          item_no: item.item_no,
+          item_name: item.item_name,
+          original_quantity: originalQty,
+          corrected_quantity: correctedQty,
+          stock_to_restore: originalQty - correctedQty
+        })
       }
-
-      // Only include if actually changed from original (normalized comparison)
-      const orig = (log[k] || '')
-      const origNorm = (typeof orig === 'string') ? orig.trim().split(';').map(s=>s.trim()).filter(Boolean).join(';') : orig
-      if (val !== origNorm) payload[k] = val
+    })
+    
+    if (!hasChanges) {
+      alert('No quantity changes detected')
+      return
     }
-    console.debug('EditLogWizard payload:', payload)
+    
+    payload.item_corrections = itemCorrections
+    console.debug('Checkout Edit payload:', payload)
 
     setSaving(true)
     try {
@@ -1456,7 +1449,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved }) {
 
   return (
     <ModalPortal>
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-10000 p-4 animate-fadeIn">
         <div className="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border-2 border-slate-200 dark:border-slate-700 animate-scaleIn">
           {/* Modal Header */}
           <div className="bg-linear-to-r from-amber-600 via-orange-600 to-red-600 p-6">
@@ -1468,8 +1461,12 @@ function EditLogWizard({ isOpen, onClose, log, onSaved }) {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-white font-bold text-2xl">Edit Activity Log</h3>
-                  <p className="text-orange-100 text-sm mt-1">Log ID: #{log.id} • {log.username || 'N/A'}</p>
+                  <h3 className="text-white font-bold text-2xl">
+                    Edit Checkout Quantities
+                  </h3>
+                  <p className="text-orange-100 text-sm mt-1">
+                    Correcting {log.items.length} item{log.items.length > 1 ? 's' : ''} • Log ID: #{log.id}
+                  </p>
                 </div>
               </div>
               <button 
@@ -1497,8 +1494,12 @@ function EditLogWizard({ isOpen, onClose, log, onSaved }) {
                   {step > 1 ? '✓' : '1'}
                 </div>
                 <div>
-                  <div className="font-semibold text-slate-900 dark:text-white text-sm">Select Fields</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Choose what to edit</div>
+                  <div className="font-semibold text-slate-900 dark:text-white text-sm">
+                    Review Items
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    Check quantities to correct
+                  </div>
                 </div>
               </div>
 
@@ -1515,8 +1516,12 @@ function EditLogWizard({ isOpen, onClose, log, onSaved }) {
                   {step > 2 ? '✓' : '2'}
                 </div>
                 <div>
-                  <div className="font-semibold text-slate-900 dark:text-white text-sm">Edit Values</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Update information</div>
+                  <div className="font-semibold text-slate-900 dark:text-white text-sm">
+                    Correct Quantities
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    Fix incorrect quantities
+                  </div>
                 </div>
               </div>
 
@@ -1542,131 +1547,119 @@ function EditLogWizard({ isOpen, onClose, log, onSaved }) {
           <div className="p-6 overflow-y-auto max-h-[calc(90vh-280px)]">
             {step === 1 && (
               <div className="space-y-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
-                    <span className="text-2xl">✅</span>
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-lg text-slate-900 dark:text-white">Select Fields to Edit</h4>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">Choose which fields you want to modify</p>
-                  </div>
-                </div>
-
-                {selectedFields.length > 0 && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 mb-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-blue-700 dark:text-blue-300 font-semibold">
-                        {selectedFields.length} field{selectedFields.length > 1 ? 's' : ''} selected
-                      </span>
+                {/* Checkout item review step */}
+                <>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                      <span className="text-2xl">📦</span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg text-slate-900 dark:text-white">Review Checkout Items</h4>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Review the items that were checked out in this transaction</p>
                     </div>
                   </div>
-                )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {fieldList.map(f => (
-                    <label 
-                      key={f.key} 
-                      className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-md ${
-                        selectedFields.includes(f.key)
-                          ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20'
-                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50'
-                      }`}
-                    >
-                      <input 
-                        type="checkbox" 
-                        checked={selectedFields.includes(f.key)} 
-                        onChange={() => toggleField(f.key)}
-                        className="w-5 h-5 rounded border-slate-300 dark:border-slate-600 text-amber-600 focus:ring-amber-500"
-                      />
-                      <span className="text-2xl">{f.icon}</span>
-                      <span className="font-semibold text-slate-900 dark:text-white">{f.label}</span>
-                    </label>
-                  ))}
-                </div>
+                  <div className="space-y-3">
+                    {log.items.map((item) => (
+                      <div key={item.item_no} className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-1">
+                              <span className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded">#{item.item_no}</span>
+                              <div className="font-bold text-slate-900 dark:text-white">{item.item_name || 'Unknown item'}</div>
+                            </div>
+                            <div className="text-sm text-slate-600 dark:text-slate-400">
+                              {item.brand && <span className="font-medium">{item.brand}</span>}
+                              {item.location && <span className="ml-2">• {item.location}</span>}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                              Qty: {item.quantity || 1}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">checked out</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               </div>
-            )}
-
-            {step === 2 && (
+            )}            {step === 2 && (
               <div className="space-y-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
-                    <span className="text-2xl">✏️</span>
+                {/* Checkout quantity correction step */}
+                <>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
+                      <span className="text-2xl">🔢</span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg text-slate-900 dark:text-white">Correct Item Quantities</h4>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Adjust quantities for items that were logged incorrectly</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-bold text-lg text-slate-900 dark:text-white">Edit Values</h4>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">Update the selected fields with new information</p>
-                  </div>
-                </div>
 
-                {selectedFields.length === 0 ? (
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">⚠️</span>
-                      <div>
-                        <h5 className="font-semibold text-yellow-800 dark:text-yellow-300">No fields selected</h5>
-                        <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">Please go back and select at least one field to edit.</p>
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-4">
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-blue-700 dark:text-blue-300 font-semibold">💡 Formula:</span>
+                        <span className="text-blue-600 dark:text-blue-400">(Original quantity - Corrected quantity) = Stock to restore</span>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {selectedFields.map(k => {
-                      const field = fieldList.find(f => f.key === k)
-                      const originalValue = log[k] || ''
-                      const hasChanged = form[k] !== originalValue
-                      
-                      return (
-                        <div key={k} className="bg-white dark:bg-slate-800 rounded-xl p-4 border-2 border-slate-200 dark:border-slate-700">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xl">{field.icon}</span>
-                            <label className="block text-sm font-bold text-slate-900 dark:text-white">{field.label}</label>
-                            {hasChanged && (
-                              <span className="ml-auto text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full font-semibold">Modified</span>
-                            )}
-                          </div>
-                          
-                          <div className="mb-2 text-xs text-slate-500 dark:text-slate-400">
-                            Original: <span className="font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">{originalValue || '(empty)'}</span>
-                          </div>
 
-                          {k === 'details' || k === 'purpose' ? (
-                            <textarea 
-                              value={form[k]} 
-                              onChange={(e) => setForm(prev => ({...prev, [k]: e.target.value}))} 
-                              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                              rows={3}
-                            />
-                          ) : k === 'log_date' ? (
-                            <input 
-                              type="date"
-                              value={form[k]} 
-                              onChange={(e) => setForm(prev => ({...prev, [k]: e.target.value}))} 
-                              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                            />
-                          ) : k === 'log_time' ? (
-                            <input 
-                              type="time"
-                              value={form[k]} 
-                              onChange={(e) => setForm(prev => ({...prev, [k]: e.target.value}))} 
-                              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                            />
-                          ) : (
-                            <input 
-                              type="text"
-                              value={form[k]} 
-                              onChange={(e) => setForm(prev => ({...prev, [k]: e.target.value}))} 
-                              className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                            />
-                          )}
-                        </div>
-                      )
+                    <div className="space-y-4">
+                      {log.items.map((item) => {
+                        const originalQty = item.quantity || 1
+                        const correctedQty = itemQuantities[item.item_no] || originalQty
+                        const stockToRestore = originalQty - correctedQty
+                        const hasChanged = correctedQty !== originalQty
+                        
+                        return (
+                          <div key={item.item_no} className="bg-white dark:bg-slate-800 rounded-xl p-4 border-2 border-slate-200 dark:border-slate-700">
+                            <div className="flex items-center gap-2 mb-3">
+                              <span className="text-lg">📦</span>
+                              <div className="font-bold text-slate-900 dark:text-white">{item.item_name || 'Unknown item'}</div>
+                              <span className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded ml-auto">#{item.item_no}</span>
+                              {hasChanged && (
+                                <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full font-semibold">Modified</span>
+                              )}
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3">
+                                <div className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Original Qty</div>
+                                <div className="text-slate-900 dark:text-white font-mono font-bold mt-1">{originalQty}</div>
+                              </div>
+                              
+                              <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 border-2 border-amber-200 dark:border-amber-800">
+                                <div className="text-xs text-amber-700 dark:text-amber-300 uppercase font-semibold">Corrected Qty</div>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={correctedQty}
+                                  onChange={(e) => {
+                                    const newQty = Math.max(0, parseInt(e.target.value) || 0)
+                                    setItemQuantities(prev => ({ ...prev, [item.item_no]: newQty }))
+                                  }}
+                                  className="w-full text-amber-900 dark:text-amber-100 font-mono font-bold mt-1 bg-transparent border-none outline-none"
+                                />
+                              </div>
+                              
+                              <div className={`rounded-lg p-3 ${stockToRestore > 0 ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800' : stockToRestore < 0 ? 'bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800' : 'bg-slate-50 dark:bg-slate-900/50'}`}>
+                                <div className={`text-xs uppercase font-semibold ${stockToRestore > 0 ? 'text-green-700 dark:text-green-300' : stockToRestore < 0 ? 'text-red-700 dark:text-red-300' : 'text-slate-500 dark:text-slate-400'}`}>
+                                  Stock {stockToRestore > 0 ? 'to Restore' : stockToRestore < 0 ? 'to Deduct' : 'Unchanged'}
+                                </div>
+                                <div className={`font-mono font-bold mt-1 ${stockToRestore > 0 ? 'text-green-600 dark:text-green-400' : stockToRestore < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>
+                                  {Math.abs(stockToRestore)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
                     })}
                   </div>
-                )}
+                </>
               </div>
-            )}
-
-            {step === 3 && (
+            )}            {step === 3 && (
               <div className="space-y-4">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
@@ -1678,33 +1671,40 @@ function EditLogWizard({ isOpen, onClose, log, onSaved }) {
                   </div>
                 </div>
 
-                {/* Summary of Changes */}
+                {/* Summary of Item Corrections */}
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-4">
                   <h5 className="font-bold text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
                     <span>📋</span>
-                    Summary of Changes
+                    Summary of Quantity Corrections
                   </h5>
                   <div className="space-y-2">
-                    {selectedFields.map(k => {
-                      const field = fieldList.find(f => f.key === k)
-                      const originalValue = log[k] || '(empty)'
-                      const newValue = form[k] || '(empty)'
-                      const hasChanged = form[k] !== log[k]
+                    {log.items.map((item) => {
+                      const originalQty = item.quantity || 1
+                      const correctedQty = itemQuantities[item.item_no] || originalQty
+                      const stockToRestore = originalQty - correctedQty
+                      const hasChanged = correctedQty !== originalQty
                       
                       return (
-                        <div key={k} className={`text-sm ${hasChanged ? 'font-semibold' : 'opacity-60'}`}>
+                        <div key={item.item_no} className={`text-sm ${hasChanged ? 'font-semibold' : 'opacity-60'}`}>
                           <div className="flex items-start gap-2">
-                            <span>{field.icon}</span>
+                            <span>📦</span>
                             <div className="flex-1">
-                              <div className="font-semibold text-blue-900 dark:text-blue-100">{field.label}</div>
+                              <div className="font-semibold text-blue-900 dark:text-blue-100">{item.item_name || 'Unknown item'}</div>
                               <div className="text-xs mt-1">
-                                <span className="text-red-600 dark:text-red-400">- {originalValue}</span>
+                                <span className="text-red-600 dark:text-red-400">- Qty: {originalQty}</span>
                               </div>
                               <div className="text-xs">
-                                <span className="text-green-600 dark:text-green-400">+ {newValue}</span>
+                                <span className="text-green-600 dark:text-green-400">+ Qty: {correctedQty}</span>
                               </div>
+                              {hasChanged && (
+                                <div className="text-xs mt-1">
+                                  <span className={`font-semibold ${stockToRestore > 0 ? 'text-green-600 dark:text-green-400' : stockToRestore < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                                    Stock {stockToRestore > 0 ? 'to restore' : stockToRestore < 0 ? 'to deduct' : 'unchanged'}: {Math.abs(stockToRestore)}
+                                  </span>
+                                </div>
+                              )}
                             </div>
-                            {hasChanged && <span className="text-amber-500">✏️</span>}
+                            {hasChanged && <span className="text-amber-500">🔢</span>}
                           </div>
                         </div>
                       )

@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { ArrowLeft, FileText, Download, Mail, Phone, MapPin, Calendar, Users, Briefcase, Lock, X, Eye, EyeOff } from "lucide-react"
+import apiService from "../../../utils/api/api-service"
 
 // UI Components
 const Button = ({ children, variant = "default", size = "default", onClick, disabled, className = "", ...props }) => {
@@ -135,28 +136,37 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
     try {
       setIsChangingPassword(true)
 
-      // TODO: Replace with actual API call
-      // const response = await apiService.auth.changePassword({
-      //   currentPassword: passwordForm.currentPassword,
-      //   newPassword: passwordForm.newPassword
-      // })
+      // Get employee ID from the employee data
+      const employeeId = fullEmployee?.uid || fullEmployee?.id
 
-      // Simulated API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      if (!employeeId) {
+        throw new Error("Employee ID not found")
+      }
 
-      setPasswordSuccess("Password changed successfully!")
-      setPasswordForm({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: ""
+      // Call the API to update password
+      const response = await apiService.employees.updateEmployeePassword(employeeId, {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
       })
 
-      setTimeout(() => {
-        setIsPasswordModalOpen(false)
-        setPasswordSuccess("")
-      }, 2000)
+      if (response.success) {
+        setPasswordSuccess("Password changed successfully!")
+        setPasswordForm({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: ""
+        })
+
+        setTimeout(() => {
+          setIsPasswordModalOpen(false)
+          setPasswordSuccess("")
+        }, 2000)
+      } else {
+        throw new Error(response.error || "Failed to change password")
+      }
 
     } catch (error) {
+      console.error("Password change error:", error)
       setPasswordError(error.message || "Failed to change password")
     } finally {
       setIsChangingPassword(false)

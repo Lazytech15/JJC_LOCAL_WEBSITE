@@ -112,12 +112,13 @@ export class AuthService extends BaseAPIService {
   }
 
   /**
-   * Check if user has SuperAdmin privileges
+   * Check if user has TRUE SuperAdmin privileges
+   * Only users with access_level='admin' AND department='superAdmin' are TRUE SuperAdmins
    * @param {Object} user - User object
-   * @returns {boolean} True if user is SuperAdmin
+   * @returns {boolean} True if user is TRUE SuperAdmin
    */
   isSuperAdmin(user) {
-    return user?.isSuperAdmin === true || user?.access_level === 'superadmin'
+    return user?.access_level === 'admin' && user?.department === 'superAdmin'
   }
 
   /**
@@ -129,11 +130,11 @@ export class AuthService extends BaseAPIService {
   canAccessDepartment(user, department) {
     if (!user) return false
     
-    // SuperAdmins can access all departments
+    // TRUE SuperAdmins (admin + superAdmin dept) can access all departments
     if (this.isSuperAdmin(user)) return true
     
-    // Regular users can only access their own department
-    return user.department === department || user.loginDepartment === department
+    // Regular users (including admins from other depts) can only access their own department
+    return user.department === department
   }
 
   /**
@@ -144,20 +145,21 @@ export class AuthService extends BaseAPIService {
   getAccessibleDepartments(user) {
     const allDepartments = [
       { id: 'hr', name: 'Human Resources' },
-      { id: 'operations', name: 'Operation' },
+      { id: 'operations', name: 'Operations' },
       { id: 'finance', name: 'Finance' },
       { id: 'procurement', name: 'Procurement' },
       { id: 'engineering', name: 'Engineering' }
     ]
 
-    // SuperAdmins can access all departments
+    // TRUE SuperAdmins can access all departments + superAdmin
     if (this.isSuperAdmin(user)) {
-      return allDepartments
+      return [
+        ...allDepartments,
+        { id: 'superadmin', name: 'superAdmin' }
+      ]
     }
 
-    // Regular users can only access their own department
-    return allDepartments.filter(dept => 
-      dept.name === user.department || dept.name === user.loginDepartment
-    )
+    // Regular users (including non-superAdmin admins) can only access their own department
+    return allDepartments.filter(dept => dept.name === user.department)
   }
 }

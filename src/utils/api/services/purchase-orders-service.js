@@ -73,6 +73,16 @@ export class PurchaseOrdersService extends BaseAPIService {
 
   // GET /api/items/purchase-orders/check/:po_number - Check if PO number exists
   async checkPONumber(poNumber) {
-    return this.request(`/api/items/purchase-orders/check/${poNumber}`)
+    // Suppress throwing on 4xx/5xx so callers can read validation messages
+    return this.request(`/api/items/purchase-orders/check/${poNumber}`, { suppressErrors: true })
+  }
+
+  // PUT /api/items/purchase-orders/:id - Update (replace) an existing purchase order
+  async updatePurchaseOrder(id, orderData, options = {}) {
+    return this.request(`/api/items/purchase-orders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(orderData),
+      ...options
+    })
   }
 }

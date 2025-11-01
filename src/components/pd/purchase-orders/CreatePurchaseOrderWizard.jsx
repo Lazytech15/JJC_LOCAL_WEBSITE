@@ -4,7 +4,8 @@ import apiService from "../../../utils/api/api-service"
 import { exportPurchaseOrderToPDF, exportPurchaseOrderToExcel } from "../../../utils/purchase-order-export"
 
 function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = null }) {
-  const [currentStep, setCurrentStep] = useState(1)
+  // If editingOrder is provided, start at step 2 (skip PO Number & Supplier)
+  const [currentStep, setCurrentStep] = useState(editingOrder ? 2 : 1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   
@@ -48,6 +49,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     tax_type: "goods", // goods (1%), services (2%), rental (5%)
     has_discount: false,
     discount_percentage: 0,
+  // Priority levels: P0..P4 (P2 = Moderate default)
+  priority: 'P2',
     
     // Step 4 - Details
     attention_person: "",
@@ -58,6 +61,13 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     approved_by: "",
     notes: ""
   })
+
+  // Helper to safely format currency numbers
+  const formatAmount = (v, decimals = 2) => {
+    const n = Number(v)
+    if (!isFinite(n)) return (0).toFixed(decimals)
+    return n.toFixed(decimals)
+  }
 
   // Track which fields were auto-filled so we can show a badge and clear it on user edit
   const [autofilledFields, setAutofilledFields] = useState({
@@ -201,6 +211,64 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     }
   }
 
+  // When editing, prefill the formData from the provided editingOrder
+  useEffect(() => {
+    if (editingOrder) {
+      try {
+        const po = editingOrder
+        setFormData(prev => ({
+          ...prev,
+          supplier_name: po.supplier_name || po.supplier || prev.supplier_name,
+          supplier_id: po.supplier_id || prev.supplier_id,
+          supplier_address: po.supplier_address || po.supplier_address || prev.supplier_address,
+          supplier_details: po.supplier_details || prev.supplier_details,
+          // PO number fields retained but not editable in edit mode
+          po_number: po.id || po.po_number || prev.po_number,
+          po_sequence: (po.id || '').split('-')[1] || prev.po_sequence,
+          // Items
+          selectedItems: (po.items || []).map(i => {
+            const qty = Number(i.quantity) || 0
+            const price = Number(i.price_per_unit || i.unit_price || i.price) || 0
+            const amt = qty * price
+            return {
+              item_no: i.item_no,
+              item_name: i.item_name,
+              quantity: qty,
+              unit: i.unit || i.unit_of_measure || 'pcs',
+              // normalize field names used elsewhere in the wizard
+              price_per_unit: price,
+              amount: amt,
+              recommended_quantity: Number(i.recommended_quantity) || qty,
+              delivery_method: i.delivery_method || 'delivery',
+              unit_dropdown_open: false,
+              custom_unit_active: false,
+              custom_unit_value: ''
+            }
+          }),
+          // Step 3 & 4 fields
+          apply_tax: po.apply_tax ?? prev.apply_tax,
+          tax_type: po.tax_type || prev.tax_type,
+          has_discount: po.has_discount ?? prev.has_discount,
+          discount_percentage: po.discount_percentage ?? prev.discount_percentage,
+          attention_person: po.attention_person || prev.attention_person,
+          terms: po.terms || prev.terms,
+          po_date: po.po_date || prev.po_date,
+          prepared_by: po.prepared_by ? (Array.isArray(po.prepared_by) ? po.prepared_by : [po.prepared_by]) : prev.prepared_by,
+          verified_by: po.verified_by || prev.verified_by,
+          approved_by: po.approved_by || prev.approved_by,
+          notes: po.notes || prev.notes,
+          // preserve priority when editing if present (support legacy values too)
+          priority: po.priority || po.priority_level || prev.priority
+        }))
+
+        // If editing, ensure we start at step 2
+        setCurrentStep(2)
+      } catch (e) {
+        console.warn('Failed to prefill edit form from editingOrder', e)
+      }
+    }
+  }, [editingOrder])
+
   // Fetch items when supplier is selected
   useEffect(() => {
     const supplierForFetch = formData.supplier_name || formData.supplier_id
@@ -278,7 +346,9 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
   // Check PO number availability (debounced)
   useEffect(() => {
-    if (formData.po_sequence && formData.po_sequence.length === 3) {
+    // Only trigger PO number check when the sequence is exactly 3 digits (e.g. 001..999)
+    const isValidSeq = /^\d{3}$/.test(formData.po_sequence)
+    if (isValidSeq) {
       const timer = setTimeout(() => {
         checkPONumber(`${poPrefix}-${formData.po_sequence}`)
       }, 500)
@@ -293,21 +363,21 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       setPoNumberStatus({ checking: true, exists: false, message: "Checking..." })
       
       const data = await apiService.purchaseOrders.checkPONumber(poNumber)
-      
-      if (data.success) {
-        setPoNumberStatus({
-          checking: false,
-          exists: data.exists,
-          message: data.message
-        })
-        
-        if (data.exists) {
-          setExistingPO(data.po_data)
-        }
+
+      // If server returned a validation error or other non-success response (suppressErrors), handle it gracefully
+      if (data && data.success === false) {
+        setPoNumberStatus({ checking: false, exists: false, message: data.error || data.message || 'Invalid PO number' })
+        return
+      }
+
+      if (data && data.success) {
+        setPoNumberStatus({ checking: false, exists: data.exists, message: data.message })
+        if (data.exists) setExistingPO(data.po_data)
       }
     } catch (err) {
       console.error("Error checking PO number:", err)
-      setPoNumberStatus({ checking: false, exists: false, message: "Error checking availability" })
+      const msg = (err && err.message) ? err.message : "Error checking availability"
+      setPoNumberStatus({ checking: false, exists: false, message: msg })
     }
   }
 
@@ -618,6 +688,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         supplier_details: formData.supplier_details || null,
         attention_person: formData.attention_person,
         terms: formData.terms,
+        // Priority level included
+        priority: formData.priority,
         po_date: formData.po_date,
         prepared_by: formData.prepared_by.filter(p => p.trim()).join(', '), // Convert array to comma-separated string
         verified_by: formData.verified_by,
@@ -642,13 +714,22 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         overwrite_existing: overwriteExisting
       }
       let data
-      data = await apiService.purchaseOrders.createPurchaseOrder(orderData)
-      
+      if (editingOrder) {
+        // Update existing PO (replace strategy) - editingOrder.id is authoritative
+        data = await apiService.purchaseOrders.updatePurchaseOrder(editingOrder.id, orderData)
+      } else {
+        data = await apiService.purchaseOrders.createPurchaseOrder(orderData)
+      }
+
       if (data.success) {
-        onSuccess(`Purchase Order ${formData.po_number} created successfully!`)
+        if (editingOrder) {
+          onSuccess(`Purchase Order ${editingOrder.id} updated successfully!`)
+        } else {
+          onSuccess(`Purchase Order ${formData.po_number} created successfully!`)
+        }
         handleClose()
       } else {
-        throw new Error(data.message || "Failed to create purchase order")
+        throw new Error(data.message || (editingOrder ? "Failed to update purchase order" : "Failed to create purchase order"))
       }
     } catch (err) {
       console.error("Error submitting PO:", err)
@@ -677,6 +758,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       tax_type: "goods",
       has_discount: false,
       discount_percentage: 0,
+      priority: 'P2',
       attention_person: "",
       terms: "",
       po_date: new Date().toISOString().split('T')[0],
@@ -702,16 +784,23 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     { number: 5, title: "Review & Submit", icon: "✅" }
   ]
 
+  // For the progress UI, if editing an existing PO, hide step 1 visually
+  const progressSteps = editingOrder ? steps.filter(s => s.number !== 1) : steps
+
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
-            <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold">Create Purchase Order</h2>
-                <p className="text-blue-100 text-sm mt-1">JJC Engineering Receipt Format</p>
+                <h2 className="text-2xl font-bold">{editingOrder ? 'Edit Purchase Order' : 'Create Purchase Order'}</h2>
+                {editingOrder ? (
+                  <p className="text-blue-100 text-sm mt-1">Editing PO: {editingOrder.id}</p>
+                ) : (
+                  <p className="text-blue-100 text-sm mt-1">JJC Engineering Receipt Format</p>
+                )}
               </div>
               <button
                 onClick={handleClose}
@@ -725,17 +814,19 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
             
             {/* Step Progress */}
             <div className="mt-6 flex items-center justify-between">
-              {steps.map((step, index) => (
+              {progressSteps.map((step, index) => (
                 <div key={step.number} className="flex items-center flex-1">
                   <button
                     type="button"
                     onClick={() => {
-                      if (!canJumpToStep(step.number)) {
+                      // Map displayed step back to real step number when editing
+                      const targetStep = editingOrder && step.number > 1 ? step.number : step.number
+                      if (!canJumpToStep(targetStep)) {
                         setError('Please complete required fields before jumping ahead')
                         return
                       }
                       setError(null)
-                      setCurrentStep(step.number)
+                      setCurrentStep(targetStep)
                     }}
                     className="flex flex-col items-center flex-1"
                     aria-current={currentStep === step.number}
@@ -808,9 +899,10 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       <select
                         value={formData.supplier_id || formData.supplier_name}
                         onChange={(e) => handleSupplierSelect(e.target.value)}
-                        className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                        disabled={!!editingOrder}
+                        className={`w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
                           bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                          focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                          focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${editingOrder ? 'opacity-60 cursor-not-allowed' : ''}`}
                       >
                         <option value="">-- Choose a supplier --</option>
                         {suppliers.map((supplier, index) => (
@@ -913,8 +1005,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           </h4>
                         </div>
                         <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                          {formData.selectedItems.map(item => (
-                            <div key={item.item_no} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                          {formData.selectedItems.map((item, idx) => (
+                            <div key={`${item.item_no}-${idx}`} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                               <div className="flex items-start gap-4">
                                 <div className="flex-1">
                                   <div className="font-semibold text-gray-900 dark:text-gray-100">
@@ -1015,7 +1107,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                     <div>
                                       <label className="text-xs text-gray-600 dark:text-gray-400">Amount</label>
                                       <div className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                        ₱{item.amount.toFixed(2)}
+                                        ₱{formatAmount(item.amount, 2)}
                                       </div>
                                     </div>
                                   </div>
@@ -1036,7 +1128,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-gray-700 dark:text-gray-300">Total Amount:</span>
                             <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                              ₱{calculateTotal().toFixed(2)}
+                              ₱{formatAmount(calculateTotal(), 2)}
                             </span>
                           </div>
                         </div>
@@ -1049,11 +1141,11 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                         Available Items ({availableItems.length})
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
-                        {availableItems.map(item => {
+                          {availableItems.map((item, idx) => {
                           const isAdded = formData.selectedItems.some(i => i.item_no === item.item_no)
                           return (
                             <div
-                              key={item.item_no}
+                              key={`${item.item_no}-${idx}`}
                               className={`p-4 border-2 rounded-lg transition-all ${
                                 isAdded
                                   ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/20'
@@ -1081,7 +1173,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                       {item.status}
                                     </span>
                                     <span className="text-sm text-gray-600 dark:text-gray-400">
-                                      ₱{Number(item.price_per_unit || 0).toFixed(2)}
+                                      ₱{formatAmount(item.price_per_unit || 0, 2)}
                                     </span>
                                   </div>
                                 </div>
@@ -1197,7 +1289,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                 <span className="text-sm text-gray-700 dark:text-gray-300">
                                   {formData.apply_tax ? "Total Before Withholding Tax (TBWT)" : "Total Amount"}
                                 </span>
-                                <span className="font-semibold text-gray-900 dark:text-gray-100">₱{breakdown.totalBeforeWithholdingTax.toFixed(2)}</span>
+                                <span className="font-semibold text-gray-900 dark:text-gray-100">₱{formatAmount(breakdown.totalBeforeWithholdingTax, 2)}</span>
                               </div>
                               
                               {formData.apply_tax && (
@@ -1208,15 +1300,15 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                   </div>
                                   <div className="flex justify-between items-center pb-2 border-b border-gray-300 dark:border-gray-600">
                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Subtotal (Gross Total)</span>
-                                    <span className="font-semibold text-gray-900 dark:text-gray-100">₱{breakdown.subtotal.toFixed(2)}</span>
+                                    <span className="font-semibold text-gray-900 dark:text-gray-100">₱{formatAmount(breakdown.subtotal, 2)}</span>
                                   </div>
                                   <div className="flex justify-between items-center">
                                     <span className="text-sm text-gray-700 dark:text-gray-300">Withholding Tax ({breakdown.taxRate}%)</span>
-                                    <span className="font-semibold text-red-600 dark:text-red-400">- ₱{breakdown.withholdingTax.toFixed(2)}</span>
+                                    <span className="font-semibold text-red-600 dark:text-red-400">- ₱{formatAmount(breakdown.withholdingTax, 2)}</span>
                                   </div>
                                   <div className="flex justify-between items-center pb-2 border-b-2 border-gray-400 dark:border-gray-500">
                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Total After Withholding Tax</span>
-                                    <span className="font-semibold text-gray-900 dark:text-gray-100">₱{breakdown.totalAfterWithholdingTax.toFixed(2)}</span>
+                                    <span className="font-semibold text-gray-900 dark:text-gray-100">₱{formatAmount(breakdown.totalAfterWithholdingTax, 2)}</span>
                                   </div>
                                 </>
                               )}
@@ -1225,14 +1317,14 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                 <>
                                   <div className="flex justify-between items-center">
                                     <span className="text-sm text-gray-700 dark:text-gray-300">Discount ({breakdown.discountPercentage}%)</span>
-                                    <span className="font-semibold text-red-600 dark:text-red-400">- ₱{breakdown.discountAmount.toFixed(2)}</span>
+                                    <span className="font-semibold text-red-600 dark:text-red-400">- ₱{formatAmount(breakdown.discountAmount, 2)}</span>
                                   </div>
                                 </>
                               )}
                               
                               <div className="flex justify-between items-center pt-2 border-t-2 border-gray-400 dark:border-gray-500">
                                 <span className="text-lg font-bold text-gray-900 dark:text-gray-100">Grand Total</span>
-                                <span className="text-2xl font-bold text-green-600 dark:text-green-400">₱{breakdown.grandTotal.toFixed(2)}</span>
+                                <span className="text-2xl font-bold text-green-600 dark:text-green-400">₱{formatAmount(breakdown.grandTotal, 2)}</span>
                               </div>
                             </>
                           )
@@ -1301,6 +1393,34 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       <p className="text-purple-700 dark:text-purple-300 text-sm">
                         Fill in the required details for the purchase order
                       </p>
+                    </div>
+
+                    {/* Priority Selection (P0 - P4) */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border-2 border-gray-200 dark:border-gray-700">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Priority</label>
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                        {[
+                          { id: 'P0', title: 'P0 (Critical)', desc: 'Immediate emergency response' },
+                          { id: 'P1', title: 'P1 (High)', desc: 'High urgency and impact' },
+                          { id: 'P2', title: 'P2 (Moderate)', desc: 'Moderate urgency (default)' },
+                          { id: 'P3', title: 'P3 (Low)', desc: 'Low urgency' },
+                          { id: 'P4', title: 'P4 (Negligible)', desc: 'No urgency, backlog' }
+                        ].map(option => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, priority: option.id }))}
+                            className={`p-3 rounded-lg border-2 text-left transition-all ${formData.priority === option.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500'}`}>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-semibold text-gray-900 dark:text-gray-100">{option.title}</div>
+                                <div className="text-xs text-gray-600 dark:text-gray-400">{option.desc}</div>
+                              </div>
+                              <div className="text-sm font-bold text-blue-600">{option.id}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-6">
@@ -1524,13 +1644,13 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                         </thead>
                         <tbody>
                           {formData.selectedItems.map((item, index) => (
-                            <tr key={item.item_no} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <tr key={`${item.item_no}-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                               <td className="border border-gray-900 px-3 py-2 text-sm text-gray-900">#{item.item_no}</td>
                               <td className="border border-gray-900 px-3 py-2 text-center text-sm text-gray-900">{item.quantity}</td>
                               <td className="border border-gray-900 px-3 py-2 text-center text-sm text-gray-900">{item.unit}</td>
                               <td className="border border-gray-900 px-3 py-2 text-sm text-gray-900">{item.item_name}</td>
-                              <td className="border border-gray-900 px-3 py-2 text-right text-sm text-gray-900">{item.price_per_unit.toFixed(2)}</td>
-                              <td className="border border-gray-900 px-3 py-2 text-right text-sm font-semibold text-gray-900">{item.amount.toFixed(2)}</td>
+                              <td className="border border-gray-900 px-3 py-2 text-right text-sm text-gray-900">{formatAmount(item.price_per_unit, 2)}</td>
+                              <td className="border border-gray-900 px-3 py-2 text-right text-sm font-semibold text-gray-900">{formatAmount(item.amount, 2)}</td>
                             </tr>
                           ))}
                           {(() => {
@@ -1545,7 +1665,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                         GROSS TOTAL (with 12% VAT):
                                       </td>
                                       <td className="border border-gray-900 px-3 py-2 text-right font-bold text-gray-900">
-                                        ₱{breakdown.totalBeforeWithholdingTax.toFixed(2)}
+                                        ₱{formatAmount(breakdown.totalBeforeWithholdingTax, 2)}
                                       </td>
                                     </tr>
                                     {/* Subtotal after VAT removal */}
@@ -1554,7 +1674,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                         Subtotal (Gross Total ÷ 1.12):
                                       </td>
                                       <td className="border border-gray-900 px-3 py-2 text-right font-semibold text-gray-900">
-                                        ₱{breakdown.subtotal.toFixed(2)}
+                                        ₱{formatAmount(breakdown.subtotal, 2)}
                                       </td>
                                     </tr>
                                     {/* Withholding Tax */}
@@ -1563,7 +1683,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                         Less: Withholding Tax ({breakdown.taxRate}% - {formData.tax_type.charAt(0).toUpperCase() + formData.tax_type.slice(1)}):
                                       </td>
                                       <td className="border border-gray-900 px-3 py-2 text-right font-semibold text-red-700">
-                                        (₱{breakdown.withholdingTax.toFixed(2)})
+                                        (₱{formatAmount(breakdown.withholdingTax, 2)})
                                       </td>
                                     </tr>
                                   </>
@@ -1573,7 +1693,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                       TOTAL AMOUNT:
                                     </td>
                                     <td className="border border-gray-900 px-3 py-2 text-right font-bold text-gray-900">
-                                      ₱{breakdown.totalBeforeWithholdingTax.toFixed(2)}
+                                      ₱{formatAmount(breakdown.totalBeforeWithholdingTax, 2)}
                                     </td>
                                   </tr>
                                 )}
@@ -1584,7 +1704,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                       Less: Discount ({breakdown.discountPercentage}%):
                                     </td>
                                     <td className="border border-gray-900 px-3 py-2 text-right font-semibold text-red-700">
-                                      (₱{breakdown.discountAmount.toFixed(2)})
+                                      (₱{formatAmount(breakdown.discountAmount, 2)})
                                     </td>
                                   </tr>
                                 )}
@@ -1594,7 +1714,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                     GRAND TOTAL:
                                   </td>
                                   <td className="border border-gray-900 px-3 py-2 text-right font-bold text-lg text-green-700">
-                                    ₱{breakdown.grandTotal.toFixed(2)}
+                                    ₱{formatAmount(breakdown.grandTotal, 2)}
                                   </td>
                                 </tr>
                               </>

@@ -16,11 +16,12 @@ function PurchaseOrderTracker() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
+  // Reuse CreatePurchaseOrderWizard for editing by passing editingOrder prop
   const [restockItems, setRestockItems] = useState([])
   
   // Sorting state
-  const [sortField, setSortField] = useState("po_date") // Default sort by date
-  const [sortDirection, setSortDirection] = useState("desc") // desc = latest first
+  const [sortField, setSortField] = useState("priority") // Default sort by priority
+  const [sortDirection, setSortDirection] = useState("desc") // desc = highest first
 
   // Form states
   const [orderForm, setOrderForm] = useState({
@@ -28,7 +29,8 @@ function PurchaseOrderTracker() {
     items: [],
     expected_delivery_date: "",
     notes: "",
-    priority: "normal",
+    // Default to moderate priority
+    priority: "P2",
     multi_supplier_mode: false // New field for handling multiple suppliers
   })
   
@@ -82,6 +84,10 @@ function PurchaseOrderTracker() {
         case "po_date":
           aVal = new Date(a.po_date || 0)
           bVal = new Date(b.po_date || 0)
+          break
+        case "priority":
+          aVal = getPriorityRank(a.priority)
+          bVal = getPriorityRank(b.priority)
           break
         case "total_amount":
           aVal = parseFloat(a.total_amount) || 0
@@ -186,13 +192,39 @@ function PurchaseOrderTracker() {
   }
 
   const getPriorityColor = (priority) => {
-    const colors = {
-      low: "bg-green-100 text-green-800",
-      normal: "bg-blue-100 text-blue-800",
-      high: "bg-red-100 text-red-800",
-      urgent: "bg-purple-100 text-purple-800"
+    // Support new P0..P4 codes; fallback to legacy strings
+    const map = {
+      'P0': 'bg-red-100 text-red-800',    // Critical
+      'P1': 'bg-orange-100 text-orange-800',
+      'P2': 'bg-yellow-100 text-yellow-800',
+      'P3': 'bg-green-100 text-green-800',
+      'P4': 'bg-gray-100 text-gray-800',
+      // legacy
+      low: 'bg-green-100 text-green-800',
+      normal: 'bg-yellow-100 text-yellow-800',
+      high: 'bg-orange-100 text-orange-800',
+      urgent: 'bg-red-100 text-red-800'
     }
-    return colors[priority] || "bg-gray-100 text-gray-800"
+    return map[priority] || 'bg-gray-100 text-gray-800'
+  }
+
+  const getPriorityRank = (priority) => {
+    // Higher number = higher priority for sorting
+    if (!priority) return 0
+    const p = String(priority).toUpperCase()
+    const rankMap = {
+      'P0': 5,
+      'P1': 4,
+      'P2': 3,
+      'P3': 2,
+      'P4': 1,
+      // legacy mapping (in case some rows still use legacy values)
+      'URGENT': 5,
+      'HIGH': 4,
+      'NORMAL': 3,
+      'LOW': 2
+    }
+    return rankMap[p] || 0
   }
 
   const formatCurrency = (amount) => {
@@ -241,8 +273,9 @@ function PurchaseOrderTracker() {
       items: [],
       expected_delivery_date: "",
       notes: "",
-      priority: "normal"
+      priority: "P2"
     })
+    setSelectedOrder(null)
     setShowCreateModal(true)
   }
 
@@ -412,7 +445,7 @@ function PurchaseOrderTracker() {
             items: [],
             expected_delivery_date: "",
             notes: "",
-            priority: "normal",
+            priority: "P2",
             multi_supplier_mode: false
           })
           setOrderSplitMode("single")
@@ -442,7 +475,7 @@ function PurchaseOrderTracker() {
             items: [],
             expected_delivery_date: "",
             notes: "",
-            priority: "normal",
+            priority: "P2",
             multi_supplier_mode: false
           })
           setOrderSplitMode("single")
@@ -495,6 +528,15 @@ function PurchaseOrderTracker() {
     })
     setShowOrderDetails(true)
   }
+
+  // Open edit modal and prefill form
+  const handleOpenEdit = (order) => {
+    // Open the create wizard in editing mode with the selected order
+    setSelectedOrder(order)
+    setShowCreateModal(true)
+  }
+
+  // Note: editing uses CreatePurchaseOrderWizard by passing `editingOrder={selectedOrder}`
 
   const handleDeleteOrder = async (orderId) => {
     if (window.confirm("Are you sure you want to delete this purchase order? This action cannot be undone.")) {
@@ -610,7 +652,22 @@ function PurchaseOrderTracker() {
                     </div>
                   </div>
                 </th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Priority</th>
+                <th 
+                  onClick={() => handleSort("priority")}
+                  className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-white/20 dark:hover:bg-black/30 transition-colors"
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <span>Priority</span>
+                    <div className="flex flex-col">
+                      <svg className={`w-3 h-3 ${sortField === "priority" && sortDirection === "asc" ? "text-amber-500" : "text-gray-400"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"/>
+                      </svg>
+                      <svg className={`w-3 h-3 -mt-2 ${sortField === "priority" && sortDirection === "desc" ? "text-amber-500" : "text-gray-400"}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z"/>
+                      </svg>
+                    </div>
+                  </div>
+                </th>
                 <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Items</th>
                 <th 
                   onClick={() => handleSort("total_amount")}
@@ -663,9 +720,9 @@ function PurchaseOrderTracker() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(order.priority)}`}>
-                      {order.priority}
-                    </span>
+                            <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(order.priority)}`}>
+                              {order.priority?.toUpperCase()}
+                            </span>
                   </td>
                   <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">
                     {order.total_items} ({order.total_quantity} qty)
@@ -690,6 +747,12 @@ function PurchaseOrderTracker() {
                         className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
                       >
                         PDF
+                      </button>
+                      <button
+                        onClick={() => handleOpenEdit(order)}
+                        className="px-3 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-xs font-medium transition-colors"
+                      >
+                        Edit
                       </button>
                       <button
                         onClick={() => handleExportExcel(order)}
@@ -721,9 +784,12 @@ function PurchaseOrderTracker() {
       {/* Create Order Wizard */}
       <CreatePurchaseOrderWizard 
         isOpen={showCreateModal}
-        onClose={() => { setShowCreateModal(false) }}
+        onClose={() => { setShowCreateModal(false); setSelectedOrder(null); }}
         onSuccess={(msg) => { handleWizardSuccess(msg); }}
+        editingOrder={selectedOrder}
       />
+
+      {/* Editing uses CreatePurchaseOrderWizard - open create modal with editingOrder prop */}
 
       {/* Order Details Modal */}
       {showOrderDetails && selectedOrder && (
@@ -736,14 +802,22 @@ function PurchaseOrderTracker() {
                   <h3 className="text-2xl font-bold text-white">Purchase Order Details</h3>
                   <p className="text-blue-100 text-sm mt-1">{selectedOrder.id}</p>
                 </div>
-                <button
-                  onClick={() => setShowOrderDetails(false)}
-                  className="text-white hover:text-blue-200 transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => handleOpenEdit(selectedOrder)}
+                    className="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-black rounded text-xs font-medium transition-colors"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => setShowOrderDetails(false)}
+                    className="text-white hover:text-blue-200 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               {/* Scrollable Content */}
@@ -811,7 +885,7 @@ function PurchaseOrderTracker() {
                           </thead>
                           <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
                             {selectedOrder.items.map((item, idx) => (
-                              <tr key={item.item_no} className={idx % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800/50'}>
+                              <tr key={`${item.item_no}-${idx}`} className={idx % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800/50'}>
                                 <td className="px-4 py-3">
                                   <div className="font-semibold text-gray-900 dark:text-gray-100">{item.item_name}</div>
                                   <div className="text-xs text-gray-500 dark:text-gray-400">#{item.item_no}</div>
