@@ -222,7 +222,7 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
                   </div>
                   <div className="text-right">
                     <p className="font-medium dark:text-slate-100">Qty: {item.quantity}</p>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">${(item.quantity * 10).toFixed(2)}</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">₱{(item.quantity * 10).toFixed(2)}</p>
                   </div>
                 </div>
               ))}
@@ -243,7 +243,7 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
             </div>
             <div className="flex justify-between text-lg font-bold">
               <span className="dark:text-slate-100">Total Amount:</span>
-              <span className="dark:text-slate-100">${totalValue.toFixed(2)}</span>
+              <span className="dark:text-slate-100">₱{totalValue.toFixed(2)}</span>
             </div>
           </div>
 

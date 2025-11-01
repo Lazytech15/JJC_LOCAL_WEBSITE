@@ -2,7 +2,7 @@
 // service-worker.js - Optimized for Performance
 // ============================================================================
 
-const CACHE_VERSION = "v4" // Increment version
+const CACHE_VERSION = "v5" // Increment version to force cache refresh
 const STATIC_CACHE = `jjc-static-${CACHE_VERSION}`
 const API_CACHE = `jjc-api-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `jjc-dynamic-${CACHE_VERSION}`

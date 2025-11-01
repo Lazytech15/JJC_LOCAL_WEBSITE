@@ -2,7 +2,7 @@ import { getStoredToken, clearTokens } from "./auth.js"
 import { io } from "socket.io-client"
 
 export const API_ENDPOINTS = {
-  public: "http://192.168.68.140:3001",
+  public: "https://jjcenggworks.com",
   // public: window.location.origin,
 }
 
