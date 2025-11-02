@@ -605,7 +605,7 @@ function Attendance() {
 
           if (dayOfWeek === 0) { // Sunday
             const totalHours = (regularHours || 0) + (overtimeHours || 0);
-            return totalHours > 0 ? totalHours.toFixed(1) : "";
+            return totalHours > 0 ? parseFloat(totalHours || 0) : "";
           }
           return "";
         };
@@ -997,7 +997,7 @@ function Attendance() {
             emp.data.position || "N/A",
             emp.data.total_days,
             emp.avgHours.toFixed(1),
-            emp.punctualityRate.toFixed(1) + "%",
+            parseFloat(emp.punctualityRate).toFixed(1) + "%",
             emp.completionRate.toFixed(1) + "%",
             emp.score.toFixed(1),
             emp.grade,
@@ -1023,7 +1023,7 @@ function Attendance() {
         };
 
         Object.entries(gradeDistribution).forEach(([grade, count]) => {
-          const percentage = ((count / performanceArray.length) * 100).toFixed(1);
+          const percentage = (parseFloat(count) / parseFloat(performanceArray.length) * 100);
           performanceData.push([grade, count, percentage + "%", gradeRanges[grade] || ""]);
         });
       }
@@ -1108,8 +1108,8 @@ function Attendance() {
       weekOrder.forEach(day => {
         if (dayOfWeekPattern[day]) {
           const data = dayOfWeekPattern[day];
-          const latePercent = ((data.late / data.total) * 100).toFixed(1);
-          const otPercent = ((data.overtime / data.total) * 100).toFixed(1);
+          const latePercent = ((parseFloat(data.late) / parseFloat(data.total) * 100) || 0);
+          const otPercent = ((parseFloat(data.overtime) / parseFloat(data.total) * 100) || 0);
 
           let riskLevel = "Low";
           let recommendations = "Monitor regularly";
@@ -1146,7 +1146,7 @@ function Attendance() {
       if (dayOfWeekPattern["Monday"] && dayOfWeekPattern["Monday"].late / dayOfWeekPattern["Monday"].total > 0.15) {
         insights.push({
           category: "Monday Blues Effect",
-          finding: `${((dayOfWeekPattern["Monday"].late / dayOfWeekPattern["Monday"].total) * 100).toFixed(1)}% late rate on Mondays`,
+          finding: `${(parseFloat(dayOfWeekPattern["Monday"].late) / parseFloat(dayOfWeekPattern["Monday"].total) * 100)}% late rate on Mondays`,
           impact: "Medium",
           action: "Consider flexible Monday start times or team building activities",
           timeline: "2-4 weeks"
@@ -1158,7 +1158,7 @@ function Attendance() {
       if (weekendWork > rangeStats.total_records * 0.1) {
         insights.push({
           category: "Weekend Work Concern",
-          finding: `${weekendWork} weekend records (${((weekendWork / rangeStats.total_records) * 100).toFixed(1)}%)`,
+          finding: `${weekendWork} weekend records (${(parseFloat(weekendWork) / parseFloat(rangeStats.total_records) * 100)}%)`,
           impact: "High",
           action: "Review workload distribution and implement work-life balance policies",
           timeline: "1-2 weeks"
@@ -1754,7 +1754,7 @@ function Attendance() {
             }}
           />
           <div
-            className={`${size} rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg ring-4 ring-white/50 dark:ring-gray-700/50 shadow-lg`}
+            className={`${size} rounded-2xl bg-linear-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg ring-4 ring-white/50 dark:ring-gray-700/50 shadow-lg`}
             style={{ display: "none" }}
           >
             {initials}
@@ -1766,7 +1766,7 @@ function Attendance() {
     // Default fallback to initials
     return (
       <div
-        className={`${size} rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg ring-4 ring-white/50 dark:ring-gray-700/50 shadow-lg`}
+        className={`${size} rounded-2xl bg-linear-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg ring-4 ring-white/50 dark:ring-gray-700/50 shadow-lg`}
       >
         {initials}
       </div>
@@ -1785,7 +1785,7 @@ function Attendance() {
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
           {/* Modal Header */}
-          <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-t-3xl">
+          <div className="sticky top-0 bg-linear-to-r from-indigo-600 to-purple-600 p-6 rounded-t-3xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <ProfilePicture
@@ -1866,7 +1866,7 @@ function Attendance() {
                 {/* Summary Statistics */}
                 {employeeStats && (
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 rounded-2xl p-6">
+                    <div className="bg-linear-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 rounded-2xl p-6">
                       <div className="text-center">
                         <div className="text-3xl mb-2">📅</div>
                         <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
@@ -1878,11 +1878,11 @@ function Attendance() {
                       </div>
                     </div>
 
-                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-2xl p-6">
+                    <div className="bg-linear-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-2xl p-6">
                       <div className="text-center">
                         <div className="text-3xl mb-2">⏰</div>
                         <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                          {(employeeStats.total_regular_hours || 0).toFixed(1)}h
+                          {(parseFloat(employeeStats.total_regular_hours) || 0)}h
                         </div>
                         <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
                           Regular Hours
@@ -1890,11 +1890,11 @@ function Attendance() {
                       </div>
                     </div>
 
-                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-2xl p-6">
+                    <div className="bg-linear-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-2xl p-6">
                       <div className="text-center">
                         <div className="text-3xl mb-2">🌙</div>
                         <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
-                          {(employeeStats.total_overtime_hours || 0).toFixed(1)}
+                          {(parseFloat(employeeStats.total_overtime_hours) || 0)}
                           h
                         </div>
                         <div className="text-sm font-medium text-orange-600 dark:text-orange-400">
@@ -1903,7 +1903,7 @@ function Attendance() {
                       </div>
                     </div>
 
-                    <div className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-2xl p-6">
+                    <div className="bg-linear-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-2xl p-6">
                       <div className="text-center">
                         <div className="text-3xl mb-2">⚠️</div>
                         <div className="text-2xl font-bold text-red-700 dark:text-red-300">
@@ -2002,7 +2002,7 @@ function Attendance() {
                               cy="50%"
                               labelLine={false}
                               label={({ name, value }) =>
-                                `${name}: ${value.toFixed(1)}h`
+                                `${name}: ${(parseFloat(value) || 0)}h`
                               }
                               outerRadius={100}
                               fill="#8884d8"
@@ -2017,7 +2017,7 @@ function Attendance() {
                             </Pie>
                             <Tooltip
                               formatter={(value) => [
-                                value.toFixed(1) + "h",
+                                (parseFloat(value) || 0) + "h",
                                 "Hours",
                               ]}
                             />
@@ -2161,7 +2161,7 @@ function Attendance() {
                                 title={`${record.date}: ${record.total_hours}h${isLate ? " (Late)" : ""
                                   }${isIncomplete ? " (Incomplete)" : ""}`}
                               >
-                                {record.total_hours.toFixed(0)}
+                                {parseFloat(record.total_hours)}
                               </div>
                             );
                           })}
@@ -2246,12 +2246,12 @@ function Attendance() {
                                   </div>
                                 </div>
                                 <div className="text-right">
-                                  <div className="font-bold text-slate-800 dark:text-slate-200">
-                                    {avgHours.toFixed(1)}h avg
+                                    <div className="font-bold text-slate-800 dark:text-slate-200">
+                                    {(parseFloat(avgHours) || 0)}h avg
                                   </div>
                                   {latePercentage > 0 && (
                                     <div className="text-xs text-red-600 dark:text-red-400">
-                                      {latePercentage.toFixed(0)}% late
+                                      {(parseFloat(latePercentage) || 0)}% late
                                     </div>
                                   )}
                                 </div>
@@ -2324,7 +2324,7 @@ function Attendance() {
                                 }`}
                             >
                               {trend >= 0 ? "↗️" : "↘️"}{" "}
-                              {Math.abs(trendPercentage).toFixed(1)}%
+                              {(parseFloat(Math.abs(trendPercentage)) || 0)}%
                             </div>
                             <div className="text-xs text-slate-600 dark:text-slate-400">
                               vs previous week
@@ -2355,7 +2355,7 @@ function Attendance() {
                             </div>
                             <div className="text-lg font-bold text-indigo-600">
                               🏆{" "}
-                              {mostProductiveDay.total_hours?.toFixed(1) || 0}h
+                              {parseFloat(mostProductiveDay.total_hours) || 0}h
                             </div>
                             <div className="text-xs text-slate-600 dark:text-slate-400">
                               {mostProductiveDay.date
@@ -2407,7 +2407,7 @@ function Attendance() {
                                 Attendance Rate
                               </div>
                               <div className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">
-                                {attendanceRate.toFixed(0)}%
+                                {(parseFloat(attendanceRate) || 0).toFixed(0)}%
                               </div>
                             </div>
                             <div className="text-3xl">📈</div>
@@ -2419,7 +2419,7 @@ function Attendance() {
                                 Punctuality Rate
                               </div>
                               <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                                {punctualityRate.toFixed(0)}%
+                                {parseFloat(punctualityRate).toFixed(0)}%
                               </div>
                             </div>
                             <div className="text-3xl">⏰</div>
@@ -2443,10 +2443,7 @@ function Attendance() {
                                 Total Hours
                               </div>
                               <div className="text-2xl font-bold text-purple-800 dark:text-purple-200">
-                                {(employeeStats.grand_total_hours || 0).toFixed(
-                                  0
-                                )}
-                                h
+                                {(parseFloat(employeeStats.grand_total_hours) || 0).toFixed(0)}h
                               </div>
                             </div>
                             <div className="text-3xl">⚡</div>
@@ -2516,13 +2513,13 @@ function Attendance() {
                                 {new Date(record.date).toLocaleDateString()}
                               </td>
                               <td className="p-4 text-slate-700 dark:text-slate-300">
-                                {(record.regular_hours || 0).toFixed(1)}h
+                                {(parseFloat(record.regular_hours) || 0)}h
                               </td>
                               <td className="p-4 text-slate-700 dark:text-slate-300">
-                                {(record.overtime_hours || 0).toFixed(1)}h
+                                {(parseFloat(record.overtime_hours) || 0)}h
                               </td>
                               <td className="p-4 font-semibold text-slate-800 dark:text-slate-200">
-                                {(record.total_hours || 0).toFixed(1)}h
+                                {(parseFloat(record.total_hours) || 0)}h
                               </td>
                               <td className="p-4">
                                 <div className="flex items-center gap-2">
@@ -2581,7 +2578,7 @@ function Attendance() {
 
                 {/* Performance Insights */}
                 {employeeStats && (
-                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-2xl p-6 border border-indigo-200 dark:border-indigo-800/30">
+                  <div className="bg-linear-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-2xl p-6 border border-indigo-200 dark:border-indigo-800/30">
                     <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
                       💡 Performance Insights
                     </h3>
@@ -2596,7 +2593,7 @@ function Attendance() {
                               Average Daily Hours:
                             </span>
                             <span className="font-medium text-slate-800 dark:text-slate-200">
-                              {(employeeStats.avg_daily_hours || 0).toFixed(1)}h
+                              {(parseFloat(employeeStats.avg_daily_hours) || 0).toFixed(0)}h
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -2627,7 +2624,7 @@ function Attendance() {
                                       0)) /
                                     employeeStats.total_days) *
                                   100
-                                ).toFixed(1)
+                                ).toFixed(0)
                                 : 0}
                               %
                             </span>
@@ -2700,7 +2697,7 @@ function Attendance() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className={`text-4xl font-bold bg-gradient-to-r bg-clip-text text-transparent ${
+          <h1 className={`text-4xl font-bold bg-linear-to-r bg-clip-text text-transparent ${
             isDarkMode 
               ? "from-slate-100 to-slate-300" 
               : "from-slate-800 to-slate-600"
@@ -2824,8 +2821,8 @@ function Attendance() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className={`group backdrop-blur-xl rounded-3xl p-6 border shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1 ${
             isDarkMode 
-              ? "bg-gradient-to-br from-slate-800/80 to-slate-900/60 border-slate-700/40" 
-              : "bg-gradient-to-br from-white/80 to-white/60 border-white/40"
+              ? "bg-linear-to-br from-slate-800/80 to-slate-900/60 border-slate-700/40" 
+              : "bg-linear-to-br from-white/80 to-white/60 border-white/40"
           }`}>
             <div className="flex items-center justify-between mb-4">
               <div className={`p-3 rounded-2xl ${
@@ -2855,8 +2852,8 @@ function Attendance() {
 
           <div className={`group backdrop-blur-xl rounded-3xl p-6 border shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1 ${
             isDarkMode 
-              ? "bg-gradient-to-br from-emerald-900/20 to-emerald-800/20 border-emerald-800/40" 
-              : "bg-gradient-to-br from-emerald-50/80 to-emerald-100/60 border-emerald-200/40"
+              ? "bg-linear-to-br from-emerald-900/20 to-emerald-800/20 border-emerald-800/40" 
+              : "bg-linear-to-br from-emerald-50/80 to-emerald-100/60 border-emerald-200/40"
           }`}>
             <div className="flex items-center justify-between mb-4">
               <div className={`p-3 rounded-2xl ${
@@ -2886,8 +2883,8 @@ function Attendance() {
 
           <div className={`group backdrop-blur-xl rounded-3xl p-6 border shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1 ${
             isDarkMode 
-              ? "bg-gradient-to-br from-orange-900/20 to-orange-800/20 border-orange-800/40" 
-              : "bg-gradient-to-br from-orange-50/80 to-orange-100/60 border-orange-200/40"
+              ? "bg-linear-to-br from-orange-900/20 to-orange-800/20 border-orange-800/40" 
+              : "bg-linear-to-br from-orange-50/80 to-orange-100/60 border-orange-200/40"
           }`}>
             <div className="flex items-center justify-between mb-4">
               <div className={`p-3 rounded-2xl ${
@@ -2899,7 +2896,7 @@ function Attendance() {
                 <p className={`text-3xl font-bold ${
                   isDarkMode ? "text-orange-300" : "text-orange-700"
                 }`}>
-                  {(stats.total_regular_hours || 0).toFixed(1)}h
+                  {(parseFloat(stats.total_regular_hours) || 0)}h
                 </p>
                 <p className={`text-sm font-medium ${
                   isDarkMode ? "text-orange-400" : "text-orange-600"
@@ -2917,8 +2914,8 @@ function Attendance() {
 
           <div className={`group backdrop-blur-xl rounded-3xl p-6 border shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1 ${
             isDarkMode 
-              ? "bg-gradient-to-br from-red-900/20 to-red-800/20 border-red-800/40" 
-              : "bg-gradient-to-br from-red-50/80 to-red-100/60 border-red-200/40"
+              ? "bg-linear-to-br from-red-900/20 to-red-800/20 border-red-800/40" 
+              : "bg-linear-to-br from-red-50/80 to-red-100/60 border-red-200/40"
           }`}>
             <div className="flex items-center justify-between mb-4">
               <div className={`p-3 rounded-2xl ${
@@ -2951,8 +2948,8 @@ function Attendance() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className={`backdrop-blur-xl rounded-2xl p-6 border ${
             isDarkMode 
-              ? "bg-gradient-to-br from-blue-900/20 to-blue-800/20 border-blue-800/40" 
-              : "bg-gradient-to-br from-blue-50/80 to-blue-100/60 border-blue-200/40"
+              ? "bg-linear-to-br from-blue-900/20 to-blue-800/20 border-blue-800/40" 
+              : "bg-linear-to-br from-blue-50/80 to-blue-100/60 border-blue-200/40"
           }`}>
             <div className="flex items-center gap-4">
               <div className={`p-3 rounded-xl ${
@@ -2977,8 +2974,8 @@ function Attendance() {
 
           <div className={`backdrop-blur-xl rounded-2xl p-6 border ${
             isDarkMode 
-              ? "bg-gradient-to-br from-purple-900/20 to-purple-800/20 border-purple-800/40" 
-              : "bg-gradient-to-br from-purple-50/80 to-purple-100/60 border-purple-200/40"
+              ? "bg-linear-to-br from-purple-900/20 to-purple-800/20 border-purple-800/40" 
+              : "bg-linear-to-br from-purple-50/80 to-purple-100/60 border-purple-200/40"
           }`}>
             <div className="flex items-center gap-4">
               <div className={`p-3 rounded-xl ${
@@ -3003,8 +3000,8 @@ function Attendance() {
 
           <div className={`backdrop-blur-xl rounded-2xl p-6 border ${
             isDarkMode 
-              ? "bg-gradient-to-br from-yellow-900/20 to-yellow-800/20 border-yellow-800/40" 
-              : "bg-gradient-to-br from-yellow-50/80 to-yellow-100/60 border-yellow-200/40"
+              ? "bg-linear-to-br from-yellow-900/20 to-yellow-800/20 border-yellow-800/40" 
+              : "bg-linear-to-br from-yellow-50/80 to-yellow-100/60 border-yellow-200/40"
           }`}>
             <div className="flex items-center gap-4">
               <div className={`p-3 rounded-xl ${
@@ -3016,7 +3013,7 @@ function Attendance() {
                 <p className={`text-2xl font-bold ${
                   isDarkMode ? "text-yellow-300" : "text-yellow-700"
                 }`}>
-                  {(stats.total_overtime_hours || 0).toFixed(1)}h
+                  {(parseFloat(stats.total_overtime_hours) || 0)}h
                 </p>
                 <p className={`text-sm font-medium ${
                   isDarkMode ? "text-yellow-400" : "text-yellow-600"
@@ -3056,8 +3053,8 @@ function Attendance() {
               disabled={isExporting}
               className={`flex items-center gap-2 px-5 py-3 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl disabled:hover:translate-y-0 disabled:hover:shadow-none disabled:cursor-not-allowed ${
                 isDarkMode 
-                  ? "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:from-slate-600 disabled:to-slate-700" 
-                  : "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:from-slate-400 disabled:to-slate-500"
+                  ? "bg-linear-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:from-slate-600 disabled:to-slate-700" 
+                  : "bg-linear-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:from-slate-400 disabled:to-slate-500"
               }`}
             >
               {isExporting ? (
@@ -3088,8 +3085,8 @@ function Attendance() {
               onClick={() => setShowEditModal(true)}
               className={`px-5 py-3 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl flex items-center gap-2 ${
                 isDarkMode 
-                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700" 
-                  : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                  ? "bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700" 
+                  : "bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
               }`}
             >
               <span>✏️</span>
@@ -3100,8 +3097,8 @@ function Attendance() {
               onClick={() => setShowFaceRecognition(true)}
               className={`flex items-center gap-2 px-5 py-3 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl ${
                 isDarkMode 
-                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700" 
-                  : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                  ? "bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700" 
+                  : "bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
               }`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3349,8 +3346,8 @@ function Attendance() {
                 }}
                 className={`w-full px-6 py-3 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl ${
                   isDarkMode 
-                    ? "bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800" 
-                    : "bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800"
+                    ? "bg-linear-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800" 
+                    : "bg-linear-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800"
                 }`}
               >
                 Refresh Data
@@ -3419,11 +3416,11 @@ function Attendance() {
                     className={`group relative overflow-hidden rounded-3xl border transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl cursor-pointer ${
                       hasNewRecords
                         ? isDarkMode
-                          ? "bg-gradient-to-br from-emerald-900/30 to-emerald-800/20 border-emerald-700/60 shadow-2xl animate-pulse shadow-emerald-500/20"
-                          : "bg-gradient-to-br from-emerald-50/90 to-emerald-100/70 border-emerald-300/60 shadow-2xl animate-pulse shadow-emerald-500/20"
+                          ? "bg-linear-to-br from-emerald-900/30 to-emerald-800/20 border-emerald-700/60 shadow-2xl animate-pulse shadow-emerald-500/20"
+                          : "bg-linear-to-br from-emerald-50/90 to-emerald-100/70 border-emerald-300/60 shadow-2xl animate-pulse shadow-emerald-500/20"
                         : isDarkMode
-                          ? "bg-gradient-to-br from-slate-800/80 to-slate-900/60 border-slate-700/40 hover:shadow-xl backdrop-blur-xl hover:border-indigo-700/60"
-                          : "bg-gradient-to-br from-white/80 to-white/60 border-white/40 hover:shadow-xl backdrop-blur-xl hover:border-indigo-300/60"
+                          ? "bg-linear-to-br from-slate-800/80 to-slate-900/60 border-slate-700/40 hover:shadow-xl backdrop-blur-xl hover:border-indigo-700/60"
+                          : "bg-linear-to-br from-white/80 to-white/60 border-white/40 hover:shadow-xl backdrop-blur-xl hover:border-indigo-300/60"
                     }`}
                   >
                     {/* New Record Indicator */}
@@ -3445,7 +3442,7 @@ function Attendance() {
                     <div className="p-6">
                       {/* Header Section */}
                       <div className="flex items-start gap-4 mb-6">
-                        <div className="flex-shrink-0">
+                        <div className="shrink-0">
                           <ProfilePicture
                             uid={employee.employee_uid}
                             name={employeeName}
@@ -3590,7 +3587,7 @@ function Attendance() {
                           <p className={`text-xl font-bold ${
                             isDarkMode ? "text-slate-200" : "text-slate-800"
                           }`}>
-                            {employee.total_regular_hours.toFixed(1)}h
+                            {parseFloat(employee.total_regular_hours)}h
                           </p>
                         </div>
 
@@ -3610,7 +3607,7 @@ function Attendance() {
                           <p className={`text-xl font-bold ${
                             isDarkMode ? "text-orange-300" : "text-orange-700"
                           }`}>
-                            {employee.total_overtime_hours.toFixed(1)}h
+                            {parseFloat(employee.total_overtime_hours)}h
                           </p>
                         </div>
                       </div>
@@ -3619,8 +3616,8 @@ function Attendance() {
                     {/* Hover Effect Overlay */}
                     <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none ${
                       isDarkMode 
-                        ? "bg-gradient-to-r from-transparent via-white/5 to-transparent" 
-                        : "bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                        ? "bg-linear-to-r from-transparent via-white/5 to-transparent" 
+                        : "bg-linear-to-r from-transparent via-white/10 to-transparent"
                     }`}></div>
 
                     {/* Interactive Indicator */}
@@ -3731,8 +3728,8 @@ function Attendance() {
       {stats.unsynced_count > 0 && (
         <div className={`backdrop-blur-xl border rounded-2xl p-6 shadow-xl ${
           isDarkMode 
-            ? "bg-gradient-to-r from-amber-900/20 to-orange-900/20 border-amber-700/60" 
-            : "bg-gradient-to-r from-amber-50/90 to-orange-50/90 border-amber-200/60"
+            ? "bg-linear-to-r from-amber-900/20 to-orange-900/20 border-amber-700/60" 
+            : "bg-linear-to-r from-amber-50/90 to-orange-50/90 border-amber-200/60"
         }`}>
           <div className="flex items-center gap-4">
             <div className={`p-3 rounded-xl ${
@@ -3767,8 +3764,8 @@ function Attendance() {
                 {/* Optional: Add a header bar with close button (alternative placement) */}
                 <div className={`sticky top-0 p-4 rounded-t-3xl flex justify-between items-center z-10 ${
                   isDarkMode 
-                    ? "bg-gradient-to-r from-indigo-600 to-purple-600" 
-                    : "bg-gradient-to-r from-indigo-600 to-purple-600"
+                    ? "bg-linear-to-r from-indigo-600 to-purple-600" 
+                    : "bg-linear-to-r from-indigo-600 to-purple-600"
                 }`}>
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">✏️</span>
