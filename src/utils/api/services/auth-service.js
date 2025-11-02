@@ -6,23 +6,24 @@ import { BaseAPIService } from "../core/base-api.js"
 export class AuthService extends BaseAPIService {
   /**
    * Login user with credentials
-   * @param {Object} credentials - Login credentials (username, password, department)
+   * @param {Object} credentials - Login credentials (username, password, department, loginType)
    * @returns {Promise} User data and authentication token
    */
   async login(credentials) {
     try {
-      const { username, password, department } = credentials
+      const { username, password, department, loginType } = credentials
       
       // Validate required fields
       if (!username || !password || !department) {
         throw new Error('Username, password, and department are required')
       }
 
-      // Make login request
+      // Make login request - include loginType to identify employee vs admin login
       const queryParams = new URLSearchParams({
         username,
         password,
-        department
+        department,
+        loginType: loginType || 'admin' // Default to 'admin' for backward compatibility
       }).toString()
 
       const response = await this.request(`/api/auth?${queryParams}`, {

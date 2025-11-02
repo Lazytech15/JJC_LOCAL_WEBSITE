@@ -94,8 +94,8 @@ export default function DashboardHome({
   // Count documents
   const documentCount = documentData?.documents?.length || documentData?.length || 0
 
-  const totalHours = userSummaries.reduce((sum, day) => sum + (day.total_hours || 0), 0)
-  const overtimeHours = userSummaries.reduce((sum, day) => sum + (day.overtime_hours || 0), 0)
+  const totalHours = userSummaries.reduce((sum, day) => sum + (parseFloat(day.total_hours) || 0), 0)
+const overtimeHours = userSummaries.reduce((sum, day) => sum + (parseFloat(day.overtime_hours) || 0), 0)
 
   const stats = [
     {

@@ -248,104 +248,106 @@ export default function EmployeeLogin() {
   }
 
   const handleSubmit = async () => {
-    setError("")
-    setIsLoading(true)
+  setError("")
+  setIsLoading(true)
 
-    try {
-      if (!username.trim() || !password.trim() || !department) {
-        setError("Please fill in all fields.")
-        setIsLoading(false)
-        return
-      }
-
-      const response = await authService.login({
-        username: username.trim(),
-        password,
-        department
-      })
-
-      console.log("API Response:", response)
-
-      if (response.success && response.user) {
-        const userData = response.user
-
-        const accessTokenExpiry = rememberMe ? "24h" : "1h"
-        const refreshTokenExpiry = rememberMe ? "7d" : "24h"
-
-        const accessToken = response.accessToken || createToken({
-          userId: userData.id,
-          username: userData.username,
-          name: userData.name,
-          department: userData.department,
-          accessLevel: userData.access_level,
-          role: userData.role,
-          permissions: userData.permissions
-        }, accessTokenExpiry)
-
-        const refreshToken = response.refreshToken || createToken({
-          id: userData.id,
-          type: "refresh",
-          department: userData.department
-        }, refreshTokenExpiry)
-
-        storeTokens(accessToken, refreshToken)
-
-        if (employeeLogin) {
-          employeeLogin({
-            id: userData.id,
-            name: userData.name,
-            username: userData.username,
-            employeeId: `JJC-${userData.id}`,
-            department: userData.department,
-            position: userData.access_level,
-            role: userData.role,
-            permissions: userData.permissions,
-            loginTime: new Date().toISOString(),
-            tokenExpiry: rememberMe ? "24 hours" : "1 hour",
-            hasValidToken: true
-          })
-        }
-
-        console.log("Login successful with JWT authentication")
-
-        if (userData.role === 'super-admin') {
-          navigate("/jjcewgsaccess/super-admin", { replace: true })
-        } else if (userData.role === 'admin' || userData.role === 'manager') {
-          const deptRoutes = {
-            'Human Resources': '/jjcewgsaccess/hr',
-            'Operations': '/jjcewgsaccess/operations',
-            'Finance': '/jjcewgsaccess/finance',
-            'Procurement': '/jjcewgsaccess/procurement',
-            'Engineering': '/jjcewgsaccess/engineering'
-          }
-          const route = deptRoutes[userData.department] || '/jjcewgsaccess'
-          navigate(route, { replace: true })
-        } else {
-          navigate("/employee/dashboard", { replace: true })
-        }
-      } else {
-        clearTokens()
-        setError(response.message || response.error || "Authentication failed")
-      }
-    } catch (err) {
-      console.error("Login error:", err)
-      clearTokens()
-
-      if (err.name === "NetworkError" || !navigator.onLine) {
-        setError("Network connection error. Please check your internet connection.")
-      } else if (err.message.includes("404")) {
-        setError("User not found or not authorized for this department.")
-      } else if (err.message.includes("401")) {
-        setError("Invalid credentials. Please check your password.")
-      } else if (err.message.includes("400")) {
-        setError("Invalid request. Please check all fields.")
-      } else {
-        setError(err.message || "Unable to connect to server. Please try again later.")
-      }
-    } finally {
+  try {
+    if (!username.trim() || !password.trim() || !department) {
+      setError("Please fill in all fields.")
       setIsLoading(false)
+      return
     }
+
+    // Add loginType identifier for employee login
+    const response = await authService.login({
+      username: username.trim(),
+      password,
+      department,
+      loginType: 'employee' // NEW: Identify this as employee login
+    })
+
+    console.log("API Response:", response)
+
+    if (response.success && response.user) {
+      const userData = response.user
+
+      const accessTokenExpiry = rememberMe ? "24h" : "1h"
+      const refreshTokenExpiry = rememberMe ? "7d" : "24h"
+
+      const accessToken = response.accessToken || createToken({
+        userId: userData.id,
+        username: userData.username,
+        name: userData.name,
+        department: userData.department,
+        accessLevel: userData.access_level,
+        role: userData.role,
+        permissions: userData.permissions
+      }, accessTokenExpiry)
+
+      const refreshToken = response.refreshToken || createToken({
+        id: userData.id,
+        type: "refresh",
+        department: userData.department
+      }, refreshTokenExpiry)
+
+      storeTokens(accessToken, refreshToken)
+
+      if (employeeLogin) {
+        employeeLogin({
+          id: userData.id,
+          name: userData.name,
+          username: userData.username,
+          employeeId: `JJC-${userData.id}`,
+          department: userData.department,
+          position: userData.access_level,
+          role: userData.role,
+          permissions: userData.permissions,
+          loginTime: new Date().toISOString(),
+          tokenExpiry: rememberMe ? "24 hours" : "1 hour",
+          hasValidToken: true
+        })
+      }
+
+      console.log("Login successful with JWT authentication")
+
+      if (userData.role === 'super-admin') {
+        navigate("/jjcewgsaccess/super-admin", { replace: true })
+      } else if (userData.role === 'admin' || userData.role === 'manager') {
+        const deptRoutes = {
+          'Human Resources': '/jjcewgsaccess/hr',
+          'Operations': '/jjcewgsaccess/operations',
+          'Finance': '/jjcewgsaccess/finance',
+          'Procurement': '/jjcewgsaccess/procurement',
+          'Engineering': '/jjcewgsaccess/engineering'
+        }
+        const route = deptRoutes[userData.department] || '/jjcewgsaccess'
+        navigate(route, { replace: true })
+      } else {
+        navigate("/employee/dashboard", { replace: true })
+      }
+    } else {
+      clearTokens()
+      setError(response.message || response.error || "Authentication failed")
+    }
+  } catch (err) {
+    console.error("Login error:", err)
+    clearTokens()
+
+    if (err.name === "NetworkError" || !navigator.onLine) {
+      setError("Network connection error. Please check your internet connection.")
+    } else if (err.message.includes("404")) {
+      setError("User not found or not authorized for this department.")
+    } else if (err.message.includes("401")) {
+      setError("Invalid credentials. Please check your password.")
+    } else if (err.message.includes("400")) {
+      setError("Invalid request. Please check all fields.")
+    } else {
+      setError(err.message || "Unable to connect to server. Please try again later.")
+    }
+  } finally {
+    setIsLoading(false)
   }
+}
 
   const handleInputChange = (field, value) => {
     if (field === 'username') setUsername(value)
@@ -385,7 +387,7 @@ if (isInitializing) {
                     alt={item.title}
                     className="w-full h-full object-cover"
                   />
-                  <div className={`absolute inset-0 bg-gradient-to-br ${
+                  <div className={`absolute inset-0 bg-linear-to-br ${
                     isDarkMode 
                       ? "from-black/80 via-gray-900/70 to-black/80"
                       : "from-zinc-900/60 via-zinc-900/40 to-zinc-900/60"
@@ -499,9 +501,9 @@ if (isInitializing) {
                   className="w-12 h-12 rounded-xl object-cover shadow-md bg-primary"
                 />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center califoniaFont gap-2">
                 <div>
-                  <h1 className="text-2xl font-extrabold text-white drop-shadow-lg">JJC</h1>
+                  <h1 className="text-5xl text-white drop-shadow-lg">JJC</h1>
                 </div>
                 <div className="text-left">
                   <p className="text-xs font-semibold uppercase leading-tight text-white drop-shadow-lg">Engineering Works</p>

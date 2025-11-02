@@ -1,8 +1,8 @@
 // ============================================================================
-// service-worker.js - Optimized for Performance
+// service-worker.js - Optimized for Performance with Network First on Empty Cache
 // ============================================================================
 
-const CACHE_VERSION = "v5" // Increment version to force cache refresh
+const CACHE_VERSION = "v13" // Increment version to force cache refresh
 const STATIC_CACHE = `jjc-static-${CACHE_VERSION}`
 const API_CACHE = `jjc-api-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `jjc-dynamic-${CACHE_VERSION}`
@@ -29,11 +29,12 @@ const CORE_ASSETS = [
 self.addEventListener("install", (event) => {
   console.log("[Service Worker] Installing...")
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => {
-      console.log("[Service Worker] Caching core assets only")
-      return cache.addAll(CORE_ASSETS).catch(err => {
+    caches.open(STATIC_CACHE).then(async (cache) => {
+      try {
+        return await cache.addAll(CORE_ASSETS)
+      } catch (err) {
         console.warn("[Service Worker] Failed to cache some core assets:", err)
-      })
+      }
     })
   )
   self.skipWaiting()
@@ -41,7 +42,6 @@ self.addEventListener("install", (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener("activate", (event) => {
-  console.log("[Service Worker] Activating...")
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -57,7 +57,6 @@ self.addEventListener("activate", (event) => {
                    name !== GALLERY_CACHE
           })
           .map((name) => {
-            console.log("[Service Worker] Deleting old cache:", name)
             return caches.delete(name)
           }),
       )
@@ -76,21 +75,21 @@ self.addEventListener("fetch", (event) => {
     return
   }
 
-  // Landing page images - Network First (lazy cache)
+  // Landing page images - Cache First with Network Fallback (no cache = direct network)
   if (url.pathname.includes("/api/profile/landing/")) {
-    event.respondWith(lazyImageCacheStrategy(request, LANDING_CACHE, CACHE_EXPIRATION.LANDING))
+    event.respondWith(cacheFirstWithNetworkFallback(request, LANDING_CACHE, CACHE_EXPIRATION.LANDING))
     return
   }
 
-  // Gallery images - Network First (lazy cache)
+  // Gallery images - Cache First with Network Fallback (no cache = direct network)
   if (url.pathname.includes("/api/profile/gallery/")) {
-    event.respondWith(lazyImageCacheStrategy(request, GALLERY_CACHE, CACHE_EXPIRATION.GALLERY))
+    event.respondWith(cacheFirstWithNetworkFallback(request, GALLERY_CACHE, CACHE_EXPIRATION.GALLERY))
     return
   }
 
-  // Profile pictures - Network First (lazy cache with shorter expiration)
+  // Profile pictures - Cache First with Network Fallback
   if (url.pathname.includes("/api/profile/")) {
-    event.respondWith(lazyImageCacheStrategy(request, PROFILE_CACHE, CACHE_EXPIRATION.PROFILE))
+    event.respondWith(cacheFirstWithNetworkFallback(request, PROFILE_CACHE, CACHE_EXPIRATION.PROFILE))
     return
   }
 
@@ -132,94 +131,117 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(fetch(request))
 })
 
-// Lazy Image Cache Strategy - Only cache on first successful load
-async function lazyImageCacheStrategy(request, cacheName, maxAge) {
+// Cache First with Network Fallback - Checks cache first, if not found goes to network
+async function cacheFirstWithNetworkFallback(request, cacheName, maxAge) {
   const cache = await caches.open(cacheName)
   const cached = await cache.match(request)
 
-  // Check if cache is still valid
+  // Check if we have a valid cache
   if (cached) {
     const dateHeader = cached.headers.get('sw-cache-date')
     if (dateHeader) {
       const cacheDate = new Date(dateHeader).getTime()
       const now = Date.now()
       
+      // If cache is still valid, return it
       if (now - cacheDate < maxAge) {
-        console.log(`[Service Worker] Image from cache (${cacheName}):`, request.url)
+        console.log(`[Service Worker] ✅ Cache hit (valid):`, request.url)
         
-        // Update in background without blocking
-        fetch(request)
-          .then(async (response) => {
-            if (response.ok && response.status === 200) {
-              const newResponse = new Response(response.body, {
-                status: response.status,
-                statusText: response.statusText,
-                headers: response.headers
-              })
-              newResponse.headers.append('sw-cache-date', new Date().toISOString())
-              await cache.put(request, newResponse)
-            }
-          })
-          .catch(() => {}) // Ignore background update errors
+        // Update cache in background if it's getting old (>50% of maxAge)
+        if (now - cacheDate > maxAge * 0.5) {
+          console.log(`[Service Worker] 🔄 Refreshing cache in background:`, request.url)
+          fetch(request, { cache: 'no-cache' })
+            .then(response => {
+              if (response.ok && response.status === 200) {
+                cacheResponseWithDate(cache, request, response)
+              }
+            })
+            .catch(() => {}) // Ignore background update errors
+        }
         
         return cached
       } else {
-        // Cache expired, delete it
-        await cache.delete(request)
+        console.log(`[Service Worker] ⏰ Cache expired:`, request.url)
       }
     }
   }
 
-  // Fetch from network
+  // No valid cache - fetch from network
+  console.log(`[Service Worker] 🌐 No valid cache, fetching from network:`, request.url)
+  
   try {
-    const response = await fetch(request)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+    
+    const response = await fetch(request, { 
+      signal: controller.signal,
+      cache: 'no-cache'
+    })
+    clearTimeout(timeoutId)
     
     if (response.ok && response.status === 200) {
-      // Cache in background, don't block response
-      const responseToCache = response.clone()
-      try { 
-        // Only cache http(s) requests; skip extensions or unsupported schemes
-        const proto = new URL(request.url).protocol
-        if (proto === 'http:' || proto === 'https:') {
-          await cache.put(request, responseToCache)
-          console.log(`[Service Worker] Image cached in ${cacheName}:`, request.url)
-        } else {
-          console.log(`[Service Worker] Skipping cache for unsupported scheme (${proto}):`, request.url)
-        }
-      } catch (putErr) {
-        console.warn(`[Service Worker] Failed to put image in cache:`, putErr)
-      }
+      console.log(`[Service Worker] ✅ Network fetch successful, caching:`, request.url)
+      // Cache the response in background
+      cacheResponseWithDate(cache, request, response.clone())
+      return response
     }
     
-    return response
-  } catch (error) {
-    console.error(`[Service Worker] Image fetch failed (${cacheName}):`, error)
+    // Non-OK response
+    console.warn(`[Service Worker] ⚠️ Network response not OK (${response.status}):`, request.url)
     
-    // Return cached version even if expired as fallback
+    // If we have expired cache, use it as fallback
     if (cached) {
+      console.log(`[Service Worker] 📦 Using expired cache as fallback:`, request.url)
       return cached
     }
     
-    return new Response("Image not available", { 
-      status: 503,
-      headers: { "Content-Type": "text/plain" }
-    })
+    return response
+    
+  } catch (error) {
+    console.error(`[Service Worker] ❌ Network fetch failed (${error.name}):`, request.url)
+    
+    // If we have any cache (even expired), use it
+    if (cached) {
+      console.log(`[Service Worker] 📦 Network failed, using cached version:`, request.url)
+      return cached
+    }
+    
+    // No cache available - return error response
+    return new Response(
+      JSON.stringify({ 
+        error: "Image temporarily unavailable",
+        message: "Please check your connection and refresh",
+        url: request.url 
+      }), 
+      { 
+        status: 503,
+        statusText: "Service Unavailable",
+        headers: { 
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store"
+        }
+      }
+    )
   }
 }
 
-// Helper function to cache response asynchronously
-async function cacheResponse(cache, request, response) {
+// Helper function to cache response with timestamp
+async function cacheResponseWithDate(cache, request, response) {
   try {
-    const newResponse = new Response(response.body, {
+    const blob = await response.blob()
+    const headers = new Headers(response.headers)
+    headers.set('sw-cache-date', new Date().toISOString())
+    
+    const responseToCache = new Response(blob, {
       status: response.status,
       statusText: response.statusText,
-      headers: response.headers
+      headers: headers
     })
-    newResponse.headers.append('sw-cache-date', new Date().toISOString())
-    await cache.put(request, newResponse)
-    console.log("[Service Worker] Cached in background:", request.url)
+    
+    await cache.put(request, responseToCache)
+    console.log(`[Service Worker] 💾 Cached successfully:`, request.url)
   } catch (error) {
-    console.warn("[Service Worker] Failed to cache:", error)
+    console.warn(`[Service Worker] Failed to cache:`, error)
   }
 }
 
@@ -229,20 +251,16 @@ async function cacheFirstStrategy(request, cacheName) {
   const cached = await cache.match(request)
 
   if (cached) {
-    console.log("[Service Worker] Serving from cache:", request.url)
     return cached
   }
 
   try {
-    console.log("[Service Worker] Fetching and caching:", request.url)
     const response = await fetch(request)
     if (response.ok) {
       try {
         const proto = new URL(request.url).protocol
         if (proto === 'http:' || proto === 'https:') {
           await cache.put(request, response.clone())
-        } else {
-          console.log(`[Service Worker] Skipping cache for unsupported scheme (${proto}):`, request.url)
         }
       } catch (putErr) {
         console.warn('[Service Worker] cache.put failed:', putErr)
@@ -260,7 +278,6 @@ async function cacheFirstStrategy(request, cacheName) {
 }
 
 // Network First Strategy - Try network first, fallback to cache
-// Accepts a timeout parameter (ms) to abort the fetch if it takes too long
 async function networkFirstStrategy(request, cacheName, timeout = 5000) {
   const cache = await caches.open(cacheName)
 
@@ -297,30 +314,9 @@ async function networkFirstStrategy(request, cacheName, timeout = 5000) {
   }
 }
 
-// Wrapper used by the fetch handler for clearer naming; preserved for backward compatibility
+// Wrapper used by the fetch handler
 async function networkFirstWithTimeout(request, cacheName, timeoutMs) {
   return networkFirstStrategy(request, cacheName, timeoutMs)
-}
-
-// Cache First Strategy - For static assets only
-async function cacheFirstStrategy(request, cacheName) {
-  const cache = await caches.open(cacheName)
-  const cached = await cache.match(request)
-
-  if (cached) {
-    return cached
-  }
-
-  try {
-    const response = await fetch(request)
-    if (response.ok) {
-      cache.put(request, response.clone()).catch(() => {})
-    }
-    return response
-  } catch (error) {
-    console.error("[Service Worker] Fetch failed:", error)
-    return new Response("Offline", { status: 503 })
-  }
 }
 
 // Background sync for failed requests
@@ -422,13 +418,7 @@ async function prefetchImages(urls) {
         try {
           const response = await fetch(url)
           if (response.ok) {
-            const newResponse = new Response(response.body, {
-              status: response.status,
-              statusText: response.statusText,
-              headers: response.headers
-            })
-            newResponse.headers.append('sw-cache-date', new Date().toISOString())
-            await cache.put(url, newResponse)
+            await cacheResponseWithDate(cache, new Request(url), response)
           }
         } catch (error) {
           console.warn(`[Service Worker] Prefetch failed for ${url}:`, error)

@@ -18,8 +18,8 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
 
     console.log("[v0] TimeAttendance - Processing summaries:", dailySummaries.length)
 
-    const totalHours = dailySummaries.reduce((sum, day) => sum + (day.total_hours || 0), 0)
-    const overtimeHours = dailySummaries.reduce((sum, day) => sum + (day.overtime_hours || 0), 0)
+    const totalHours = dailySummaries.reduce((sum, day) => sum + (parseFloat(day.total_hours) || 0), 0)
+    const overtimeHours = dailySummaries.reduce((sum, day) => sum + (parseFloat(day.overtime_hours) || 0), 0)
     const lateDays = dailySummaries.filter((day) => day.has_late_entry === 1 || day.has_late_entry === true).length
     const incompleteDays = dailySummaries.filter((day) => day.is_incomplete === 1 || day.is_incomplete === true).length
     const completeDays = dailySummaries.length - incompleteDays
@@ -233,7 +233,7 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
                       <td
                         className={`py-4 px-4 text-right font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}
                       >
-                        {day.total_hours?.toFixed(1) || "0.0"}h
+                        {(parseFloat(day.total_hours) || 0).toFixed(1)}h
                       </td>
                       <td className="py-4 px-4 text-right">{getStatusBadge(day)}</td>
                     </tr>
@@ -251,7 +251,7 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
             <CardContent className="p-6">
               <div className="flex items-start gap-4">
                 <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                     stats.lateDays > 0
                       ? isDarkMode
                         ? "bg-amber-500/20 text-amber-400"
@@ -282,7 +282,7 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
             <CardContent className="p-6">
               <div className="flex items-start gap-4">
                 <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                     stats.incompleteDays > 0
                       ? isDarkMode
                         ? "bg-red-500/20 text-red-400"

@@ -440,7 +440,6 @@ export class ProfileService extends BaseAPIService {
       }
 
       this.galleryImageCache.set(filename, result)
-      console.log(`[ProfileService] Cached gallery image: ${filename}`)
 
       return result
 

@@ -244,7 +244,7 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-white">
       {/* Transparent Navigation */}
-      <nav className="absolute top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/60 to-transparent">
+      <nav className="absolute top-0 left-0 right-0 z-50 bg-linear-to-b from-black/60 to-transparent">
         <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center gap-3">
@@ -343,7 +343,7 @@ useEffect(() => {
                   className="w-full h-full object-cover"
                 />
                 {/* Darker overlay with blur for text readability */}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+                <div className="absolute inset-0 bg-linear-to-b from-black/70 via-black/60 to-black/80" />
               </div>
             ))
           )}
@@ -389,14 +389,14 @@ useEffect(() => {
                     <ChevronRight className="ml-2 w-5 h-5 inline" />
                   </Button>
                 </a>
-                <Link to="/employee/login" className="block">
+                {/* <Link to="/employee/login" className="block">
                   <Button
                     size="lg"
                     className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border border-white/30 text-base h-14 px-8 shadow-xl"
                   >
                     Employee Portal
                   </Button>
-                </Link>
+                </Link> */}
               </div>
             </div>
           </div>
@@ -506,7 +506,7 @@ useEffect(() => {
                 className="p-5 bg-white rounded-2xl border border-zinc-200 hover:border-zinc-900 hover:shadow-md transition-all"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
                     <Cog className="w-6 h-6 text-white" />
                   </div>
                   <p className="font-semibold text-zinc-900 text-sm">{machine}</p>
