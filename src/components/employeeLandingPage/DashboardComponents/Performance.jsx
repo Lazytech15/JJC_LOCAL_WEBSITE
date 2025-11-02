@@ -19,8 +19,8 @@ export default function Performance({ dailySummaries, isDarkMode }) {
     console.log("[v0] Performance - Processing summaries:", dailySummaries.length)
 
     const totalHours = dailySummaries.reduce((sum, day) => sum + (parseFloat(day.total_hours) || 0), 0)
-const regularHours = dailySummaries.reduce((sum, day) => sum + (parseFloat(day.regular_hours) || 0), 0)
-const overtimeHours = dailySummaries.reduce((sum, day) => sum + (parseFloat(day.overtime_hours) || 0), 0)
+    const regularHours = dailySummaries.reduce((sum, day) => sum + (parseFloat(day.regular_hours) || 0), 0)
+    const overtimeHours = dailySummaries.reduce((sum, day) => sum + (parseFloat(day.overtime_hours) || 0), 0)
     const avgHoursPerDay = totalHours / dailySummaries.length
 
     // Calculate completion rate (days with complete sessions)
