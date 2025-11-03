@@ -45,6 +45,7 @@ interface DashboardViewProps {
   setDataSource?: React.Dispatch<React.SetStateAction<"api" | "cached">>
   lastFetchTime?: Date | null
   setLastFetchTime?: React.Dispatch<React.SetStateAction<Date | null>>
+  currentView?: "dashboard" | "cart" | "item-detail"
 }
 
 export function DashboardView({ 
@@ -63,7 +64,8 @@ export function DashboardView({
   dataSource: parentDataSource,
   setDataSource: parentSetDataSource,
   lastFetchTime: parentLastFetchTime,
-  setLastFetchTime: parentSetLastFetchTime
+  setLastFetchTime: parentSetLastFetchTime,
+  currentView = "dashboard"
 }: DashboardViewProps) {
   // Use parent state if available, otherwise fallback to local state
   const [localProducts, setLocalProducts] = useState<Product[]>([])
@@ -734,23 +736,12 @@ export function DashboardView({
     setIsBarcodeModalOpen(true)
     if (result.success && result.product) {
       // When modal opens it reads detectedProduct via props (we set it above)
-      // Also append immediately so UI shows the item in the list
-      // Use a small timeout to allow modal to initialize
-      setTimeout(() => {
-        const p = result.product
-        if (p) {
-          if (isAvailable(p, 1)) {
-            window.dispatchEvent(new CustomEvent('scanned-barcode-append', { detail: { item: { product: p, quantity: 1 } } }))
-          } else {
-            toast({ title: '❌ Not Available', description: `${p.name} is out of stock and will not be queued` })
-          }
-        }
-      }, 80)
+      // The modal will initialize with this product automatically - no need to append again
     }
   }, [products, isBarcodeModalOpen, toast])
 
-  // Start global scanner
-  useGlobalBarcodeScanner(onGlobalBarcodeDetected, { minLength: 3, interKeyMs: 80 })
+  // Start global scanner only when in dashboard view
+  useGlobalBarcodeScanner(onGlobalBarcodeDetected, { minLength: 3, interKeyMs: 80, enabled: currentView === "dashboard" })
 
   // Update local search when header search changes
   useEffect(() => {
@@ -963,7 +954,12 @@ export function DashboardView({
         open={isBarcodeModalOpen}
         initialValue={detectedBarcode ?? ''}
         products={detectedProduct ? [detectedProduct] : []}
-        onClose={() => setIsBarcodeModalOpen(false)}
+        onClose={() => {
+          setIsBarcodeModalOpen(false)
+          // Clear detected state when modal is closed
+          setDetectedProduct(null)
+          setDetectedBarcode('')
+        }}
         onConfirm={(payload: any) => {
           // Bulk items payload
           if (payload && payload.items && Array.isArray(payload.items)) {
@@ -989,7 +985,10 @@ export function DashboardView({
             }
 
             if (addedCount > 0) {
-              // Open cart view only if at least one item was added
+              // Close the modal and open cart view only if at least one item was added
+              setIsBarcodeModalOpen(false)
+              setDetectedProduct(null)
+              setDetectedBarcode('')
               window.dispatchEvent(new CustomEvent('toolbox-navigate', { detail: { view: 'cart' } }))
             }
 
@@ -1002,7 +1001,10 @@ export function DashboardView({
           if (barcodeValue) {
             if (detectedProduct) {
               handleModalAdd(detectedProduct, qty)
-              // after adding, open cart
+              // Close the modal and open cart
+              setIsBarcodeModalOpen(false)
+              setDetectedProduct(null)
+              setDetectedBarcode('')
               window.dispatchEvent(new CustomEvent('toolbox-navigate', { detail: { view: 'cart' } }))
             } else {
               processBarcodeSubmit(barcodeValue)

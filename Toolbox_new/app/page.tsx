@@ -255,6 +255,7 @@ export default function HomePage() {
             setDataSource={setProductsDataSource}
             lastFetchTime={productsLastFetchTime}
             setLastFetchTime={setProductsLastFetchTime}
+            currentView={currentView}
           />
         </div>
 

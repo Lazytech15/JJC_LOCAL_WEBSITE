@@ -111,6 +111,16 @@ export default function BarcodeModal({ open, initialValue = '', products = [], o
     return () => window.removeEventListener('scanned-barcode-append', handler as EventListener)
   }, [])
 
+  // Listen for clear queue events (e.g., after checkout)
+  useEffect(() => {
+    const handler = () => {
+      setLineItems([])
+    }
+
+    window.addEventListener('clear-barcode-queue', handler as EventListener)
+    return () => window.removeEventListener('clear-barcode-queue', handler as EventListener)
+  }, [])
+
   const handleConfirmSingle = () => {
     onConfirm({ barcode: barcode.trim(), quantity })
     onClose()
