@@ -24,25 +24,22 @@ export default defineConfig({
   
   build: {
     outDir: "dist",
-    sourcemap: false, // Disable for production
-    // Enable minification
+    sourcemap: false,
     minify: 'esbuild',
-    // Code splitting for better caching
     rollupOptions: {
       output: {
         manualChunks: {
-          // Separate vendor chunks for better caching
           'react-vendor': ['react', 'react-dom'],
           'ui-vendor': ['lucide-react'],
         },
       },
+      onwarn(warning, warn) {
+        // Suppress sourcemap warnings
+        if (warning.code === 'SOURCEMAP_ERROR') return
+        warn(warning)
+      },
     },
-    // Chunk size warnings
     chunkSizeWarningLimit: 1000,
-    // Enable CSS code splitting
-    cssCodeSplit: true,
-    // Asset optimization
-    assetsInlineLimit: 4096,
   },
   
   // Optimize dependencies
@@ -52,6 +49,6 @@ export default defineConfig({
   
   // Performance optimizations
   esbuild: {
-    drop: ['console', 'debugger'],
+    logOverride: { 'this-is-undefined-in-esm': 'silent' },
   },
 })

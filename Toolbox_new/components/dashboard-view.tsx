@@ -43,7 +43,6 @@ interface DashboardViewProps {
   setDataSource?: React.Dispatch<React.SetStateAction<"api" | "cached">>
   lastFetchTime?: Date | null
   setLastFetchTime?: React.Dispatch<React.SetStateAction<Date | null>>
-  currentView?: "dashboard" | "cart" | "item-detail"
 }
 
 export function DashboardView({ 
@@ -63,7 +62,6 @@ export function DashboardView({
   setDataSource: parentSetDataSource,
   lastFetchTime: parentLastFetchTime,
   setLastFetchTime: parentSetLastFetchTime,
-  currentView = "dashboard"
 }: DashboardViewProps) {
   // Use parent state if available, otherwise fallback to local state
   const [localProducts, setLocalProducts] = useState<Product[]>([])
@@ -1664,7 +1662,6 @@ export function DashboardView({
             onBulkExport={async (selectedProducts, format) => {
               try {
                 // Use existing export functionality
-                const { exportToCSV, exportToXLSX, exportToJSON, prepareExportData } = await import('../lib/export-utils')
                 const exportData = prepareExportData(selectedProducts)
                 
                 let filename = `selected_products_${new Date().toISOString().split('T')[0]}`

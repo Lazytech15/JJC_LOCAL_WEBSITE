@@ -1,39 +1,11 @@
 import type React from "react"
-import type { Metadata } from "next"
-import { GeistSans } from "geist/font/sans"
-import { GeistMono } from "geist/font/mono"
-import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "../components/theme-provider"
 import { ErrorBoundary } from "../components/error-boundary"
 import { KeyboardShortcuts } from "../components/keyboard-shortcuts"
 import { LoadingProvider } from "../components/loading-context"
 import { Suspense } from "react"
 import "./globals.css"
-import dynamic from 'next/dynamic'
-
-// Client-only Global Barcode Listener
-const GlobalBarcodeListener = dynamic(() => import('../components/GlobalBarcodeListener.client'), { ssr: false })
-
-export const metadata: Metadata = {
-  title: "Toolbox Inventory - Warehouse Management",
-  description: "Professional warehouse inventory management system with offline capability for employees",
-  generator: "Next.js + PWA",
-  manifest: "/manifest.json",
-  themeColor: "#0f172a",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "Toolbox Inventory"
-  },
-  icons: {
-    apple: "/ToolBoxlogo.png",
-  },
-  other: {
-    "mobile-web-app-capable": "yes",
-    "application-name": "Toolbox Inventory"
-  }
-}
+import GlobalBarcodeListener from '../components/GlobalBarcodeListener.client'
 
 export default function RootLayout({
   children,
@@ -71,7 +43,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} bg-background text-foreground overflow-hidden h-screen`}>
+      <body className="font-sans bg-background text-foreground overflow-hidden h-screen">
         <ErrorBoundary>
           <Suspense fallback={null}>
             <ThemeProvider defaultTheme="dark" storageKey="toolbox-theme">
@@ -83,7 +55,6 @@ export default function RootLayout({
             </ThemeProvider>
           </Suspense>
         </ErrorBoundary>
-        <Analytics />
       </body>
     </html>
   )
