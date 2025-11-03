@@ -340,6 +340,9 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
     // Clear cart items
     items.forEach((item) => onRemoveItem(item.id))
 
+    // Clear the scanned barcode queue to prevent items from appearing in new processes
+    window.dispatchEvent(new CustomEvent('clear-barcode-queue'))
+
     // Return to browsing/dashboard view
     if (onReturnToBrowsing) {
       onReturnToBrowsing()

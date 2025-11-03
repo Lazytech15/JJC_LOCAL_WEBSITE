@@ -63,43 +63,40 @@ function EmployeeLogs() {
               continue
             }
 
-            // Try profile service (returns cached blob/url)
+            // Simplified approach: directly test the profile URL like HR does
             try {
-              const profileResult = await apiService.profiles.getProfileByUid(uid)
-              if (profileResult && profileResult.success && profileResult.url) {
-                profileMap[uid] = profileResult.url
-                logProfileMap[log.id] = profileResult.url
-                continue
-              }
-            } catch (e) {
-              // ignore and try fallback
-            }
+              const profileUrl = apiService.profiles.getProfileUrlByUid(uid)
 
-            // Fallback: check existence and construct URL
-            try {
-              const hasProfile = await apiService.profiles.hasProfileByUid(uid)
-              if (hasProfile) {
-                const profileUrl = apiService.profiles.getProfileUrlByUid(uid)
-                try {
-                  const resp = await fetch(profileUrl, { method: 'GET', headers: { Authorization: `Bearer ${getStoredToken()}` } })
-                  if (resp.ok) {
-                    profileMap[uid] = profileUrl
-                    logProfileMap[log.id] = profileUrl
-                    continue
-                  }
-                } catch (e) {
-                  // network failed, mark as null
+              // Test if the image exists by fetching it
+              const response = await fetch(profileUrl, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${getStoredToken()}`
                 }
-              }
-            } catch (e) {
-              // ignore
-            }
+              })
 
-            // No profile found
-            profileMap[uid] = null
-            logProfileMap[log.id] = null
+              if (response.ok) {
+                // Store the URL directly (service worker will cache it)
+                profileMap[uid] = profileUrl
+                logProfileMap[log.id] = profileUrl
+                console.log(`[EmployeeLogs] ✓ Profile available for UID: ${uid}, Log: ${log.id}`)
+              } else {
+                console.log(`[EmployeeLogs] ✗ No profile for UID: ${uid}, Log: ${log.id}`)
+                profileMap[uid] = null
+                logProfileMap[log.id] = null
+              }
+            } catch (err) {
+              console.log(`[EmployeeLogs] ✗ Error loading profile for UID ${uid}, Log: ${log.id}:`, err.message)
+              profileMap[uid] = null
+              logProfileMap[log.id] = null
+            }
           } else {
             // couldn't resolve employee, mark as null to avoid retrying constantly
+            console.log(`[EmployeeLogs] ✗ Could not resolve employee for log ${log.id}, data:`, {
+              username: log.username,
+              id_number: log.id_number,
+              id_barcode: log.id_barcode
+            })
             logProfileMap[log.id] = null
           }
         } catch (err) {
@@ -457,83 +454,178 @@ function EmployeeLogs() {
     try {
       let employeeResult = null
       
-      if (log.username && log.username !== 'N/A' && log.username.trim() !== '') {
-        const searchResult = await apiService.employees.getEmployees({ 
-          search: log.username.trim(),
-          limit: 1 
-        })
-        if (searchResult.success && searchResult.employees.length > 0) {
-          employeeResult = searchResult.employees[0]
+      // Clean and prepare search terms
+      const username = log.username && log.username !== 'N/A' && log.username.trim() !== '' ? log.username.trim() : null
+      const idNumber = log.id_number && log.id_number.trim() !== '' ? log.id_number.trim() : null
+      const idBarcode = log.id_barcode && log.id_barcode.trim() !== '' ? log.id_barcode.trim() : null
+
+      console.log(`[EmployeeLogs] Searching for employee with log data:`, {
+        username,
+        idNumber,
+        idBarcode,
+        logId: log.id
+      })
+
+      // Try searching by username first
+      if (username) {
+        try {
+          const searchResult = await apiService.employees.getEmployees({ 
+            search: username,
+            limit: 1 
+          })
+          if (searchResult.success && searchResult.employees && searchResult.employees.length > 0) {
+            employeeResult = searchResult.employees[0]
+            console.log(`[EmployeeLogs] ✓ Found employee by username "${username}":`, employeeResult.id)
+          } else {
+            console.log(`[EmployeeLogs] ✗ No employee found by username "${username}"`)
+          }
+        } catch (error) {
+          console.warn(`[EmployeeLogs] Error searching by username "${username}":`, error.message)
         }
       }
       
-      if (!employeeResult && log.id_number && log.id_number.trim() !== '') {
-        const searchResult = await apiService.employees.getEmployees({ 
-          search: log.id_number.trim(),
-          limit: 1 
-        })
-        if (searchResult.success && searchResult.employees.length > 0) {
-          employeeResult = searchResult.employees[0]
+      // If not found, try searching by id_number
+      if (!employeeResult && idNumber) {
+        try {
+          const searchResult = await apiService.employees.getEmployees({ 
+            search: idNumber,
+            limit: 1 
+          })
+          if (searchResult.success && searchResult.employees && searchResult.employees.length > 0) {
+            employeeResult = searchResult.employees[0]
+            console.log(`[EmployeeLogs] ✓ Found employee by ID number "${idNumber}":`, employeeResult.id)
+          } else {
+            console.log(`[EmployeeLogs] ✗ No employee found by ID number "${idNumber}"`)
+          }
+        } catch (error) {
+          console.warn(`[EmployeeLogs] Error searching by ID number "${idNumber}":`, error.message)
         }
       }
       
-      if (!employeeResult && log.id_barcode && log.id_barcode.trim() !== '') {
-        const searchResult = await apiService.employees.getEmployees({ 
-          search: log.id_barcode.trim(),
-          limit: 1 
-        })
-        if (searchResult.success && searchResult.employees.length > 0) {
-          employeeResult = searchResult.employees[0]
+      // If still not found, try searching by id_barcode
+      if (!employeeResult && idBarcode) {
+        try {
+          const searchResult = await apiService.employees.getEmployees({ 
+            search: idBarcode,
+            limit: 1 
+          })
+          if (searchResult.success && searchResult.employees && searchResult.employees.length > 0) {
+            employeeResult = searchResult.employees[0]
+            console.log(`[EmployeeLogs] ✓ Found employee by ID barcode "${idBarcode}":`, employeeResult.id)
+          } else {
+            console.log(`[EmployeeLogs] ✗ No employee found by ID barcode "${idBarcode}"`)
+          }
+        } catch (error) {
+          console.warn(`[EmployeeLogs] Error searching by ID barcode "${idBarcode}":`, error.message)
         }
+      }
+
+      if (employeeResult) {
+        console.log(`[EmployeeLogs] ✓ Successfully resolved employee for log ${log.id}:`, {
+          id: employeeResult.id,
+          name: `${employeeResult.firstName || ''} ${employeeResult.lastName || ''}`.trim(),
+          department: employeeResult.department
+        })
+      } else {
+        console.log(`[EmployeeLogs] ✗ Could not resolve employee for log ${log.id} with any search method`)
       }
       
       return employeeResult
     } catch (error) {
-      console.error('Error fetching employee details:', error)
+      console.error('[EmployeeLogs] Error in fetchEmployeeDetails:', error)
       return null
     }
   }
 
-  const fetchAssociatedItems = async (itemNos) => {
+  const fetchAssociatedItems = async (itemNos, detailsText = '') => {
     if (!itemNos || itemNos.trim() === '') return []
-    
+
+    const sanitizeNumber = (value) => {
+      const parsed = parseInt(value, 10)
+      return Number.isNaN(parsed) ? null : parsed
+    }
+
+    const parseToken = (token) => {
+      let raw = token.trim()
+      let qty = null
+
+      // colon format: 123:2
+      const colonMatch = raw.match(/^(.*?)\s*[:=]\s*(\d+)$/)
+      if (colonMatch) {
+        return { itemNo: colonMatch[1].trim(), qty: sanitizeNumber(colonMatch[2]) }
+      }
+
+      // parentheses format: 123(2) or 123 (2)
+      const parenMatch = raw.match(/^(.*?)\(\s*(\d+)\s*\)$/)
+      if (parenMatch) {
+        return { itemNo: parenMatch[1].trim(), qty: sanitizeNumber(parenMatch[2]) }
+      }
+
+      // x format (guard against fractional measurements)
+      const xMatch = raw.match(/^(.*?)\b[x×]\s*(\d+)(?=\s*(?:pcs?|units?|unit|ea|pc|piece|pieces|\(|,|$))/i)
+      if (xMatch) {
+        const itemPart = xMatch[1].trim()
+        return { itemNo: itemPart, qty: sanitizeNumber(xMatch[2]) }
+      }
+
+      return { itemNo: raw, qty: null }
+    }
+
+    const extractQuantitiesFromDetails = (details) => {
+      if (!details) return []
+
+      const normalized = details.replace(/\s+/g, ' ').trim()
+      const withoutPrefix = normalized.replace(/^checkout:\s*\d+\s*items?\s*-\s*/i, '')
+  const segments = withoutPrefix.split(/[;,•]\s*/).map(seg => seg.trim()).filter(Boolean)
+
+      return segments.map(seg => {
+        // Preferred pattern: Qty: 5
+        const qtyLabel = seg.match(/qty\s*[:\-]?\s*(\d+)/i)
+        if (qtyLabel) return sanitizeNumber(qtyLabel[1])
+
+        // Pattern: x5 (ensure not capturing fraction like x 1/4)
+        const qtyX = seg.match(/\b[x×]\s*(\d+)(?=\s*(?:pcs?|units?|unit|ea|pc|piece|pieces|\(|,|$))/i)
+        if (qtyX) return sanitizeNumber(qtyX[1])
+
+        // Pattern: (5 pcs)
+        const qtyParen = seg.match(/\((\d+)\s*(?:pcs?|units?|unit|ea|pc|piece|pieces)?\)/i)
+        if (qtyParen) return sanitizeNumber(qtyParen[1])
+
+        return null
+      })
+    }
+
     try {
-      // Accept multiple formats for quantity, e.g. "123:2", "123x2", "123(2)" or just "123"
-      const tokens = itemNos.split(';').map(t => t.trim()).filter(t => t !== '')
+      const tokens = itemNos
+        .split(/[;|]/)
+        .map(t => t.trim())
+        .filter(t => t !== '')
+
       if (tokens.length === 0) return []
 
-      const parsed = tokens.map(tok => {
-        let itemNo = tok
-        let qty = 1
+      const detailQuantities = extractQuantitiesFromDetails(detailsText)
 
-        // 1) colon format: 123:2
-        if (tok.includes(':')) {
-          const [a, b] = tok.split(':').map(s => s.trim())
-          itemNo = a
-          qty = parseInt(b, 10) || 1
-        }
-        // 2) x format: 123x2 or 123X2
-        else if (tok.toLowerCase().includes('x')) {
-          const parts = tok.toLowerCase().split('x').map(s => s.trim())
-          itemNo = parts[0]
-          qty = parseInt(parts[1], 10) || 1
-        }
-        // 3) parentheses: 123(2)
-        else {
-          const m = tok.match(/^(.*)\((\d+)\)\s*$/)
-          if (m) {
-            itemNo = m[1].trim()
-            qty = parseInt(m[2], 10) || 1
-          }
+      const parsed = tokens.map((tok, index) => {
+        const { itemNo, qty } = parseToken(tok)
+        const normalizedItemNo = itemNo.replace(/^#/, '').trim()
+        const fallbackQty = detailQuantities[index] ?? null
+        const finalQty = qty ?? fallbackQty ?? 1
+
+        if (!qty && fallbackQty) {
+          console.debug(`[EmployeeLogs] Using quantity from details for item ${normalizedItemNo}:`, fallbackQty)
         }
 
-        return { itemNo, qty }
+        return { itemNo: normalizedItemNo, qty: finalQty }
       })
 
-      const promises = parsed.map(p => apiService.items.getItem(p.itemNo).then(res => ({ res, qty: p.qty })).catch(err => ({ res: { success: false, error: err }, qty: p.qty })))
+      const promises = parsed.map(p => (
+        apiService.items.getItem(p.itemNo)
+          .then(res => ({ res, qty: p.qty, itemNo: p.itemNo }))
+          .catch(err => ({ res: { success: false, error: err }, qty: p.qty, itemNo: p.itemNo }))
+      ))
+
       const results = await Promise.all(promises)
 
-      // Attach quantity to each successful item result
       return results
         .filter(r => r && r.res && r.res.success)
         .map(r => ({ ...(r.res.data || {}), quantity: r.qty }))
@@ -549,35 +641,33 @@ function EmployeeLogs() {
     try {
       const [employeeResult, associatedItems] = await Promise.all([
         fetchEmployeeDetails(log),
-        fetchAssociatedItems(log.item_no)
+  fetchAssociatedItems(log.item_no, log.details)
       ])
 
       let finalEmployee = employeeResult
       try {
         if (!finalEmployee) finalEmployee = null
         if (finalEmployee && !finalEmployee.profilePicture && finalEmployee.id) {
-          // Follow HR pattern: try the profile service helper which returns a cached blob/url when available
+          // Simplified approach: directly test the profile URL like HR does
           try {
-            const profileResult = await apiService.profiles.getProfileByUid(finalEmployee.id)
-            if (profileResult && profileResult.success && profileResult.url) {
-              finalEmployee = { ...finalEmployee, profilePicture: profileResult.url }
-            } else {
-              // Fallback: check info endpoint then construct direct profile URL and verify it
-              const hasProfile = await apiService.profiles.hasProfileByUid(finalEmployee.id)
-              if (hasProfile) {
-                const profileUrl = apiService.profiles.getProfileUrlByUid(finalEmployee.id)
-                try {
-                  const resp = await fetch(profileUrl, { method: 'GET', headers: { Authorization: `Bearer ${getStoredToken()}` } })
-                  if (resp.ok) {
-                    finalEmployee = { ...finalEmployee, profilePicture: profileUrl }
-                  }
-                } catch (e) {
-                  console.warn('Profile image fetch failed (fallback):', e)
-                }
+            const profileUrl = apiService.profiles.getProfileUrlByUid(finalEmployee.id)
+
+            // Test if the image exists by fetching it
+            const response = await fetch(profileUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${getStoredToken()}`
               }
+            })
+
+            if (response.ok) {
+              finalEmployee = { ...finalEmployee, profilePicture: profileUrl }
+              console.log(`[EmployeeLogs] ✓ Profile loaded for detailed view, UID: ${finalEmployee.id}`)
+            } else {
+              console.log(`[EmployeeLogs] ✗ No profile for detailed view, UID: ${finalEmployee.id}`)
             }
           } catch (e) {
-            console.warn('Profile image lookup failed:', e)
+            console.warn('Profile image lookup failed for detailed view:', e)
           }
         }
       } catch (err) {

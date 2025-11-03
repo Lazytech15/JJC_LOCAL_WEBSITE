@@ -4,11 +4,12 @@ import { useEffect, useRef } from 'react'
 
 type OnDetected = (barcode: string) => void
 
-export function useGlobalBarcodeScanner(onDetected: OnDetected, options?: { minLength?: number; interKeyMs?: number; maxScanDurationMs?: number }) {
+export function useGlobalBarcodeScanner(onDetected: OnDetected, options?: { minLength?: number; interKeyMs?: number; maxScanDurationMs?: number; enabled?: boolean }) {
   const opts = {
     minLength: 3,
     interKeyMs: 80, // max time between keystrokes to still consider as scanner
     maxScanDurationMs: 1200, // whole scan must complete within this
+    enabled: true, // default to enabled
     ...options,
   }
 
@@ -18,6 +19,8 @@ export function useGlobalBarcodeScanner(onDetected: OnDetected, options?: { minL
   const cleanupTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
+    if (!opts.enabled) return
+
     const onKey = (e: KeyboardEvent) => {
       const key = e.key
       const now = Date.now()
@@ -78,7 +81,7 @@ export function useGlobalBarcodeScanner(onDetected: OnDetected, options?: { minL
         cleanupTimerRef.current = null
       }
     }
-  }, [onDetected, opts.interKeyMs, opts.maxScanDurationMs, opts.minLength])
+  }, [onDetected, opts.interKeyMs, opts.maxScanDurationMs, opts.minLength, opts.enabled])
 }
 
 export default useGlobalBarcodeScanner

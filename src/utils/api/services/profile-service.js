@@ -69,6 +69,16 @@ export class ProfileService extends BaseAPIService {
     }
   }
 
+  async hasProfileByUid(uid) {
+    try {
+      const info = await this.getProfileInfoByUid(uid)
+      return info.success && info.data && info.data.profile_pictures && info.data.profile_pictures.length > 0
+    } catch (error) {
+      console.error("Error checking profile existence:", error)
+      return false
+    }
+  }
+
   clearProfileFromServiceWorker(uid) {
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({

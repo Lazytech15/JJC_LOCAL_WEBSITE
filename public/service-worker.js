@@ -11,6 +11,9 @@ const UI_CACHE = `jjc-ui-${CACHE_VERSION}`
 const LANDING_CACHE = `jjc-landing-${CACHE_VERSION}`
 const GALLERY_CACHE = `jjc-gallery-${CACHE_VERSION}`
 
+const DEV_HOSTS = ["localhost:5173", "127.0.0.1:5173"]
+const IS_DEV_SERVER = DEV_HOSTS.includes(self.location.host)
+
 // Cache expiration times (in milliseconds)
 const CACHE_EXPIRATION = {
   PROFILE: 24 * 60 * 60 * 1000, // 24 hours
@@ -67,6 +70,10 @@ self.addEventListener("activate", (event) => {
 
 // Fetch event - implement optimized caching strategies
 self.addEventListener("fetch", (event) => {
+  if (IS_DEV_SERVER) {
+    return
+  }
+
   const { request } = event
   const url = new URL(request.url)
 
@@ -78,6 +85,12 @@ self.addEventListener("fetch", (event) => {
   // Landing page images - Cache First with Network Fallback (no cache = direct network)
   if (url.pathname.includes("/api/profile/landing/")) {
     event.respondWith(cacheFirstWithNetworkFallback(request, LANDING_CACHE, CACHE_EXPIRATION.LANDING))
+    return
+  }
+
+  // Skip dev server module requests (e.g. Vite /src imports)
+  if (url.origin === self.location.origin && url.pathname.startsWith("/src/")) {
+    event.respondWith(fetch(request))
     return
   }
 
