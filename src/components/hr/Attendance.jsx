@@ -26,7 +26,7 @@ function Attendance() {
   const { user, isDarkMode } = useAuth();
   const [attendanceData, setAttendanceData] = useState([]);
   const [profilePictures, setProfilePictures] = useState({});
-  const [profileLoadingState, setProfileLoadingState] = useState("idle"); // 'idle', 'loading', 'loaded', 'error'
+  const [profileLoadingState, setProfileLoadingState] = useState("idle");
   const [stats, setStats] = useState({
     total_records: 0,
     unique_employees: 0,
@@ -119,15 +119,6 @@ function Attendance() {
   };
 
   const handleEmployeeIdentified = (employee, descriptor) => {
-    console.log('Employee identified:', employee);
-    console.log('Face descriptor saved:', descriptor);
-
-    // You can perform additional actions here, such as:
-    // - Auto-clock in the employee
-    // - Show a success notification
-    // - Refresh attendance data
-
-    // Example: Auto-refresh attendance after identification
     fetchAttendanceData();
     fetchAttendanceStats();
 
@@ -1630,19 +1621,28 @@ function Attendance() {
     return types[clockType] || clockType;
   };
 
-  const formatTime = (timeString) => {
-    if (!timeString) return "-";
-    try {
-      const time = new Date(timeString);
-      return time.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
-    } catch {
-      return timeString;
+const formatTime = (timeString) => {
+  if (!timeString) return "-";
+  try {
+    const dateStr = timeString.includes(' ') ? timeString.replace(' ', 'T') : timeString;
+    const time = new Date(dateStr);
+    
+    // Check if date is valid
+    if (isNaN(time.getTime())) {
+      console.warn('Invalid date format:', timeString);
+      return "-";
     }
-  };
+    
+    return time.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch (error) {
+    console.error('Error formatting time:', error, timeString);
+    return "-";
+  }
+};
 
   const formatEmployeeName = (employeeInfo) => {
     const parts = [
@@ -2247,7 +2247,7 @@ function Attendance() {
                                 </div>
                                 <div className="text-right">
                                     <div className="font-bold text-slate-800 dark:text-slate-200">
-                                    {(parseFloat(avgHours) || 0)}h avg
+                                    {(parseFloat(avgHours) || 0).toFixed(1)}h avg
                                   </div>
                                   {latePercentage > 0 && (
                                     <div className="text-xs text-red-600 dark:text-red-400">
@@ -3587,7 +3587,7 @@ function Attendance() {
                           <p className={`text-xl font-bold ${
                             isDarkMode ? "text-slate-200" : "text-slate-800"
                           }`}>
-                            {parseFloat(employee.total_regular_hours)}h
+                            {parseFloat(employee.total_regular_hours).toFixed(1)}h
                           </p>
                         </div>
 
