@@ -48,6 +48,29 @@ export const SOCKET_EVENTS = {
     REBUILT: 'daily_summary_rebuilt',
   },
 
+  // Inventory/Stock events (Toolbox)
+  INVENTORY: {
+    UPDATED: 'stock_updated',
+    INSERTED: 'stock_inserted',
+    REMOVED: 'stock_removed',
+    ITEM_CREATED: 'item_created',
+    ITEM_UPDATED: 'item_updated',
+    ITEM_DELETED: 'item_deleted',
+    CHECKOUT_COMPLETED: 'checkout_completed',
+    LOG_CREATED: 'employee_log_created',
+  },
+
+  // Procurement events (Purchase Orders)
+  PROCUREMENT: {
+    PO_CREATED: 'po_created',
+    PO_UPDATED: 'po_updated',
+    PO_DELETED: 'po_deleted',
+    PO_STATUS_CHANGED: 'po_status_changed',
+    PO_APPROVED: 'po_approved',
+    PO_REJECTED: 'po_rejected',
+    PO_RECEIVED: 'po_received',
+  },
+
   // Recruitment events (if you have them)
   RECRUITMENT: {
     CREATED: 'recruitment:created',
@@ -66,6 +89,8 @@ export const SOCKET_ROOMS = {
   AUTH: 'auth',
   ATTENDANCE: 'attendance',
   DAILY_SUMMARY: 'daily-summary',
+  INVENTORY: 'inventory',
+  PROCUREMENT: 'procurement',
   RECRUITMENT: 'recruitment',
 }
 
@@ -75,6 +100,8 @@ export const EVENT_CATEGORIES = {
   DEPARTMENT: Object.values(SOCKET_EVENTS.DEPARTMENT),
   ATTENDANCE: Object.values(SOCKET_EVENTS.ATTENDANCE),
   DAILY_SUMMARY: Object.values(SOCKET_EVENTS.DAILY_SUMMARY),
+  INVENTORY: Object.values(SOCKET_EVENTS.INVENTORY),
+  PROCUREMENT: Object.values(SOCKET_EVENTS.PROCUREMENT),
 }
 
 // Helper function to get all event names
