@@ -241,16 +241,14 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
               balance_after: item.newBalance
             }))
 
-            const now = new Date()
             const transactionData: any = {
               username: employee.fullName,
               details: detailsText,
               id_number: employee.idNumber,
               id_barcode: employee.idBarcode,
               item_no: itemNumbers,
-              items_json: JSON.stringify(structuredItems), // NEW: Structured data
-              log_date: now.toISOString().split('T')[0] || '', // YYYY-MM-DD
-              log_time: now.toTimeString().split(' ')[0] || ''  // HH:MM:SS
+              items_json: JSON.stringify(structuredItems) // NEW: Structured data
+              // log_date and log_time are now set by the server using NOW() for accuracy
             }
 
             // Only include purpose if provided
