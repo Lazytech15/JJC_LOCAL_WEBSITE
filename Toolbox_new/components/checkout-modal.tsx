@@ -38,6 +38,14 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
     }
   }, [isOpen])
 
+  // Notify GlobalBarcodeListener about checkout modal state
+  useEffect(() => {
+    // Dispatch event to disable global barcode scanner when checkout modal is open
+    window.dispatchEvent(new CustomEvent('checkout-modal-state', { 
+      detail: { isOpen } 
+    }))
+  }, [isOpen])
+
   // Listen for barcode scanner input
   useEffect(() => {
     if (!isOpen || inputMethod !== 'barcode') return
