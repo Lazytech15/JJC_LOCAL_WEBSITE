@@ -107,36 +107,29 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       if (allItemsData.success) {
         const allItems = allItemsData.data || allItemsData.items || []
         
-        console.log("Total items fetched:", allItems.length)
-        console.log("Sample item structure:", allItems[0])
+        console.log("🔍 Total items fetched:", allItems.length)
+        console.log("🔍 Sample item structure:", allItems[0])
         
-        // Trust the database trigger - it automatically sets item_status
-        const normalizeStatus = (dbStatus) => {
-          if (!dbStatus) return "In Stock"
-          const status = String(dbStatus).trim()
-          // Database returns: "Out of Stock", "Low in Stock", "In Stock"
-          if (status === "Out of Stock") return "Out Of Stock"
-          if (status === "Low in Stock") return "Low In Stock"
-          if (status === "In Stock") return "In Stock"
-          return "In Stock"
-        }
+        // FIXED: Check actual stock levels instead of relying on item_status field
+        // An item needs restocking if balance < min_stock OR balance = 0
+        const restockItems = allItems.filter(i => {
+          const balance = parseInt(i.balance) || 0
+          const minStock = parseInt(i.min_stock) || 0
+          
+          // Item needs restock if: out of stock (balance = 0) OR low stock (balance < min_stock and min_stock > 0)
+          const isOutOfStock = balance === 0
+          const isLowStock = minStock > 0 && balance < minStock
+          const needsRestock = isOutOfStock || isLowStock
+          
+          if (needsRestock) {
+            console.log(`🔴 Item needing restock: ${i.item_no} - ${i.item_name} - Supplier: ${i.supplier} - Balance: ${balance} - Min: ${minStock}`)
+          }
+          
+          return needsRestock
+        })
         
-        // Filter items needing restock (Out of Stock or Low in Stock)
-        const restockItems = allItems
-          .map(i => ({
-            ...i,
-            __status: normalizeStatus(i.item_status) // Trust database trigger
-          }))
-          .filter(i => {
-            const needsRestock = i.__status === "Out Of Stock" || i.__status === "Low In Stock"
-            if (needsRestock) {
-              console.log(`Item needing restock: ${i.item_no} - ${i.item_name} (${i.__status}) - DB status: ${i.item_status}`)
-            }
-            return needsRestock
-          })
-        
-        console.log("Total items needing restock:", restockItems.length)
-        console.log("Restock items:", restockItems)
+        console.log("📊 Total items needing restock:", restockItems.length)
+        console.log("📦 Restock items:", restockItems)
         
         // Group by supplier and count items
         const supplierMap = new Map()
@@ -156,30 +149,55 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
           .filter(s => s.item_count > 0)
           .sort((a, b) => b.item_count - a.item_count)
 
-        console.log("Suppliers needing restock:", suppliersList)
+        console.log("🏢 Suppliers needing restock:", suppliersList.length, "suppliers")
+        console.log("🏢 Supplier details:", suppliersList)
+        console.log("🏷️ Supplier names from itemsdb:", suppliersList.map(s => s.name))
 
         // Fetch full suppliers from API to get IDs and additional info, then merge IDs where names match exactly
         try {
-          const apiSuppliersResp = await apiService.suppliers.getSuppliers()
+          console.log("🔵 Fetching suppliers from API...")
+          const apiSuppliersResp = await apiService.suppliers.getSuppliers({ limit: 500 })
+          console.log("🔵 API Response:", apiSuppliersResp)
+          
           if (apiSuppliersResp.success && Array.isArray(apiSuppliersResp.suppliers)) {
             const apiSuppliers = apiSuppliersResp.suppliers
+            console.log("✅ Suppliers from API:", apiSuppliers.length, "suppliers")
+            console.log("📋 Supplier names from API:", apiSuppliers.map(s => s.name))
+            
             const lookup = {}
             apiSuppliers.forEach(s => {
-              if (s && s.name) lookup[s.name] = s
+              if (s && s.name) {
+                // Case-insensitive lookup for better matching
+                lookup[s.name.toLowerCase().trim()] = s
+              }
             })
 
-            // Attach id (if available) to suppliersList entries
-            suppliersList = suppliersList.map(s => ({
-              ...s,
-              id: lookup[s.name] ? lookup[s.name].id : undefined
-            }))
+            // Attach id (if available) to suppliersList entries using case-insensitive matching
+            suppliersList = suppliersList.map(s => {
+              const matchedSupplier = lookup[s.name.toLowerCase().trim()]
+              if (matchedSupplier) {
+                console.log(`✓ Matched: "${s.name}" with supplier ID ${matchedSupplier.id}`)
+                return {
+                  ...s,
+                  id: matchedSupplier.id,
+                  contact_person: matchedSupplier.contact_person,
+                  email: matchedSupplier.email
+                }
+              } else {
+                console.warn(`✗ No match found for supplier: "${s.name}"`)
+                return s
+              }
+            })
 
             setSupplierLookup(lookup)
+          } else {
+            console.error("❌ API response not successful or suppliers not an array:", apiSuppliersResp)
           }
         } catch (err) {
-          console.warn('Failed to fetch full suppliers for lookup', err)
+          console.error('❌ Failed to fetch full suppliers for lookup:', err)
         }
 
+        console.log("Final suppliers list:", suppliersList)
         setSuppliers(suppliersList)
         // Derive unique unit_of_measure values from all items and set as options
         try {
@@ -282,35 +300,41 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
   const fetchSupplierItems = async (supplier) => {
     try {
-      // Fetch all items and trust database trigger for status
+      // Fetch all items
       const data = await apiService.items.getItems({ limit: 10000 })
       
       if (data.success) {
         const allItems = data.data || data.items || []
         
-        // Trust the database trigger - it automatically sets item_status
-        const normalizeStatus = (dbStatus) => {
-          if (!dbStatus) return "In Stock"
-          const status = String(dbStatus).trim()
-          // Database returns: "Out of Stock", "Low in Stock", "In Stock"
-          if (status === "Out of Stock") return "Out Of Stock"
-          if (status === "Low in Stock") return "Low In Stock"
-          if (status === "In Stock") return "In Stock"
-          return "In Stock"
-        }
+        console.log(`🔍 Fetching items for supplier: ${supplier}`)
+        console.log(`🔍 Total items in database: ${allItems.length}`)
         
-        // Filter items: matching supplier AND needing restock
+        // FIXED: Check actual stock levels instead of item_status field
         const filteredItems = allItems
-          .map(i => ({
-            ...i,
-            __status: normalizeStatus(i.item_status), // Trust database trigger
-            __shortage: Math.max((Number(i.min_stock) || 0) - (Number(i.balance) || 0), 0),
-            __recommended_order: Math.max(Math.max((Number(i.min_stock) || 0) - (Number(i.balance) || 0), 0), 1)
-          }))
+          .map(i => {
+            const balance = parseInt(i.balance) || 0
+            const minStock = parseInt(i.min_stock) || 0
+            const isOutOfStock = balance === 0
+            const isLowStock = minStock > 0 && balance < minStock
+            const needsRestock = isOutOfStock || isLowStock
+            
+            return {
+              ...i,
+              __status: isOutOfStock ? "Out Of Stock" : isLowStock ? "Low In Stock" : "In Stock",
+              __shortage: Math.max(minStock - balance, 0),
+              __recommended_order: Math.max(Math.max(minStock - balance, 0), 1),
+              __needsRestock: needsRestock
+            }
+          })
           .filter(item => {
             const itemSupplier = item.supplier || item.supplier_name || 'N/A'
-            const needsRestock = item.__status === "Out Of Stock" || item.__status === "Low In Stock"
-            return itemSupplier === supplier && needsRestock
+            const matchesSupplier = itemSupplier === supplier
+            
+            if (matchesSupplier && item.__needsRestock) {
+              console.log(`✅ Item match: ${item.item_no} - ${item.item_name} - Balance: ${item.balance} - Min: ${item.min_stock}`)
+            }
+            
+            return matchesSupplier && item.__needsRestock
           })
           .sort((a, b) => {
             // Out of stock first
@@ -323,7 +347,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
             return 0
           })
         
-        console.log(`Items needing restock from ${supplier}:`, filteredItems.length)
+        console.log(`📦 Items needing restock from ${supplier}:`, filteredItems.length)
+        console.log(`📦 Items:`, filteredItems)
         setAvailableItems(filteredItems)
         // Update unit options from this fetch too (merge with existing)
         try {
