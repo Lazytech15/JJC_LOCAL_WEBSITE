@@ -537,7 +537,67 @@ function EmployeeLogs() {
     }
   }
 
-  const fetchAssociatedItems = async (itemNos, detailsText = '') => {
+  const fetchAssociatedItems = async (itemNos, detailsText = '', itemsJson = null) => {
+    // NEW: Use structured JSON data if available (from Toolbox v2)
+    if (itemsJson) {
+      try {
+        const parsedItems = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson
+        
+        if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+          console.log('[EmployeeLogs] Using structured items_json:', parsedItems)
+          
+          // Fetch full item details from API and merge with JSON data
+          const promises = parsedItems.map(async (jsonItem) => {
+            try {
+              const res = await apiService.items.getItem(jsonItem.item_no)
+              if (res.success && res.data) {
+                return {
+                  ...res.data,
+                  quantity: jsonItem.quantity,
+                  unit_of_measure: jsonItem.unit_of_measure || 'pcs',
+                  balance_before: jsonItem.balance_before,
+                  balance_after: jsonItem.balance_after,
+                  _fromJson: true // Flag to indicate this came from structured data
+                }
+              }
+              // If API fetch fails, use JSON data directly
+              return {
+                item_no: jsonItem.item_no,
+                item_name: jsonItem.item_name,
+                brand: jsonItem.brand,
+                location: jsonItem.location,
+                quantity: jsonItem.quantity,
+                unit_of_measure: jsonItem.unit_of_measure || 'pcs',
+                balance_before: jsonItem.balance_before,
+                balance_after: jsonItem.balance_after,
+                _fromJson: true
+              }
+            } catch (err) {
+              console.warn(`Failed to fetch item ${jsonItem.item_no}, using JSON data:`, err)
+              return {
+                item_no: jsonItem.item_no,
+                item_name: jsonItem.item_name,
+                brand: jsonItem.brand,
+                location: jsonItem.location,
+                quantity: jsonItem.quantity,
+                unit_of_measure: jsonItem.unit_of_measure || 'pcs',
+                balance_before: jsonItem.balance_before,
+                balance_after: jsonItem.balance_after,
+                _fromJson: true
+              }
+            }
+          })
+          
+          const results = await Promise.all(promises)
+          console.log('[EmployeeLogs] ✓ Loaded items from structured JSON:', results.length)
+          return results
+        }
+      } catch (err) {
+        console.warn('[EmployeeLogs] Failed to parse items_json, falling back to text parsing:', err)
+      }
+    }
+
+    // FALLBACK: Legacy text parsing for old logs
     if (!itemNos || itemNos.trim() === '') return []
 
     const sanitizeNumber = (value) => {
@@ -641,9 +701,9 @@ function EmployeeLogs() {
     try {
       const [employeeResult, associatedItems] = await Promise.all([
         fetchEmployeeDetails(log),
-  fetchAssociatedItems(log.item_no, log.details)
+        fetchAssociatedItems(log.item_no, log.details, log.items_json) // Pass items_json
       ])
-
+      
       let finalEmployee = employeeResult
       try {
         if (!finalEmployee) finalEmployee = null
@@ -1461,6 +1521,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved }) {
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
   const [itemQuantities, setItemQuantities] = useState({}) // For item quantity editing
+  const [itemUnits, setItemUnits] = useState({}) // For unit of measure editing
   
   // Check if this is a checkout log with items to edit
   const isCheckoutEdit = log && log.items && Array.isArray(log.items) && log.items.length > 0
@@ -1470,12 +1531,15 @@ function EditLogWizard({ isOpen, onClose, log, onSaved }) {
       setReason('')
       setStep(1)
       
-      // Initialize item quantities for checkout editing
+      // Initialize item quantities and units for checkout editing
       const quantities = {}
+      const units = {}
       log.items.forEach(item => {
         quantities[item.item_no] = item.quantity || 1
+        units[item.item_no] = item.unit_of_measure || 'pcs'
       })
       setItemQuantities(quantities)
+      setItemUnits(units)
     }
   }, [log, isCheckoutEdit])
 

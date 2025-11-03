@@ -228,6 +228,19 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
               itemNumbers = truncatedIds.join(';') + (truncatedIds.length < itemIds.length ? '...' : '')
             }
 
+            // NEW: Build structured items JSON for accurate parsing
+            const structuredItems = enhancedItems.map(item => ({
+              item_no: item.id,
+              item_name: item.name,
+              brand: item.brand,
+              item_type: item.itemType,
+              location: item.location,
+              quantity: item.quantity,
+              unit_of_measure: 'pcs', // Default unit, can be customized per item
+              balance_before: item.originalBalance,
+              balance_after: item.newBalance
+            }))
+
             const now = new Date()
             const transactionData: any = {
               username: employee.fullName,
@@ -235,6 +248,7 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
               id_number: employee.idNumber,
               id_barcode: employee.idBarcode,
               item_no: itemNumbers,
+              items_json: JSON.stringify(structuredItems), // NEW: Structured data
               log_date: now.toISOString().split('T')[0] || '', // YYYY-MM-DD
               log_time: now.toTimeString().split(' ')[0] || ''  // HH:MM:SS
             }
