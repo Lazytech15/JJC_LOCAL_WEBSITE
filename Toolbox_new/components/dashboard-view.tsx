@@ -24,8 +24,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { exportToCSV, exportToXLSX, exportToJSON, prepareExportData, exportLogsToXLSX } from "../lib/export-utils"
 import { EnhancedItemCard } from "./enhanced-item-card"
 import { BulkOperationsBar, useBulkSelection } from "./bulk-operations"
-import useGlobalBarcodeScanner from "../hooks/use-global-barcode-scanner"
-import BarcodeModal from "./barcode-modal"
 
 
 interface DashboardViewProps {
@@ -102,10 +100,8 @@ export function DashboardView({
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   const [isExporting, setIsExporting] = useState(false)
-  // Modal state for global barcode flow
-  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false)
-  const [detectedBarcode, setDetectedBarcode] = useState<string | null>(null)
-  const [detectedProduct, setDetectedProduct] = useState<Product | null>(null)
+  // Note: Global barcode scanning is handled by GlobalBarcodeListener component
+  // The dashboard listens to 'scanned-barcode' events dispatched by that component
   const [logs, setLogs] = useState<any[]>([])
   const [useEnhancedCards] = useState(true)
 
@@ -151,6 +147,16 @@ export function DashboardView({
       window.removeEventListener('online', updateOnlineStatus)
       window.removeEventListener('offline', updateOnlineStatus)
     }
+  }, [])
+
+  // Listen for clear-barcode-queue event (triggered after checkout)
+  useEffect(() => {
+    const handleClearQueue = () => {
+      console.log('[Dashboard] Barcode queue cleared after checkout')
+    }
+
+    window.addEventListener('clear-barcode-queue', handleClearQueue)
+    return () => window.removeEventListener('clear-barcode-queue', handleClearQueue)
   }, [])
 
   // Debounced search with loading states
@@ -696,52 +702,8 @@ export function DashboardView({
     return () => window.removeEventListener('scanned-barcode', handler as EventListener)
   }, [processBarcodeSubmit, onAddToCart, toast])
 
-  // When modal triggers add, call onAddToCart
-  const handleModalAdd = useCallback((product: Product, quantity: number) => {
-    // Prevent adding out-of-stock or zero-balance items
-    if (!product) return
-    if (!isAvailable(product, quantity)) {
-      toast({ title: '❌ Cannot Add', description: `${product.name} is out of stock or insufficient balance and was not added`, variant: 'destructive' })
-      return
-    }
-
-    onAddToCart(product, quantity, true)
-    toast({ title: '✅ Item Added', description: `${product.name} x${quantity} added to cart` })
-  }, [onAddToCart, toast])
-
-  // Called by global scanner when a barcode is detected
-  const onGlobalBarcodeDetected = useCallback((barcode: string) => {
-    // Look up product synchronously from loaded products
-    const result = processBarcodeInput(barcode, products)
-    setDetectedBarcode(barcode)
-    setDetectedProduct(result.product ?? null)
-
-    // If modal is already open, append the detected item so continuous scanning accumulates
-      if (isBarcodeModalOpen) {
-      if (result.success && result.product) {
-        // Only queue if the product is available
-        if (isAvailable(result.product, 1)) {
-          window.dispatchEvent(new CustomEvent('scanned-barcode-append', { detail: { item: { product: result.product, quantity: 1 } } }))
-          toast({ title: '✅ Item Queued', description: `${result.product.name} queued for add` })
-        } else {
-          toast({ title: '❌ Not Available', description: `${result.product.name} is out of stock and will not be queued` })
-        }
-      } else {
-        toast({ title: '❌ Not Found', description: `Barcode ${barcode} not found` })
-      }
-      return
-    }
-
-    // Open modal and seed with the first detected product if available
-    setIsBarcodeModalOpen(true)
-    if (result.success && result.product) {
-      // When modal opens it reads detectedProduct via props (we set it above)
-      // The modal will initialize with this product automatically - no need to append again
-    }
-  }, [products, isBarcodeModalOpen, toast])
-
-  // Start global scanner only when in dashboard view
-  useGlobalBarcodeScanner(onGlobalBarcodeDetected, { minLength: 3, interKeyMs: 80, enabled: currentView === "dashboard" })
+  // Note: Global barcode scanning is handled by GlobalBarcodeListener component
+  // which dispatches 'scanned-barcode' events that we listen to above
 
   // Update local search when header search changes
   useEffect(() => {
@@ -949,69 +911,8 @@ export function DashboardView({
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Global Barcode Modal */}
-      <BarcodeModal
-        open={isBarcodeModalOpen}
-        initialValue={detectedBarcode ?? ''}
-        products={detectedProduct ? [detectedProduct] : []}
-        onClose={() => {
-          setIsBarcodeModalOpen(false)
-          // Clear detected state when modal is closed
-          setDetectedProduct(null)
-          setDetectedBarcode('')
-        }}
-        onConfirm={(payload: any) => {
-          // Bulk items payload
-          if (payload && payload.items && Array.isArray(payload.items)) {
-            const skipped: string[] = []
-            const addedCount = payload.items.reduce((acc: number, li: any) => {
-              if (!li || !li.product) return acc
-              const p: Product = li.product
-              const qty = Number(li.quantity || 0)
-              if (qty <= 0) return acc
-
-              // Skip if out-of-stock or zero balance
-              if (p.status === 'out-of-stock' || (typeof p.balance === 'number' && p.balance <= 0)) {
-                skipped.push(p.name || String(p.id || 'Unknown'))
-                return acc
-              }
-
-              onAddToCart(p, qty, true)
-              return acc + 1
-            }, 0)
-
-            if (skipped.length > 0) {
-              toast({ title: 'Skipped Items', description: `${skipped.length} item(s) were skipped because they are out of stock: ${skipped.join(', ')}`, variant: 'destructive' })
-            }
-
-            if (addedCount > 0) {
-              // Close the modal and open cart view only if at least one item was added
-              setIsBarcodeModalOpen(false)
-              setDetectedProduct(null)
-              setDetectedBarcode('')
-              window.dispatchEvent(new CustomEvent('toolbox-navigate', { detail: { view: 'cart' } }))
-            }
-
-            return
-          }
-
-          // Single barcode payload
-          const barcodeValue = String(payload?.barcode || '').trim()
-          const qty = Number(payload?.quantity || 1)
-          if (barcodeValue) {
-            if (detectedProduct) {
-              handleModalAdd(detectedProduct, qty)
-              // Close the modal and open cart
-              setIsBarcodeModalOpen(false)
-              setDetectedProduct(null)
-              setDetectedBarcode('')
-              window.dispatchEvent(new CustomEvent('toolbox-navigate', { detail: { view: 'cart' } }))
-            } else {
-              processBarcodeSubmit(barcodeValue)
-            }
-          }
-        }}
-      />
+      {/* Note: Global Barcode Modal is handled by GlobalBarcodeListener component in layout.tsx */}
+      
       {/* Mobile Sidebar Overlay */}
       {isMobileSidebarOpen && (
         <>

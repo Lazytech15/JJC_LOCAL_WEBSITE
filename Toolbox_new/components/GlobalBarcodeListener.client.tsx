@@ -1,12 +1,23 @@
 "use client"
 
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import useGlobalBarcodeScanner from '../hooks/use-global-barcode-scanner'
 import BarcodeModal from './barcode-modal'
 
 export default function GlobalBarcodeListener() {
   const [modalOpen, setModalOpen] = useState(false)
   const [pendingValue, setPendingValue] = useState('')
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false)
+
+  // Listen for checkout modal state changes
+  useEffect(() => {
+    const handleCheckoutModalChange = (event: CustomEvent) => {
+      setIsCheckoutModalOpen(event.detail.isOpen)
+    }
+
+    window.addEventListener('checkout-modal-state', handleCheckoutModalChange as EventListener)
+    return () => window.removeEventListener('checkout-modal-state', handleCheckoutModalChange as EventListener)
+  }, [])
 
   const handleDetected = useCallback((value: string) => {
     // Show modal with scanned value
@@ -14,7 +25,13 @@ export default function GlobalBarcodeListener() {
     setModalOpen(true)
   }, [])
 
-  useGlobalBarcodeScanner(handleDetected, { minLength: 3, interKeyMs: 80, maxScanDurationMs: 1200 })
+  // Disable global barcode scanner when checkout modal is open
+  useGlobalBarcodeScanner(handleDetected, { 
+    minLength: 3, 
+    interKeyMs: 80, 
+    maxScanDurationMs: 1200,
+    enabled: !isCheckoutModalOpen 
+  })
 
   const handleConfirm = (payload: any) => {
     // Forward whatever the modal sends (single barcode or bulk items) to global listeners

@@ -32,6 +32,14 @@ function EmployeeLogs() {
   const { logs, loading, initialLoading, error, searchTerm, dateFilter, currentPage, totalLogs, filters, visibleCount, selectedLogs, showFilters, showDetailedView, selectedLog, employeeDetails, associatedItems, detailsLoading } = state
   const [isEditWizardOpen, setIsEditWizardOpen] = useState(false)
   const [editTargetLog, setEditTargetLog] = useState(null)
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' })
+
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type })
+    setTimeout(() => {
+      setToast({ show: false, message: '', type: 'success' })
+    }, 4000)
+  }
 
   // Preload profiles for visible logs (cache by uid and map to log id)
   useEffect(() => {
@@ -1303,7 +1311,24 @@ function EmployeeLogs() {
           onClose={() => { setIsEditWizardOpen(false); setEditTargetLog(null); }}
           log={editTargetLog}
           onSaved={(res) => { fetchEmployeeLogs(); setIsEditWizardOpen(false); setEditTargetLog(null); }}
+          showToast={showToast}
         />
+      )}
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className={`fixed top-4 right-4 z-60 animate-slide-in-right ${
+          toast.type === 'success'
+            ? 'bg-emerald-500'
+            : toast.type === 'error'
+            ? 'bg-red-500'
+            : 'bg-amber-500'
+        } text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3`}>
+          <span className="text-lg">
+            {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : '⚠️'}
+          </span>
+          <span className="font-medium">{toast.message}</span>
+        </div>
       )}
 
     </div>
@@ -1515,7 +1540,7 @@ function AuditViewer({ logId }) {
 export default EmployeeLogs
 
 // Multi-step Edit Log Wizard (separate modal)
-function EditLogWizard({ isOpen, onClose, log, onSaved }) {
+function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
   const { user } = useAuth()
   const [step, setStep] = useState(1)
   const [reason, setReason] = useState('')
@@ -1551,8 +1576,14 @@ function EditLogWizard({ isOpen, onClose, log, onSaved }) {
   const canProceedStep3 = reason.trim() !== ''
 
   const doSave = async () => {
-    if (!user) { alert('Only admins may edit logs'); return }
-    if (!reason || reason.trim() === '') { alert('Reason required'); return }
+    if (!user) { 
+      if (showToast) showToast('Only admins may edit logs', 'error')
+      return 
+    }
+    if (!reason || reason.trim() === '') { 
+      if (showToast) showToast('Edit reason is required', 'error')
+      return 
+    }
 
     const payload = { admin_id: user.id, reason }
     
@@ -1577,17 +1608,33 @@ function EditLogWizard({ isOpen, onClose, log, onSaved }) {
     })
     
     if (!hasChanges) {
-      alert('No quantity changes detected')
+      if (showToast) showToast('No quantity changes detected', 'error')
+      return
+    }
+    
+    // Validation: Ensure all corrected quantities are valid numbers
+    const invalidItems = itemCorrections.filter(item => 
+      isNaN(item.corrected_quantity) || item.corrected_quantity < 0
+    )
+    
+    if (invalidItems.length > 0) {
+      if (showToast) showToast(`Invalid quantities detected for items: ${invalidItems.map(i => i.item_name).join(', ')}. Please ensure all quantities are non-negative numbers.`, 'error')
       return
     }
     
     payload.item_corrections = itemCorrections
     console.debug('Checkout Edit payload:', payload)
+    console.debug(`Editing ${itemCorrections.length} item(s):`, itemCorrections.map(ic => `${ic.item_name} (${ic.original_quantity} → ${ic.corrected_quantity})`).join(', '))
 
     setSaving(true)
     try {
       const res = await apiService.employeeLogs.updateEmployeeLog(log.id, payload)
       if (res && res.success) {
+        console.log('✓ Successfully updated log:', res)
+        
+        // Show success message
+        if (showToast) showToast(`✅ Successfully corrected quantities for ${itemCorrections.length} item(s)!`, 'success')
+        
         if (typeof onSaved === 'function') onSaved(res)
         onClose()
       } else {
@@ -1595,7 +1642,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved }) {
       }
     } catch (err) {
       console.error('Edit failed', err)
-      alert('Failed to save: ' + (err.message || err))
+      if (showToast) showToast('❌ Failed to save: ' + (err.message || err), 'error')
     } finally {
       setSaving(false)
     }
@@ -1749,9 +1796,33 @@ function EditLogWizard({ isOpen, onClose, log, onSaved }) {
                     </div>
                     <div>
                       <h4 className="font-bold text-lg text-slate-900 dark:text-white">Correct Item Quantities</h4>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">Adjust quantities for items that were logged incorrectly</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Adjust quantities for items that were logged incorrectly • 
+                        {' '}<span className="font-semibold">{log.items.length} item{log.items.length > 1 ? 's' : ''} total</span>
+                      </p>
                     </div>
                   </div>
+
+                    {/* Summary of changes */}
+                    {(() => {
+                      const changedItems = log.items.filter(item => {
+                        const originalQty = item.quantity || 1
+                        const correctedQty = itemQuantities[item.item_no] || originalQty
+                        return originalQty !== correctedQty
+                      })
+                      
+                      if (changedItems.length > 0) {
+                        return (
+                          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-4">
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-amber-700 dark:text-amber-300 font-semibold">⚠️ {changedItems.length} item{changedItems.length > 1 ? 's' : ''} modified</span>
+                              <span className="text-amber-600 dark:text-amber-400">• Review changes below before proceeding</span>
+                            </div>
+                          </div>
+                        )
+                      }
+                      return null
+                    })()}
 
                     <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-4">
                       <div className="flex items-center gap-2 text-sm">
