@@ -910,7 +910,7 @@ export function DashboardView({
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-full bg-background">
       {/* Note: Global Barcode Modal is handled by GlobalBarcodeListener component in layout.tsx */}
       
       {/* Mobile Sidebar Overlay */}
@@ -923,7 +923,7 @@ export function DashboardView({
             aria-hidden="true"
           />
           {/* Mobile Drawer */}
-          <div className="fixed inset-y-0 left-0 w-72 bg-card border-r border-border z-50 lg:hidden overflow-y-auto custom-scrollbar transform transition-transform duration-300 ease-in-out">
+          <div className="fixed inset-y-0 left-0 w-72 bg-card border-r border-border z-50 lg:hidden overflow-y-auto transform transition-transform duration-300 ease-in-out">
             {/* Mobile Sidebar Header with Close Button */}
             <div className="p-6 border-b border-border">
               <div className="flex items-center justify-between">
@@ -1094,10 +1094,10 @@ export function DashboardView({
       )}
 
       {/* Desktop Sidebar - Hidden on mobile, visible on lg+ */}
-      <div className="hidden lg:block w-72 bg-card border-r border-border backdrop-blur-sm sticky top-0 h-screen">
-        <div className="h-full overflow-y-auto custom-scrollbar">
+      <div className="hidden lg:flex lg:flex-col w-72 bg-card border-r border-border sticky top-0 h-screen shrink-0">
+        <div className="flex-1 overflow-y-auto">
           {/* Sidebar Header */}
-          <div className="p-6 border-b border-border">
+          <div className="p-6 border-b border-border sticky top-0 bg-card z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
@@ -1544,8 +1544,8 @@ export function DashboardView({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 bg-background overflow-y-auto content-scrollbar">
-        <div className="p-6">
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-6">
           {/* Top Controls */}
           <div className="bg-background relative z-10 mb-6">
             <div className="flex items-center justify-between">
@@ -1713,7 +1713,7 @@ export function DashboardView({
           ) : (
             <>
               {viewMode === "grid" ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 pb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3 md:gap-4 pb-6">
                   {paginatedProducts.map((product) => 
                     useEnhancedCards ? (
                       <EnhancedItemCard
@@ -1725,17 +1725,17 @@ export function DashboardView({
                       />
                     ) : (
                       <Card key={product.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                        <CardContent className="p-4" onClick={() => onViewItem(product)}>
-                          <div className="aspect-square bg-slate-100 dark:bg-slate-700 rounded-lg mb-3 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm">
-                            image here
+                        <CardContent className="p-2" onClick={() => onViewItem(product)}>
+                          <div className="aspect-square bg-slate-100 dark:bg-slate-700 rounded-md mb-2 flex items-center justify-center text-slate-500 dark:text-slate-400 text-xs">
+                            image
                           </div>
 
-                          <h3 className="font-medium text-sm mb-2 line-clamp-2 dark:text-slate-100">{product.name}</h3>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Brand: {product.brand}</p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mb-3">Balance: {product.balance}</p>
+                          <h3 className="font-medium text-xs mb-1 line-clamp-2 dark:text-slate-100 leading-tight">{product.name}</h3>
+                          <p className="text-[10px] text-slate-600 dark:text-slate-400 mb-0.5 leading-tight">Brand: {product.brand}</p>
+                          <p className="text-[10px] text-slate-600 dark:text-slate-400 mb-1.5 leading-tight">Bal: {product.balance}</p>
 
                           <div className="flex items-center justify-between">
-                            <Badge className={`${getStatusColor(product.status)} text-white text-xs`}>
+                            <Badge className={`${getStatusColor(product.status)} text-white text-[10px] py-0 px-1.5 h-4`}>
                               {getStatusText(product.status)}
                             </Badge>
                             <Button
@@ -1745,6 +1745,7 @@ export function DashboardView({
                                 onAddToCart(product)
                               }}
                               disabled={product.status === "out-of-stock"}
+                              className="h-6 text-xs px-2"
                             >
                               Add
                             </Button>
@@ -1755,7 +1756,7 @@ export function DashboardView({
                   )}
                 </div>
               ) : (
-                <div className="space-y-2 sm:space-y-3 pb-4 sm:pb-6">
+                <div className="space-y-3 pb-4">
                   {paginatedProducts.map((product) => 
                     useEnhancedCards ? (
                       <EnhancedItemCard
@@ -1769,42 +1770,38 @@ export function DashboardView({
                       <Card key={product.id} className="cursor-pointer hover:shadow-md transition-shadow">
                         <CardContent className="p-4" onClick={() => onViewItem(product)}>
                           <div className="flex items-center space-x-4">
-                            <div className="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 text-xs">
-                              image here
+                            <div className="w-20 h-20 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm shrink-0">
+                              img
                             </div>
 
-                            <div className="flex-1">
-                              <h3 className="font-medium mb-1 dark:text-slate-100">{product.name}</h3>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-medium text-base mb-1 dark:text-slate-100 truncate">{product.name}</h3>
                               <div className="text-sm text-slate-600 dark:text-slate-400 space-y-1">
-                                <p>Brand: {product.brand}</p>
-                                <p>Item Type: {product.itemType}</p>
-                                <p>Location: {product.location}</p>
+                                <p>{product.brand} • {product.itemType}</p>
+                                <p>{product.location}</p>
                               </div>
                             </div>
 
-                            <div className="text-right space-y-2">
-                              <div className="text-lg font-bold dark:text-slate-100">
-                                BAL: {product.balance.toString().padStart(2, "0")}
+                            <div className="text-right shrink-0">
+                              <div className="text-lg font-bold dark:text-slate-100 mb-2">
+                                {product.balance.toString().padStart(2, "0")}
                               </div>
-                              <Badge className={`${getStatusColor(product.status)} text-white text-xs`}>
+                              <Badge className={`${getStatusColor(product.status)} text-white text-sm py-1 px-3 h-7`}>
                                 {getStatusText(product.status)}
                               </Badge>
                             </div>
 
-                            <div className="flex flex-col space-y-2">
-                              <Button
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  onAddToCart(product)
-                                }}
-                                disabled={product.status === "out-of-stock"}
-                              >
-                                Add
-                              </Button>
-                            </div>
-
-                            <div className={`w-2 h-full ${getStatusColor(product.status)} rounded-r-lg`}></div>
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onAddToCart(product)
+                              }}
+                              disabled={product.status === "out-of-stock"}
+                              className="h-10 text-sm px-4"
+                            >
+                              Add
+                            </Button>
                           </div>
                         </CardContent>
                       </Card>

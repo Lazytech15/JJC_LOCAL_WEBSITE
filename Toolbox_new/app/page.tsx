@@ -227,7 +227,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
       <Header
         cartItemCount={totalCartItems}
         currentView={currentView}
@@ -235,7 +235,7 @@ export default function HomePage() {
         onSearch={setHeaderSearchQuery}
       />
 
-      <main className="pt-16">
+      <main className="flex-1 overflow-y-auto pt-16">
         {/* Keep DashboardView mounted but conditionally visible */}
         <div className={currentView === "dashboard" ? "block" : "hidden"}>
           <DashboardView 

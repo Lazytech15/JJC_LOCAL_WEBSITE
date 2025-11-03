@@ -93,11 +93,11 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
 
   if (viewMode === 'list') {
     return (
-      <Card className="group hover:shadow-lg transition-all duration-200 hover:scale-[1.01] border border-border hover:border-primary/50 bg-card">
+      <Card className="group hover:shadow-md transition-all duration-200 hover:scale-[1.005] border border-border hover:border-primary/50 bg-card">
         <CardContent className="p-4">
           <div className="flex items-center space-x-4">
             {/* Image */}
-            <div className="relative w-16 h-16 bg-muted rounded-lg flex items-center justify-center overflow-hidden group-hover:shadow-inner transition-all">
+            <div className="relative w-20 h-20 bg-muted rounded-lg flex items-center justify-center overflow-hidden group-hover:shadow-inner transition-all shrink-0">
               {!imageError && (
                 <img 
                   src={imageUrl || undefined} 
@@ -108,25 +108,25 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
                 />
               )}
               {(!imageUrl || !imageLoaded || imageError) && (
-                <Package className="w-8 h-8 text-muted-foreground group-hover:text-primary transition-colors" />
+                <Package className="w-10 h-10 text-muted-foreground group-hover:text-primary transition-colors" />
               )}
             </div>
 
             {/* Product Info */}
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm truncate text-card-foreground group-hover:text-primary transition-colors">
+              <h3 className="font-semibold text-base truncate text-card-foreground group-hover:text-primary transition-colors mb-1">
                 {product.name}
               </h3>
-              <p className="text-xs text-muted-foreground truncate">
-                ID: {product.id} • {product.itemType || 'Uncategorized'}
+              <p className="text-sm text-muted-foreground truncate mb-2">
+                {product.id} • {product.itemType || 'Uncategorized'}
               </p>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge variant={stockStatus.color as any} className="text-xs flex items-center gap-1">
-                  <StockIcon className="w-3 h-3" />
+              <div className="flex items-center gap-2 mt-2">
+                <Badge variant={stockStatus.color as any} className="text-xs py-1 px-2 h-6 flex items-center gap-1">
+                  <StockIcon className="w-4 h-4" />
                   {product.balance || 0}
                 </Badge>
                 {product.location && (
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-xs py-1 px-2 h-6">
                     {product.location}
                   </Badge>
                 )}
@@ -134,18 +134,16 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
             </div>
 
             {/* Status & Actions */}
-            <div className="text-right space-y-2">
-              <div className="text-sm font-medium">
-                <Badge variant={product.status === 'in-stock' ? 'default' : product.status === 'low-stock' ? 'secondary' : 'destructive'}>
-                  {product.status}
-                </Badge>
-              </div>
-              <div className="flex gap-1">
+            <div className="flex items-center gap-3">
+              <Badge variant={product.status === 'in-stock' ? 'default' : product.status === 'low-stock' ? 'secondary' : 'destructive'} className="text-sm py-1 px-3 h-7">
+                {product.status}
+              </Badge>
+              <div className="flex gap-2">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => onViewItem(product)}
-                  className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="h-9 w-9 p-0"
                 >
                   <Eye className="w-4 h-4" />
                 </Button>
@@ -153,7 +151,7 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
                   size="sm"
                   onClick={() => onAddToCart(product)}
                   disabled={product.status === 'out-of-stock'}
-                  className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="h-9 w-9 p-0"
                 >
                   <Briefcase className="w-4 h-4" />
                 </Button>
@@ -167,10 +165,10 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
 
   // Grid view
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer border border-border hover:border-primary/50 bg-card">
-      <CardContent className="p-4">
+    <Card className="group hover:shadow-lg transition-all duration-200 hover:scale-[1.01] cursor-pointer border border-border hover:border-primary/50 bg-card">
+      <CardContent className="p-2">
         {/* Image Container */}
-        <div className="relative aspect-square mb-3 bg-muted rounded-lg overflow-hidden group-hover:shadow-inner">
+        <div className="relative aspect-square mb-2 bg-muted rounded-md overflow-hidden group-hover:shadow-inner">
           <div className="w-full h-full flex items-center justify-center">
             {!imageError && (
               <img 
@@ -182,12 +180,12 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
               />
             )}
             {(!imageUrl || !imageLoaded || imageError) && (
-              <Package className="w-12 h-12 text-muted-foreground group-hover:text-primary transition-colors" />
+              <Package className="w-8 h-8 text-muted-foreground group-hover:text-primary transition-colors" />
             )}
           </div>
           
           {/* Overlay Actions */}
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-1.5">
             <Button
               size="sm"
               variant="secondary"
@@ -195,9 +193,9 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
                 e.stopPropagation()
                 onViewItem(product)
               }}
-              className="backdrop-blur-sm"
+              className="backdrop-blur-sm h-7 text-xs px-2"
             >
-              <Eye className="w-4 h-4 mr-1" />
+              <Eye className="w-3 h-3 mr-1" />
               View
             </Button>
             <Button
@@ -207,17 +205,17 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
                 onAddToCart(product)
               }}
               disabled={product.status === 'out-of-stock'}
-              className="backdrop-blur-sm"
+              className="backdrop-blur-sm h-7 text-xs px-2"
             >
-              <Briefcase className="w-4 h-4 mr-1" />
+              <Briefcase className="w-3 h-3 mr-1" />
               Add
             </Button>
           </div>
 
           {/* Stock Badge */}
-          <div className="absolute top-2 right-2">
-            <Badge variant={stockStatus.color as any} className="text-xs flex items-center gap-1 shadow-sm">
-              <StockIcon className="w-3 h-3" />
+          <div className="absolute top-1.5 right-1.5">
+            <Badge variant={stockStatus.color as any} className="text-[10px] py-0 px-1.5 h-4 flex items-center gap-0.5 shadow-sm">
+              <StockIcon className="w-2.5 h-2.5" />
               {product.balance || 0}
             </Badge>
           </div>
@@ -225,22 +223,22 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
 
         {/* Product Details */}
         <div onClick={() => onViewItem(product)}>
-          <h3 className="font-semibold text-sm mb-1 line-clamp-2 group-hover:text-primary transition-colors">
+          <h3 className="font-semibold text-xs mb-0.5 line-clamp-2 group-hover:text-primary transition-colors leading-tight">
             {product.name}
           </h3>
           
-          <p className="text-xs text-muted-foreground mb-2 line-clamp-1">
+          <p className="text-[10px] text-muted-foreground mb-1 line-clamp-1 leading-tight">
             {product.itemType || 'Uncategorized'}
           </p>
           
           {product.location && (
-            <Badge variant="outline" className="text-xs mb-2">
+            <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 mb-1">
               {product.location}
             </Badge>
           )}
           
-          <div className="flex items-center justify-between">
-            <Badge variant={product.status === 'in-stock' ? 'default' : product.status === 'low-stock' ? 'secondary' : 'destructive'}>
+          <div className="flex items-center justify-between mt-1">
+            <Badge variant={product.status === 'in-stock' ? 'default' : product.status === 'low-stock' ? 'secondary' : 'destructive'} className="text-[10px] py-0 px-1.5 h-4">
               {product.status}
             </Badge>
             <Button
@@ -251,9 +249,9 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
                 onAddToCart(product)
               }}
               disabled={product.status === 'out-of-stock'}
-              className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
+              className="h-6 w-6 p-0"
             >
-              <Briefcase className="w-4 h-4" />
+              <Briefcase className="w-3 h-3" />
             </Button>
           </div>
         </div>
