@@ -1635,8 +1635,13 @@ function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
         // Show success message
         if (showToast) showToast(`✅ Successfully corrected quantities for ${itemCorrections.length} item(s)!`, 'success')
         
+        // Call onSaved to refresh the list
         if (typeof onSaved === 'function') onSaved(res)
-        onClose()
+        
+        // Delay closing modal so toast is visible
+        setTimeout(() => {
+          onClose()
+        }, 1500)
       } else {
         throw new Error(res?.message || 'Save failed')
       }

@@ -71,7 +71,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} bg-background text-foreground`}>
+      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} bg-background text-foreground overflow-hidden h-screen`}>
         <ErrorBoundary>
           <Suspense fallback={null}>
             <ThemeProvider defaultTheme="dark" storageKey="toolbox-theme">
