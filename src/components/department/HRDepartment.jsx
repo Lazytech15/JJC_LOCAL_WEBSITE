@@ -197,8 +197,8 @@ function HRDepartment() {
   return (
     <div className={`min-h-screen p-8 transition-colors duration-300 ${
       isDarkMode
-        ? "bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950"
-        : "bg-gradient-to-br from-gray-50 via-slate-50 to-stone-50"
+        ? "bg-linear-to-br from-gray-950 via-gray-900 to-gray-950"
+        : "bg-linear-to-br from-gray-50 via-slate-50 to-stone-50"
     }`}>
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
