@@ -489,6 +489,7 @@ useEffect(() => {
                   items={items}
                   calculateItemProgress={calculateItemProgress}
                   loading={loading}
+                  apiService={apiService}
                 />
               )}
 
