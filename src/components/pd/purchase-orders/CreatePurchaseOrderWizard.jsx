@@ -48,7 +48,9 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     apply_tax: true, // New: Tax checkbox - defaults to true for backward compatibility
     tax_type: "goods", // goods (1%), services (2%), rental (5%)
     has_discount: false,
-    discount_percentage: 0,
+    discount_type: "percentage", // "percentage" or "fixed"
+    discount_value: 0, // Value for discount (percentage 0-100 or fixed amount in pesos)
+    discount_percentage: 0, // Kept for backward compatibility
   // Priority levels: P0..P4 (P2 = Moderate default)
   priority: 'P2',
     
@@ -267,6 +269,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
           apply_tax: po.apply_tax ?? prev.apply_tax,
           tax_type: po.tax_type || prev.tax_type,
           has_discount: po.has_discount ?? prev.has_discount,
+          discount_type: po.discount_type ?? prev.discount_type ?? "percentage",
+          discount_value: po.discount_value ?? po.discount_percentage ?? prev.discount_value,
           discount_percentage: po.discount_percentage ?? prev.discount_percentage,
           attention_person: po.attention_person || prev.attention_person,
           terms: po.terms || prev.terms,
@@ -600,10 +604,15 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     const withholdingTax = subtotal * taxRate
     const totalAfterWithholdingTax = totalBeforeWithholdingTax - withholdingTax
     
-    // Calculate discount
-    const discountAmount = formData.has_discount 
-      ? totalAfterWithholdingTax * (Number(formData.discount_percentage) / 100)
-      : 0
+    // Calculate discount based on type
+    let discountAmount = 0
+    if (formData.has_discount) {
+      if (formData.discount_type === "percentage") {
+        discountAmount = totalAfterWithholdingTax * (Number(formData.discount_value) / 100)
+      } else if (formData.discount_type === "fixed") {
+        discountAmount = Number(formData.discount_value)
+      }
+    }
     
     const grandTotal = totalAfterWithholdingTax - discountAmount
 
@@ -613,7 +622,9 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       taxRate: taxRate * 100, // Convert to percentage for display
       withholdingTax,
       totalAfterWithholdingTax,
-      discountPercentage: formData.has_discount ? Number(formData.discount_percentage) : 0,
+      discountType: formData.discount_type,
+      discountValue: formData.has_discount ? Number(formData.discount_value) : 0,
+      discountPercentage: formData.has_discount && formData.discount_type === "percentage" ? Number(formData.discount_value) : 0,
       discountAmount,
       grandTotal,
       applyTax: formData.apply_tax // Include flag for export functions
@@ -646,8 +657,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     
     if (currentStep === 3) {
       // Tax & discount validation - only validate tax type if tax is applied
-      if (formData.apply_tax && formData.has_discount && (!formData.discount_percentage || formData.discount_percentage <= 0)) {
-        setError("Please enter a valid discount percentage")
+      if (formData.apply_tax && formData.has_discount && (!formData.discount_value || formData.discount_value <= 0)) {
+        setError("Please enter a valid discount value")
         return
       }
     }
@@ -724,7 +735,9 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         apply_tax: formData.apply_tax,
         tax_type: formData.tax_type,
         has_discount: formData.has_discount,
-        discount_percentage: formData.has_discount ? formData.discount_percentage : 0,
+        discount_type: formData.discount_type, // "percentage" or "fixed"
+        discount_value: formData.has_discount ? formData.discount_value : 0,
+        discount_percentage: formData.has_discount && formData.discount_type === "percentage" ? formData.discount_value : 0, // For backward compatibility
         // Tax breakdown
         subtotal: taxBreakdown.subtotal,
         withholding_tax_amount: taxBreakdown.withholdingTax,
@@ -1341,7 +1354,11 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                               {breakdown.discountAmount > 0 && (
                                 <>
                                   <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">Discount ({breakdown.discountPercentage}%)</span>
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                                      Discount {breakdown.discountType === "percentage" 
+                                        ? `(${breakdown.discountPercentage}%)` 
+                                        : "(Fixed Amount)"}
+                                    </span>
                                     <span className="font-semibold text-red-600 dark:text-red-400">- ₱{formatAmount(breakdown.discountAmount, 2)}</span>
                                   </div>
                                 </>
@@ -1367,7 +1384,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           onChange={(e) => setFormData(prev => ({ 
                             ...prev, 
                             has_discount: e.target.checked,
-                            discount_percentage: e.target.checked ? prev.discount_percentage : 0
+                            discount_value: e.target.checked ? prev.discount_value : 0
                           }))}
                           className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                         />
@@ -1377,31 +1394,92 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       </div>
                       
                       {formData.has_discount && (
-                        <div className="mt-4">
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                            Discount Percentage (%)
-                          </label>
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              value={formData.discount_percentage}
-                              onChange={(e) => setFormData(prev => ({ 
-                                ...prev, 
-                                discount_percentage: Math.max(0, Math.min(100, Number(e.target.value)))
-                              }))}
-                              className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                                bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-lg font-semibold
-                                focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                              placeholder="Enter discount percentage (0-100)"
-                            />
-                            <span className="text-2xl font-bold text-gray-600 dark:text-gray-400">%</span>
+                        <div className="space-y-4 mt-4">
+                          {/* Discount Type Selector */}
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                              Discount Type
+                            </label>
+                            <div className="grid grid-cols-2 gap-3">
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  discount_type: "percentage",
+                                  discount_value: 0
+                                }))}
+                                className={`p-3 rounded-lg border-2 transition-all ${
+                                  formData.discount_type === "percentage"
+                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                                    : 'border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 text-gray-700 dark:text-gray-300'
+                                }`}
+                              >
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className="text-xl">%</span>
+                                  <span className="font-semibold">Percentage</span>
+                                </div>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  discount_type: "fixed",
+                                  discount_value: 0
+                                }))}
+                                className={`p-3 rounded-lg border-2 transition-all ${
+                                  formData.discount_type === "fixed"
+                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                                    : 'border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 text-gray-700 dark:text-gray-300'
+                                }`}
+                              >
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className="text-xl">₱</span>
+                                  <span className="font-semibold">Fixed Amount</span>
+                                </div>
+                              </button>
+                            </div>
                           </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                            Enter a value between 0 and 100
-                          </p>
+
+                          {/* Discount Value Input */}
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                              {formData.discount_type === "percentage" 
+                                ? "Discount Percentage (%)" 
+                                : "Discount Amount (₱)"}
+                            </label>
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="number"
+                                min="0"
+                                max={formData.discount_type === "percentage" ? "100" : undefined}
+                                step={formData.discount_type === "percentage" ? "0.01" : "0.01"}
+                                value={formData.discount_value}
+                                onChange={(e) => {
+                                  const value = Number(e.target.value)
+                                  setFormData(prev => ({ 
+                                    ...prev, 
+                                    discount_value: formData.discount_type === "percentage" 
+                                      ? Math.max(0, Math.min(100, value))
+                                      : Math.max(0, value)
+                                  }))
+                                }}
+                                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                                  bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-lg font-semibold
+                                  focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                placeholder={formData.discount_type === "percentage" 
+                                  ? "Enter discount percentage (0-100)" 
+                                  : "Enter discount amount in pesos"}
+                              />
+                              <span className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                                {formData.discount_type === "percentage" ? "%" : "₱"}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                              {formData.discount_type === "percentage" 
+                                ? "Enter a percentage value between 0 and 100" 
+                                : "Enter a fixed discount amount in Philippine Pesos"}
+                            </p>
+                          </div>
                         </div>
                       )}
                     </div>
