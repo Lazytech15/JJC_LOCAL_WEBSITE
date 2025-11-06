@@ -24,6 +24,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { exportToCSV, exportToXLSX, exportToJSON, prepareExportData, exportLogsToXLSX } from "../lib/export-utils"
 import { EnhancedItemCard } from "./enhanced-item-card"
 import { BulkOperationsBar, useBulkSelection } from "./bulk-operations"
+import useGlobalBarcodeScanner from "../hooks/use-global-barcode-scanner"
+import BarcodeModal from "./barcode-modal"
+import { useInventorySync } from "../hooks/useInventorySync"
 
 
 interface DashboardViewProps {
@@ -98,6 +101,22 @@ export function DashboardView({
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   const [isExporting, setIsExporting] = useState(false)
+  // Live updates: subscribe to inventory and procurement events
+  useInventorySync({
+    onInventoryChange: () => {
+      // silently refresh without extra toasts
+      fetchProductsFromAPI(false)
+    },
+    onCheckout: () => {
+      // ensure immediate refresh after successful checkout
+      fetchProductsFromAPI(false)
+    },
+    onPOChange: () => {
+      // PO changes can affect inventory soon after; refresh as well
+      fetchProductsFromAPI(false)
+    },
+    enabled: true,
+  })
   // Note: Global barcode scanning is handled by GlobalBarcodeListener component
   // The dashboard listens to 'scanned-barcode' events dispatched by that component
   const [logs, setLogs] = useState<any[]>([])
@@ -118,6 +137,64 @@ export function DashboardView({
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const { toast } = useToast()
   const { setSearchLoading } = useLoading()
+
+  // === Global Barcode modal state (reinstated) ===
+  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false)
+  const [detectedBarcode, setDetectedBarcode] = useState<string | null>(null)
+  const [detectedProduct, setDetectedProduct] = useState<Product | null>(null)
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false)
+
+  // Listen for checkout modal state to disable scanner when checkout is open
+  useEffect(() => {
+    const handleCheckoutModalChange = (event: Event) => {
+      const detail = (event as CustomEvent).detail
+      if (detail && typeof detail.isOpen === 'boolean') {
+        setIsCheckoutModalOpen(detail.isOpen)
+      }
+    }
+    window.addEventListener('checkout-modal-state', handleCheckoutModalChange as EventListener)
+    return () => window.removeEventListener('checkout-modal-state', handleCheckoutModalChange as EventListener)
+  }, [])
+
+  // Add to cart from modal, with availability guard
+  const handleModalAdd = useCallback((product: Product, quantity: number) => {
+    if (!product) return
+    if (!isAvailable(product, quantity)) {
+      toast({ title: '❌ Cannot Add', description: `${product.name} is out of stock or insufficient balance and was not added`, variant: 'destructive' })
+      return
+    }
+    onAddToCart(product, quantity, true)
+    toast({ title: '✅ Item Added', description: `${product.name} x${quantity} added to cart` })
+  }, [onAddToCart, toast])
+
+  // Handle detected barcode from global scanner
+  const onGlobalBarcodeDetected = useCallback((barcode: string) => {
+    const result = processBarcodeInput(barcode, products)
+    setDetectedBarcode(barcode)
+    setDetectedProduct(result.product ?? null)
+
+    // If modal already open, queue additional items so continuous scanning accumulates
+    if (isBarcodeModalOpen) {
+      if (result.success && result.product) {
+        if (isAvailable(result.product, 1)) {
+          window.dispatchEvent(new CustomEvent('scanned-barcode-append', { detail: { item: { product: result.product, quantity: 1 } } }))
+          toast({ title: '✅ Item Queued', description: `${result.product.name} queued for add` })
+        } else {
+          toast({ title: '❌ Not Available', description: `${result.product.name} is out of stock and will not be queued` })
+        }
+      } else {
+        toast({ title: '❌ Not Found', description: `Barcode ${barcode} not found` })
+      }
+      return
+    }
+
+    // Open modal and seed with first detected product if available
+    setIsBarcodeModalOpen(true)
+    // The modal reads detectedProduct via props
+  }, [products, isBarcodeModalOpen, toast])
+
+  // Start global scanner only on dashboard view (this component), and pause when checkout modal is open
+  useGlobalBarcodeScanner(onGlobalBarcodeDetected, { minLength: 3, interKeyMs: 80, enabled: !isCheckoutModalOpen })
 
   // Helper: determine if a product is available for adding
   const isAvailable = (p: Product | null | undefined, qty = 1) => {
@@ -909,6 +986,68 @@ export function DashboardView({
 
   return (
     <div className="flex h-full bg-background">
+      {/* Global Barcode Modal (primary scanner UI) */}
+      <BarcodeModal
+        open={isBarcodeModalOpen}
+        initialValue={detectedBarcode ?? ''}
+        products={detectedProduct ? [detectedProduct] : []}
+        onClose={() => {
+          setIsBarcodeModalOpen(false)
+          setDetectedProduct(null)
+          setDetectedBarcode('')
+        }}
+        onConfirm={(payload: any) => {
+          // Bulk items payload
+          if (payload && payload.items && Array.isArray(payload.items)) {
+            const skipped: string[] = []
+            const addedCount = payload.items.reduce((acc: number, li: any) => {
+              if (!li || !li.product) return acc
+              const p: Product = li.product
+              const qty = Number(li.quantity || 0)
+              if (qty <= 0) return acc
+
+              if (!isAvailable(p, qty)) {
+                skipped.push(p.name || String(p.id || 'Unknown'))
+                return acc
+              }
+
+              onAddToCart(p, qty, true)
+              return acc + 1
+            }, 0)
+
+            if (skipped.length > 0) {
+              toast({ title: 'Skipped Items', description: `${skipped.length} item(s) were skipped because they are out of stock: ${skipped.join(', ')}`, variant: 'destructive' })
+            }
+
+            if (addedCount > 0) {
+              // Close the modal and open cart view only if at least one item was added
+              setIsBarcodeModalOpen(false)
+              setDetectedProduct(null)
+              setDetectedBarcode('')
+              window.dispatchEvent(new CustomEvent('toolbox-navigate', { detail: { view: 'cart' } }))
+            }
+
+            return
+          }
+
+          // Single barcode payload
+          const barcodeValue = String(payload?.barcode || '').trim()
+          const qty = Number(payload?.quantity || 1)
+          if (barcodeValue) {
+            if (detectedProduct) {
+              handleModalAdd(detectedProduct, qty)
+              // Close the modal and open cart
+              setIsBarcodeModalOpen(false)
+              setDetectedProduct(null)
+              setDetectedBarcode('')
+              window.dispatchEvent(new CustomEvent('toolbox-navigate', { detail: { view: 'cart' } }))
+            } else {
+              // Fallback to existing processor which looks up by barcode
+              processBarcodeSubmit(barcodeValue)
+            }
+          }
+        }}
+      />
       {/* Note: Global Barcode Modal is handled by GlobalBarcodeListener component in layout.tsx */}
       
       {/* Mobile Sidebar Overlay */}
@@ -1413,40 +1552,26 @@ export function DashboardView({
           </DialogContent>
         </Dialog>
 
-          {/* Barcode Scanner Card */}
-          <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                <div className="w-5 h-5 bg-linear-to-br from-blue-400 to-indigo-500 rounded-md flex items-center justify-center">
-                  <Scan className="w-3 h-3 text-white" />
-                </div>
-                Barcode Scanner
-              </h3>
-              
+          {/* Barcode Scanner Card (manual) - hidden, global scanner + modal is the primary */}
+          {false && (
+            <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
               <div className="space-y-3">
-                <Input
-                  id="barcode-scanner-input"
-                  placeholder="Click here first, then scan ITM001, ITM004..."
-                  value={barcodeInput}
-                  onChange={handleBarcodeInputChange}
-                  onKeyPress={handleBarcodeKeyPress}
-                  className="font-mono text-sm bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 border-2 border-slate-300 dark:border-slate-600 rounded-lg transition-all duration-200 hover:border-blue-400 dark:hover:border-blue-500 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900/50 focus:bg-white dark:focus:bg-slate-900"
-                />
-                
-                <Button
-                  size="sm"
-                  className="w-full bg-linear-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white border-0 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
-                  onClick={handleBarcodeSubmit}
-                  disabled={!barcodeInput.trim()}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add to Cart
-                </Button>
-                
-
+                <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <div className="w-5 h-5 bg-linear-to-br from-blue-400 to-indigo-500 rounded-md flex items-center justify-center">
+                    <Scan className="w-3 h-3 text-white" />
+                  </div>
+                  Barcode Scanner
+                </h3>
+                <div className="space-y-3">
+                  <Input id="barcode-scanner-input" placeholder="Click here first, then scan" value={barcodeInput} onChange={handleBarcodeInputChange} onKeyPress={handleBarcodeKeyPress} />
+                  <Button size="sm" onClick={handleBarcodeSubmit} disabled={!barcodeInput.trim()}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add to Cart
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Categories Card - Collapsible */}
           <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-3 shadow-sm">

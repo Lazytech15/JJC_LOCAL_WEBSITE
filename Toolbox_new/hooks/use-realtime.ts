@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { io, Socket } from 'socket.io-client'
+// Switch from socket.io to the shared polling manager used across apps
+import { pollingManager } from '../../src/utils/api/websocket/polling-manager.jsx'
+import { SOCKET_ROOMS } from '../../src/utils/api/websocket/constants/events.js'
 
 interface RealtimeEventData {
   [key: string]: any
@@ -13,72 +15,38 @@ interface RealtimeEvent {
 
 // Simple polling manager for Toolbox
 class ToolboxPollingManager {
-  private socket: Socket | null = null
-  private isConnected = false
+  private isReady = false
   private eventListeners: Map<string, ((data: any) => void)[]> = new Map()
-  private reconnectTimer: NodeJS.Timeout | null = null
-  private apiUrl: string
 
-  constructor(apiUrl: string) {
-    this.apiUrl = apiUrl
-  }
+  constructor(_apiUrl: string) { /* apiUrl unused with polling manager */ }
 
   initialize() {
-    if (this.isConnected) return
+    if (this.isReady) return
+    // Initialize shared polling manager once
+    pollingManager.initialize()
+    // Join rooms relevant to Toolbox
+    pollingManager.joinRoom(SOCKET_ROOMS.INVENTORY)
+    pollingManager.joinRoom(SOCKET_ROOMS.PROCUREMENT)
 
-    try {
-      // Connect to socket.io server
-      this.socket = io(this.apiUrl, {
-        transports: ['websocket', 'polling'],
-        timeout: 20000,
-      })
+    // Bridge events from polling manager to local listeners map
+    const forward = (evt: string) =>
+      pollingManager.subscribeToUpdates(evt, (data: any) => this.notifyListeners(evt, data))
 
-      this.socket.on('connect', () => {
-        console.log('[Toolbox] Connected to realtime server')
-        this.isConnected = true
-        if (this.reconnectTimer) {
-          clearTimeout(this.reconnectTimer)
-          this.reconnectTimer = null
-        }
-      })
+    // Inventory and item events commonly used in Toolbox
+    const defaultEvents = [
+      'stock_updated',
+      'stock_inserted',
+      'stock_removed',
+      'item_created',
+      'item_updated',
+      'item_deleted',
+      'checkout_completed',
+      // Some legacy names used in UI (ensure they get updates too)
+      'inventory:refresh'
+    ]
+    defaultEvents.forEach(forward)
 
-      this.socket.on('disconnect', () => {
-        console.log('[Toolbox] Disconnected from realtime server')
-        this.isConnected = false
-        this.scheduleReconnect()
-      })
-
-      this.socket.on('connect_error', (error) => {
-        console.error('[Toolbox] Socket connection error:', error)
-        this.isConnected = false
-        this.scheduleReconnect()
-      })
-
-      // Listen for custom events
-      this.socket.on('item_updated', (data) => {
-        this.notifyListeners('item_updated', data)
-      })
-
-      this.socket.on('item_created', (data) => {
-        this.notifyListeners('item_created', data)
-      })
-
-      this.socket.on('item_deleted', (data) => {
-        this.notifyListeners('item_deleted', data)
-      })
-
-      this.socket.on('inventory_updated', (data) => {
-        this.notifyListeners('inventory_updated', data)
-      })
-
-      this.socket.on('transaction_created', (data) => {
-        this.notifyListeners('transaction_created', data)
-      })
-
-    } catch (error) {
-      console.error('[Toolbox] Failed to initialize socket connection:', error)
-      this.scheduleReconnect()
-    }
+    this.isReady = true
   }
 
   private notifyListeners(event: string, data: any) {
@@ -92,14 +60,7 @@ class ToolboxPollingManager {
     })
   }
 
-  private scheduleReconnect() {
-    if (this.reconnectTimer) return
-
-    this.reconnectTimer = setTimeout(() => {
-      console.log('[Toolbox] Attempting to reconnect...')
-      this.initialize()
-    }, 5000)
-  }
+  // No reconnect logic needed; polling manager handles retry
 
   subscribeToUpdates(event: string, callback: (data: any) => void) {
     if (!this.eventListeners.has(event)) {
@@ -116,20 +77,10 @@ class ToolboxPollingManager {
     }
   }
 
-  disconnect() {
-    if (this.socket) {
-      this.socket.disconnect()
-      this.socket = null
-    }
-    this.isConnected = false
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer)
-      this.reconnectTimer = null
-    }
-  }
+  disconnect() {/* keep polling manager alive to serve other listeners */}
 
   get isSocketConnected() {
-    return this.isConnected
+    return pollingManager.isConnected
   }
 }
 
@@ -328,7 +279,7 @@ export function useAutoRefresh(
   apiUrl?: string
 ) {
   const { debounce = 500, enabled = true } = options
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const debouncedRefresh = useCallback(() => {
     if (!enabled) return
