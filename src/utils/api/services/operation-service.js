@@ -1,5 +1,5 @@
 // ============================================================================
-// services/operations-service.js
+// services/operations-service.js - Updated for part_number schema
 // ============================================================================
 import { BaseAPIService } from "../core/base-api.js"
 
@@ -17,20 +17,26 @@ export class OperationsService extends BaseAPIService {
   }
 
   /**
-   * Get single item by ID with full details (phases and subphases)
-   * @param {number|string} id - Item ID
+   * Get single item by part_number with full details (phases and subphases)
+   * @param {string} partNumber - Item part number
    * @returns {Promise} Item data with phases and subphases
    */
-  async getItem(id) {
-    return this.request(`/api/operations/items?id=${id}`)
+  async getItem(partNumber) {
+    return this.request(`/api/operations/items?part_number=${encodeURIComponent(partNumber)}`)
   }
 
   /**
    * Create new operations item
-   * @param {Object} itemData - Item information (name, description)
+   * @param {Object} itemData - Item information (part_number, name, description)
    * @returns {Promise} Created item data
    */
   async createItem(itemData) {
+    if (!itemData.part_number) {
+      throw new Error('part_number is required')
+    }
+    if (!itemData.name) {
+      throw new Error('name is required')
+    }
     return this.request("/api/operations/items", {
       method: "POST",
       body: JSON.stringify(itemData),
@@ -38,13 +44,13 @@ export class OperationsService extends BaseAPIService {
   }
 
   /**
-   * Update item by ID
-   * @param {number|string} id - Item ID
+   * Update item by part_number
+   * @param {string} partNumber - Item part number
    * @param {Object} itemData - Updated item information (name, description, status, overall_progress)
    * @returns {Promise} Success confirmation
    */
-  async updateItem(id, itemData) {
-    return this.request(`/api/operations/items?id=${id}`, {
+  async updateItem(partNumber, itemData) {
+    return this.request(`/api/operations/items?part_number=${encodeURIComponent(partNumber)}`, {
       method: "PUT",
       body: JSON.stringify(itemData),
     })
@@ -52,11 +58,11 @@ export class OperationsService extends BaseAPIService {
 
   /**
    * Delete item (cascades to phases and subphases)
-   * @param {number|string} id - Item ID
+   * @param {string} partNumber - Item part number
    * @returns {Promise} Deletion confirmation
    */
-  async deleteItem(id) {
-    return this.request(`/api/operations/items?id=${id}`, {
+  async deleteItem(partNumber) {
+    return this.request(`/api/operations/items?part_number=${encodeURIComponent(partNumber)}`, {
       method: "DELETE",
     })
   }
@@ -65,11 +71,11 @@ export class OperationsService extends BaseAPIService {
 
   /**
    * Get phases for a specific item
-   * @param {number|string} itemId - Item ID
+   * @param {string} partNumber - Item part number
    * @returns {Promise} Array of phases
    */
-  async getPhases(itemId) {
-    return this.request(`/api/operations/phases?item_id=${itemId}`)
+  async getPhases(partNumber) {
+    return this.request(`/api/operations/phases?part_number=${encodeURIComponent(partNumber)}`)
   }
 
   /**
@@ -83,10 +89,16 @@ export class OperationsService extends BaseAPIService {
 
   /**
    * Create new phase
-   * @param {Object} phaseData - Phase information (item_id, name)
+   * @param {Object} phaseData - Phase information (part_number, name)
    * @returns {Promise} Created phase data
    */
   async createPhase(phaseData) {
+    if (!phaseData.part_number) {
+      throw new Error('part_number is required')
+    }
+    if (!phaseData.name) {
+      throw new Error('name is required')
+    }
     return this.request("/api/operations/phases", {
       method: "POST",
       body: JSON.stringify(phaseData),
@@ -139,10 +151,19 @@ export class OperationsService extends BaseAPIService {
 
   /**
    * Create new subphase
-   * @param {Object} subphaseData - Subphase information (item_id, phase_id, name, condition, expected_duration)
+   * @param {Object} subphaseData - Subphase information (part_number, phase_id, name, condition, expected_duration)
    * @returns {Promise} Created subphase data
    */
   async createSubphase(subphaseData) {
+    if (!subphaseData.part_number) {
+      throw new Error('part_number is required')
+    }
+    if (!subphaseData.phase_id) {
+      throw new Error('phase_id is required')
+    }
+    if (!subphaseData.name) {
+      throw new Error('name is required')
+    }
     return this.request("/api/operations/subphases", {
       method: "POST",
       body: JSON.stringify(subphaseData),
@@ -216,7 +237,7 @@ export class OperationsService extends BaseAPIService {
 
   /**
    * Get audit log with optional filtering
-   * @param {Object} params - Query parameters (item_id, limit, offset)
+   * @param {Object} params - Query parameters (part_number, limit, offset)
    * @returns {Promise} Audit log entries with pagination
    */
   async getAuditLog(params = {}) {
@@ -238,7 +259,7 @@ export class OperationsService extends BaseAPIService {
 
   /**
    * Get progress report for items
-   * @param {Object} params - Query parameters (item_id, format: 'json'|'summary'|'detailed')
+   * @param {Object} params - Query parameters (part_number, format: 'json'|'summary'|'detailed')
    * @returns {Promise} Progress report data
    */
   async getProgressReport(params = {}) {
@@ -251,11 +272,11 @@ export class OperationsService extends BaseAPIService {
   /**
    * Get item with full hierarchy (item -> phases -> subphases)
    * Alias for getItem() for clarity
-   * @param {number|string} id - Item ID
+   * @param {string} partNumber - Item part number
    * @returns {Promise} Complete item hierarchy
    */
-  async getItemHierarchy(id) {
-    return this.getItem(id)
+  async getItemHierarchy(partNumber) {
+    return this.getItem(partNumber)
   }
 
   /**
@@ -268,7 +289,7 @@ export class OperationsService extends BaseAPIService {
   }
 
   /**
-   * Search items by name or description
+   * Search items by part number, name or description
    * @param {string} searchTerm - Search query
    * @returns {Promise} Matching items
    */
@@ -278,11 +299,11 @@ export class OperationsService extends BaseAPIService {
 
   /**
    * Get detailed progress report for specific item
-   * @param {number|string} itemId - Item ID
+   * @param {string} partNumber - Item part number
    * @returns {Promise} Detailed report with all phases and subphases
    */
-  async getDetailedItemReport(itemId) {
-    return this.getProgressReport({ item_id: itemId, format: "detailed" })
+  async getDetailedItemReport(partNumber) {
+    return this.getProgressReport({ part_number: partNumber, format: "detailed" })
   }
 
   /**
@@ -332,11 +353,187 @@ export class OperationsService extends BaseAPIService {
 
   /**
    * Get audit log for specific item
-   * @param {number|string} itemId - Item ID
+   * @param {string} partNumber - Item part number
    * @param {number} limit - Number of entries (default: 100)
    * @returns {Promise} Item-specific audit entries
    */
-  async getItemAuditLog(itemId, limit = 100) {
-    return this.getAuditLog({ item_id: itemId, limit })
+  async getItemAuditLog(partNumber, limit = 100) {
+    return this.getAuditLog({ part_number: partNumber, limit })
   }
+
+  // ==================== BULK OPERATIONS ====================
+
+  /**
+   * Create item with phases and subphases in one call
+   * @param {Object} itemData - Complete item structure
+   * @param {string} itemData.part_number - Item part number
+   * @param {string} itemData.name - Item name
+   * @param {string} itemData.description - Item description
+   * @param {Array} itemData.phases - Array of phases with subphases
+   * @returns {Promise} Created item with all phases and subphases
+   */
+  async createItemWithStructure(itemData) {
+    // Create item first
+    const item = await this.createItem({
+      part_number: itemData.part_number,
+      name: itemData.name,
+      description: itemData.description
+    })
+
+    // Create phases if provided
+    if (itemData.phases && itemData.phases.length > 0) {
+      for (const phaseData of itemData.phases) {
+        const phase = await this.createPhase({
+          part_number: itemData.part_number,
+          name: phaseData.name
+        })
+
+        // Create subphases if provided
+        if (phaseData.subphases && phaseData.subphases.length > 0) {
+          for (const subphaseData of phaseData.subphases) {
+            await this.createSubphase({
+              part_number: itemData.part_number,
+              phase_id: phase.id,
+              name: subphaseData.name,
+              condition: subphaseData.condition,
+              expected_duration: subphaseData.expected_duration || 0
+            })
+          }
+        }
+      }
+    }
+
+    // Return complete item with hierarchy
+    return this.getItemHierarchy(itemData.part_number)
+  }
+
+  /**
+   * Get all incomplete items
+   * @returns {Promise} Items that are not completed
+   */
+  async getIncompleteItems() {
+    const allItems = await this.getItems()
+    return allItems.filter(item => item.status !== 'completed')
+  }
+
+  /**
+   * Get all items assigned to specific employee
+   * @param {number|string} employeeUid - Employee UID
+   * @returns {Promise} Items with employee assignments
+   */
+  async getEmployeeItems(employeeUid) {
+    const performance = await this.getEmployeePerformance(employeeUid)
+    return performance.recent_tasks || []
+  }
+
+  /**
+   * Validate part number format (optional helper)
+   * @param {string} partNumber - Part number to validate
+   * @returns {boolean} True if valid
+   */
+  validatePartNumber(partNumber) {
+    if (!partNumber || typeof partNumber !== 'string') {
+      return false
+    }
+    // Basic validation - adjust rules as needed
+    if (partNumber.length > 100) {
+      return false
+    }
+    // Part number should not be empty after trim
+    if (partNumber.trim().length === 0) {
+      return false
+    }
+    return true
+  }
+
+  /**
+   * Check if item exists by part number
+   * @param {string} partNumber - Part number to check
+   * @returns {Promise<boolean>} True if item exists
+   */
+  async itemExists(partNumber) {
+    try {
+      await this.getItem(partNumber)
+      return true
+    } catch (error) {
+      if (error.message && error.message.includes('404')) {
+        return false
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Get items with completion percentage
+   * @param {number} minPercentage - Minimum completion percentage (0-100)
+   * @param {number} maxPercentage - Maximum completion percentage (0-100)
+   * @returns {Promise} Filtered items
+   */
+  async getItemsByCompletionRange(minPercentage = 0, maxPercentage = 100) {
+    const allItems = await this.getItems()
+    return allItems.filter(item => {
+      const progress = item.overall_progress || 0
+      return progress >= minPercentage && progress <= maxPercentage
+    })
+  }
+
+  /**
+   * Get items nearing completion (80-99%)
+   * @returns {Promise} Items near completion
+   */
+  async getItemsNearingCompletion() {
+    return this.getItemsByCompletionRange(80, 99)
+  }
+
+  /**
+   * Get recently created items
+   * @param {number} days - Number of days to look back (default: 7)
+   * @returns {Promise} Recent items
+   */
+  async getRecentItems(days = 7) {
+    const allItems = await this.getItems()
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - days)
+    
+    return allItems.filter(item => {
+      const createdDate = new Date(item.created_at)
+      return createdDate >= cutoffDate
+    })
+  }
+
+  /**
+ * Start item process - records start_time
+ * @param {string} partNumber - Item part number
+ * @returns {Promise} Success confirmation
+ */
+async startItemProcess(partNumber) {
+  return this.request(`/api/operations/start-item`, {
+    method: "POST",
+    body: JSON.stringify({ part_number: partNumber }),
+  })
+}
+
+/**
+ * Stop item process - records end_time
+ * @param {string} partNumber - Item part number
+ * @returns {Promise} Success confirmation
+ */
+async stopItemProcess(partNumber) {
+  return this.request(`/api/operations/stop-item`, {
+    method: "POST",
+    body: JSON.stringify({ part_number: partNumber }),
+  })
+}
+
+/**
+ * Reset item process times - clears start_time and end_time
+ * @param {string} partNumber - Item part number
+ * @returns {Promise} Success confirmation
+ */
+async resetItemProcess(partNumber) {
+  return this.request(`/api/operations/reset-item`, {
+    method: "POST",
+    body: JSON.stringify({ part_number: partNumber }),
+  })
+}
 }
