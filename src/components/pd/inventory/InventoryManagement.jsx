@@ -634,13 +634,34 @@ function InventoryManagement() {
       return
     }
 
+    const getConfirmationDetails = () => {
+      switch (importMode) {
+        case 'replace':
+          return {
+            title: "Replace All Data?",
+            message: `This will DELETE all existing ${items.length} items and replace them with ${importPreview.length} new items. This action CANNOT be undone!`,
+            type: "danger"
+          }
+        case 'update':
+          return {
+            title: "Update Existing Items?",
+            message: `This will update existing items that match by Item Number or Item Name, and add ${importPreview.length} items as new if they don't exist.`,
+            type: "warning"
+          }
+        default: // 'add'
+          return {
+            title: "Add Items?",
+            message: `This will add ${importPreview.length} new items to your existing ${items.length} items.`,
+            type: "warning"
+          }
+      }
+    }
+
+    const confirmDetails = getConfirmationDetails()
+
     setConfirmModal({
       isOpen: true,
-      title: importMode === 'replace' ? "Replace All Data?" : "Add Items?",
-      message: importMode === 'replace' 
-        ? `This will DELETE all existing ${items.length} items and replace them with ${importPreview.length} new items. This action CANNOT be undone!`
-        : `This will add ${importPreview.length} new items to your existing ${items.length} items.`,
-      type: importMode === 'replace' ? "danger" : "warning",
+      ...confirmDetails,
       onConfirm: async () => {
         try {
           setImportLoading(true)
@@ -650,20 +671,77 @@ function InventoryManagement() {
             for (const item of items) {
               await apiService.items.deleteItem(item.item_no)
             }
-          }
 
-          // Create new items
-          let successCount = 0
-          let failCount = 0
-          
-          for (const item of importPreview) {
-            try {
-              await apiService.items.createItem(item)
-              successCount++
-            } catch (err) {
-              console.error(`Failed to import item: ${item.item_name}`, err)
-              failCount++
+            // Create new items
+            let successCount = 0
+            let failCount = 0
+            
+            for (const item of importPreview) {
+              try {
+                await apiService.items.createItem(item)
+                successCount++
+              } catch (err) {
+                console.error(`Failed to import item: ${item.item_name}`, err)
+                failCount++
+              }
             }
+
+            success(
+              "Import Complete!", 
+              `Successfully imported ${successCount} items${failCount > 0 ? `, ${failCount} failed` : ''}`
+            )
+          } else if (importMode === 'update') {
+            // Update existing or add new
+            let updatedCount = 0
+            let addedCount = 0
+            let failCount = 0
+            
+            for (const item of importPreview) {
+              try {
+                // Try to find existing item by item_no (if provided) or item_name
+                const existingItem = items.find(i => 
+                  (item.item_no && i.item_no === item.item_no) || 
+                  (i.item_name.toLowerCase() === item.item_name.toLowerCase())
+                )
+
+                if (existingItem) {
+                  // Update existing item
+                  await apiService.items.updateItem(existingItem.item_no, item)
+                  updatedCount++
+                } else {
+                  // Create new item
+                  await apiService.items.createItem(item)
+                  addedCount++
+                }
+              } catch (err) {
+                console.error(`Failed to process item: ${item.item_name}`, err)
+                failCount++
+              }
+            }
+
+            success(
+              "Import Complete!", 
+              `Updated ${updatedCount} items, added ${addedCount} new items${failCount > 0 ? `, ${failCount} failed` : ''}`
+            )
+          } else {
+            // Add mode - create all as new items
+            let successCount = 0
+            let failCount = 0
+            
+            for (const item of importPreview) {
+              try {
+                await apiService.items.createItem(item)
+                successCount++
+              } catch (err) {
+                console.error(`Failed to import item: ${item.item_name}`, err)
+                failCount++
+              }
+            }
+
+            success(
+              "Import Complete!", 
+              `Successfully imported ${successCount} items${failCount > 0 ? `, ${failCount} failed` : ''}`
+            )
           }
 
           // Refresh the list
@@ -674,11 +752,6 @@ function InventoryManagement() {
           setImportFile(null)
           setImportPreview(null)
           setImportErrors([])
-
-          success(
-            "Import Complete!", 
-            `Successfully imported ${successCount} items${failCount > 0 ? `, ${failCount} failed` : ''}`
-          )
         } catch (error) {
           showError("Import Failed", error.message)
         } finally {
@@ -1535,9 +1608,10 @@ function InventoryManagement() {
                   <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Import Instructions</h4>
                   <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
                     <li>Upload a CSV or Excel file with your inventory data</li>
-                    <li>Required fields: Item Name, Balance, Min Stock, Price Per Unit</li>
+                    <li>Required fields: Item Name, Balance, ROP (Min Stock), Price Per Unit</li>
+                    <li>Optional fields: Item Number, MOQ, Brand, Type, Supplier, Location</li>
                     <li>Download a template above to see the correct format</li>
-                    <li>Choose to add items or replace all existing data</li>
+                    <li>Choose to <strong>add</strong>, <strong>update existing</strong>, or <strong>replace all</strong> items</li>
                   </ul>
                 </div>
 
@@ -1546,29 +1620,53 @@ function InventoryManagement() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Import Mode
                   </label>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-3">
                     <button
                       onClick={() => setImportMode('add')}
                       className={`px-4 py-3 rounded-lg border-2 transition-all ${
                         importMode === 'add'
                           ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
-                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-gray-400'
                       }`}
                     >
                       <div className="font-semibold">Add Items</div>
                       <div className="text-xs mt-1">Add to existing inventory</div>
                     </button>
                     <button
+                      onClick={() => setImportMode('update')}
+                      className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                        importMode === 'update'
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      <div className="font-semibold">Update Existing</div>
+                      <div className="text-xs mt-1">🔄 Update or add items</div>
+                    </button>
+                    <button
                       onClick={() => setImportMode('replace')}
                       className={`px-4 py-3 rounded-lg border-2 transition-all ${
                         importMode === 'replace'
                           ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
-                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-gray-400'
                       }`}
                     >
                       <div className="font-semibold">Replace All</div>
                       <div className="text-xs mt-1">⚠️ Delete all & replace</div>
                     </button>
+                  </div>
+                  
+                  {/* Mode Description */}
+                  <div className="mt-3 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                    {importMode === 'add' && (
+                      <p>✅ All imported items will be added as <strong>new items</strong>. Existing items remain unchanged.</p>
+                    )}
+                    {importMode === 'update' && (
+                      <p>🔄 Items matching by <strong>Item Number</strong> or <strong>Item Name</strong> will be updated. Non-matching items will be added as new.</p>
+                    )}
+                    {importMode === 'replace' && (
+                      <p className="text-red-600 dark:text-red-400">⚠️ <strong>WARNING:</strong> All existing items will be permanently deleted and replaced with imported data!</p>
+                    )}
                   </div>
                 </div>
 

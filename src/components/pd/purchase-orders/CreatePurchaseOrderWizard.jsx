@@ -507,21 +507,29 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     const isAlreadyAdded = formData.selectedItems.some(i => i.item_no === item.item_no)
     if (isAlreadyAdded) return
 
+    // Calculate initial quantity based on MOQ
+    const moq = Number(item.moq) || 0
+    const initialQuantity = moq > 0 ? moq : 1
+    const pricePerUnit = Number(item.price_per_unit) || 0
+    const initialAmount = initialQuantity * pricePerUnit
+
     setFormData(prev => ({
       ...prev,
       selectedItems: [...prev.selectedItems, {
         item_no: item.item_no,
         item_name: item.item_name,
         description: item.description || "",
-        quantity: 1,
+        // Respect MOQ if present; default to 1 when not set
+        moq: moq,
+        quantity: initialQuantity,
         // Prefer unit recorded on the item; fallback to first known option or pcs
         unit: (item.unit_of_measure && String(item.unit_of_measure).trim()) || (unitOptions && unitOptions[0]) || 'pcs',
         // If the unit is not in unitOptions, treat it as a custom unit
         custom_unit_active: !!(item.unit_of_measure && unitOptions && !unitOptions.includes(String(item.unit_of_measure).trim())),
   custom_unit_value: item.unit_of_measure && String(item.unit_of_measure).trim() || '',
   unit_dropdown_open: false,
-  price_per_unit: Number(item.price_per_unit) || 0,
-        amount: Number(item.price_per_unit) || 0
+  price_per_unit: pricePerUnit,
+        amount: initialAmount
       }]
     }))
   }
@@ -542,7 +550,13 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
           let updated = { ...item }
 
           if (field === 'quantity' || field === 'price_per_unit') {
-            updated[field] = Number(value) || 0
+            if (field === 'quantity') {
+              const raw = Number(value) || 0
+              const minQty = (Number(updated.moq) || 0) > 0 ? Number(updated.moq) : 1
+              updated.quantity = Math.max(minQty, raw)
+            } else {
+              updated.price_per_unit = Number(value) || 0
+            }
             updated.amount = (Number(updated.quantity) || 0) * (Number(updated.price_per_unit) || 0)
             return updated
           }
@@ -1060,12 +1074,15 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                       <label className="text-xs text-gray-600 dark:text-gray-400">Quantity</label>
                                       <input
                                         type="number"
-                                        min="1"
+                                        min={(Number(item.moq) || 0) > 0 ? Number(item.moq) : 1}
                                         value={item.quantity}
                                         onChange={(e) => handleUpdateItem(item.item_no, 'quantity', e.target.value)}
                                         className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded
                                           bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
                                       />
+                                      {(Number(item.moq) || 0) > 0 && (
+                                        <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">MOQ: {Number(item.moq)}</p>
+                                      )}
                                     </div>
                                     <div>
                                       <label className="text-xs text-gray-600 dark:text-gray-400">Unit</label>
@@ -1213,6 +1230,17 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                     <span className="text-sm text-gray-600 dark:text-gray-400">
                                       ₱{formatAmount(item.price_per_unit || 0, 2)}
                                     </span>
+                                    {/* Show ROP and MOQ badges for buyer context */}
+                                    {(Number(item.min_stock) || 0) > 0 && (
+                                      <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                                        ROP: {Number(item.min_stock)}
+                                      </span>
+                                    )}
+                                    {(Number(item.moq) || 0) > 0 && (
+                                      <span className="text-[10px] px-2 py-0.5 rounded bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+                                        MOQ: {Number(item.moq)}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                                 <button
