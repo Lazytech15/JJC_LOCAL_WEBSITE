@@ -145,7 +145,11 @@ export default function HomePage() {
 
   // Auto-refresh when items are updated
   useAutoRefresh(
-    ['item_updated', 'item_created', 'item_deleted', 'inventory_updated'],
+    [
+      'item_updated', 'item_created', 'item_deleted',
+      // Use emitted stock events and the generic refresh signal
+      'stock_updated', 'stock_inserted', 'stock_removed', 'inventory:refresh'
+    ],
     refreshProducts,
     { debounce: 1000, enabled: isAppStarted },
     apiUrl

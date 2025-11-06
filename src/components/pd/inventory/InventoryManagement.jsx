@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react"
+import { useState, useEffect, lazy, Suspense, useRef } from "react"
 import { useAuth } from "../../../contexts/AuthContext"
 import apiService from "../../../utils/api/api-service"
 import ModalPortal from "../shared/ModalPortal"
@@ -16,6 +16,9 @@ import {
   validateImportedItems,
   downloadTemplate
 } from "../../../utils/inventory-import-export"
+import { pollingManager } from "../../../utils/api/websocket/polling-manager.jsx"
+import { InventoryEventHandler } from "../../../utils/api/websocket/handlers/inventory-handler"
+import { SOCKET_EVENTS, SOCKET_ROOMS } from "../../../utils/api/websocket/constants/events.js"
 
 // Lazy load the heavy wizard component
 const AddEditItemWizard = lazy(() => import('./AddEditItemWizard'))
@@ -74,10 +77,58 @@ function InventoryManagement() {
   const [importErrors, setImportErrors] = useState([])
   const [showExportModal, setShowExportModal] = useState(false)
 
+  // Track if real-time handlers are registered to prevent duplicates
+  const handlersRegistered = useRef(false)
+
   useEffect(() => {
     fetchItems()
     setVisibleCount(20)
   }, [filters])
+
+  // Real-time event subscription for inventory updates
+  useEffect(() => {
+    if (handlersRegistered.current) return
+
+    // Register inventory event handler
+    new InventoryEventHandler(pollingManager)
+    
+    // Initialize polling and join rooms
+    pollingManager.initialize()
+    pollingManager.joinRoom(SOCKET_ROOMS.INVENTORY)
+    pollingManager.joinRoom(SOCKET_ROOMS.PROCUREMENT)
+
+    // Subscribe to inventory refresh events
+    const unsubInventoryRefresh = pollingManager.subscribeToUpdates('inventory:refresh', () => {
+      console.log('📦 Inventory refresh triggered by real-time event')
+      fetchItems()
+    })
+
+    // Subscribe to specific inventory events
+    const inventoryEvents = [
+      SOCKET_EVENTS.INVENTORY.UPDATED,
+      SOCKET_EVENTS.INVENTORY.INSERTED,
+      SOCKET_EVENTS.INVENTORY.REMOVED,
+      SOCKET_EVENTS.INVENTORY.ITEM_CREATED,
+      SOCKET_EVENTS.INVENTORY.ITEM_UPDATED,
+      SOCKET_EVENTS.INVENTORY.ITEM_DELETED,
+      SOCKET_EVENTS.INVENTORY.CHECKOUT_COMPLETED
+    ]
+
+    const unsubsInventory = inventoryEvents.map(evt => 
+      pollingManager.subscribeToUpdates(evt, (data) => {
+        console.log(`📦 Received ${evt} event:`, data)
+        fetchItems()
+      })
+    )
+
+    handlersRegistered.current = true
+
+    // Cleanup on unmount
+    return () => {
+      unsubInventoryRefresh()
+      unsubsInventory.forEach(unsub => unsub())
+    }
+  }, [])
 
   const fetchItems = async () => {
     try {

@@ -2,7 +2,7 @@
 // service-worker.js - Optimized for Performance with Network First on Empty Cache
 // ============================================================================
 
-const CACHE_VERSION = "v13" // Increment version to force cache refresh
+const CACHE_VERSION = "v14" // Increment version to force cache refresh
 const STATIC_CACHE = `jjc-static-${CACHE_VERSION}`
 const API_CACHE = `jjc-api-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `jjc-dynamic-${CACHE_VERSION}`
@@ -72,6 +72,14 @@ self.addEventListener("fetch", (event) => {
 
   // Skip non-GET requests
   if (request.method !== "GET") {
+    return
+  }
+
+  // Real-time events (SSE/Polling) - always bypass cache and stream directly
+  // Prevent timeouts or cached responses breaking live updates
+  const acceptHeader = request.headers.get('accept') || ''
+  if (url.pathname.startsWith('/api/events/') || acceptHeader.includes('text/event-stream')) {
+    event.respondWith(fetch(request))
     return
   }
 

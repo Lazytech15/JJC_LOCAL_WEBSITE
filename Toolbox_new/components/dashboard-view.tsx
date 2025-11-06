@@ -26,6 +26,7 @@ import { EnhancedItemCard } from "./enhanced-item-card"
 import { BulkOperationsBar, useBulkSelection } from "./bulk-operations"
 import useGlobalBarcodeScanner from "../hooks/use-global-barcode-scanner"
 import BarcodeModal from "./barcode-modal"
+import { useInventorySync } from "../hooks/useInventorySync"
 
 
 interface DashboardViewProps {
@@ -100,6 +101,22 @@ export function DashboardView({
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   const [isExporting, setIsExporting] = useState(false)
+  // Live updates: subscribe to inventory and procurement events
+  useInventorySync({
+    onInventoryChange: () => {
+      // silently refresh without extra toasts
+      fetchProductsFromAPI(false)
+    },
+    onCheckout: () => {
+      // ensure immediate refresh after successful checkout
+      fetchProductsFromAPI(false)
+    },
+    onPOChange: () => {
+      // PO changes can affect inventory soon after; refresh as well
+      fetchProductsFromAPI(false)
+    },
+    enabled: true,
+  })
   // Note: Global barcode scanning is handled by GlobalBarcodeListener component
   // The dashboard listens to 'scanned-barcode' events dispatched by that component
   const [logs, setLogs] = useState<any[]>([])
