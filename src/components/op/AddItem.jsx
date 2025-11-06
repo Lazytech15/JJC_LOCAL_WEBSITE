@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Trash2, Plus, Copy, Search, Calendar } from 'lucide-react';
+import { Trash2, Plus, Copy, Search, User, Flag, Package, AlertTriangle } from 'lucide-react';
 
 function AddItems({ 
   items,
@@ -8,17 +8,37 @@ function AddItems({
 }) {
   const [partNumber, setPartNumber] = useState('');
   const [itemName, setItemName] = useState('');
-  const [itemDescription, setItemDescription] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [priority, setPriority] = useState('Medium');
+  const [quantity, setQuantity] = useState(1);
   const [phases, setPhases] = useState([]);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [batchNumber, setBatchNumber] = useState('');
   const [autoBatch, setAutoBatch] = useState(true);
+  const [clients, setClients] = useState([]);
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [filteredClients, setFilteredClients] = useState([]);
   
   // Dropdown states
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
   const [filteredItems, setFilteredItems] = useState([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const dropdownRef = useRef(null);
+  const clientDropdownRef = useRef(null);
+
+  // Load existing clients on mount
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  const loadClients = async () => {
+    try {
+      const clientList = await apiService.operations.getClients();
+      setClients(clientList);
+    } catch (error) {
+      console.error('Error loading clients:', error);
+    }
+  };
 
   // Generate batch number automatically
   useEffect(() => {
@@ -29,11 +49,14 @@ function AddItems({
     }
   }, [partNumber, autoBatch]);
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowTemplateDropdown(false);
+      }
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target)) {
+        setShowClientDropdown(false);
       }
     };
 
@@ -57,30 +80,76 @@ function AddItems({
     }
   }, [itemName, items]);
 
+  // Filter clients based on input
+  useEffect(() => {
+    const searchTerm = clientName.trim().toLowerCase();
+    
+    if (!Array.isArray(clients)) {
+      setFilteredClients([]);
+      setShowClientDropdown(false);
+      return;
+    }
+    
+    if (searchTerm.length >= 1) {
+      const matches = clients.filter(client => 
+        client.toLowerCase().includes(searchTerm)
+      );
+      setFilteredClients(matches);
+      setShowClientDropdown(matches.length > 0);
+    } else {
+      setFilteredClients(clients);
+      setShowClientDropdown(false);
+    }
+  }, [clientName, clients]);
+
+  // Calculate total allocated quantity across all subphases
+  const getTotalAllocatedQuantity = () => {
+    let total = 0;
+    phases.forEach(phase => {
+      phase.subphases.forEach(sub => {
+        const qty = parseInt(sub.expectedQuantity) || 0;
+        total += qty;
+      });
+    });
+    return total;
+  };
+
+  // Calculate remaining quantity available for allocation
+  const getRemainingQuantity = () => {
+    const batchQty = parseInt(quantity) || 0;
+    const allocated = getTotalAllocatedQuantity();
+    return batchQty - allocated;
+  };
+
+  // Check if quantity allocation is valid
+  const isQuantityValid = () => {
+    return getRemainingQuantity() >= 0;
+  };
+
   const loadTemplateFromItem = async (item) => {
     setLoadingTemplate(true);
     setShowTemplateDropdown(false);
     setSelectedTemplateId(item.id);
     
     try {
-      // Fetch full item details with phases and subphases
       const fullItem = await apiService.operations.getItem(item.part_number);
       
-      // Load the base part number and name, but let user modify if needed
-      setPartNumber(fullItem.part_number || '');
+      setPartNumber(fullItem.part_number.split('-')[0] || fullItem.part_number);
       setItemName(fullItem.name || '');
-      setItemDescription(fullItem.description || '');
+      setClientName(fullItem.client_name || '');
+      setPriority(fullItem.priority || 'Medium');
+      setQuantity(fullItem.quantity || 1);
       
-      // Load phases and subphases
+      // Load phases and subphases with expected_quantity
       if (fullItem.phases && fullItem.phases.length > 0) {
         const loadedPhases = fullItem.phases.map(phase => ({
-          id: Date.now() + Math.random(), // Temporary ID for UI
+          id: Date.now() + Math.random(),
           name: phase.name || '',
           subphases: phase.subphases?.map(sub => ({
             id: Date.now() + Math.random(),
             name: sub.name || '',
-            condition: sub.condition || '',
-            expectedDuration: sub.expected_duration || ''
+            expectedDuration: sub.expected_duration || '',
+            expectedQuantity: sub.expected_quantity || ''
           })) || []
         }));
         setPhases(loadedPhases);
@@ -119,8 +188,8 @@ function AddItems({
             subphases: [...phase.subphases, {
               id: Date.now(),
               name: '',
-              condition: '',
-              expectedDuration: ''
+              expectedDuration: '',
+              expectedQuantity: ''
             }]
           }
         : phase
@@ -152,75 +221,102 @@ function AddItems({
   };
 
   const handleSave = async () => {
-    if (!partNumber.trim()) {
-      alert('Part Number is required');
-      return;
-    }
-    if (!itemName.trim()) {
-      alert('Item Name is required');
-      return;
-    }
-    if (!batchNumber.trim()) {
-      alert('Batch Number is required');
-      return;
-    }
+  if (!partNumber.trim()) {
+    alert('Part Number is required');
+    return;
+  }
+  if (!itemName.trim()) {
+    alert('Item Name is required');
+    return;
+  }
+  if (!batchNumber.trim()) {
+    alert('Batch Number is required');
+    return;
+  }
+  if (!clientName.trim()) {
+    alert('Client Name is required');
+    return;
+  }
 
-    // Validate phases
-    const validPhases = phases.filter(p => p.name.trim());
-    if (validPhases.length === 0) {
-      alert('Please add at least one phase');
-      return;
-    }
+  const validPhases = phases.filter(p => p.name.trim());
+  if (validPhases.length === 0) {
+    alert('Please add at least one phase');
+    return;
+  }
 
-    // Create unique part number with batch
-    const uniquePartNumber = `${partNumber.trim()}-${batchNumber.trim()}`;
+  // Validate quantity allocation
+  if (!isQuantityValid()) {
+    alert(`Total allocated quantity (${getTotalAllocatedQuantity()}) exceeds batch quantity (${quantity}). Please adjust subphase quantities.`);
+    return;
+  }
 
-    const itemData = {
-      part_number: uniquePartNumber,
-      name: itemName.trim(),
-      description: itemDescription.trim(),
-      phases: validPhases.map(phase => ({
-        name: phase.name.trim(),
-        subphases: phase.subphases
-          .filter(sub => sub.name.trim())
-          .map(sub => ({
-            name: sub.name.trim(),
-            condition: sub.condition.trim(),
-            expected_duration: parseFloat(sub.expectedDuration) || 0
-          }))
-      }))
-    };
+  const uniquePartNumber = `${partNumber.trim()}-${batchNumber.trim()}`;
 
-    try {
-      await apiService.operations.createItemWithStructure(itemData);
-      
-      // Clear form after successful save
-      setPartNumber('');
-      setItemName('');
-      setItemDescription('');
-      setPhases([]);
-      setBatchNumber('');
-      setSelectedTemplateId(null);
-      
-      alert('Item saved successfully!');
-      window.location.reload(); // Reload to refresh items list
-    } catch (error) {
-      console.error('Error saving item:', error);
-      alert('Error saving item: ' + error.message);
-    }
+  const itemData = {
+    part_number: uniquePartNumber,
+    name: itemName.trim(),
+    client_name: clientName.trim(),
+    priority: priority,
+    quantity: parseInt(quantity) || 1,
+    phases: validPhases.map(phase => ({
+      name: phase.name.trim(),
+      subphases: phase.subphases
+        .filter(sub => sub.name.trim())
+        .map(sub => ({
+          name: sub.name.trim(),
+          expected_duration: parseFloat(sub.expectedDuration) || 0,
+          expected_quantity: parseInt(sub.expectedQuantity) || 0  // Make sure this is included
+        }))
+    }))
   };
+
+  try {
+    await apiService.operations.createItemWithStructure(itemData);
+    
+    setPartNumber('');
+    setItemName('');
+    setClientName('');
+    setPriority('Medium');
+    setQuantity(1);
+    setPhases([]);
+    setBatchNumber('');
+    setSelectedTemplateId(null);
+    
+    alert('Item saved successfully!');
+    window.location.reload();
+  } catch (error) {
+    console.error('Error saving item:', error);
+    alert('Error saving item: ' + error.message);
+  }
+};
 
   const handleClear = () => {
     if (confirm('Clear all fields?')) {
       setPartNumber('');
       setItemName('');
-      setItemDescription('');
+      setClientName('');
+      setPriority('Medium');
+      setQuantity(1);
       setPhases([]);
       setBatchNumber('');
       setSelectedTemplateId(null);
       setShowTemplateDropdown(false);
+      setShowClientDropdown(false);
     }
   };
+
+  const getPriorityColor = (priorityValue) => {
+    switch(priorityValue) {
+      case 'High': return 'bg-red-500/20 text-red-700 border-red-500';
+      case 'Medium': return 'bg-yellow-500/20 text-yellow-700 border-yellow-500';
+      case 'Low': return 'bg-green-500/20 text-green-700 border-green-500';
+      default: return 'bg-gray-500/20 text-gray-700 border-gray-500';
+    }
+  };
+
+  const remaining = getRemainingQuantity();
+  const allocated = getTotalAllocatedQuantity();
+  const batchQty = parseInt(quantity) || 0;
 
   return (
     <div className="space-y-6">
@@ -234,13 +330,28 @@ function AddItems({
         )}
       </div>
 
-      {/* Template Selection Hint */}
       {items.length > 0 && (
         <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
           <p className="text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
             <Copy size={16} />
             <strong>Tip:</strong> Start typing an item name to use an existing item as a template. Each new item will have a unique batch number.
           </p>
+        </div>
+      )}
+
+      {/* Quantity Allocation Warning */}
+      {phases.length > 0 && !isQuantityValid() && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={20} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-red-700 dark:text-red-300">Quantity Allocation Error</p>
+              <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                Total allocated quantity ({allocated}) exceeds batch quantity ({batchQty}). 
+                Please reduce subphase quantities or increase batch quantity.
+              </p>
+            </div>
+          </div>
         </div>
       )}
       
@@ -265,8 +376,8 @@ function AddItems({
 
           {/* Batch Number */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-              <Calendar size={16} />
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+              <Package size={16} />
               Batch Number * 
               <span className="text-xs text-gray-500">(Unique identifier for this batch)</span>
             </label>
@@ -321,7 +432,6 @@ function AddItems({
               <Search size={18} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             </div>
 
-            {/* Template Dropdown */}
             {showTemplateDropdown && filteredItems.length > 0 && (
               <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                 <div className="p-2 bg-gray-100 dark:bg-gray-700 border-b border-gray-300 dark:border-gray-600">
@@ -341,8 +451,8 @@ function AddItems({
                         <div className="flex-1">
                           <p className="font-medium text-gray-800 dark:text-gray-200">{item.name}</p>
                           <p className="text-sm text-gray-600 dark:text-gray-400">Part #: {item.part_number}</p>
-                          {item.description && (
-                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 line-clamp-1">{item.description}</p>
+                          {item.client_name && (
+                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Client: {item.client_name}</p>
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
@@ -359,19 +469,113 @@ function AddItems({
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Description
+          {/* Client Name with Dropdown */}
+          <div className="relative" ref={clientDropdownRef}>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+              <User size={16} />
+              Client Name *
             </label>
-            <textarea
-              placeholder="Enter item description"
-              value={itemDescription}
-              onChange={(e) => setItemDescription(e.target.value)}
+            <input
+              type="text"
+              placeholder="Enter or select client name"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              onFocus={() => setShowClientDropdown(clients.length > 0)}
               disabled={submitting}
               className="w-full px-4 py-2 rounded-lg bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              rows="3"
+            />
+
+            {showClientDropdown && filteredClients.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                {filteredClients.map((client, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setClientName(client);
+                      setShowClientDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 last:border-b-0 transition-colors text-gray-800 dark:text-gray-200"
+                  >
+                    {client}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Priority */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+              <Flag size={16} />
+              Priority *
+            </label>
+            <div className="flex gap-2">
+              {['High', 'Medium', 'Low'].map(p => (
+                <button
+                  key={p}
+                  onClick={() => setPriority(p)}
+                  className={`flex-1 px-4 py-2 rounded-lg border-2 font-medium transition-colors ${
+                    priority === p 
+                      ? getPriorityColor(p)
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Quantity */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+              <Package size={16} />
+              Batch Quantity *
+            </label>
+            <input
+              type="number"
+              min="1"
+              placeholder="Enter quantity"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              disabled={submitting}
+              className="w-full px-4 py-2 rounded-lg bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             />
           </div>
+
+          {/* Quantity Tracker */}
+          {phases.length > 0 && (
+            <div className={`p-4 rounded-lg border-2 ${
+              isQuantityValid() 
+                ? 'bg-blue-500/10 border-blue-500/30' 
+                : 'bg-red-500/10 border-red-500/30'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Quantity Allocation</span>
+                <span className={`text-lg font-bold ${
+                  isQuantityValid() 
+                    ? 'text-blue-700 dark:text-blue-300' 
+                    : 'text-red-700 dark:text-red-300'
+                }`}>
+                  {remaining} / {batchQty} remaining
+                </span>
+              </div>
+              <div className="w-full bg-gray-300 dark:bg-gray-700 rounded-full h-3">
+                <div
+                  className={`h-3 rounded-full transition-all duration-300 ${
+                    isQuantityValid() 
+                      ? 'bg-blue-600 dark:bg-blue-400' 
+                      : 'bg-red-600 dark:bg-red-400'
+                  }`}
+                  style={{ width: `${Math.min((allocated / batchQty) * 100, 100)}%` }}
+                ></div>
+              </div>
+              <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mt-1">
+                <span>Allocated: {allocated}</span>
+                <span>{Math.min(Math.round((allocated / batchQty) * 100), 100)}%</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -435,47 +639,76 @@ function AddItems({
                   {phase.subphases.length === 0 ? (
                     <p className="text-sm text-gray-500 dark:text-gray-400 italic">No sub-phases yet</p>
                   ) : (
-                    phase.subphases.map((subphase, subIndex) => (
-                      <div key={subphase.id} className="bg-white/5 dark:bg-black/10 rounded p-3 space-y-2">
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder={`Sub-phase ${subIndex + 1} name`}
-                            value={subphase.name}
-                            onChange={(e) => updateSubphase(phase.id, subphase.id, 'name', e.target.value)}
-                            disabled={submitting}
-                            className="flex-1 px-3 py-1.5 text-sm rounded bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                          />
-                          <button
-                            onClick={() => removeSubphase(phase.id, subphase.id)}
-                            disabled={submitting}
-                            className="p-1.5 text-red-500 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50"
-                            title="Remove sub-phase"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                    phase.subphases.map((subphase, subIndex) => {
+                      const subQty = parseInt(subphase.expectedQuantity) || 0;
+                      const maxAllowed = remaining + subQty;
+                      
+                      return (
+                        <div key={subphase.id} className="bg-white/5 dark:bg-black/10 rounded p-3 space-y-2">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder={`Sub-phase ${subIndex + 1} name`}
+                              value={subphase.name}
+                              onChange={(e) => updateSubphase(phase.id, subphase.id, 'name', e.target.value)}
+                              disabled={submitting}
+                              className="flex-1 px-3 py-1.5 text-sm rounded bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                            />
+                            <button
+                              onClick={() => removeSubphase(phase.id, subphase.id)}
+                              disabled={submitting}
+                              className="p-1.5 text-red-500 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50"
+                              title="Remove sub-phase"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <input
+                              type="number"
+                              step="0.5"
+                              placeholder="Duration (hours)"
+                              value={subphase.expectedDuration}
+                              onChange={(e) => updateSubphase(phase.id, subphase.id, 'expectedDuration', e.target.value)}
+                              disabled={submitting}
+                              className="px-3 py-1.5 text-sm rounded bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                            />
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min="0"
+                                max={maxAllowed}
+                                placeholder={`Expected quantity (max: ${maxAllowed})`}
+                                value={subphase.expectedQuantity}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value) || 0;
+                                  if (value <= maxAllowed) {
+                                    updateSubphase(phase.id, subphase.id, 'expectedQuantity', e.target.value);
+                                  }
+                                }}
+                                disabled={submitting}
+                                className={`w-full px-3 py-1.5 text-sm rounded border ${
+                                  subQty > maxAllowed 
+                                    ? 'bg-red-500/10 border-red-500 text-red-700 dark:text-red-300' 
+                                    : 'bg-white/10 dark:bg-black/20 border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200'
+                                } placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50`}
+                              />
+                              {subQty > 0 && (
+                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 dark:text-gray-400">
+                                  /{maxAllowed}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {subQty > maxAllowed && (
+                            <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                              <AlertTriangle size={12} />
+                              Exceeds available quantity by {subQty - maxAllowed}
+                            </p>
+                          )}
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          <input
-                            type="text"
-                            placeholder="Condition (optional)"
-                            value={subphase.condition}
-                            onChange={(e) => updateSubphase(phase.id, subphase.id, 'condition', e.target.value)}
-                            disabled={submitting}
-                            className="px-3 py-1.5 text-sm rounded bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                          />
-                          <input
-                            type="number"
-                            step="0.5"
-                            placeholder="Duration (hours)"
-                            value={subphase.expectedDuration}
-                            onChange={(e) => updateSubphase(phase.id, subphase.id, 'expectedDuration', e.target.value)}
-                            disabled={submitting}
-                            className="px-3 py-1.5 text-sm rounded bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                          />
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -495,7 +728,7 @@ function AddItems({
         </button>
         <button
           onClick={handleSave}
-          disabled={submitting}
+          disabled={submitting || !isQuantityValid()}
           className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? 'Saving...' : 'Save Item'}

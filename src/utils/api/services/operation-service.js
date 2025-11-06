@@ -1,5 +1,5 @@
 // ============================================================================
-// services/operations-service.js - Updated for part_number schema
+// services/operations-service.js - Updated for part_number schema with client_name, priority, remarks
 // ============================================================================
 import { BaseAPIService } from "../core/base-api.js"
 
@@ -8,7 +8,7 @@ export class OperationsService extends BaseAPIService {
 
   /**
    * Get all items with optional filtering
-   * @param {Object} params - Query parameters (status, search)
+   * @param {Object} params - Query parameters (status, search, priority, client_name)
    * @returns {Promise} Response with items array
    */
   async getItems(params = {}) {
@@ -27,7 +27,14 @@ export class OperationsService extends BaseAPIService {
 
   /**
    * Create new operations item
-   * @param {Object} itemData - Item information (part_number, name, description)
+   * @param {Object} itemData - Item information
+   * @param {string} itemData.part_number - Item part number (required)
+   * @param {string} itemData.name - Item name (required)
+   * @param {string} [itemData.description] - Item description
+   * @param {string} [itemData.client_name] - Client name
+   * @param {string} [itemData.priority='Medium'] - Priority (High, Medium, Low)
+   * @param {string} [itemData.remarks] - Additional remarks
+   * @param {number} [itemData.quantity=1] - Batch quantity
    * @returns {Promise} Created item data
    */
   async createItem(itemData) {
@@ -37,6 +44,10 @@ export class OperationsService extends BaseAPIService {
     if (!itemData.name) {
       throw new Error('name is required')
     }
+    // Validate priority if provided
+    if (itemData.priority && !['High', 'Medium', 'Low'].includes(itemData.priority)) {
+      throw new Error('priority must be High, Medium, or Low')
+    }
     return this.request("/api/operations/items", {
       method: "POST",
       body: JSON.stringify(itemData),
@@ -44,12 +55,31 @@ export class OperationsService extends BaseAPIService {
   }
 
   /**
+   * Get all distinct client names
+   * @returns {Promise} Array of client names
+   */
+  async getClients() {
+    return this.request("/api/operations/clients")
+  }
+
+  /**
    * Update item by part_number
    * @param {string} partNumber - Item part number
-   * @param {Object} itemData - Updated item information (name, description, status, overall_progress)
+   * @param {Object} itemData - Updated item information
+   * @param {string} [itemData.name] - Item name
+   * @param {string} [itemData.description] - Item description
+   * @param {string} [itemData.client_name] - Client name
+   * @param {string} [itemData.priority] - Priority (High, Medium, Low)
+   * @param {string} [itemData.remarks] - Additional remarks
+   * @param {string} [itemData.status] - Status (not_started, in_progress, completed)
+   * @param {number} [itemData.overall_progress] - Overall progress percentage
    * @returns {Promise} Success confirmation
    */
   async updateItem(partNumber, itemData) {
+    // Validate priority if provided
+    if (itemData.priority && !['High', 'Medium', 'Low'].includes(itemData.priority)) {
+      throw new Error('priority must be High, Medium, or Low')
+    }
     return this.request(`/api/operations/items?part_number=${encodeURIComponent(partNumber)}`, {
       method: "PUT",
       body: JSON.stringify(itemData),
@@ -149,26 +179,32 @@ export class OperationsService extends BaseAPIService {
     return this.request(`/api/operations/subphases?id=${id}`)
   }
 
-  /**
-   * Create new subphase
-   * @param {Object} subphaseData - Subphase information (part_number, phase_id, name, condition, expected_duration)
-   * @returns {Promise} Created subphase data
-   */
-  async createSubphase(subphaseData) {
-    if (!subphaseData.part_number) {
-      throw new Error('part_number is required')
-    }
-    if (!subphaseData.phase_id) {
-      throw new Error('phase_id is required')
-    }
-    if (!subphaseData.name) {
-      throw new Error('name is required')
-    }
-    return this.request("/api/operations/subphases", {
-      method: "POST",
-      body: JSON.stringify(subphaseData),
-    })
+/**
+ * Create new subphase
+ * @param {Object} subphaseData - Subphase information
+ * @param {string} subphaseData.part_number - Item part number (required)
+ * @param {number} subphaseData.phase_id - Phase ID (required)
+ * @param {string} subphaseData.name - Subphase name (required)
+ * @param {string} [subphaseData.condition] - Subphase condition
+ * @param {number} [subphaseData.expected_duration=0] - Expected duration in hours
+ * @param {number} [subphaseData.expected_quantity=0] - Expected quantity
+ * @returns {Promise} Created subphase data
+ */
+async createSubphase(subphaseData) {
+  if (!subphaseData.part_number) {
+    throw new Error('part_number is required')
   }
+  if (!subphaseData.phase_id) {
+    throw new Error('phase_id is required')
+  }
+  if (!subphaseData.name) {
+    throw new Error('name is required')
+  }
+  return this.request("/api/operations/subphases", {
+    method: "POST",
+    body: JSON.stringify(subphaseData),
+  })
+}
 
   /**
    * Update subphase by ID
@@ -222,6 +258,44 @@ export class OperationsService extends BaseAPIService {
         subphase_id: subphaseId, 
         employee_barcode: employeeBarcode 
       }),
+    })
+  }
+
+  // ==================== PROCESS CONTROL METHODS ====================
+
+  /**
+   * Start item process - records start_time
+   * @param {string} partNumber - Item part number
+   * @returns {Promise} Success confirmation
+   */
+  async startItemProcess(partNumber) {
+    return this.request(`/api/operations/start-item`, {
+      method: "POST",
+      body: JSON.stringify({ part_number: partNumber }),
+    })
+  }
+
+  /**
+   * Stop item process - records end_time
+   * @param {string} partNumber - Item part number
+   * @returns {Promise} Success confirmation
+   */
+  async stopItemProcess(partNumber) {
+    return this.request(`/api/operations/stop-item`, {
+      method: "POST",
+      body: JSON.stringify({ part_number: partNumber }),
+    })
+  }
+
+  /**
+   * Reset item process times - clears start_time and end_time
+   * @param {string} partNumber - Item part number
+   * @returns {Promise} Success confirmation
+   */
+  async resetItemProcess(partNumber) {
+    return this.request(`/api/operations/reset-item`, {
+      method: "POST",
+      body: JSON.stringify({ part_number: partNumber }),
     })
   }
 
@@ -289,7 +363,36 @@ export class OperationsService extends BaseAPIService {
   }
 
   /**
-   * Search items by part number, name or description
+   * Get all items by priority
+   * @param {string} priority - Priority filter ('High'|'Medium'|'Low')
+   * @returns {Promise} Filtered items
+   */
+  async getItemsByPriority(priority) {
+    if (!['High', 'Medium', 'Low'].includes(priority)) {
+      throw new Error('priority must be High, Medium, or Low')
+    }
+    return this.getItems({ priority })
+  }
+
+  /**
+   * Get all items by client name
+   * @param {string} clientName - Client name to filter
+   * @returns {Promise} Filtered items
+   */
+  async getItemsByClient(clientName) {
+    return this.getItems({ client_name: clientName })
+  }
+
+  /**
+   * Get high priority items
+   * @returns {Promise} High priority items
+   */
+  async getHighPriorityItems() {
+    return this.getItemsByPriority('High')
+  }
+
+  /**
+   * Search items by part number, name, description, client name, or remarks
    * @param {string} searchTerm - Search query
    * @returns {Promise} Matching items
    */
@@ -368,8 +471,11 @@ export class OperationsService extends BaseAPIService {
    * @param {Object} itemData - Complete item structure
    * @param {string} itemData.part_number - Item part number
    * @param {string} itemData.name - Item name
-   * @param {string} itemData.description - Item description
-   * @param {Array} itemData.phases - Array of phases with subphases
+   * @param {string} [itemData.description] - Item description
+   * @param {string} [itemData.client_name] - Client name
+   * @param {string} [itemData.priority='Medium'] - Priority (High, Medium, Low)
+   * @param {string} [itemData.remarks] - Additional remarks
+   * @param {Array} [itemData.phases] - Array of phases with subphases
    * @returns {Promise} Created item with all phases and subphases
    */
   async createItemWithStructure(itemData) {
@@ -377,7 +483,10 @@ export class OperationsService extends BaseAPIService {
     const item = await this.createItem({
       part_number: itemData.part_number,
       name: itemData.name,
-      description: itemData.description
+      description: itemData.description,
+      client_name: itemData.client_name,
+      priority: itemData.priority || 'Medium',
+      remarks: itemData.remarks
     })
 
     // Create phases if provided
@@ -447,6 +556,15 @@ export class OperationsService extends BaseAPIService {
   }
 
   /**
+   * Validate priority value
+   * @param {string} priority - Priority to validate
+   * @returns {boolean} True if valid
+   */
+  validatePriority(priority) {
+    return ['High', 'Medium', 'Low'].includes(priority)
+  }
+
+  /**
    * Check if item exists by part number
    * @param {string} partNumber - Part number to check
    * @returns {Promise<boolean>} True if item exists
@@ -502,38 +620,271 @@ export class OperationsService extends BaseAPIService {
   }
 
   /**
- * Start item process - records start_time
- * @param {string} partNumber - Item part number
- * @returns {Promise} Success confirmation
- */
-async startItemProcess(partNumber) {
-  return this.request(`/api/operations/start-item`, {
-    method: "POST",
-    body: JSON.stringify({ part_number: partNumber }),
-  })
-}
+   * Get items by multiple filters
+   * @param {Object} filters - Filter options
+   * @param {string} [filters.status] - Status filter
+   * @param {string} [filters.priority] - Priority filter
+   * @param {string} [filters.client_name] - Client name filter
+   * @param {string} [filters.search] - Search term
+   * @returns {Promise} Filtered items
+   */
+  async getItemsByFilters(filters) {
+    return this.getItems(filters)
+  }
 
-/**
- * Stop item process - records end_time
- * @param {string} partNumber - Item part number
- * @returns {Promise} Success confirmation
- */
-async stopItemProcess(partNumber) {
-  return this.request(`/api/operations/stop-item`, {
-    method: "POST",
-    body: JSON.stringify({ part_number: partNumber }),
-  })
-}
+  /**
+   * Update item priority
+   * @param {string} partNumber - Item part number
+   * @param {string} priority - New priority (High, Medium, Low)
+   * @returns {Promise} Success confirmation
+   */
+  async updateItemPriority(partNumber, priority) {
+    if (!this.validatePriority(priority)) {
+      throw new Error('priority must be High, Medium, or Low')
+    }
+    return this.updateItem(partNumber, { priority })
+  }
 
-/**
- * Reset item process times - clears start_time and end_time
- * @param {string} partNumber - Item part number
- * @returns {Promise} Success confirmation
- */
-async resetItemProcess(partNumber) {
-  return this.request(`/api/operations/reset-item`, {
-    method: "POST",
-    body: JSON.stringify({ part_number: partNumber }),
-  })
-}
+  /**
+   * Update item client
+   * @param {string} partNumber - Item part number
+   * @param {string} clientName - New client name
+   * @returns {Promise} Success confirmation
+   */
+  async updateItemClient(partNumber, clientName) {
+    return this.updateItem(partNumber, { client_name: clientName })
+  }
+
+  /**
+   * Add or update item remarks
+   * @param {string} partNumber - Item part number
+   * @param {string} remarks - New remarks
+   * @returns {Promise} Success confirmation
+   */
+  async updateItemRemarks(partNumber, remarks) {
+    return this.updateItem(partNumber, { remarks })
+  }
+
+  /**
+   * Get items grouped by client
+   * @returns {Promise} Object with client names as keys and items as values
+   */
+  async getItemsGroupedByClient() {
+    const allItems = await this.getItems()
+    const grouped = {}
+    
+    allItems.forEach(item => {
+      const client = item.client_name || 'No Client'
+      if (!grouped[client]) {
+        grouped[client] = []
+      }
+      grouped[client].push(item)
+    })
+    
+    return grouped
+  }
+
+  /**
+   * Get items grouped by priority
+   * @returns {Promise} Object with priority levels as keys and items as values
+   */
+  async getItemsGroupedByPriority() {
+    const allItems = await this.getItems()
+    const grouped = {
+      High: [],
+      Medium: [],
+      Low: []
+    }
+    
+    allItems.forEach(item => {
+      const priority = item.priority || 'Medium'
+      if (grouped[priority]) {
+        grouped[priority].push(item)
+      }
+    })
+    
+    return grouped
+  }
+
+  /**
+   * Get urgent items (High priority and in progress or not started)
+   * @returns {Promise} Urgent items
+   */
+  async getUrgentItems() {
+    const highPriorityItems = await this.getItemsByPriority('High')
+    return highPriorityItems.filter(item => 
+      item.status === 'in_progress' || item.status === 'not_started'
+    )
+  }
+
+  /**
+   * Get client summary (count of items per client)
+   * @returns {Promise} Array of objects with client_name and item_count
+   */
+  async getClientSummary() {
+    const allItems = await this.getItems()
+    const summary = {}
+    
+    allItems.forEach(item => {
+      const client = item.client_name || 'No Client'
+      summary[client] = (summary[client] || 0) + 1
+    })
+    
+    return Object.entries(summary).map(([client_name, item_count]) => ({
+      client_name,
+      item_count
+    }))
+  }
+
+  /**
+   * Get priority distribution
+   * @returns {Promise} Object with count for each priority level
+   */
+  async getPriorityDistribution() {
+    const allItems = await this.getItems()
+    const distribution = {
+      High: 0,
+      Medium: 0,
+      Low: 0
+    }
+    
+    allItems.forEach(item => {
+      const priority = item.priority || 'Medium'
+      if (distribution[priority] !== undefined) {
+        distribution[priority]++
+      }
+    })
+    
+    return distribution
+  }
+
+  /**
+   * Search items by remarks
+   * @param {string} searchTerm - Search term for remarks
+   * @returns {Promise} Items with matching remarks
+   */
+  async searchItemsByRemarks(searchTerm) {
+    const allItems = await this.getItems({ search: searchTerm })
+    return allItems.filter(item => 
+      item.remarks && item.remarks.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }
+
+  /**
+   * Get items without client assigned
+   * @returns {Promise} Items with no client_name
+   */
+  async getItemsWithoutClient() {
+    const allItems = await this.getItems()
+    return allItems.filter(item => !item.client_name || item.client_name.trim() === '')
+  }
+
+  /**
+   * Get items without remarks
+   * @returns {Promise} Items with no remarks
+   */
+  async getItemsWithoutRemarks() {
+    const allItems = await this.getItems()
+    return allItems.filter(item => !item.remarks || item.remarks.trim() === '')
+  }
+
+  /**
+   * Get overdue items (based on expected vs actual hours for completed subphases)
+   * @returns {Promise} Items that are taking longer than expected
+   */
+  async getOverdueItems() {
+    const allItems = await this.getItems()
+    const overdueItems = []
+    
+    for (const item of allItems) {
+      if (item.status !== 'completed') {
+        const detailedItem = await this.getItem(item.part_number)
+        let totalExpected = 0
+        let totalActual = 0
+        
+        if (detailedItem.phases) {
+          detailedItem.phases.forEach(phase => {
+            if (phase.subphases) {
+              phase.subphases.forEach(subphase => {
+                totalExpected += parseFloat(subphase.expected_duration || 0)
+                totalActual += parseFloat(subphase.actual_hours || 0)
+              })
+            }
+          })
+        }
+        
+        if (totalActual > totalExpected && totalExpected > 0) {
+          overdueItems.push({
+            ...item,
+            total_expected: totalExpected,
+            total_actual: totalActual,
+            overdue_hours: totalActual - totalExpected
+          })
+        }
+      }
+    }
+    
+    return overdueItems
+  }
+
+  /**
+   * Export items to CSV-ready format
+   * @param {Object} filters - Optional filters to apply
+   * @returns {Promise} Array of items with flattened structure for CSV export
+   */
+  async exportItemsToCSV(filters = {}) {
+    const items = await this.getItems(filters)
+    return items.map(item => ({
+      part_number: item.part_number,
+      name: item.name,
+      description: item.description || '',
+      client_name: item.client_name || '',
+      priority: item.priority || 'Medium',
+      remarks: item.remarks || '',
+      status: item.status,
+      overall_progress: item.overall_progress || 0,
+      phase_count: item.phase_count || 0,
+      subphase_count: item.subphase_count || 0,
+      completed_subphase_count: item.completed_subphase_count || 0,
+      start_time: item.start_time || '',
+      end_time: item.end_time || '',
+      created_at: item.created_at,
+      completed_at: item.completed_at || ''
+    }))
+  }
+
+  /**
+   * Get client performance metrics
+   * @param {string} clientName - Client name
+   * @returns {Promise} Performance metrics for the client
+   */
+  async getClientPerformance(clientName) {
+    const clientItems = await this.getItemsByClient(clientName)
+    
+    const totalItems = clientItems.length
+    const completedItems = clientItems.filter(item => item.status === 'completed').length
+    const inProgressItems = clientItems.filter(item => item.status === 'in_progress').length
+    const notStartedItems = clientItems.filter(item => item.status === 'not_started').length
+    
+    const avgProgress = clientItems.reduce((sum, item) => 
+      sum + (parseFloat(item.overall_progress) || 0), 0) / (totalItems || 1)
+    
+    const priorityDistribution = {
+      High: clientItems.filter(item => item.priority === 'High').length,
+      Medium: clientItems.filter(item => item.priority === 'Medium').length,
+      Low: clientItems.filter(item => item.priority === 'Low').length
+    }
+    
+    return {
+      client_name: clientName,
+      total_items: totalItems,
+      completed_items: completedItems,
+      in_progress_items: inProgressItems,
+      not_started_items: notStartedItems,
+      avg_progress: avgProgress.toFixed(2),
+      completion_rate: ((completedItems / (totalItems || 1)) * 100).toFixed(2),
+      priority_distribution: priorityDistribution,
+      items: clientItems
+    }
+  }
 }
