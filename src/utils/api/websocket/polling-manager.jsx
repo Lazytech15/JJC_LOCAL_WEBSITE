@@ -6,6 +6,9 @@ import { getStoredToken } from '../../auth.js'
 import { API_ENDPOINTS } from '../config/api-config.js'
 import { SOCKET_EVENTS } from './constants/events.js'
 import { ListenerManager } from './managers/listener-manager.js'
+// Register default handlers here so they are active for polling
+import { InventoryEventHandler } from './handlers/inventory-handler.js'
+import { ProcurementEventHandler } from './handlers/procurement-handler.js'
 
 export class PollingManager {
   constructor() {
@@ -35,13 +38,10 @@ export class PollingManager {
     const mockSocket = this.createMockSocketInterface()
     
     // Import and initialize handlers dynamically
-    this.eventHandlers = []
-    
-    // Initialize each handler type if you have them
-    // Note: Import them at the top of this file
-    // Example:
-    // import { DailySummaryEventHandler } from './handlers/daily-summary-handler.js'
-    // this.eventHandlers.push(new DailySummaryEventHandler(this))
+    this.eventHandlers = [
+      new InventoryEventHandler(this),
+      new ProcurementEventHandler(this),
+    ]
     
     // Setup all handlers
     this.eventHandlers.forEach(handler => {
@@ -91,12 +91,9 @@ export class PollingManager {
 
   async poll() {
     try {
-      const room = this.rooms.size > 0 ? Array.from(this.rooms)[0] : null
+      // Fetch all events since last timestamp; server will include room=null and all types
       const url = new URL(`${API_ENDPOINTS.public}/api/events/poll`)
       url.searchParams.append('since', this.lastTimestamp)
-      if (room) {
-        url.searchParams.append('room', room)
-      }
 
       const response = await fetch(url.toString(), {
         headers: {

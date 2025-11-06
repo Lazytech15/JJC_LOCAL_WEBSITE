@@ -1,10 +1,14 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useAuth } from "../../../contexts/AuthContext"
 import apiService from "../../../utils/api/api-service"
 import { ModalPortal, useToast } from "../shared"
 import CreatePurchaseOrderWizard from "./CreatePurchaseOrderWizard"
 import { PurchaseOrderTrackerSkeleton } from "../../skeletons/ProcurementSkeletons"
 import { exportPurchaseOrderToPDF, exportPurchaseOrderToExcel } from "../../../utils/purchase-order-export"
+// Realtime imports for live updates
+import { pollingManager } from "../../../utils/api/websocket/polling-manager.jsx"
+import { SOCKET_EVENTS, SOCKET_ROOMS } from "../../../utils/api/websocket/constants/events.js"
+import { ProcurementEventHandler } from "../../../utils/api/websocket/handlers/procurement-handler.js"
 //comment test
 
 function PurchaseOrderTracker() {
@@ -43,9 +47,48 @@ function PurchaseOrderTracker() {
     actual_delivery_date: ""
   })
 
+  // Realtime setup flag and unsubs storage
+  const handlersRegistered = useRef(false)
+  const unsubscribers = useRef([])
+
   useEffect(() => {
     fetchPurchaseOrders()
     fetchRestockItems()
+    // Initialize realtime subscriptions for procurement updates (once)
+    if (!handlersRegistered.current) {
+      // Register procurement handlers (they emit generic procurement:refresh events)
+      new ProcurementEventHandler(pollingManager)
+      // Start polling and join the procurement room
+      pollingManager.initialize()
+      pollingManager.joinRoom(SOCKET_ROOMS.PROCUREMENT)
+
+      // Subscribe to refresh signal and important PO events
+      const unsubRefresh = pollingManager.subscribeToUpdates('procurement:refresh', () => {
+        fetchPurchaseOrders()
+      })
+
+      const poEvents = [
+        SOCKET_EVENTS.PROCUREMENT.PO_CREATED,
+        SOCKET_EVENTS.PROCUREMENT.PO_UPDATED,
+        SOCKET_EVENTS.PROCUREMENT.PO_DELETED,
+        SOCKET_EVENTS.PROCUREMENT.PO_STATUS_CHANGED,
+        SOCKET_EVENTS.PROCUREMENT.PO_APPROVED,
+        SOCKET_EVENTS.PROCUREMENT.PO_REJECTED,
+        SOCKET_EVENTS.PROCUREMENT.PO_RECEIVED,
+      ]
+      const unsubs = poEvents.map(evt => pollingManager.subscribeToUpdates(evt, () => fetchPurchaseOrders()))
+
+      unsubscribers.current.push(unsubRefresh, ...unsubs)
+      handlersRegistered.current = true
+    }
+
+    return () => {
+      // Clean up listeners on unmount
+      if (unsubscribers.current.length) {
+        unsubscribers.current.forEach((fn) => { try { fn && fn() } catch(_){} })
+        unsubscribers.current = []
+      }
+    }
   }, [])
 
   const fetchPurchaseOrders = async () => {
