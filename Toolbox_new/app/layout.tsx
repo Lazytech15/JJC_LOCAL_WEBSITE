@@ -5,7 +5,6 @@ import { KeyboardShortcuts } from "../components/keyboard-shortcuts"
 import { LoadingProvider } from "../components/loading-context"
 import { Suspense } from "react"
 import "./globals.css"
-import GlobalBarcodeListener from '../components/GlobalBarcodeListener.client'
 
 export default function RootLayout({
   children,
@@ -49,7 +48,6 @@ export default function RootLayout({
             <ThemeProvider defaultTheme="dark" storageKey="toolbox-theme">
               <LoadingProvider>
                 <KeyboardShortcuts />
-                <GlobalBarcodeListener />
                 {children}
               </LoadingProvider>
             </ThemeProvider>
