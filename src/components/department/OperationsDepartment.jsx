@@ -1,5 +1,5 @@
 import { useAuth } from "../../contexts/AuthContext"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import apiService from "../../utils/api/api-service"
 import Dashboard from "../op/Dashboard.jsx"
 import AddItems from "../op/AddItem.jsx"
@@ -13,70 +13,159 @@ function OperationsDepartment() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [statistics, setStatistics] = useState(null)
-  
+
   // Form states - UPDATED: Added part_number
-  const [newItem, setNewItem] = useState({ 
-    part_number: "", 
-    name: "", 
-    description: "" 
+  const [newItem, setNewItem] = useState({
+    part_number: "",
+    name: "",
+    description: ""
   })
-  const [newPhase, setNewPhase] = useState({ 
-    partNumber: "", 
-    name: "" 
+  const [newPhase, setNewPhase] = useState({
+    partNumber: "",
+    name: ""
   })
-  const [newSubPhase, setNewSubPhase] = useState({ 
-    partNumber: "", 
-    phaseId: "", 
-    name: "", 
-    condition: "", 
-    expectedDuration: "" 
+  const [newSubPhase, setNewSubPhase] = useState({
+    partNumber: "",
+    phaseId: "",
+    name: "",
+    condition: "",
+    expectedDuration: ""
   })
   const [scanningFor, setScanningFor] = useState(null)
   const [barcodeInput, setBarcodeInput] = useState("")
-  
+
   // UI states
   const [expandedItems, setExpandedItems] = useState({})
   const [expandedPhases, setExpandedPhases] = useState({})
   const [submitting, setSubmitting] = useState(false)
 
-useEffect(() => {
-  // Load full item details when switching to tabs that need phase information
-  if (items.length > 0) {
-    const needsDetails = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
-    
-    if (needsDetails) {
-      const hasItemsWithoutDetails = items.some(item => 
-        !item.phases || (item.phase_count > 0 && (!item.phases || item.phases.length === 0))
-      )
-      
-      if (hasItemsWithoutDetails) {
-        loadAllItemDetails()
+  // Ref to track if component is mounted
+  const isMountedRef = useRef(true)
+  const refreshIntervalRef = useRef(null)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current)
       }
     }
-  }
-}, [activeTab, items.length])
+  }, [])
 
+  useEffect(() => {
+    // Load full item details when switching to tabs that need phase information
+    if (items.length > 0) {
+      const needsDetails = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
+
+      if (needsDetails) {
+        const hasItemsWithoutDetails = items.some(item =>
+          !item.phases || (item.phase_count > 0 && (!item.phases || item.phases.length === 0))
+        )
+
+        if (hasItemsWithoutDetails) {
+          loadAllItemDetails()
+        }
+      }
+    }
+  }, [activeTab, items.length])
+
+  // NEW: Auto-refresh effect for active phases
+  useEffect(() => {
+    // Clear existing interval
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current)
+      refreshIntervalRef.current = null
+    }
+
+    // Only set up refresh if we have active phases and are on a relevant tab
+    const needsRefresh = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
+    
+    if (needsRefresh && items.length > 0) {
+      const hasActivePhases = items.some(item =>
+        item.phases?.some(phase =>
+          phase.start_time && !phase.end_time
+        )
+      )
+
+      if (hasActivePhases) {
+        // Refresh every 30 seconds to keep data synchronized
+        refreshIntervalRef.current = setInterval(() => {
+          if (isMountedRef.current) {
+            refreshActiveData()
+          }
+        }, 30000) // 30 seconds
+      }
+    }
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current)
+        refreshIntervalRef.current = null
+      }
+    }
+  }, [activeTab, items])
 
   useEffect(() => {
     loadData()
   }, [])
 
+  // NEW: Refresh active data without full page reload
+  const refreshActiveData = async () => {
+    try {
+      console.log('Refreshing active data...')
+      
+      // Get items with active phases
+      const activeItems = items.filter(item =>
+        item.phases?.some(phase => phase.start_time && !phase.end_time)
+      )
+
+      if (activeItems.length === 0) return
+
+      // Fetch fresh data for active items only
+      const freshItems = await Promise.all(
+        activeItems.map(item => apiService.operations.getItem(item.part_number))
+      )
+
+      // Update state with fresh data
+      if (isMountedRef.current) {
+        setItems(prevItems => {
+          const updatedItems = [...prevItems]
+          freshItems.forEach(freshItem => {
+            const index = updatedItems.findIndex(i => i.part_number === freshItem.part_number)
+            if (index !== -1) {
+              updatedItems[index] = freshItem
+            }
+          })
+          return updatedItems
+        })
+
+        // Also refresh statistics
+        const statsResponse = await apiService.operations.getStatistics()
+        setStatistics(statsResponse)
+      }
+    } catch (err) {
+      console.error('Failed to refresh active data:', err)
+      // Don't show error to user for background refresh failures
+    }
+  }
+
   const loadData = async () => {
     try {
       setLoading(true)
       setError(null)
-      
+
       console.log('Loading items...')
-      
+
       // Load items and statistics in parallel
       const [itemsResponse, statsResponse] = await Promise.all([
         apiService.operations.getItems(),
         apiService.operations.getStatistics()
       ])
-      
+
       console.log('Items response:', itemsResponse)
       console.log('Stats response:', statsResponse)
-      
+
       // FIX: Extract items array properly - handle both direct array and nested object responses
       let itemsArray = []
       if (Array.isArray(itemsResponse)) {
@@ -93,24 +182,24 @@ useEffect(() => {
           itemsArray = itemsResponse.items || itemsResponse.data || itemsResponse.results || []
         }
       }
-      
+
       console.log('Items array:', itemsArray)
-      
+
       if (itemsArray.length === 0) {
         console.log('No items found')
         setItems([])
         setStatistics(statsResponse)
         return
       }
-      
+
       // FIX: Instead of fetching full details for each item (which is slow),
       // just use the items array directly and fetch full details only when needed
       // This ensures dropdowns populate immediately
       setItems(itemsArray)
       setStatistics(statsResponse)
-      
+
       console.log('Items loaded successfully:', itemsArray.length, 'items')
-      
+
     } catch (err) {
       console.error('Failed to load operations data:', err)
       setError('Failed to load data: ' + err.message)
@@ -128,7 +217,9 @@ useEffect(() => {
         items.map(item => apiService.operations.getItem(item.part_number))
       )
       console.log('All items with details:', itemsWithDetails)
-      setItems(itemsWithDetails)
+      if (isMountedRef.current) {
+        setItems(itemsWithDetails)
+      }
     } catch (err) {
       console.error('Failed to load all item details:', err)
     }
@@ -140,15 +231,17 @@ useEffect(() => {
       console.log('Loading details for item:', partNumber)
       const fullItem = await apiService.operations.getItem(partNumber)
       console.log('Full item loaded:', fullItem)
-      
-      setItems(prevItems => {
-        const newItems = prevItems.map(item => 
-          item.part_number === partNumber ? fullItem : item
-        )
-        console.log('Updated items:', newItems)
-        return newItems
-      })
-      
+
+      if (isMountedRef.current) {
+        setItems(prevItems => {
+          const newItems = prevItems.map(item =>
+            item.part_number === partNumber ? fullItem : item
+          )
+          console.log('Updated items:', newItems)
+          return newItems
+        })
+      }
+
       return fullItem
     } catch (err) {
       console.error('Failed to load item details:', err)
@@ -156,123 +249,61 @@ useEffect(() => {
     }
   }
 
-  // UPDATED: Added part_number validation and creation
-  const addItem = async () => {
-    if (!newItem.part_number.trim()) {
-      setError('Part number is required')
-      return
-    }
-    
-    if (!newItem.name.trim()) {
-      setError('Item name is required')
-      return
-    }
-    
-    try {
-      setSubmitting(true)
-      setError(null)
-      
-      // Validate part number format
-      if (!apiService.operations.validatePartNumber(newItem.part_number)) {
-        setError('Invalid part number format')
-        return
-      }
-      
-      // Check if part number already exists
-      const exists = await apiService.operations.itemExists(newItem.part_number)
-      if (exists) {
-        setError('Part number already exists')
-        return
-      }
-      
-      const result = await apiService.operations.createItem({
-        part_number: newItem.part_number,
-        name: newItem.name,
-        description: newItem.description
-      })
-      
-      console.log('Item created:', result)
-      
-      setNewItem({ part_number: "", name: "", description: "" })
-      await loadData()
-      
-      alert('Item created successfully!')
-    } catch (err) {
-      console.error('Failed to create item:', err)
-      setError('Failed to create item: ' + err.message)
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  const getItemElapsedTime = (item) => {
+    if (!item.start_time) return 0;
+    const start = new Date(item.start_time);
+    const end = item.end_time ? new Date(item.end_time) : new Date();
+    return Math.floor((end - start) / 1000);
+  };
 
-  // UPDATED: Use part_number instead of item_id
-  const addPhase = async () => {
-    if (!newPhase.partNumber || !newPhase.name.trim()) {
-      setError('Please select an item and enter phase name')
-      return
-    }
-    
-    try {
-      setSubmitting(true)
-      setError(null)
-      
-      await apiService.operations.createPhase({
-        part_number: newPhase.partNumber,
-        name: newPhase.name
-      })
-      
-      setNewPhase({ partNumber: "", name: "" })
-      await loadData()
-      alert('Phase created successfully!')
-    } catch (err) {
-      console.error('Failed to create phase:', err)
-      setError('Failed to create phase: ' + err.message)
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  const formatTime = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
 
-  // UPDATED: Use part_number instead of item_id
-  const addSubPhase = async () => {
-    if (!newSubPhase.partNumber || !newSubPhase.phaseId || !newSubPhase.name.trim()) {
-      setError('Please select item, phase and enter sub-phase name')
-      return
+  const getPhaseElapsedTime = (phase) => {
+    if (!phase.start_time) return 0;
+
+    const start = new Date(phase.start_time);
+
+    // If phase is completed, calculate total time minus pauses
+    if (phase.end_time) {
+      const end = new Date(phase.end_time);
+      let elapsed = Math.floor((end - start) / 1000);
+      if (phase.paused_duration) {
+        elapsed -= phase.paused_duration;
+      }
+      return Math.max(0, elapsed);
     }
-    
-    try {
-      setSubmitting(true)
-      setError(null)
-      
-      await apiService.operations.createSubphase({
-        part_number: newSubPhase.partNumber,
-        phase_id: newSubPhase.phaseId,
-        name: newSubPhase.name,
-        condition: newSubPhase.condition,
-        expected_duration: parseFloat(newSubPhase.expectedDuration) || 0
-      })
-      
-      setNewSubPhase({ 
-        partNumber: "", 
-        phaseId: "", 
-        name: "", 
-        condition: "", 
-        expectedDuration: "" 
-      })
-      await loadData()
-      alert('Sub-phase created successfully!')
-    } catch (err) {
-      console.error('Failed to create sub-phase:', err)
-      setError('Failed to create sub-phase: ' + err.message)
-    } finally {
-      setSubmitting(false)
+
+    // If phase is currently paused, show time up to pause
+    if (phase.pause_time) {
+      const pause = new Date(phase.pause_time);
+      let elapsed = Math.floor((pause - start) / 1000);
+      if (phase.paused_duration) {
+        elapsed -= phase.paused_duration;
+      }
+      return Math.max(0, elapsed);
     }
-  }
+
+    // Phase is running - calculate from start to now minus pauses
+    const now = new Date();
+    let elapsed = Math.floor((now - start) / 1000);
+    if (phase.paused_duration) {
+      elapsed -= phase.paused_duration;
+    }
+    return Math.max(0, elapsed);
+  };
 
   // UPDATED: Use part_number for reloading item details
   const toggleSubPhase = async (partNumber, phaseId, subPhaseId, currentStatus) => {
     try {
       await apiService.operations.completeSubphase(subPhaseId, !currentStatus)
-      
+
       // Instead of reloading all data (which loses phase details),
       // just reload the specific item's full details
       await loadItemDetails(partNumber)
@@ -288,31 +319,33 @@ useEffect(() => {
       await apiService.operations.updateSubphase(subPhaseId, {
         actual_hours: parseFloat(hours) || 0
       })
-      
-      setItems(prevItems => 
-        prevItems.map(item => {
-          if (item.part_number === partNumber) {
-            return {
-              ...item,
-              phases: item.phases?.map(phase => {
-                if (phase.id === phaseId) {
-                  return {
-                    ...phase,
-                    subphases: phase.subphases?.map(subPhase => {
-                      if (subPhase.id === subPhaseId) {
-                        return { ...subPhase, actual_hours: parseFloat(hours) || 0 }
-                      }
-                      return subPhase
-                    })
+
+      if (isMountedRef.current) {
+        setItems(prevItems =>
+          prevItems.map(item => {
+            if (item.part_number === partNumber) {
+              return {
+                ...item,
+                phases: item.phases?.map(phase => {
+                  if (phase.id === phaseId) {
+                    return {
+                      ...phase,
+                      subphases: phase.subphases?.map(subPhase => {
+                        if (subPhase.id === subPhaseId) {
+                          return { ...subPhase, actual_hours: parseFloat(hours) || 0 }
+                        }
+                        return subPhase
+                      })
+                    }
                   }
-                }
-                return phase
-              })
+                  return phase
+                })
+              }
             }
-          }
-          return item
-        })
-      )
+            return item
+          })
+        )
+      }
     } catch (err) {
       console.error('Failed to update hours:', err)
       setError('Failed to update hours: ' + err.message)
@@ -334,15 +367,15 @@ useEffect(() => {
 
     try {
       setError(null)
-      
+
       await apiService.operations.assignEmployee(
-        scanningFor.subPhaseId, 
+        scanningFor.subPhaseId,
         barcodeInput.trim()
       )
-      
+
       // Reload the specific item instead of all data
       await loadItemDetails(scanningFor.partNumber)
-      
+
       setScanningFor(null)
       setBarcodeInput("")
     } catch (err) {
@@ -380,7 +413,7 @@ useEffect(() => {
   const toggleItemExpansion = async (partNumber) => {
     const isExpanding = !expandedItems[partNumber]
     setExpandedItems(prev => ({ ...prev, [partNumber]: !prev[partNumber] }))
-    
+
     // Load full item details when expanding
     if (isExpanding) {
       const item = items.find(i => i.part_number === partNumber)
@@ -408,10 +441,10 @@ useEffect(() => {
     console.log('Selected item for subphase:', partNumber)
     const item = items.find(i => i.part_number === partNumber)
     console.log('Current item data:', item)
-    
+
     // Always load fresh details to ensure we have the latest phases
     const fullItem = await loadItemDetails(partNumber)
-    
+
     // Update the state after loading
     setNewSubPhase({ ...newSubPhase, partNumber, phaseId: "" })
   }
@@ -470,11 +503,10 @@ useEffect(() => {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-6 py-3 font-medium capitalize transition-colors ${
-                      activeTab === tab
+                    className={`px-6 py-3 font-medium capitalize transition-colors ${activeTab === tab
                         ? "border-b-2 border-slate-600 dark:border-slate-400 text-slate-700 dark:text-slate-300"
                         : "text-gray-600 dark:text-gray-400 hover:text-slate-600 dark:hover:text-slate-400"
-                    }`}
+                      }`}
                   >
                     {tab.replace("-", " ")}
                   </button>
@@ -485,7 +517,7 @@ useEffect(() => {
             {/* Content */}
             <div className="bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-lg shadow-lg p-6">
               {activeTab === "dashboard" && (
-                <Dashboard 
+                <Dashboard
                   items={items}
                   calculateItemProgress={calculateItemProgress}
                   loading={loading}
@@ -504,6 +536,7 @@ useEffect(() => {
               {activeTab === "checklist" && (
                 <Checklist
                   items={items}
+                  setItems={setItems}
                   expandedItems={expandedItems}
                   expandedPhases={expandedPhases}
                   scanningFor={scanningFor}
@@ -529,6 +562,10 @@ useEffect(() => {
                   items={items}
                   calculateItemProgress={calculateItemProgress}
                   calculatePhaseProgress={calculatePhaseProgress}
+                  getItemElapsedTime={getItemElapsedTime}
+                  formatTime={formatTime}
+                  getPhaseElapsedTime={getPhaseElapsedTime}
+                  apiService={apiService}
                 />
               )}
             </div>

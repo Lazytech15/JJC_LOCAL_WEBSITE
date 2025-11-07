@@ -138,18 +138,18 @@ async updateItem(partNumber, itemData) {
     })
   }
 
-  /**
-   * Update phase by ID
-   * @param {number|string} id - Phase ID
-   * @param {Object} phaseData - Updated phase information (name, phase_order, progress)
-   * @returns {Promise} Success confirmation
-   */
-  async updatePhase(id, phaseData) {
-    return this.request(`/api/operations/phases?id=${id}`, {
-      method: "PUT",
-      body: JSON.stringify(phaseData),
-    })
-  }
+/**
+ * Update phase by ID
+ * @param {number|string} id - Phase ID
+ * @param {Object} phaseData - Updated phase information (name, phase_order, progress, actual_hours)
+ * @returns {Promise} Success confirmation
+ */
+async updatePhase(id, phaseData) {
+  return this.request(`/api/operations/phases?id=${id}`, {
+    method: "PUT",
+    body: JSON.stringify(phaseData),
+  })
+}
 
   /**
    * Delete phase (cascades to subphases)
@@ -266,41 +266,85 @@ async createSubphase(subphaseData) {
 
   // ==================== PROCESS CONTROL METHODS ====================
 
-  /**
-   * Start item process - records start_time
-   * @param {string} partNumber - Item part number
-   * @returns {Promise} Success confirmation
-   */
-  async startItemProcess(partNumber) {
-    return this.request(`/api/operations/start-item`, {
-      method: "POST",
-      body: JSON.stringify({ part_number: partNumber }),
-    })
-  }
+/**
+ * Start phase process - records start_time
+ * @param {string} partNumber - Item part number
+ * @param {number|string} phaseId - Phase ID
+ * @returns {Promise} Success confirmation
+ */
+async startPhaseProcess(partNumber, phaseId) {
+  return this.request(`/api/operations/start-item`, {
+    method: "POST",
+    body: JSON.stringify({ 
+      part_number: partNumber,
+      phase_id: phaseId 
+    }),
+  })
+}
 
-  /**
-   * Stop item process - records end_time
-   * @param {string} partNumber - Item part number
-   * @returns {Promise} Success confirmation
-   */
-  async stopItemProcess(partNumber) {
-    return this.request(`/api/operations/stop-item`, {
-      method: "POST",
-      body: JSON.stringify({ part_number: partNumber }),
-    })
-  }
+/**
+ * Stop phase process - records end_time
+ * @param {string} partNumber - Item part number
+ * @param {number|string} phaseId - Phase ID
+ * @returns {Promise} Success confirmation
+ */
+async stopPhaseProcess(partNumber, phaseId) {
+  return this.request(`/api/operations/stop-item`, {
+    method: "POST",
+    body: JSON.stringify({ 
+      part_number: partNumber,
+      phase_id: phaseId 
+    }),
+  })
+}
 
-  /**
-   * Reset item process times - clears start_time and end_time
-   * @param {string} partNumber - Item part number
-   * @returns {Promise} Success confirmation
-   */
-  async resetItemProcess(partNumber) {
-    return this.request(`/api/operations/reset-item`, {
-      method: "POST",
-      body: JSON.stringify({ part_number: partNumber }),
-    })
-  }
+/**
+ * Pause phase process - records pause_time
+ * @param {string} partNumber - Item part number
+ * @param {number|string} phaseId - Phase ID
+ * @returns {Promise} Success confirmation
+ */
+async pausePhaseProcess(partNumber, phaseId) {
+  return this.request(`/api/operations/pause-phase`, {
+    method: "POST",
+    body: JSON.stringify({ 
+      part_number: partNumber,
+      phase_id: phaseId 
+    }),
+  })
+}
+
+/**
+ * Resume phase process - clears pause_time
+ * @param {string} partNumber - Item part number
+ * @param {number|string} phaseId - Phase ID
+ * @returns {Promise} Success confirmation
+ */
+async resumePhaseProcess(partNumber, phaseId) {
+  return this.request(`/api/operations/resume-phase`, {
+    method: "POST",
+    body: JSON.stringify({ 
+      part_number: partNumber,
+      phase_id: phaseId 
+    }),
+  })
+}
+
+/**
+ * Reset phase process times - clears start_time, pause_time, and end_time
+ * @param {string} partNumber - Item part number
+ * @param {number|string} phaseId - Phase ID
+ * @returns {Promise} Success confirmation
+ */
+async resetPhaseProcess(partNumber, phaseId) {
+  return this.request(`/api/operations/reset-item`, {
+    method: "POST",
+    body: JSON.stringify({ 
+      part_number: partNumber,
+      phase_id: phaseId 
+    }),
+  })
+}
 
   // ==================== REPORTING METHODS ====================
 
