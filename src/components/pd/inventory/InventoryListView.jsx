@@ -19,7 +19,8 @@ function InventoryListView({
               <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Brand</th>
               <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Location</th>
               <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Balance</th>
-              <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Min Stock</th>
+              <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">ROP</th>
+              <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">MOQ</th>
               <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Price</th>
               <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Status</th>
               <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Actions</th>
@@ -46,6 +47,7 @@ function InventoryListView({
                   </span>
                 </td>
                 <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-300">{item.min_stock || 0}</td>
+                <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-300">{item.moq || 0}</td>
                 <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-300">
                   {item.price_per_unit ? formatCurrency(item.price_per_unit) : '-'}
                 </td>

@@ -131,9 +131,17 @@ export const exportPurchaseOrderToPDF = (poData) => {
     const withholdingTax = subtotal * taxRate
     const totalAfterWithholdingTax = totalBeforeWithholdingTax - withholdingTax
     
-    const discountAmount = poData.has_discount 
-      ? totalAfterWithholdingTax * (Number(poData.discount_percentage) / 100)
-      : 0
+    // Calculate discount based on type
+    let discountAmount = 0
+    if (poData.has_discount) {
+      const discountType = poData.discount_type || "percentage" // Default to percentage for backward compatibility
+      if (discountType === "percentage") {
+        const discountValue = poData.discount_value || poData.discount_percentage || 0
+        discountAmount = totalAfterWithholdingTax * (Number(discountValue) / 100)
+      } else if (discountType === "fixed") {
+        discountAmount = Number(poData.discount_value || 0)
+      }
+    }
     
     const grandTotal = totalAfterWithholdingTax - discountAmount
 
@@ -143,7 +151,11 @@ export const exportPurchaseOrderToPDF = (poData) => {
       taxRate: taxRate * 100,
       withholdingTax,
       totalAfterWithholdingTax,
-      discountPercentage: poData.has_discount ? Number(poData.discount_percentage) : 0,
+      discountType: poData.discount_type || "percentage",
+      discountValue: poData.has_discount ? Number(poData.discount_value || poData.discount_percentage || 0) : 0,
+      discountPercentage: poData.has_discount && (poData.discount_type === "percentage" || !poData.discount_type) 
+        ? Number(poData.discount_value || poData.discount_percentage || 0) 
+        : 0,
       discountAmount,
       grandTotal,
       applyTax: poData.apply_tax // Include flag for consistency
@@ -490,7 +502,10 @@ export const exportPurchaseOrderToPDF = (poData) => {
       if (taxBreakdown.discountAmount > 0) {
         doc.setFont("helvetica", "normal")
         doc.setFontSize(FONT_SIZES.tiny)
-        doc.text(`Less: Discount (${taxBreakdown.discountPercentage}%) =`, totalBoxX + 2, rowY)
+        const discountLabel = taxBreakdown.discountType === "percentage" 
+          ? `Less: Discount (${taxBreakdown.discountPercentage}%) =` 
+          : "Less: Discount (Fixed Amount) ="
+        doc.text(discountLabel, totalBoxX + 2, rowY)
         doc.setFontSize(FONT_SIZES.body)
         doc.text(`(${formatPesoWithPrefix(taxBreakdown.discountAmount)})`, totalBoxX + totalBoxWidth - 2, rowY, { align: "right" })
         
@@ -614,18 +629,48 @@ export const exportPurchaseOrderToPDF = (poData) => {
 }
 
 /**
- * Excel Export with Professional Formatting - Matching PDF Layout
+ * Excel Export with Professional Formatting - Matching Image Layout
  */
 export const exportPurchaseOrderToExcel = (poData) => {
   const wb = XLSX.utils.book_new()
   
   // Get items and calculate total
   const items = poData.items || poData.selectedItems || []
-  const totalAmount = items.reduce((sum, item) => 
-    sum + ((item.quantity || 0) * (item.price_per_unit || 0)), 0
-  )
+  
+  // Helper functions to resolve unit price and amount
+  const resolveUnitPrice = (item) => {
+    if (item == null) return 0
+    const candidates = [item.unit_price, item.price_per_unit, item.unitPrice, item.unitPriceRaw]
+    for (const v of candidates) {
+      if (typeof v === 'number' && !isNaN(v)) return v
+      if (typeof v === 'string' && v.trim() !== '') {
+        const parsed = Number(v)
+        if (!isNaN(parsed)) return parsed
+      }
+    }
+    if (item.amount && item.quantity) {
+      const q = Number(item.quantity) || 0
+      if (q > 0) return Number(item.amount) / q
+    }
+    return 0
+  }
 
-  // Format currency - Remove PHP prefix for unit prices and amounts
+  const resolveAmount = (item) => {
+    if (item == null) return 0
+    if (typeof item.amount === 'number') return item.amount
+    if (typeof item.amount === 'string' && item.amount.trim() !== '') {
+      const parsed = Number(item.amount)
+      if (!isNaN(parsed)) return parsed
+    }
+    const qty = Number(item.quantity) || 0
+    const up = resolveUnitPrice(item)
+    return qty * up
+  }
+
+  const computedItemsTotal = items.reduce((sum, item) => sum + resolveAmount(item), 0)
+  const totalAmount = (typeof poData.total_value === 'number' && !isNaN(poData.total_value)) ? poData.total_value : computedItemsTotal
+
+  // Format currency without prefix for unit prices and amounts
   const formatPeso = (amount) => {
     return amount.toLocaleString('en-PH', { 
       minimumFractionDigits: 2, 
@@ -633,18 +678,9 @@ export const exportPurchaseOrderToExcel = (poData) => {
     })
   }
 
-  // Format currency with PHP prefix for totals
-  const formatPesoWithPrefix = (amount) => {
-    const formatted = amount.toLocaleString('en-PH', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    })
-    return `PHP ${formatted}`
-  }
-
   // Tax calculation functions
   const getTaxRate = () => {
-    if (!poData.apply_tax) return 0 // No tax when apply_tax is false
+    if (!poData.apply_tax) return 0
     switch(poData.tax_type) {
       case 'goods': return 0.01
       case 'services': return 0.02
@@ -655,155 +691,273 @@ export const exportPurchaseOrderToExcel = (poData) => {
 
   const calculateTaxBreakdown = () => {
     const totalBeforeWithholdingTax = totalAmount
-    const subtotal = poData.apply_tax ? totalBeforeWithholdingTax / 1.12 : totalBeforeWithholdingTax // Remove 12% VAT only if tax is applied
+    const subtotal = poData.apply_tax ? totalBeforeWithholdingTax / 1.12 : totalBeforeWithholdingTax
     const taxRate = getTaxRate()
     const withholdingTax = subtotal * taxRate
     const totalAfterWithholdingTax = totalBeforeWithholdingTax - withholdingTax
     
-    const discountAmount = poData.has_discount 
-      ? totalAfterWithholdingTax * (Number(poData.discount_percentage) / 100)
-      : 0
+    // Calculate discount based on type
+    let discountAmount = 0
+    if (poData.has_discount) {
+      const discountType = poData.discount_type || "percentage"
+      if (discountType === "percentage") {
+        const discountValue = poData.discount_value || poData.discount_percentage || 0
+        discountAmount = totalAfterWithholdingTax * (Number(discountValue) / 100)
+      } else if (discountType === "fixed") {
+        discountAmount = Number(poData.discount_value || 0)
+      }
+    }
     
     const grandTotal = totalAfterWithholdingTax - discountAmount
 
     return {
-      totalBeforeWithholdingTax,
       subtotal,
-      taxRate: taxRate * 100,
       withholdingTax,
-      totalAfterWithholdingTax,
-      discountPercentage: poData.has_discount ? Number(poData.discount_percentage) : 0,
       discountAmount,
-      grandTotal,
-      applyTax: poData.apply_tax // Include flag for consistency
+      grandTotal
     }
   }
 
   const taxBreakdown = calculateTaxBreakdown()
-  const taxTypeLabel = poData.tax_type ? poData.tax_type.charAt(0).toUpperCase() + poData.tax_type.slice(1) : 'Goods'
 
-  // Create worksheet data matching PDF layout
+  // Build supplier address lines
+  const supplierAddrLines = poData.supplier_address ? poData.supplier_address.split('\n') : []
+  const supplierAddr1 = supplierAddrLines[0] || ""
+  const supplierAddr2 = supplierAddrLines[1] || ""
+
+  // Create worksheet data matching the image format
   const wsData = [
-    // Row 1-4: Company Information (left side)
-    [COMPANY_INFO.name, "", "", "", "", "", "", "", "", "", "", "PURCHASE ORDER"],
-    [COMPANY_INFO.address, "", "", "", "", "", "", "", "", "", "", ""],
-    [COMPANY_INFO.address2, "", "", "", "", "", "", "", "", "", "", ""],
-    [COMPANY_INFO.phone, "", "", "", "", "", "", "", "", "", "", ""],
-    [COMPANY_INFO.email, "", "", "", "", "", "", "", "", "", "", ""],
-    [], // Empty row
-    // Row 9-10: Information Grid Headers
-    ["SUPPLIER'S NAME & ADDRESS", "", "", "", "", "ORDER INFORMATION", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", "", "", "", "", ""],
-    // Row 11: Supplier Name
-    [(poData.supplier_name || "").toUpperCase(), "", "", "", "", "DATE :", poData.po_date || "—", "", "", "", "", ""],
-    // Row 12: Supplier Address Line 1
-    [poData.supplier_address ? poData.supplier_address.split('\n')[0] || "" : "", "", "", "", "", "TERMS :", poData.terms || "—", "", "", "", "", ""],
-    // Row 13: Supplier Address Line 2
-    [poData.supplier_address ? poData.supplier_address.split('\n')[1] || "" : "", "", "", "", "", "", "", "", "", "", "", ""],
-    // Row 14: Attention
-    [`Attention: ${poData.attention_person || ""}`, "", "", "", "", "", "", "", "", "", "", ""],
-    [], // Empty row
-    // Row 16: Items Table Header
-    ["ITEM", "QTY", "UNIT", "DESCRIPTION", "UNIT PRICE", "AMOUNT"],
+    // Row 1: Title row with PURCHASE ORDER
+    ["", "", "", "", "", "", "", "", "", "PURCHASE ORDER"],
+    // Row 2: Supplier header and PO Number
+    ["SUPPLIER'S NAME &", "", "", "", "", "", "", "", "P. O. # :", poData.po_number || poData.id || ""],
+    ["ADDRESS", "", "", "", "", "", "", "", "", ""],
+    // Row 3: Supplier name and DATE
+    [(poData.supplier_name || "").toUpperCase(), "", "", "", "", "", "", "", "DATE :", poData.po_date || ""],
+    // Row 4: Address 1
+    [supplierAddr1, "", "", "", "", "", "", "", "", ""],
+    // Row 5: Address 2 and TERMS
+    [supplierAddr2, "", "", "", "", "", "", "", "TERMS :", poData.terms || ""],
+    // Row 6: Attention
+    [`Attention : ${poData.attention_person || ""}`, "", "", "", "", "", "", "", "", ""],
+    // Row 7: Empty
+    [],
+    // Row 8: Table headers
+    ["ITEM", "QTY", "UNIT", "DESCRIPTION OF ITEMS", "", "", "", "UNIT PRICE", "AMOUNT"],
     // Items rows
     ...items.map((item, index) => [
-      (index + 1).toString().padStart(2, '0'),
+      index + 1,
       item.quantity || 0,
       item.unit || "pcs",
       item.item_name || item.description || "",
-      formatPeso(item.price_per_unit || 0),
-      formatPeso((item.quantity || 0) * (item.price_per_unit || 0))
+      "", "", "",
+      formatPeso(resolveUnitPrice(item) || 0),
+      formatPeso(resolveAmount(item) || 0)
     ]),
-    [], // Empty row
-    // Totals with Tax Breakdown (conditional)
-    ...(poData.apply_tax ? [
-      ["", "", "", "GROSS TOTAL (with 12% VAT) =", "", formatPesoWithPrefix(taxBreakdown.totalBeforeWithholdingTax)],
-      ["", "", "", `Subtotal (Gross ÷ 1.12) =`, "", formatPesoWithPrefix(taxBreakdown.subtotal)],
-      ["", "", "", `Less: Withholding Tax (${taxBreakdown.taxRate}% - ${taxTypeLabel}) =`, "", `(${formatPesoWithPrefix(taxBreakdown.withholdingTax)})`]
-    ] : [
-      ["", "", "", "TOTAL AMOUNT =", "", formatPesoWithPrefix(taxBreakdown.totalBeforeWithholdingTax)]
-    ]),
-    ...(taxBreakdown.discountAmount > 0 ? [
-      ["", "", "", `Less: Discount (${taxBreakdown.discountPercentage}%) =`, "", `(${formatPesoWithPrefix(taxBreakdown.discountAmount)})`]
-    ] : []),
-    ["", "", "", "GRAND TOTAL =", "", formatPesoWithPrefix(taxBreakdown.grandTotal)],
-    [], // Empty row
+    // Empty rows for spacing
+    [], [],
+    // Totals section
+    ["", "", "", "", "", "", "Sub-Total =", formatPeso(taxBreakdown.subtotal)],
+    ["", "", "", "", "", "", "LESS: With Holding Tax =", `(${formatPeso(taxBreakdown.withholdingTax)})`],
+    ["", "", "", "", "", "", "TOTAL AMOUNT =", formatPeso(taxBreakdown.grandTotal)],
+    // Empty row
+    [],
     // Signatures
-    ["PREPARED BY", "", "", "VERIFIED BY", "", "", "APPROVED BY"],
-    [Array.isArray(poData.prepared_by) ? poData.prepared_by.join(', ') : poData.prepared_by || "", 
-     "", 
-     "", 
-     poData.verified_by || "", 
-     "", 
-     "", 
-     poData.approved_by || ""],
-    [], // Empty row
-    // Notes
-    ["NOTES:", poData.notes || ""]
+    ["PREPARED BY:", "", "", "APPROVED BY:"],
+    [""],
+    [Array.isArray(poData.prepared_by) ? poData.prepared_by.join(', ') : poData.prepared_by || "", "", "", poData.approved_by || ""],
+    [""],
+    ["VERIFIED BY:"],
+    [""],
+    [poData.verified_by || ""]
   ]
 
   const ws = XLSX.utils.aoa_to_sheet(wsData)
 
-  // Set column widths to match PDF layout
+  // Set column widths
   ws['!cols'] = [
-    { wch: 3 },  // ITEM
-    { wch: 8 },  // QTY
-    { wch: 8 },  // UNIT
-    { wch: 40 }, // DESCRIPTION
-    { wch: 15 }, // UNIT PRICE
-    { wch: 15 }, // AMOUNT
-    { wch: 8 },  // DATE label
-    { wch: 12 }, // DATE value
-    { wch: 8 },  // TERMS label
-    { wch: 12 }, // TERMS value
-    { wch: 10 }, // PO label
-    { wch: 15 }  // PO value
+    { wch: 6 },   // ITEM
+    { wch: 6 },   // QTY
+    { wch: 6 },   // UNIT
+    { wch: 50 },  // DESCRIPTION (wide)
+    { wch: 8 },   // Extra space
+    { wch: 8 },   // Extra space
+    { wch: 20 },  // Label column
+    { wch: 15 },  // UNIT PRICE
+    { wch: 15 }   // AMOUNT
   ]
 
-  // Calculate merge indices based on actual content
-  const totalRowsBeforeSignatures = 4  // Consistent with PDF: always use maximum rows for merge calculations
-  const signaturesOffset = 3 // Signatures section rows
-  const notesOffset = 1 // Notes section rows
-  
-  // Merge cells to match PDF layout
-  ws['!merges'] = [
-    // Company name
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
-    // Company address lines
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } },
-    { s: { r: 2, c: 0 }, e: { r: 2, c: 10 } },
-    { s: { r: 3, c: 0 }, e: { r: 3, c: 10 } },
-    { s: { r: 4, c: 0 }, e: { r: 4, c: 10 } },
+  // Merge cells to match the image layout
+  const merges = [
     // Title
-    { s: { r: 0, c: 11 }, e: { r: 5, c: 11 } },
-    // PO Number
-    { s: { r: 6, c: 10 }, e: { r: 6, c: 11 } },
-    // Information Grid Headers
-    { s: { r: 8, c: 0 }, e: { r: 8, c: 4 } },
-    { s: { r: 8, c: 5 }, e: { r: 8, c: 11 } },
-    // Supplier Name
-    { s: { r: 10, c: 0 }, e: { r: 10, c: 4 } },
-    // Supplier Address
-    { s: { r: 11, c: 0 }, e: { r: 11, c: 4 } },
-    { s: { r: 12, c: 0 }, e: { r: 12, c: 4 } },
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } },
+    // SUPPLIER'S NAME & ADDRESS header
+    { s: { r: 1, c: 0 }, e: { r: 2, c: 0 } },
+    // Supplier name
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 7 } },
+    // Address 1
+    { s: { r: 4, c: 0 }, e: { r: 4, c: 7 } },
+    // Address 2
+    { s: { r: 5, c: 0 }, e: { r: 5, c: 7 } },
     // Attention
-    { s: { r: 13, c: 0 }, e: { r: 13, c: 4 } },
-    // Totals - merge labels with empty column
-    ...Array.from({ length: totalRowsBeforeSignatures }, (_, i) => ({
-      s: { r: wsData.length - (signaturesOffset + notesOffset + totalRowsBeforeSignatures) + i, c: 3 },
-      e: { r: wsData.length - (signaturesOffset + notesOffset + totalRowsBeforeSignatures) + i, c: 4 }
-    })),
-    // Signatures
-    { s: { r: wsData.length - (signaturesOffset + notesOffset) + 1, c: 0 }, e: { r: wsData.length - (signaturesOffset + notesOffset) + 1, c: 2 } },
-    { s: { r: wsData.length - (signaturesOffset + notesOffset) + 1, c: 3 }, e: { r: wsData.length - (signaturesOffset + notesOffset) + 1, c: 5 } },
-    { s: { r: wsData.length - (signaturesOffset + notesOffset) + 1, c: 6 }, e: { r: wsData.length - (signaturesOffset + notesOffset) + 1, c: 6 } },
-    { s: { r: wsData.length - (signaturesOffset + notesOffset) + 2, c: 0 }, e: { r: wsData.length - (signaturesOffset + notesOffset) + 2, c: 2 } },
-    { s: { r: wsData.length - (signaturesOffset + notesOffset) + 2, c: 3 }, e: { r: wsData.length - (signaturesOffset + notesOffset) + 2, c: 5 } },
-    { s: { r: wsData.length - (signaturesOffset + notesOffset) + 2, c: 6 }, e: { r: wsData.length - (signaturesOffset + notesOffset) + 2, c: 6 } },
-    // Notes
-    { s: { r: wsData.length - 1, c: 0 }, e: { r: wsData.length - 1, c: 11 } }
+    { s: { r: 6, c: 0 }, e: { r: 6, c: 7 } },
+    // DESCRIPTION header spans multiple columns
+    { s: { r: 8, c: 3 }, e: { r: 8, c: 6 } }
   ]
+
+  // Add merges for description cells in item rows
+  const itemStartRow = 9
+  items.forEach((_, index) => {
+    merges.push({ s: { r: itemStartRow + index, c: 3 }, e: { r: itemStartRow + index, c: 6 } })
+  })
+
+  // Merge total labels
+  const totalsStartRow = itemStartRow + items.length + 2
+  merges.push({ s: { r: totalsStartRow, c: 6 }, e: { r: totalsStartRow, c: 7 } })
+  merges.push({ s: { r: totalsStartRow + 1, c: 6 }, e: { r: totalsStartRow + 1, c: 7 } })
+  merges.push({ s: { r: totalsStartRow + 2, c: 6 }, e: { r: totalsStartRow + 2, c: 7 } })
+
+  // Signature merges
+  const sigStartRow = totalsStartRow + 4
+  merges.push({ s: { r: sigStartRow, c: 0 }, e: { r: sigStartRow, c: 2 } })
+  merges.push({ s: { r: sigStartRow, c: 3 }, e: { r: sigStartRow, c: 5 } })
+  merges.push({ s: { r: sigStartRow + 2, c: 0 }, e: { r: sigStartRow + 2, c: 2 } })
+  merges.push({ s: { r: sigStartRow + 2, c: 3 }, e: { r: sigStartRow + 2, c: 5 } })
+  merges.push({ s: { r: sigStartRow + 4, c: 0 }, e: { r: sigStartRow + 4, c: 2 } })
+  merges.push({ s: { r: sigStartRow + 6, c: 0 }, e: { r: sigStartRow + 6, c: 2 } })
+
+  ws['!merges'] = merges
+
+  // Apply cell styling for professional appearance
+  const range = XLSX.utils.decode_range(ws['!ref'])
+  
+  // Helper function to create styled cell
+  const styleCell = (cell, style = {}) => {
+    if (!cell) return
+    cell.s = {
+      font: style.font || { name: "Arial", sz: 10 },
+      alignment: style.alignment || { vertical: "center", horizontal: "left" },
+      border: style.border || {
+        top: { style: "thin", color: { rgb: "000000" } },
+        bottom: { style: "thin", color: { rgb: "000000" } },
+        left: { style: "thin", color: { rgb: "000000" } },
+        right: { style: "thin", color: { rgb: "000000" } }
+      },
+      fill: style.fill || { fgColor: { rgb: "FFFFFF" } }
+    }
+  }
+
+  // Style all cells
+  for (let R = range.s.r; R <= range.e.r; R++) {
+    for (let C = range.s.c; C <= range.e.c; C++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
+      const cell = ws[cellAddress]
+      
+      if (!cell) continue
+
+      // Default styling
+      let style = {
+        font: { name: "Arial", sz: 10 },
+        alignment: { vertical: "center", horizontal: "left", wrapText: true },
+        border: {
+          top: { style: "thin", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } }
+        }
+      }
+
+      // Title row (Row 0) - PURCHASE ORDER
+      if (R === 0) {
+        style.font = { name: "Arial", sz: 16, bold: true }
+        style.alignment = { vertical: "center", horizontal: "center" }
+        style.border = {
+          top: { style: "medium", color: { rgb: "000000" } },
+          bottom: { style: "medium", color: { rgb: "000000" } },
+          left: { style: "medium", color: { rgb: "000000" } },
+          right: { style: "medium", color: { rgb: "000000" } }
+        }
+      }
+
+      // Supplier header and PO# row (Row 1-2)
+      if (R >= 1 && R <= 2) {
+        style.font = { name: "Arial", sz: 9, bold: true }
+        style.border = {
+          top: { style: "medium", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left: { style: "medium", color: { rgb: "000000" } },
+          right: { style: "medium", color: { rgb: "000000" } }
+        }
+      }
+
+      // Supplier info rows (Row 3-6)
+      if (R >= 3 && R <= 6) {
+        style.font = { name: "Arial", sz: 10 }
+        if (R === 3) {
+          style.font.bold = true // Supplier name bold
+        }
+      }
+
+      // Table header row (ITEM, QTY, UNIT, etc.)
+      if (R === 8) {
+        style.font = { name: "Arial", sz: 10, bold: true }
+        style.alignment = { vertical: "center", horizontal: "center" }
+        style.fill = { fgColor: { rgb: "E0E0E0" } }
+        style.border = {
+          top: { style: "medium", color: { rgb: "000000" } },
+          bottom: { style: "medium", color: { rgb: "000000" } },
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } }
+        }
+      }
+
+      // Item rows
+      if (R >= 9 && R < 9 + items.length) {
+        // Center align for ITEM, QTY, UNIT columns
+        if (C <= 2) {
+          style.alignment = { vertical: "center", horizontal: "center" }
+        }
+        // Right align for UNIT PRICE and AMOUNT columns
+        if (C >= 7) {
+          style.alignment = { vertical: "center", horizontal: "right" }
+        }
+      }
+
+      // Totals section (Sub-Total, LESS, TOTAL AMOUNT)
+      if (R >= itemStartRow + items.length + 2 && R <= itemStartRow + items.length + 4) {
+        style.font = { name: "Arial", sz: 10, bold: true }
+        if (C >= 6) {
+          style.alignment = { vertical: "center", horizontal: "right" }
+        }
+        // TOTAL AMOUNT row - extra bold
+        if (R === itemStartRow + items.length + 4) {
+          style.font = { name: "Arial", sz: 11, bold: true }
+          style.fill = { fgColor: { rgb: "F0F0F0" } }
+        }
+      }
+
+      // Signature section
+      if (R >= sigStartRow) {
+        style.font = { name: "Arial", sz: 10, bold: true }
+        style.alignment = { vertical: "center", horizontal: "center" }
+        // Name rows
+        if (R === sigStartRow + 2 || R === sigStartRow + 6) {
+          style.border.top = { style: "thin", color: { rgb: "000000" } }
+        }
+      }
+
+      styleCell(cell, style)
+    }
+  }
+
+  // Set row heights for better appearance
+  ws['!rows'] = []
+  ws['!rows'][0] = { hpt: 30 } // Title row
+  ws['!rows'][8] = { hpt: 25 } // Header row
+  for (let i = 9; i < 9 + items.length; i++) {
+    ws['!rows'][i] = { hpt: 20 } // Item rows
+  }
 
   XLSX.utils.book_append_sheet(wb, ws, "Purchase Order")
   XLSX.writeFile(wb, `PO_${poData.po_number || poData.id || 'PO'}_${poData.supplier_name || 'Supplier'}.xlsx`)
-} 
+}

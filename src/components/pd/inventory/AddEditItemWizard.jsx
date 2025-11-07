@@ -172,6 +172,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
     // Step 2: Stock & Pricing
     balance: 0,
     min_stock: 0,
+    moq: 0,
     unit_of_measure: "",
     price_per_unit: 0,
 
@@ -224,6 +225,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
   custom_supplier: "",
         balance: selectedItem?.balance || 0,
         min_stock: selectedItem?.min_stock || 0,
+        moq: selectedItem?.moq || 0,
         unit_of_measure: selectedItem?.unit_of_measure || "",
         price_per_unit: selectedItem?.price_per_unit || 0,
         location: selectedItem?.location || "",
@@ -373,6 +375,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
       supplier: "",
       balance: 0,
       min_stock: 0,
+      moq: 0,
       unit_of_measure: "",
       price_per_unit: 0,
       location: "",
@@ -547,10 +550,10 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
   if (!isOpen) return null
     return (
       <ModalPortal>
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-[1000]">
-          <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col border-2 border-slate-200 dark:border-slate-700">
+  <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-1000">
+          <div className="bg-linear-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col border-2 border-slate-200 dark:border-slate-700">
             {/* Enhanced Header with Industrial Theme */}
-            <div className="bg-gradient-to-r from-slate-800 via-zinc-800 to-slate-800 dark:from-slate-900 dark:via-zinc-900 dark:to-slate-900 p-4 sm:p-6 text-white relative overflow-hidden">
+            <div className="bg-linear-to-r from-slate-800 via-zinc-800 to-slate-800 dark:from-slate-900 dark:via-zinc-900 dark:to-slate-900 p-4 sm:p-6 text-white relative overflow-hidden">
               {/* Clickable step breadcrumbs */}
               <div className="max-w-3xl mx-auto mb-4">
                 <div className="flex items-center gap-3">
@@ -592,7 +595,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                   </p>
                 </div>
 
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 space-y-6">
+                <div className="bg-linear-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 space-y-6">
                   {/* Item Name */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -702,8 +705,8 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                   </p>
                 </div>
 
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 space-y-6">
-                  {/* Balance & Min Stock */}
+                <div className="bg-linear-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 space-y-6">
+                  {/* Balance, ROP & MOQ */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {!selectedItem ? (
                       <div>
@@ -741,7 +744,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
 
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                        Minimum Stock <span className="text-red-500">*</span>
+                        ROP (Re-Order Point) <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="number"
@@ -754,6 +757,25 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                       {errors.min_stock && (
                         <p className="text-red-500 text-sm mt-1">{errors.min_stock}</p>
                       )}
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">System still stores this as <code>min_stock</code>.</p>
+                    </div>
+                  </div>
+
+                  {/* MOQ Field */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        MOQ (Minimum Order Quantity)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={wizardData.moq}
+                        onChange={(e) => setWizardData({ ...wizardData, moq: parseInt(e.target.value) || 0 })}
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                        placeholder="e.g., 10"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Optional. If set &gt; 0, purchase orders will enforce at least this quantity.</p>
                     </div>
                   </div>
 
@@ -782,7 +804,10 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                           min="0"
                           step="0.01"
                           value={wizardData.price_per_unit}
-                          onChange={(e) => setWizardData({ ...wizardData, price_per_unit: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? 0 : Number(e.target.value)
+                            setWizardData({ ...wizardData, price_per_unit: value })
+                          }}
                           className={`w-full border ${errors.price_per_unit ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-lg pl-8 pr-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                           placeholder="0.00"
                         />
@@ -855,7 +880,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                   </p>
                 </div>
 
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 space-y-6">
+                <div className="bg-linear-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 space-y-6">
                   {/* Location */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -925,7 +950,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                     </h4>
 
                     <div className="flex flex-col sm:flex-row gap-4 items-start">
-                      <div className="w-48 h-48 bg-white dark:bg-black/40 rounded-xl overflow-hidden flex items-center justify-center border-2 border-gray-300 dark:border-gray-700 flex-shrink-0">
+                      <div className="w-48 h-48 bg-white dark:bg-black/40 rounded-xl overflow-hidden flex items-center justify-center border-2 border-gray-300 dark:border-gray-700 shrink-0">
                         {previewUrl ? (
                           <img src={previewUrl} alt="Preview" className="object-contain w-full h-full" />
                         ) : currentImageUrl ? (
@@ -1056,7 +1081,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                         {!selectedItem?.item_no && (
                           <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg">
                             <div className="flex items-start gap-2">
-                              <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                              <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                               </svg>
                               <div>
@@ -1115,7 +1140,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
 
                 {/* Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-xl p-5 border border-blue-200 dark:border-blue-700">
+                  <div className="bg-linear-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-xl p-5 border border-blue-200 dark:border-blue-700">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-2xl">
                         📦
@@ -1131,7 +1156,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                     </div>
                   </div>
 
-                  <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 rounded-xl p-5 border border-green-200 dark:border-green-700">
+                  <div className="bg-linear-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 rounded-xl p-5 border border-green-200 dark:border-green-700">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-2xl">
                         💰
@@ -1140,7 +1165,8 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                     </div>
                     <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
                       <p><strong>Balance:</strong> {wizardData.balance} {wizardData.unit_of_measure || 'units'}</p>
-                      <p><strong>Min Stock:</strong> {wizardData.min_stock} {wizardData.unit_of_measure || 'units'}</p>
+                      <p><strong>ROP:</strong> {wizardData.min_stock} {wizardData.unit_of_measure || 'units'}</p>
+                      <p><strong>MOQ:</strong> {wizardData.moq} {wizardData.unit_of_measure || 'units'}</p>
                       <p><strong>Price:</strong> ₱{(Number(wizardData.price_per_unit) || 0).toFixed(2)}</p>
                       <p className="font-semibold text-green-700 dark:text-green-400">
                         <strong>Total Value:</strong> ₱{((wizardData.balance || 0) * (Number(wizardData.price_per_unit) || 0)).toFixed(2)}
@@ -1148,7 +1174,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                     </div>
                   </div>
 
-                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 rounded-xl p-5 border border-purple-200 dark:border-purple-700">
+                  <div className="bg-linear-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 rounded-xl p-5 border border-purple-200 dark:border-purple-700">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-2xl">
                         📍
@@ -1176,7 +1202,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
 
                 {/* Full Details Table */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+                  <div className="bg-linear-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
                     <h4 className="font-bold text-lg text-gray-900 dark:text-white">Complete Item Details</h4>
                   </div>
                   <div className="p-6 space-y-3 text-sm">
@@ -1202,8 +1228,12 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                         <span className="font-semibold text-gray-900 dark:text-white">{wizardData.balance}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Min Stock:</span>
+                        <span className="text-gray-600 dark:text-gray-400">ROP:</span>
                         <span className="font-semibold text-gray-900 dark:text-white">{wizardData.min_stock}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">MOQ:</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">{wizardData.moq}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Unit of Measure:</span>
@@ -1267,7 +1297,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                 (currentStep === 1 && !canProceedFromStep1) ||
                 (currentStep === 2 && !canProceedFromStep2)
               }
-              className="px-8 py-2.5 bg-gradient-to-r from-zinc-600 to-gray-700 hover:from-zinc-700 hover:to-gray-800 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg transition-all font-semibold shadow-lg disabled:shadow-none disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-8 py-2.5 bg-linear-to-r from-zinc-600 to-gray-700 hover:from-zinc-700 hover:to-gray-800 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg transition-all font-semibold shadow-lg disabled:shadow-none disabled:cursor-not-allowed flex items-center gap-2"
             >
               {currentStep === 4 ? (
                 <>

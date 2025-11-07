@@ -14,7 +14,8 @@ export const INVENTORY_COLUMNS = [
   { key: 'item_type', label: 'Item Type', required: false },
   { key: 'supplier', label: 'Supplier', required: false },
   { key: 'balance', label: 'Balance', required: true },
-  { key: 'min_stock', label: 'Min Stock', required: true },
+  { key: 'min_stock', label: 'ROP (Min Stock)', required: true },
+  { key: 'moq', label: 'MOQ', required: false },
   { key: 'unit_of_measure', label: 'Unit of Measure', required: false },
   { key: 'price_per_unit', label: 'Price Per Unit', required: true },
   { key: 'location', label: 'Location', required: false },
@@ -255,6 +256,13 @@ export function validateImportedItems(items) {
       itemErrors.push('Min Stock must be a non-negative number')
     }
 
+    // MOQ is optional, but if provided must be valid
+    if (item.moq !== undefined && item.moq !== null && item.moq !== '') {
+      if (isNaN(Number(item.moq)) || Number(item.moq) < 0) {
+        itemErrors.push('MOQ must be a non-negative number')
+      }
+    }
+
     if (item.price_per_unit === undefined || item.price_per_unit === null || item.price_per_unit === '') {
       itemErrors.push('Price Per Unit is required')
     } else if (isNaN(Number(item.price_per_unit)) || Number(item.price_per_unit) < 0) {
@@ -273,6 +281,7 @@ export function validateImportedItems(items) {
         ...item,
         balance: Number(item.balance),
         min_stock: Number(item.min_stock),
+        moq: item.moq !== undefined && item.moq !== null && item.moq !== '' ? Number(item.moq) : 0,
         price_per_unit: Number(item.price_per_unit)
       })
     }
@@ -294,6 +303,7 @@ export function downloadTemplate(format = 'csv') {
       supplier: 'Supplier 1',
       balance: 100,
       min_stock: 20,
+      moq: 10,
       unit_of_measure: 'pcs',
       price_per_unit: 50.00,
       location: 'Warehouse A'
@@ -305,6 +315,7 @@ export function downloadTemplate(format = 'csv') {
       supplier: 'Supplier 2',
       balance: 50,
       min_stock: 10,
+      moq: 5,
       unit_of_measure: 'kg',
       price_per_unit: 100.00,
       location: 'Warehouse B'
