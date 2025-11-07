@@ -35,19 +35,26 @@ function Checklist({
   deleteItem,
   loadData,
 }) {
-  const [currentTimes, setCurrentTimes] = useState({});
-  const [transferModalOpen, setTransferModalOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [newClient, setNewClient] = useState("");
-  const [transferQuantity, setTransferQuantity] = useState(1);
-  const [transferRemarks, setTransferRemarks] = useState("");
   const [clients, setClients] = useState([]);
-  const [showClientDropdown, setShowClientDropdown] = useState(false);
-  const [filteredClients, setFilteredClients] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterClient, setFilterClient] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [selectedSubphase, setSelectedSubphase] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedPhase, setSelectedPhase] = useState(null);
+  const [newClient, setNewClient] = useState("");
+  const [transferQuantity, setTransferQuantity] = useState("");
+  const [transferRemarks, setTransferRemarks] = useState("");
+  const [clientItems, setClientItems] = useState([]);
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [quantityModalOpen, setQuantityModalOpen] = useState(false);
+  const [quantityModalData, setQuantityModalData] = useState(null);
+  const [tempQuantity, setTempQuantity] = useState("");
+  const [selectedTargetItem, setSelectedTargetItem] = useState(null);
+  const [selectedTargetPhase, setSelectedTargetPhase] = useState(null);
+  const [selectedTargetSubphase, setSelectedTargetSubphase] = useState(null);
 
   // Load clients on mount
   useEffect(() => {
@@ -64,45 +71,6 @@ function Checklist({
     }
   };
 
-  // Filter clients for dropdown
-  useEffect(() => {
-    if (!Array.isArray(clients)) {
-      setFilteredClients([]);
-      setShowClientDropdown(false);
-      return;
-    }
-
-    const searchValue = newClient.trim().toLowerCase();
-    if (searchValue.length >= 1) {
-      const matches = clients.filter((client) =>
-        client.toLowerCase().includes(searchValue)
-      );
-      setFilteredClients(matches);
-      setShowClientDropdown(matches.length > 0);
-    } else {
-      setFilteredClients(clients);
-      setShowClientDropdown(false);
-    }
-  }, [newClient, clients]);
-
-  // Update current time every second
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
-      const newTimes = {};
-
-      items.forEach((item) => {
-        if (item.start_time && !item.end_time) {
-          newTimes[item.part_number] = now;
-        }
-      });
-
-      setCurrentTimes(newTimes);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [items]);
-
   // Auto-stop item when it reaches 100%
   useEffect(() => {
     items.forEach((item) => {
@@ -112,6 +80,70 @@ function Checklist({
       }
     });
   }, [items]);
+
+  // Load items for selected client
+  useEffect(() => {
+    if (newClient.trim() && transferModalOpen) {
+      const filtered = items.filter(item =>
+        item.client_name === newClient.trim() &&
+        item.name === selectedItem?.name
+      );
+      setClientItems(filtered);
+    } else {
+      setClientItems([]);
+    }
+  }, [newClient, items, selectedItem, transferModalOpen]);
+
+  // Filter clients for dropdown
+  useEffect(() => {
+    if (!Array.isArray(clients)) {
+      setShowClientDropdown(false);
+      return;
+    }
+
+    const searchValue = newClient.trim().toLowerCase();
+    if (searchValue.length >= 1) {
+      const matches = clients.filter((client) =>
+        client.toLowerCase().includes(searchValue) &&
+        client !== selectedItem?.client_name
+      );
+      setShowClientDropdown(matches.length > 0);
+    } else {
+      setShowClientDropdown(false);
+    }
+  }, [newClient, clients, selectedItem]);
+
+  const openQuantityModal = (item, phase, subphase) => {
+    setQuantityModalData({ item, phase, subphase });
+    setTempQuantity(subphase.current_completed_quantity || "");
+    setQuantityModalOpen(true);
+  };
+
+  const handleUpdateCompletedQuantity = async () => {
+    if (!quantityModalData) return;
+
+    const { item, phase, subphase } = quantityModalData;
+    const newQuantity = parseInt(tempQuantity) || 0;
+
+    if (newQuantity > subphase.expected_quantity) {
+      alert(`Cannot exceed expected quantity of ${subphase.expected_quantity}`);
+      return;
+    }
+
+    try {
+      await apiService.operations.updateSubphaseCompletedQuantity(
+        subphase.id,
+        newQuantity
+      );
+      await loadData();
+      setQuantityModalOpen(false);
+      setQuantityModalData(null);
+      setTempQuantity("");
+    } catch (error) {
+      console.error("Error updating completed quantity:", error);
+      alert("Failed to update completed quantity: " + error.message);
+    }
+  };
 
   const handleStartItem = async (partNumber) => {
     try {
@@ -145,186 +177,117 @@ function Checklist({
     }
   };
 
-  const openTransferModal = (item) => {
-    setSelectedItem(item);
-    setNewClient(item.client_name || "");
-    setTransferQuantity(item.quantity || 1);
-    setTransferRemarks("");
-    setTransferModalOpen(true);
-  };
-
+const openTransferModal = (item, phase, subphase) => {
+  setSelectedItem(item);
+  setSelectedPhase(phase);
+  setSelectedSubphase(subphase);
+  setNewClient("");
+  setTransferQuantity("");
+  setTransferRemarks("");
+  setSelectedTargetItem(null);
+  setSelectedTargetPhase(null);
+  setSelectedTargetSubphase(null);
+  setTransferModalOpen(true);
+  setClientItems([]);
+};
   const handleTransferClient = async () => {
-    if (!newClient.trim()) {
-      alert("Please enter a client name");
+  if (!newClient.trim()) {
+    alert("Please enter a client name");
+    return;
+  }
+
+  if (!selectedTargetItem) {
+    alert("Please select a target item");
+    return;
+  }
+
+  if (!selectedTargetPhase) {
+    alert("Please select a target phase");
+    return;
+  }
+
+  if (!selectedTargetSubphase) {
+    alert("Please select a target subphase");
+    return;
+  }
+
+  const transferQty = parseInt(transferQuantity);
+  if (!transferQty || transferQty < 1) {
+    alert("Please enter a valid transfer quantity");
+    return;
+  }
+
+  const currentQty = selectedSubphase.current_completed_quantity || 0;
+  if (transferQty > currentQty) {
+    alert(
+      `Transfer quantity (${transferQty}) cannot exceed current completed quantity (${currentQty})`
+    );
+    return;
+  }
+
+  try {
+    const timestamp = new Date().toLocaleString("en-PH", {
+      timeZone: "Asia/Manila",
+    });
+
+    // Get full target item details
+    const targetItem = await apiService.operations.getItem(selectedTargetItem.part_number);
+    const targetPhase = targetItem.phases?.find(p => p.id === parseInt(selectedTargetPhase));
+    const targetSubphase = targetPhase?.subphases?.find(s => s.id === parseInt(selectedTargetSubphase));
+
+    if (!targetSubphase) {
+      alert("Could not find target subphase");
       return;
     }
 
-    if (!transferQuantity || transferQuantity < 1) {
-      alert("Please enter a valid transfer quantity");
-      return;
-    }
+    // Update source subphase - reduce current_completed_quantity
+    const newSourceQty = currentQty - transferQty;
+    await apiService.operations.updateSubphaseCompletedQuantity(
+      selectedSubphase.id,
+      newSourceQty
+    );
 
-    if (transferQuantity > selectedItem.quantity) {
-      alert(
-        `Transfer quantity (${transferQuantity}) cannot exceed item quantity (${selectedItem.quantity})`
-      );
-      return;
-    }
+    // Update target subphase - increase current_completed_quantity
+    const targetCurrentQty = targetSubphase.current_completed_quantity || 0;
+    const newTargetQty = targetCurrentQty + transferQty;
+    await apiService.operations.updateSubphaseCompletedQuantity(
+      targetSubphase.id,
+      newTargetQty
+    );
 
-    try {
-      const currentQty = selectedItem.quantity;
-      const remainingQty = currentQty - transferQuantity;
+    // Add remarks to both items
+    const transferRemark = `[${timestamp}] Transferred OUT ${transferQty} units to ${newClient} (${selectedTargetItem.part_number}) - ${targetPhase.name} > ${targetSubphase.name} | From: ${selectedPhase.name} > ${selectedSubphase.name}: ${transferRemarks.trim() || "No remarks"}`;
+    const receiveRemark = `[${timestamp}] Received IN ${transferQty} units from ${selectedItem.client_name} (${selectedItem.part_number}) - ${selectedPhase.name} > ${selectedSubphase.name} | To: ${targetPhase.name} > ${targetSubphase.name}: ${transferRemarks.trim() || "No remarks"}`;
 
-      // If transferring all quantity, just update client and add remarks
-      if (remainingQty === 0) {
-        const updateData = {
-          client_name: newClient.trim(),
-        };
+    await apiService.operations.updateItem(selectedItem.part_number, {
+      remarks: selectedItem.remarks
+        ? `${selectedItem.remarks}\n${transferRemark}`
+        : transferRemark,
+    });
 
-        // Add remarks to existing remarks if provided
-        if (transferRemarks.trim()) {
-          const timestamp = new Date().toLocaleString("en-PH", {
-            timeZone: "Asia/Manila",
-          });
-          const newRemark = `[${timestamp}] Transferred all ${transferQuantity} units to ${newClient.trim()}: ${transferRemarks.trim()}`;
-          updateData.remarks = selectedItem.remarks
-            ? `${selectedItem.remarks}\n${newRemark}`
-            : newRemark;
-        }
+    await apiService.operations.updateItem(selectedTargetItem.part_number, {
+      remarks: selectedTargetItem.remarks
+        ? `${selectedTargetItem.remarks}\n${receiveRemark}`
+        : receiveRemark,
+    });
 
-        await apiService.operations.updateItem(
-          selectedItem.part_number,
-          updateData
-        );
-
-        setTransferModalOpen(false);
-        setSelectedItem(null);
-        setNewClient("");
-        setTransferQuantity(1);
-        setTransferRemarks("");
-        await loadData();
-        alert("Item transferred successfully!");
-        return;
-      }
-
-      // Partial transfer: Create new item with transferred quantity
-      const timestamp = new Date().toLocaleString("en-PH", {
-        timeZone: "Asia/Manila",
-      });
-      const transferRemark = `[${timestamp}] Received ${transferQuantity} units from ${
-        selectedItem.client_name || "No Client"
-      }: ${transferRemarks.trim() || "No remarks"}`;
-      const reduceRemark = `[${timestamp}] Transferred out ${transferQuantity} units to ${newClient.trim()}: ${
-        transferRemarks.trim() || "No remarks"
-      }`;
-
-      // Get full item details with phases and subphases
-      const fullItem = await apiService.operations.getItem(
-        selectedItem.part_number
-      );
-
-      // Create new item for transferred quantity
-      const basePart = selectedItem.part_number.split("-BATCH-")[0];
-      const newBatchNumber = `BATCH-${Date.now()}-TRANSFER`;
-      const newPartNumber = `${basePart}-${newBatchNumber}`;
-
-      // Calculate completion percentage and completed quantities
-      const progress = calculateItemProgress(selectedItem);
-      const completionRatio = progress / 100;
-
-      // Calculate transfer ratio based on quantities
-      const transferRatio = transferQuantity / currentQty;
-
-      const newItemData = {
-        part_number: newPartNumber,
-        name: fullItem.name,
-        client_name: newClient.trim(),
-        priority: fullItem.priority || "Medium",
-        quantity: transferQuantity,
-        remarks: transferRemark,
-        phases:
-          fullItem.phases?.map((phase) => ({
-            name: phase.name,
-            subphases:
-              phase.subphases?.map((sub) => {
-                const originalExpectedQty =
-                  parseInt(sub.expected_quantity) || 0;
-
-                // Calculate completed and remaining quantities
-                const completedQty = Math.floor(
-                  originalExpectedQty * completionRatio
-                );
-                const remainingQtyInSub = originalExpectedQty - completedQty;
-
-                // Transfer proportional quantity (from remaining only)
-                const transferSubQty = Math.ceil(
-                  remainingQtyInSub * transferRatio
-                );
-
-                return {
-                  name: sub.name,
-                  expected_duration: parseFloat(sub.expected_duration) || 0,
-                  expected_quantity: transferSubQty,
-                  completed: 0, // New item starts fresh
-                  actual_hours: 0,
-                };
-              }) || [],
-          })) || [],
-      };
-
-      await apiService.operations.createItemWithStructure(newItemData);
-
-      // Update original item: reduce quantity and adjust subphase expected quantities
-      const updatedRemarks = selectedItem.remarks
-        ? `${selectedItem.remarks}\n${reduceRemark}`
-        : reduceRemark;
-
-      await apiService.operations.updateItem(selectedItem.part_number, {
-        quantity: remainingQty,
-        remarks: updatedRemarks,
-      });
-
-      // Update all subphases in the original item with adjusted quantities
-      if (fullItem.phases) {
-        for (const phase of fullItem.phases) {
-          if (phase.subphases) {
-            for (const sub of phase.subphases) {
-              const originalExpectedQty = parseInt(sub.expected_quantity) || 0;
-
-              // Calculate completed and remaining quantities
-              const completedQty = Math.floor(
-                originalExpectedQty * completionRatio
-              );
-              const remainingQtyInSub = originalExpectedQty - completedQty;
-
-              // Keep proportional remaining quantity in original item
-              const keepSubQty = Math.floor(
-                remainingQtyInSub * (remainingQty / currentQty)
-              );
-              const newExpectedQty = completedQty + keepSubQty;
-
-              await apiService.operations.updateSubphase(sub.id, {
-                expected_quantity: newExpectedQty,
-              });
-            }
-          }
-        }
-      }
-
-      setTransferModalOpen(false);
-      setSelectedItem(null);
-      setNewClient("");
-      setTransferQuantity(1);
-      setTransferRemarks("");
-      await loadData();
-      alert(
-        `Successfully transferred ${transferQuantity} units to ${newClient.trim()}!\nRemaining in original item: ${remainingQty} units\n\nNote: Progress percentages have been recalculated based on new quantities.`
-      );
-    } catch (error) {
-      console.error("Error transferring item:", error);
-      alert("Failed to transfer item: " + error.message);
-    }
-  };
+    setTransferModalOpen(false);
+    setSelectedItem(null);
+    setSelectedPhase(null);
+    setSelectedSubphase(null);
+    setNewClient("");
+    setTransferQuantity("");
+    setTransferRemarks("");
+    setSelectedTargetItem(null);
+    setSelectedTargetPhase(null);
+    setSelectedTargetSubphase(null);
+    await loadData();
+    alert(`Successfully transferred ${transferQty} units to ${targetPhase.name} > ${targetSubphase.name}!`);
+  } catch (error) {
+    console.error("Error transferring:", error);
+    alert("Failed to transfer: " + error.message);
+  }
+};
 
   const handleUpdatePriority = async (partNumber, newPriority) => {
     try {
@@ -526,145 +489,235 @@ function Checklist({
         </div>
       </div>
 
-      {/* Transfer Client Modal */}
-      {transferModalOpen && selectedItem && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
-              <ArrowRightLeft size={20} />
-              Transfer Item to Another Client
-            </h3>
+      {/* Transfer Modal */}
+{transferModalOpen && selectedItem && selectedSubphase && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+        <ArrowRightLeft size={20} />
+        Transfer Subphase Quantity
+      </h3>
 
-            <div className="mb-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Item:</p>
-              <p className="font-semibold text-gray-800 dark:text-gray-200">
-                {selectedItem.name}
-              </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Part #: {selectedItem.part_number}
-              </p>
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  Current Client:
-                </span>
-                <span className="font-medium text-gray-800 dark:text-gray-200">
-                  {selectedItem.client_name || "None"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  Total Quantity:
-                </span>
-                <span className="font-medium text-gray-800 dark:text-gray-200">
-                  {selectedItem.quantity}
-                </span>
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  Progress:
-                </span>
-                <span className="font-medium text-gray-800 dark:text-gray-200">
-                  {calculateItemProgress(selectedItem)}%
-                </span>
-              </div>
+      <div className="mb-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg space-y-2">
+        <div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">From Item:</p>
+          <p className="font-semibold text-gray-800 dark:text-gray-200">{selectedItem.name}</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400">Client: {selectedItem.client_name}</p>
+        </div>
+        <div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Phase / Subphase:</p>
+          <p className="font-medium text-gray-800 dark:text-gray-200">
+            {selectedPhase.name} → {selectedSubphase.name}
+          </p>
+        </div>
+        <div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Available to Transfer:</p>
+          <p className="font-bold text-blue-600 dark:text-blue-400">
+            {selectedSubphase.current_completed_quantity || 0} units
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {/* Client Selection */}
+        <div className="relative">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Target Client *
+          </label>
+          <input
+            type="text"
+            placeholder="Enter client name"
+            value={newClient}
+            onChange={(e) => {
+              setNewClient(e.target.value);
+              setSelectedTargetItem(null);
+              setSelectedTargetPhase(null);
+              setSelectedTargetSubphase(null);
+            }}
+            autoFocus
+            className="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500"
+          />
+
+          {showClientDropdown && (
+            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+              {clients
+                .filter(c => c !== selectedItem?.client_name && c.toLowerCase().includes(newClient.toLowerCase()))
+                .map((client, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setNewClient(client);
+                      setShowClientDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 border-b border-gray-200 dark:border-gray-600 last:border-b-0 transition-colors text-gray-800 dark:text-gray-200"
+                  >
+                    {client}
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
+
+        {/* Target Item Selection */}
+        {newClient.trim() && (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Target Item *
+              </label>
+              {clientItems.length > 0 ? (
+                <select
+                  value={selectedTargetItem?.part_number || ""}
+                  onChange={(e) => {
+                    const item = clientItems.find(i => i.part_number === e.target.value);
+                    setSelectedTargetItem(item || null);
+                    setSelectedTargetPhase(null);
+                    setSelectedTargetSubphase(null);
+                  }}
+                  className="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                >
+                  <option value="">Select target item</option>
+                  {clientItems.map(item => (
+                    <option key={item.part_number} value={item.part_number}>
+                      {item.part_number} ({item.quantity || 0} qty)
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-sm text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 p-3 rounded">
+                  No matching items found for "{selectedItem.name}" under client "{newClient}"
+                </p>
+              )}
             </div>
 
-            <div className="space-y-4">
-              {/* New Client */}
-              <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  New Client Name *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter or select client name"
-                  value={newClient}
-                  onChange={(e) => setNewClient(e.target.value)}
-                  onFocus={() => setShowClientDropdown(clients.length > 0)}
-                  autoFocus
-                  className="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                />
-
-                {showClientDropdown && filteredClients.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                    {filteredClients.map((client, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setNewClient(client);
-                          setShowClientDropdown(false);
-                        }}
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 border-b border-gray-200 dark:border-gray-600 last:border-b-0 transition-colors text-gray-800 dark:text-gray-200"
-                      >
-                        {client}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Transfer Quantity */}
+            {/* Target Phase Selection */}
+            {selectedTargetItem && selectedTargetItem.phases && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-                  <Package size={16} />
-                  Quantity to Transfer *
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Target Phase *
                 </label>
-                <input
-                  type="number"
-                  min="1"
-                  max={selectedItem.quantity}
-                  value={transferQuantity}
-                  onChange={(e) =>
-                    setTransferQuantity(parseInt(e.target.value) || 1)
-                  }
+                <select
+                  value={selectedTargetPhase || ""}
+                  onChange={(e) => {
+                    setSelectedTargetPhase(e.target.value);
+                    setSelectedTargetSubphase(null);
+                  }}
                   className="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                />
+                >
+                  <option value="">Select target phase</option>
+                  {selectedTargetItem.phases.map(phase => (
+                    <option key={phase.id} value={phase.id}>
+                      {phase.name} ({phase.subphases?.length || 0} subphases)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Target Subphase Selection */}
+            {selectedTargetItem && selectedTargetPhase && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Target Subphase *
+                </label>
+                <select
+                  value={selectedTargetSubphase || ""}
+                  onChange={(e) => {
+                    setSelectedTargetSubphase(e.target.value);
+                  }}
+                  className="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                >
+                  <option value="">Select target subphase</option>
+                  {selectedTargetItem.phases
+                    .find(p => p.id === parseInt(selectedTargetPhase))
+                    ?.subphases?.map(subphase => (
+                      <option key={subphase.id} value={subphase.id}>
+                        {subphase.name} (Current: {subphase.current_completed_quantity || 0} / Expected: {subphase.expected_quantity})
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+
+            {/* Show selected target info */}
+            {selectedTargetItem && selectedTargetPhase && selectedTargetSubphase && (
+              <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                  ✓ Transfer destination selected
+                </p>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                  Remaining in original:{" "}
-                  {selectedItem.quantity - transferQuantity} units
+                  {selectedTargetItem.phases.find(p => p.id === parseInt(selectedTargetPhase))?.name} →{" "}
+                  {selectedTargetItem.phases
+                    .find(p => p.id === parseInt(selectedTargetPhase))
+                    ?.subphases?.find(s => s.id === parseInt(selectedTargetSubphase))?.name}
                 </p>
               </div>
-
-              {/* Transfer Remarks */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-                  <FileText size={16} />
-                  Transfer Remarks
-                </label>
-                <textarea
-                  placeholder="Enter reason for transfer or additional notes..."
-                  value={transferRemarks}
-                  onChange={(e) => setTransferRemarks(e.target.value)}
-                  rows={3}
-                  className="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500 resize-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={handleTransferClient}
-                className="flex-1 bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-              >
-                Transfer
-              </button>
-              <button
-                onClick={() => {
-                  setTransferModalOpen(false);
-                  setSelectedItem(null);
-                  setNewClient("");
-                  setTransferQuantity(1);
-                  setTransferRemarks("");
-                  setShowClientDropdown(false);
-                }}
-                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-              >
-                Cancel
-              </button>
-            </div>
+            )}
           </div>
+        )}
+
+        {/* Transfer Quantity */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+            <Package size={16} />
+            Quantity to Transfer *
+          </label>
+          <input
+            type="number"
+            min="1"
+            max={selectedSubphase.current_completed_quantity || 0}
+            value={transferQuantity}
+            onChange={(e) => setTransferQuantity(e.target.value)}
+            className="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-slate-500"
+          />
         </div>
-      )}
+
+        {/* Transfer Remarks */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+            <FileText size={16} />
+            Transfer Remarks
+          </label>
+          <textarea
+            placeholder="Enter reason for transfer..."
+            value={transferRemarks}
+            onChange={(e) => setTransferRemarks(e.target.value)}
+            rows={3}
+            className="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500 resize-none"
+          />
+        </div>
+      </div>
+
+      <div className="flex gap-3 mt-6">
+        <button
+          onClick={handleTransferClient}
+          disabled={!selectedTargetItem || !selectedTargetPhase || !selectedTargetSubphase || !transferQuantity}
+          className="flex-1 bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Transfer
+        </button>
+        <button
+          onClick={() => {
+            setTransferModalOpen(false);
+            setSelectedItem(null);
+            setSelectedPhase(null);
+            setSelectedSubphase(null);
+            setNewClient("");
+            setTransferQuantity("");
+            setTransferRemarks("");
+            setSelectedTargetItem(null);
+            setSelectedTargetPhase(null);
+            setSelectedTargetSubphase(null);
+            setShowClientDropdown(false);
+          }}
+          className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Barcode Scanner Modal */}
       {scanningFor && (
@@ -790,11 +843,10 @@ function Checklist({
                                   onClick={() =>
                                     handleUpdatePriority(item.part_number, p)
                                   }
-                                  className={`px-2 py-1 text-xs rounded transition-colors ${
-                                    priority === p
-                                      ? getPriorityColor(p)
-                                      : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                                  }`}
+                                  className={`px-2 py-1 text-xs rounded transition-colors ${priority === p
+                                    ? getPriorityColor(p)
+                                    : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                    }`}
                                   title={`Set ${p} priority`}
                                 >
                                   <Flag size={14} />
@@ -920,9 +972,7 @@ function Checklist({
                                 >
                                   {/* Phase Header */}
                                   <div
-                                    onClick={() =>
-                                      togglePhaseExpansion(phase.id)
-                                    }
+                                    onClick={() => togglePhaseExpansion(phase.id)}
                                     className="p-3 cursor-pointer hover:bg-white/5 dark:hover:bg-black/10 transition-colors"
                                   >
                                     <div className="flex justify-between items-center">
@@ -939,8 +989,7 @@ function Checklist({
                                           )}
                                         </span>
                                         <span className="text-sm text-gray-600 dark:text-gray-400">
-                                          ({phase.subphases?.length || 0}{" "}
-                                          sub-phases)
+                                          ({phase.subphases?.length || 0} sub-phases)
                                         </span>
                                       </div>
                                       <div className="flex items-center gap-3">
@@ -948,9 +997,7 @@ function Checklist({
                                           <div
                                             className="bg-slate-600 dark:bg-slate-400 h-2 rounded-full transition-all duration-300"
                                             style={{
-                                              width: `${calculatePhaseProgress(
-                                                phase
-                                              )}%`,
+                                              width: `${calculatePhaseProgress(phase)}%`,
                                             }}
                                           ></div>
                                         </div>
@@ -964,10 +1011,9 @@ function Checklist({
                                   {/* Sub-Phases */}
                                   {expandedPhases[phase.id] && (
                                     <div className="px-3 pb-3 space-y-2">
-                                      {phase.subphases &&
-                                      phase.subphases.length > 0 ? (
-                                        phase.subphases.map((subPhase) => {
-                                          const subPhaseKey = subPhase.id;
+                                      {phase.subphases && phase.subphases.length > 0 ? (
+                                        phase.subphases.map((subphase) => {
+                                          const subPhaseKey = subphase.id;
                                           return (
                                             <div
                                               key={subPhaseKey}
@@ -976,38 +1022,32 @@ function Checklist({
                                               <div className="flex items-start gap-3">
                                                 <input
                                                   type="checkbox"
-                                                  checked={
-                                                    subPhase.completed == 1
-                                                  }
+                                                  checked={subphase.completed == 1}
                                                   onChange={() => {
-                                                    if (
-                                                      subPhase.completed != 1
-                                                    ) {
+                                                    if (subphase.completed != 1) {
                                                       if (
                                                         window.confirm(
-                                                          `Mark "${subPhase.name}" as complete?`
+                                                          `Mark "${subphase.name}" as complete?`
                                                         )
                                                       ) {
                                                         toggleSubPhase(
                                                           item.part_number,
                                                           phase.id,
-                                                          subPhase.id,
-                                                          subPhase.completed ==
-                                                            1
+                                                          subphase.id,
+                                                          subphase.completed == 1
                                                         );
                                                       }
                                                     } else {
                                                       if (
                                                         window.confirm(
-                                                          `Mark "${subPhase.name}" as incomplete?`
+                                                          `Mark "${subphase.name}" as incomplete?`
                                                         )
                                                       ) {
                                                         toggleSubPhase(
                                                           item.part_number,
                                                           phase.id,
-                                                          subPhase.id,
-                                                          subPhase.completed ==
-                                                            1
+                                                          subphase.id,
+                                                          subphase.completed == 1
                                                         );
                                                       }
                                                     }
@@ -1017,16 +1057,14 @@ function Checklist({
                                                 <div className="flex-1">
                                                   <div className="flex items-start justify-between">
                                                     <p
-                                                      className={`text-gray-800 dark:text-gray-200 font-medium ${
-                                                        subPhase.completed == 1
-                                                          ? "line-through opacity-60"
-                                                          : ""
-                                                      }`}
+                                                      className={`text-gray-800 dark:text-gray-200 font-medium ${subphase.completed == 1
+                                                        ? "line-through opacity-60"
+                                                        : ""
+                                                        }`}
                                                     >
-                                                      {subPhase.name}
+                                                      {subphase.name}
                                                     </p>
-                                                    {subPhase.completed ==
-                                                      1 && (
+                                                    {subphase.completed == 1 && (
                                                       <CheckCircle
                                                         size={18}
                                                         className="text-green-500 shrink-0 ml-2"
@@ -1034,68 +1072,134 @@ function Checklist({
                                                     )}
                                                   </div>
 
-                                                  {subPhase.subphase_condition && (
+                                                  {subphase.subphase_condition && (
                                                     <p className="text-sm text-gray-600 dark:text-gray-400 italic mt-1">
-                                                      📋{" "}
-                                                      {
-                                                        subPhase.subphase_condition
-                                                      }
+                                                      📋 {subphase.subphase_condition}
                                                     </p>
                                                   )}
 
                                                   <div className="mt-2 flex flex-wrap gap-2 items-center">
                                                     <span className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded flex items-center gap-1">
                                                       <Clock size={12} />
-                                                      Expected:{" "}
-                                                      {
-                                                        subPhase.expected_duration
-                                                      }
-                                                      h
+                                                      Expected: {subphase.expected_duration}h
                                                     </span>
-                                                    {subPhase.expected_quantity !==
-                                                      undefined &&
-                                                      subPhase.expected_quantity !==
-                                                        null &&
-                                                      subPhase.expected_quantity >
-                                                        0 && (
-                                                        <span className="text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 px-2 py-1 rounded flex items-center gap-1">
-                                                          <Package size={12} />
-                                                          Expected Qty:{" "}
-                                                          {
-                                                            subPhase.expected_quantity
-                                                          }
-                                                        </span>
+
+                                                    {/* Quantity Tracking */}
+                                                    {subphase.expected_quantity !== undefined &&
+                                                      subphase.expected_quantity !== null &&
+                                                      subphase.expected_quantity > 0 && (
+                                                        <div className="flex items-center gap-2">
+                                                          <span className="text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 px-2 py-1 rounded flex items-center gap-1">
+                                                            <Package size={12} />
+                                                            Current: {subphase.current_completed_quantity || 0} / {subphase.expected_quantity}
+                                                          </span>
+                                                          <div className="flex items-center gap-1">
+                                                            <button
+                                                              onClick={() => openQuantityModal(item, phase, subphase)}
+                                                              className="px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+                                                            >
+                                                              Update
+                                                            </button>
+
+                                                          </div>
+                                                          {/* Quantity Update Modal */}
+                                                          {quantityModalOpen && quantityModalData && (
+                                                            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                                                              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+                                                                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+                                                                  <Package size={20} />
+                                                                  Update Completed Quantity
+                                                                </h3>
+
+                                                                <div className="mb-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg space-y-2">
+                                                                  <div>
+                                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Item:</p>
+                                                                    <p className="font-semibold text-gray-800 dark:text-gray-200">{quantityModalData.item.name}</p>
+                                                                  </div>
+                                                                  <div>
+                                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Phase / Subphase:</p>
+                                                                    <p className="font-medium text-gray-800 dark:text-gray-200">
+                                                                      {quantityModalData.phase.name} → {quantityModalData.subphase.name}
+                                                                    </p>
+                                                                  </div>
+                                                                  <div>
+                                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Expected Quantity:</p>
+                                                                    <p className="font-bold text-blue-600 dark:text-blue-400">
+                                                                      {quantityModalData.subphase.expected_quantity}
+                                                                    </p>
+                                                                  </div>
+                                                                </div>
+
+                                                                <div className="mb-4">
+                                                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                                    Current Completed Quantity
+                                                                  </label>
+                                                                  <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max={quantityModalData.subphase.expected_quantity}
+                                                                    value={tempQuantity}
+                                                                    onChange={(e) => setTempQuantity(e.target.value)}
+                                                                    onKeyPress={(e) => e.key === "Enter" && handleUpdateCompletedQuantity()}
+                                                                    autoFocus
+                                                                    className="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                                                  />
+                                                                </div>
+
+                                                                <div className="flex gap-3">
+                                                                  <button
+                                                                    onClick={handleUpdateCompletedQuantity}
+                                                                    className="flex-1 bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+                                                                  >
+                                                                    Update
+                                                                  </button>
+                                                                  <button
+                                                                    onClick={() => {
+                                                                      setQuantityModalOpen(false);
+                                                                      setQuantityModalData(null);
+                                                                      setTempQuantity("");
+                                                                    }}
+                                                                    className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+                                                                  >
+                                                                    Cancel
+                                                                  </button>
+                                                                </div>
+                                                              </div>
+                                                            </div>
+                                                          )}
+                                                          {subphase.current_completed_quantity > 0 && (
+                                                            <button
+                                                              onClick={() => openTransferModal(item, phase, subphase)}
+                                                              className="flex items-center gap-1 px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                                                            >
+                                                              <ArrowRightLeft size={12} />
+                                                              Transfer ({subphase.current_completed_quantity} available)
+                                                            </button>
+                                                          )}
+                                                        </div>
                                                       )}
-                                                    {subPhase.actual_hours >
-                                                      0 && (
+
+                                                    {subphase.actual_hours > 0 && (
                                                       <span
-                                                        className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
-                                                          subPhase.actual_hours <=
-                                                          subPhase.expected_duration
-                                                            ? "bg-green-500/20 text-green-700 dark:text-green-300"
-                                                            : "bg-red-500/20 text-red-700 dark:text-red-300"
-                                                        }`}
+                                                        className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${subphase.actual_hours <=
+                                                          subphase.expected_duration
+                                                          ? "bg-green-500/20 text-green-700 dark:text-green-300"
+                                                          : "bg-red-500/20 text-red-700 dark:text-red-300"
+                                                          }`}
                                                       >
                                                         <Clock size={12} />
-                                                        Actual:{" "}
-                                                        {subPhase.actual_hours}h
-                                                        {subPhase.actual_hours >
-                                                          subPhase.expected_duration &&
-                                                          " ⚠️"}
+                                                        Actual: {subphase.actual_hours}h
+                                                        {subphase.actual_hours >
+                                                          subphase.expected_duration && " ⚠️"}
                                                       </span>
                                                     )}
                                                   </div>
 
-                                                  {subPhase.employee_barcode && (
+                                                  {subphase.employee_barcode && (
                                                     <div className="mt-2 text-xs bg-slate-500/20 text-slate-700 dark:text-slate-300 px-2 py-1 rounded inline-flex items-center gap-1">
                                                       <User size={12} />
-                                                      {subPhase.employee_name ||
-                                                        "Unknown"}{" "}
-                                                      (
-                                                      {
-                                                        subPhase.employee_barcode
-                                                      }
-                                                      )
+                                                      {subphase.employee_name || "Unknown"} (
+                                                      {subphase.employee_barcode})
                                                     </div>
                                                   )}
 
@@ -1105,15 +1209,12 @@ function Checklist({
                                                         type="number"
                                                         step="0.5"
                                                         placeholder="Actual hours"
-                                                        value={
-                                                          subPhase.actual_hours ||
-                                                          ""
-                                                        }
+                                                        value={subphase.actual_hours || ""}
                                                         onChange={(e) =>
                                                           updateActualHours(
                                                             item.part_number,
                                                             phase.id,
-                                                            subPhase.id,
+                                                            subphase.id,
                                                             e.target.value
                                                           )
                                                         }
@@ -1124,7 +1225,7 @@ function Checklist({
                                                           handleBarcodeScan(
                                                             item.part_number,
                                                             phase.id,
-                                                            subPhase.id
+                                                            subphase.id
                                                           )
                                                         }
                                                         className="px-3 py-1.5 text-sm bg-slate-600 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded transition-colors flex items-center gap-1"
@@ -1135,12 +1236,12 @@ function Checklist({
                                                     </div>
                                                   </div>
 
-                                                  {subPhase.completed_at && (
+                                                  {subphase.completed_at && (
                                                     <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 flex items-center gap-1">
                                                       <CheckCircle size={12} />
                                                       Completed:{" "}
                                                       {new Date(
-                                                        subPhase.completed_at
+                                                        subphase.completed_at
                                                       ).toLocaleString()}
                                                     </p>
                                                   )}
@@ -1161,8 +1262,7 @@ function Checklist({
                             })
                           ) : (
                             <p className="text-gray-600 dark:text-gray-400 py-4">
-                              No phases added yet. Go to "Add Items" to add
-                              phases.
+                              No phases added yet. Go to "Add Items" to add phases.
                             </p>
                           )}
                         </div>

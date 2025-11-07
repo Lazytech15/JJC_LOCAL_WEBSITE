@@ -28,31 +28,32 @@ export class OperationsService extends BaseAPIService {
   /**
    * Create new operations item
    * @param {Object} itemData - Item information
-   * @param {string} itemData.part_number - Item part number (required)
-   * @param {string} itemData.name - Item name (required)
-   * @param {string} [itemData.description] - Item description
-   * @param {string} [itemData.client_name] - Client name
-   * @param {string} [itemData.priority='Medium'] - Priority (High, Medium, Low)
-   * @param {string} [itemData.remarks] - Additional remarks
-   * @param {number} [itemData.quantity=1] - Batch quantity
-   * @returns {Promise} Created item data
-   */
-  async createItem(itemData) {
-    if (!itemData.part_number) {
-      throw new Error('part_number is required')
-    }
-    if (!itemData.name) {
-      throw new Error('name is required')
-    }
-    // Validate priority if provided
-    if (itemData.priority && !['High', 'Medium', 'Low'].includes(itemData.priority)) {
-      throw new Error('priority must be High, Medium, or Low')
-    }
-    return this.request("/api/operations/items", {
-      method: "POST",
-      body: JSON.stringify(itemData),
-    })
+  * @param {string} itemData.part_number - Item part number (required)
+  * @param {string} itemData.name - Item name (required)
+  * @param {string} [itemData.description] - Item description
+  * @param {string} [itemData.client_name] - Client name
+  * @param {string} [itemData.priority='Medium'] - Priority (High, Medium, Low)
+  * @param {string} [itemData.remarks] - Additional remarks
+  * @param {number} [itemData.qty=1] - Batch quantity
+  * @param {number} [itemData.total_qty] - Total quantity (calculated from subphases)
+  * @returns {Promise} Created item data
+ */
+async createItem(itemData) {
+  if (!itemData.part_number) {
+    throw new Error('part_number is required')
   }
+  if (!itemData.name) {
+    throw new Error('name is required')
+  }
+  // Validate priority if provided
+  if (itemData.priority && !['High', 'Medium', 'Low'].includes(itemData.priority)) {
+    throw new Error('priority must be High, Medium, or Low')
+  }
+  return this.request("/api/operations/items", {
+    method: "POST",
+    body: JSON.stringify(itemData),
+  })
+}
 
   /**
    * Get all distinct client names
@@ -64,27 +65,29 @@ export class OperationsService extends BaseAPIService {
 
   /**
    * Update item by part_number
-   * @param {string} partNumber - Item part number
-   * @param {Object} itemData - Updated item information
-   * @param {string} [itemData.name] - Item name
-   * @param {string} [itemData.description] - Item description
-   * @param {string} [itemData.client_name] - Client name
-   * @param {string} [itemData.priority] - Priority (High, Medium, Low)
-   * @param {string} [itemData.remarks] - Additional remarks
-   * @param {string} [itemData.status] - Status (not_started, in_progress, completed)
-   * @param {number} [itemData.overall_progress] - Overall progress percentage
-   * @returns {Promise} Success confirmation
-   */
-  async updateItem(partNumber, itemData) {
-    // Validate priority if provided
-    if (itemData.priority && !['High', 'Medium', 'Low'].includes(itemData.priority)) {
-      throw new Error('priority must be High, Medium, or Low')
-    }
-    return this.request(`/api/operations/items?part_number=${encodeURIComponent(partNumber)}`, {
-      method: "PUT",
-      body: JSON.stringify(itemData),
-    })
+    * @param {string} partNumber - Item part number
+ * @param {Object} itemData - Updated item information
+ * @param {string} [itemData.name] - Item name
+ * @param {string} [itemData.description] - Item description
+ * @param {string} [itemData.client_name] - Client name
+ * @param {string} [itemData.priority] - Priority (High, Medium, Low)
+ * @param {string} [itemData.remarks] - Additional remarks
+ * @param {string} [itemData.status] - Status (not_started, in_progress, completed)
+ * @param {number} [itemData.overall_progress] - Overall progress percentage
+ * @param {number} [itemData.qty] - Batch quantity
+ * @param {number} [itemData.total_qty] - Total quantity
+ * @returns {Promise} Success confirmation
+ */
+async updateItem(partNumber, itemData) {
+  // Validate priority if provided
+  if (itemData.priority && !['High', 'Medium', 'Low'].includes(itemData.priority)) {
+    throw new Error('priority must be High, Medium, or Low')
   }
+  return this.request(`/api/operations/items?part_number=${encodeURIComponent(partNumber)}`, {
+    method: "PUT",
+    body: JSON.stringify(itemData),
+  })
+}
 
   /**
    * Delete item (cascades to phases and subphases)
@@ -469,52 +472,68 @@ async createSubphase(subphaseData) {
   /**
    * Create item with phases and subphases in one call
    * @param {Object} itemData - Complete item structure
-   * @param {string} itemData.part_number - Item part number
-   * @param {string} itemData.name - Item name
-   * @param {string} [itemData.description] - Item description
-   * @param {string} [itemData.client_name] - Client name
-   * @param {string} [itemData.priority='Medium'] - Priority (High, Medium, Low)
-   * @param {string} [itemData.remarks] - Additional remarks
-   * @param {Array} [itemData.phases] - Array of phases with subphases
-   * @returns {Promise} Created item with all phases and subphases
-   */
-  async createItemWithStructure(itemData) {
-    // Create item first
-    const item = await this.createItem({
-      part_number: itemData.part_number,
-      name: itemData.name,
-      description: itemData.description,
-      client_name: itemData.client_name,
-      priority: itemData.priority || 'Medium',
-      remarks: itemData.remarks
-    })
+ * @param {string} itemData.part_number - Item part number
+ * @param {string} itemData.name - Item name
+ * @param {string} [itemData.description] - Item description
+ * @param {string} [itemData.client_name] - Client name
+ * @param {string} [itemData.priority='Medium'] - Priority (High, Medium, Low)
+ * @param {string} [itemData.remarks] - Additional remarks
+ * @param {number} [itemData.qty=1] - Batch quantity
+ * @param {Array} [itemData.phases] - Array of phases with subphases
+ * @returns {Promise} Created item with all phases and subphases
+ */
+async createItemWithStructure(itemData) {
+  // Calculate total_qty from subphases
+  let totalQty = 0;
+  if (itemData.phases && itemData.phases.length > 0) {
+    itemData.phases.forEach(phase => {
+      if (phase.subphases && phase.subphases.length > 0) {
+        phase.subphases.forEach(subphase => {
+          totalQty += parseInt(subphase.expected_quantity) || 0;
+        });
+      }
+    });
+  }
+  
+  // Create item first
+  const item = await this.createItem({
+    part_number: itemData.part_number,
+    name: itemData.name,
+    description: itemData.description,
+    client_name: itemData.client_name,
+    priority: itemData.priority || 'Medium',
+    remarks: itemData.remarks,
+    qty: itemData.qty || 1,
+    total_qty: totalQty || itemData.qty || 1
+  })
 
-    // Create phases if provided
-    if (itemData.phases && itemData.phases.length > 0) {
-      for (const phaseData of itemData.phases) {
-        const phase = await this.createPhase({
-          part_number: itemData.part_number,
-          name: phaseData.name
-        })
+  // Create phases if provided
+  if (itemData.phases && itemData.phases.length > 0) {
+    for (const phaseData of itemData.phases) {
+      const phase = await this.createPhase({
+        part_number: itemData.part_number,
+        name: phaseData.name
+      })
 
-        // Create subphases if provided
-        if (phaseData.subphases && phaseData.subphases.length > 0) {
-          for (const subphaseData of phaseData.subphases) {
-            await this.createSubphase({
-              part_number: itemData.part_number,
-              phase_id: phase.id,
-              name: subphaseData.name,
-              condition: subphaseData.condition,
-              expected_duration: subphaseData.expected_duration || 0
-            })
-          }
+      // Create subphases if provided
+      if (phaseData.subphases && phaseData.subphases.length > 0) {
+        for (const subphaseData of phaseData.subphases) {
+          await this.createSubphase({
+            part_number: itemData.part_number,
+            phase_id: phase.id,
+            name: subphaseData.name,
+            condition: subphaseData.condition,
+            expected_duration: subphaseData.expected_duration || 0,
+            expected_quantity: subphaseData.expected_quantity || 0
+          })
         }
       }
     }
-
-    // Return complete item with hierarchy
-    return this.getItemHierarchy(itemData.part_number)
   }
+
+  // Return complete item with hierarchy
+  return this.getItemHierarchy(itemData.part_number)
+}
 
   /**
    * Get all incomplete items
@@ -887,4 +906,17 @@ async createSubphase(subphaseData) {
       items: clientItems
     }
   }
+
+  /**
+ * Update subphase current completed quantity
+ * @param {number|string} subphaseId - Subphase ID
+ * @param {number} currentCompletedQuantity - New completed quantity
+ * @returns {Promise} Success confirmation
+ */
+async updateSubphaseCompletedQuantity(subphaseId, currentCompletedQuantity) {
+  return this.request(`/api/operations/update-completed-quantity?id=${subphaseId}`, {
+    method: "POST",
+    body: JSON.stringify({ current_completed_quantity: currentCompletedQuantity }),
+  })
+}
 }

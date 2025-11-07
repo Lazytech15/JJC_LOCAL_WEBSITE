@@ -10,7 +10,7 @@ function AddItems({
   const [itemName, setItemName] = useState('');
   const [clientName, setClientName] = useState('');
   const [priority, setPriority] = useState('Medium');
-  const [quantity, setQuantity] = useState(1);
+  const [qty, setQty] = useState(1);
   const [phases, setPhases] = useState([]);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [batchNumber, setBatchNumber] = useState('');
@@ -107,23 +107,11 @@ function AddItems({
     let total = 0;
     phases.forEach(phase => {
       phase.subphases.forEach(sub => {
-        const qty = parseInt(sub.expectedQuantity) || 0;
-        total += qty;
+        const subQty = parseInt(sub.expectedQuantity) || 0;
+        total += subQty;
       });
     });
     return total;
-  };
-
-  // Calculate remaining quantity available for allocation
-  const getRemainingQuantity = () => {
-    const batchQty = parseInt(quantity) || 0;
-    const allocated = getTotalAllocatedQuantity();
-    return batchQty - allocated;
-  };
-
-  // Check if quantity allocation is valid
-  const isQuantityValid = () => {
-    return getRemainingQuantity() >= 0;
   };
 
   const loadTemplateFromItem = async (item) => {
@@ -138,7 +126,7 @@ function AddItems({
       setItemName(fullItem.name || '');
       setClientName(fullItem.client_name || '');
       setPriority(fullItem.priority || 'Medium');
-      setQuantity(fullItem.quantity || 1);
+      setQty(fullItem.qty || 1);
       
       // Load phases and subphases with expected_quantity
       if (fullItem.phases && fullItem.phases.length > 0) {
@@ -196,18 +184,44 @@ function AddItems({
     ));
   };
 
-  const updateSubphase = (phaseId, subphaseId, field, value) => {
-    setPhases(phases.map(phase => 
-      phase.id === phaseId 
-        ? {
-            ...phase,
-            subphases: phase.subphases.map(sub =>
-              sub.id === subphaseId ? { ...sub, [field]: value } : sub
-            )
-          }
-        : phase
-    ));
-  };
+const updateSubphase = (phaseId, subphaseId, field, value) => {
+  setPhases(phases.map(phase => 
+    phase.id === phaseId 
+      ? {
+          ...phase,
+          subphases: phase.subphases.map(sub => {
+            if (sub.id === subphaseId) {
+              // If updating expectedQuantity, validate against batch quantity
+              if (field === 'expectedQuantity') {
+                const newValue = parseInt(value) || 0;
+                const batchQty = parseInt(qty) || 0;
+                
+                // Calculate total from other subphases (excluding current one)
+                let otherSubphasesTotal = 0;
+                phases.forEach(p => {
+                  p.subphases.forEach(s => {
+                    if (!(p.id === phaseId && s.id === subphaseId)) {
+                      otherSubphasesTotal += parseInt(s.expectedQuantity) || 0;
+                    }
+                  });
+                });
+                
+                const totalIfUpdated = otherSubphasesTotal + newValue;
+                
+                if (totalIfUpdated > batchQty) {
+                  alert(`Cannot exceed batch quantity of ${batchQty}. Current total would be ${totalIfUpdated}.`);
+                  return sub;
+                }
+              }
+              
+              return { ...sub, [field]: value };
+            }
+            return sub;
+          })
+        }
+      : phase
+  ));
+};
 
   const removeSubphase = (phaseId, subphaseId) => {
     setPhases(phases.map(phase => 
@@ -244,51 +258,55 @@ function AddItems({
     return;
   }
 
-  // Validate quantity allocation
-  if (!isQuantityValid()) {
-    alert(`Total allocated quantity (${getTotalAllocatedQuantity()}) exceeds batch quantity (${quantity}). Please adjust subphase quantities.`);
+  const totalQty = getTotalAllocatedQuantity();
+  const batchQty = parseInt(qty) || 0;
+  
+  // NEW: Validate total doesn't exceed batch quantity
+  if (totalQty > batchQty) {
+    alert(`Total allocated quantity (${totalQty}) cannot exceed batch quantity (${batchQty})`);
     return;
   }
 
   const uniquePartNumber = `${partNumber.trim()}-${batchNumber.trim()}`;
 
-  const itemData = {
-    part_number: uniquePartNumber,
-    name: itemName.trim(),
-    client_name: clientName.trim(),
-    priority: priority,
-    quantity: parseInt(quantity) || 1,
-    phases: validPhases.map(phase => ({
-      name: phase.name.trim(),
-      subphases: phase.subphases
-        .filter(sub => sub.name.trim())
-        .map(sub => ({
-          name: sub.name.trim(),
-          expected_duration: parseFloat(sub.expectedDuration) || 0,
-          expected_quantity: parseInt(sub.expectedQuantity) || 0  // Make sure this is included
-        }))
-    }))
-  };
+    const itemData = {
+      part_number: uniquePartNumber,
+      name: itemName.trim(),
+      client_name: clientName.trim(),
+      priority: priority,
+      qty: parseInt(qty) || 1,
+      total_qty: totalQty,
+      phases: validPhases.map(phase => ({
+        name: phase.name.trim(),
+        subphases: phase.subphases
+          .filter(sub => sub.name.trim())
+          .map(sub => ({
+            name: sub.name.trim(),
+            expected_duration: parseFloat(sub.expectedDuration) || 0,
+            expected_quantity: parseInt(sub.expectedQuantity) || 0
+          }))
+      }))
+    };
 
-  try {
-    await apiService.operations.createItemWithStructure(itemData);
-    
-    setPartNumber('');
-    setItemName('');
-    setClientName('');
-    setPriority('Medium');
-    setQuantity(1);
-    setPhases([]);
-    setBatchNumber('');
-    setSelectedTemplateId(null);
-    
-    alert('Item saved successfully!');
-    window.location.reload();
-  } catch (error) {
-    console.error('Error saving item:', error);
-    alert('Error saving item: ' + error.message);
-  }
-};
+    try {
+      await apiService.operations.createItemWithStructure(itemData);
+      
+      setPartNumber('');
+      setItemName('');
+      setClientName('');
+      setPriority('Medium');
+      setQty(1);
+      setPhases([]);
+      setBatchNumber('');
+      setSelectedTemplateId(null);
+      
+      alert('Item saved successfully!');
+      window.location.reload();
+    } catch (error) {
+      console.error('Error saving item:', error);
+      alert('Error saving item: ' + error.message);
+    }
+  };
 
   const handleClear = () => {
     if (confirm('Clear all fields?')) {
@@ -296,7 +314,7 @@ function AddItems({
       setItemName('');
       setClientName('');
       setPriority('Medium');
-      setQuantity(1);
+      setQty(1);
       setPhases([]);
       setBatchNumber('');
       setSelectedTemplateId(null);
@@ -314,9 +332,8 @@ function AddItems({
     }
   };
 
-  const remaining = getRemainingQuantity();
-  const allocated = getTotalAllocatedQuantity();
-  const batchQty = parseInt(quantity) || 0;
+  const totalQty = getTotalAllocatedQuantity();
+  const batchQty = parseInt(qty) || 0;
 
   return (
     <div className="space-y-6">
@@ -336,22 +353,6 @@ function AddItems({
             <Copy size={16} />
             <strong>Tip:</strong> Start typing an item name to use an existing item as a template. Each new item will have a unique batch number.
           </p>
-        </div>
-      )}
-
-      {/* Quantity Allocation Warning */}
-      {phases.length > 0 && !isQuantityValid() && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle size={20} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-red-700 dark:text-red-300">Quantity Allocation Error</p>
-              <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                Total allocated quantity ({allocated}) exceeds batch quantity ({batchQty}). 
-                Please reduce subphase quantities or increase batch quantity.
-              </p>
-            </div>
-          </div>
         </div>
       )}
       
@@ -526,56 +527,78 @@ function AddItems({
             </div>
           </div>
 
-          {/* Quantity */}
+          {/* Batch Quantity */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
               <Package size={16} />
               Batch Quantity *
+              <span className="text-xs text-gray-500">(This is the qty field - items in this batch)</span>
             </label>
             <input
               type="number"
               min="1"
-              placeholder="Enter quantity"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
+              placeholder="Enter batch quantity"
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
               disabled={submitting}
               className="w-full px-4 py-2 rounded-lg bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             />
           </div>
 
-          {/* Quantity Tracker */}
-          {phases.length > 0 && (
-            <div className={`p-4 rounded-lg border-2 ${
-              isQuantityValid() 
-                ? 'bg-blue-500/10 border-blue-500/30' 
-                : 'bg-red-500/10 border-red-500/30'
-            }`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Quantity Allocation</span>
-                <span className={`text-lg font-bold ${
-                  isQuantityValid() 
-                    ? 'text-blue-700 dark:text-blue-300' 
-                    : 'text-red-700 dark:text-red-300'
-                }`}>
-                  {remaining} / {batchQty} remaining
-                </span>
-              </div>
-              <div className="w-full bg-gray-300 dark:bg-gray-700 rounded-full h-3">
-                <div
-                  className={`h-3 rounded-full transition-all duration-300 ${
-                    isQuantityValid() 
-                      ? 'bg-blue-600 dark:bg-blue-400' 
-                      : 'bg-red-600 dark:bg-red-400'
-                  }`}
-                  style={{ width: `${Math.min((allocated / batchQty) * 100, 100)}%` }}
-                ></div>
-              </div>
-              <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mt-1">
-                <span>Allocated: {allocated}</span>
-                <span>{Math.min(Math.round((allocated / batchQty) * 100), 100)}%</span>
-              </div>
-            </div>
-          )}
+          <div className="mt-4 p-4 rounded-lg border-2 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/30">
+  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Quantity Summary</h4>
+  
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+    <div className="flex justify-between items-center">
+      <span className="text-gray-600 dark:text-gray-400">Batch Quantity (qty):</span>
+      <span className="font-bold text-blue-700 dark:text-blue-300">{batchQty} units</span>
+    </div>
+    
+    <div className="flex justify-between items-center">
+      <span className="text-gray-600 dark:text-gray-400">Total Expected (from subphases):</span>
+      <span className="font-bold text-purple-700 dark:text-purple-300">{totalQty} units</span>
+    </div>
+  </div>
+  
+  {totalQty > 0 && (
+    <div className="mt-3 pt-3 border-t border-gray-300/30 dark:border-gray-600/30">
+      <p className="text-xs text-gray-600 dark:text-gray-400">
+        <strong>Note:</strong> qty = Expected batch quantity | total_qty = Sum of current completed quantities (updates as work progresses)
+      </p>
+    </div>
+  )}
+</div>
+
+          {/* Total Quantity Display */}
+{phases.length > 0 && (
+  <div className={`p-4 rounded-lg border-2 ${
+    totalQty > batchQty 
+      ? 'bg-red-500/10 border-red-500/30' 
+      : 'bg-blue-500/10 border-blue-500/30'
+  }`}>
+    <div className="flex items-center justify-between mb-2">
+      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Total Quantity Allocation</span>
+      <span className={`text-lg font-bold ${
+        totalQty > batchQty 
+          ? 'text-red-700 dark:text-red-300' 
+          : 'text-blue-700 dark:text-blue-300'
+      }`}>
+        {totalQty} / {batchQty} units
+      </span>
+    </div>
+    {totalQty > batchQty && (
+      <div className="flex items-center gap-2 mt-2 text-red-600 dark:text-red-400">
+        <AlertTriangle size={16} />
+        <p className="text-xs font-medium">
+          Total exceeds batch quantity by {totalQty - batchQty} units!
+        </p>
+      </div>
+    )}
+    <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+      This is the total_qty field - calculated from all subphase expected quantities
+    </p>
+  </div>
+)}
         </div>
       </div>
 
@@ -640,9 +663,6 @@ function AddItems({
                     <p className="text-sm text-gray-500 dark:text-gray-400 italic">No sub-phases yet</p>
                   ) : (
                     phase.subphases.map((subphase, subIndex) => {
-                      const subQty = parseInt(subphase.expectedQuantity) || 0;
-                      const maxAllowed = remaining + subQty;
-                      
                       return (
                         <div key={subphase.id} className="bg-white/5 dark:bg-black/10 rounded p-3 space-y-2">
                           <div className="flex gap-2">
@@ -673,39 +693,16 @@ function AddItems({
                               disabled={submitting}
                               className="px-3 py-1.5 text-sm rounded bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                             />
-                            <div className="relative">
-                              <input
-                                type="number"
-                                min="0"
-                                max={maxAllowed}
-                                placeholder={`Expected quantity (max: ${maxAllowed})`}
-                                value={subphase.expectedQuantity}
-                                onChange={(e) => {
-                                  const value = parseInt(e.target.value) || 0;
-                                  if (value <= maxAllowed) {
-                                    updateSubphase(phase.id, subphase.id, 'expectedQuantity', e.target.value);
-                                  }
-                                }}
-                                disabled={submitting}
-                                className={`w-full px-3 py-1.5 text-sm rounded border ${
-                                  subQty > maxAllowed 
-                                    ? 'bg-red-500/10 border-red-500 text-red-700 dark:text-red-300' 
-                                    : 'bg-white/10 dark:bg-black/20 border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200'
-                                } placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50`}
-                              />
-                              {subQty > 0 && (
-                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 dark:text-gray-400">
-                                  /{maxAllowed}
-                                </span>
-                              )}
-                            </div>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="Expected quantity"
+                              value={subphase.expectedQuantity}
+                              onChange={(e) => updateSubphase(phase.id, subphase.id, 'expectedQuantity', e.target.value)}
+                              disabled={submitting}
+                              className="px-3 py-1.5 text-sm rounded bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                            />
                           </div>
-                          {subQty > maxAllowed && (
-                            <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
-                              <AlertTriangle size={12} />
-                              Exceeds available quantity by {subQty - maxAllowed}
-                            </p>
-                          )}
                         </div>
                       );
                     })
@@ -728,7 +725,7 @@ function AddItems({
         </button>
         <button
           onClick={handleSave}
-          disabled={submitting || !isQuantityValid()}
+          disabled={submitting}
           className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? 'Saving...' : 'Save Item'}
