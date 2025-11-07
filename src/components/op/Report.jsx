@@ -12,6 +12,8 @@ function Reports({
   const [items, setItems] = useState(initialItems)
   const [loading, setLoading] = useState(false)
   const [lastRefresh, setLastRefresh] = useState(new Date())
+  const [showAll, setShowAll] = useState(false);
+
 
   // Sync with parent items when they change
   useEffect(() => {
@@ -145,7 +147,7 @@ function Reports({
   <title>JJC Engineering - Operations Report</title>
   <style>
     @page { 
-      margin: 0.25in;
+      margin: 0.2in;
       size: letter;
     }
     @media print {
@@ -158,16 +160,16 @@ function Reports({
       background: white;
       color: #000;
       font-size: 7pt;
-      line-height: 1.15;
+      line-height: 1.05;
     }
     .header-section { 
       border: 1.5px solid #333;
-      margin-bottom: 5px;
+      margin-bottom: 2px;
       background: white;
       page-break-after: avoid;
     }
     .header-content {
-      padding: 5px 8px;
+      padding: 2px 5px;
       text-align: center;
       background: white;
       border-bottom: 2px solid #2196F3;
@@ -176,33 +178,33 @@ function Reports({
       font-size: 12px;
       font-weight: bold;
       color: #333;
-      margin: 0 0 2px 0;
+      margin: 0 0 1px 0;
       letter-spacing: 0.3px;
     }
     .report-subtitle { 
       font-size: 9px;
       font-weight: 600;
       color: #666;
-      margin: 1px 0;
+      margin: 0.5px 0;
     }
     .company-info { 
       font-size: 6px;
       color: #555;
-      margin: 0.5px 0;
-      line-height: 1.1;
+      margin: 0;
+      line-height: 1.05;
     }
     .summary-section {
       background: #f5f5f5;
       border: 1px solid #ddd;
-      padding: 5px;
-      margin-bottom: 5px;
+      padding: 3px;
+      margin-bottom: 2px;
       page-break-inside: avoid;
     }
     .summary-title {
       font-size: 8px;
       font-weight: bold;
       color: #333;
-      margin: 0 0 4px 0;
+      margin: 0 0 2px 0;
       text-align: center;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -210,11 +212,11 @@ function Reports({
     .summary-grid {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 4px;
+      gap: 2px;
     }
     .summary-card {
       background: white;
-      padding: 4px;
+      padding: 2px;
       border-radius: 2px;
       text-align: center;
       border: 1px solid #e0e0e0;
@@ -224,7 +226,7 @@ function Reports({
       font-size: 6px;
       color: #666;
       text-transform: uppercase;
-      margin: 0 0 2px 0;
+      margin: 0 0 1px 0;
       font-weight: 600;
       letter-spacing: 0.3px;
     }
@@ -236,7 +238,7 @@ function Reports({
     }
     .item-card {
       page-break-inside: avoid;
-      margin-bottom: 6px;
+      margin-bottom: 3px;
       border: 1px solid #ddd;
       overflow: hidden;
       box-shadow: 0 1px 2px rgba(0,0,0,0.08);
@@ -244,20 +246,20 @@ function Reports({
     .item-header {
       background: #424242;
       color: white;
-      padding: 4px 8px;
+      padding: 2px 5px;
       font-size: 8.5px;
       font-weight: bold;
       border-bottom: 2px solid #2196F3;
     }
     .item-body {
       background: white;
-      padding: 5px 6px;
+      padding: 3px 4px;
     }
     .section-title {
       font-size: 7.5px;
       font-weight: bold;
       color: #333;
-      margin: 5px 0 3px 0;
+      margin: 3px 0 2px 0;
       padding-left: 4px;
       border-left: 2px solid #2196F3;
       text-transform: uppercase;
@@ -266,8 +268,8 @@ function Reports({
     .info-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 4px;
-      margin-bottom: 4px;
+      gap: 2px;
+      margin-bottom: 2px;
     }
     .info-item {
       font-size: 6.5px;
@@ -275,7 +277,7 @@ function Reports({
     .info-label {
       font-weight: 600;
       color: #666;
-      margin: 0 0 1px 0;
+      margin: 0 0 0.5px 0;
       font-size: 6px;
       text-transform: uppercase;
       letter-spacing: 0.2px;
@@ -284,17 +286,17 @@ function Reports({
       color: #333;
       margin: 0;
       font-size: 6.5px;
-      line-height: 1.2;
+      line-height: 1.1;
     }
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 4px;
-      margin: 4px 0;
+      gap: 2px;
+      margin: 2px 0;
     }
     .stat-box {
       background: #f5f5f5;
-      padding: 3px;
+      padding: 2px;
       text-align: center;
       border: 1px solid #e0e0e0;
       border-radius: 2px;
@@ -302,7 +304,7 @@ function Reports({
     .stat-label {
       font-size: 5.5px;
       color: #666;
-      margin: 0 0 1px 0;
+      margin: 0 0 0.5px 0;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.2px;
@@ -315,8 +317,8 @@ function Reports({
     }
     .phase-section {
       background: #fafafa;
-      padding: 4px;
-      margin: 4px 0;
+      padding: 2px;
+      margin: 2px 0;
       border: 1px solid #e0e0e0;
       border-radius: 2px;
       page-break-inside: avoid;
@@ -324,39 +326,39 @@ function Reports({
     .phase-header {
       font-weight: bold;
       color: #333;
-      margin: 0 0 3px 0;
+      margin: 0 0 2px 0;
       display: flex;
       justify-content: space-between;
       font-size: 7px;
     }
     .subphase-item {
       background: white;
-      padding: 3px;
-      margin: 2px 0;
+      padding: 2px;
+      margin: 1px 0;
       border-left: 2px solid #4CAF50;
       font-size: 6px;
       border-radius: 1px;
-      line-height: 1.2;
+      line-height: 1.1;
     }
     .subphase-item.incomplete {
       border-left-color: #FF9800;
     }
     .remarks-box {
       background: #FFF9C4;
-      padding: 4px;
+      padding: 2px;
       border-left: 2px solid #FFC107;
-      margin: 4px 0;
+      margin: 2px 0;
       font-size: 6px;
       border-radius: 1px;
-      line-height: 1.2;
+      line-height: 1.1;
     }
     .remarks-box ul {
-      margin: 2px 0;
-      padding-left: 0.8rem;
+      margin: 1px 0;
+      padding-left: 0.7rem;
     }
     .remarks-box li {
-      margin-bottom: 2px;
-      line-height: 1.2;
+      margin-bottom: 1px;
+      line-height: 1.1;
     }
     .priority-high { 
       background: #333; 
@@ -416,20 +418,20 @@ function Reports({
       display: inline-block;
     }
     .footer-note {
-      margin-top: 5px;
-      padding: 4px;
+      margin-top: 2px;
+      padding: 2px;
       background: #f5f5f5;
       border-left: 2px solid #2196F3;
       page-break-inside: avoid;
       font-size: 5.5px;
-      line-height: 1.2;
+      line-height: 1.1;
       border-radius: 1px;
     }
     .two-column-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 4px;
-      margin-bottom: 4px;
+      gap: 2px;
+      margin-bottom: 2px;
     }
   </style>
 </head>
@@ -439,7 +441,7 @@ function Reports({
       <div class="company-name">JJC ENGINEERING WORKS & GENERAL SERVICES</div>
       <div class="report-subtitle">Operations Progress Report</div>
       <div class="company-info">#119 Sto. Niño St. Brgy. San Jose, Antipolo City | Tel. 795-5816</div>
-      <div class="company-info" style="font-weight: bold; margin-top: 2px;">Generated: ${currentDate}</div>
+      <div class="company-info" style="font-weight: bold; margin-top: 1px;">Generated: ${currentDate}</div>
     </div>
   </div>
 
@@ -660,7 +662,7 @@ ${item.remarks
           ? `
   <div class="remarks-box">
     <strong>Remarks Summary:</strong>
-    <ul style="padding-left: 1rem; margin-top: 0.5rem;">
+    <ul style="padding-left: 0.8rem; margin-top: 0.3rem;">
       ${item.remarks
             .trim()
             .split('\n')
@@ -1004,10 +1006,10 @@ ${item.remarks
                           <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Priority:</span>
                           <span
                             className={`inline-block px-3 py-1 rounded-sm font-semibold text-white ml-2 text-xs ${item.priority === "High"
-                                ? "bg-gray-800"
-                                : item.priority === "Medium"
-                                  ? "bg-gray-600"
-                                  : "bg-gray-400"
+                              ? "bg-gray-800"
+                              : item.priority === "Medium"
+                                ? "bg-gray-600"
+                                : "bg-gray-400"
                               }`}
                           >
                             {item.priority}
@@ -1031,13 +1033,13 @@ ${item.remarks
                         <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Current Status:</span>
                         <span
                           className={`inline-block px-3 py-1 rounded-sm font-semibold ml-2 text-xs ${progress === 100 && item.end_time
-                              ? "bg-green-100 text-green-800 border border-green-300 dark:bg-green-900/30 dark:text-green-400"
-                              : progress > 0
-                                ? "bg-orange-100 text-orange-800 border border-orange-300 dark:bg-orange-900/30 dark:text-orange-400"
-                                : "bg-gray-100 text-gray-800 border border-gray-300 dark:bg-gray-700 dark:text-gray-400"
+                            ? "bg-green-100 text-green-800 border border-green-300 dark:bg-green-900/30 dark:text-green-400"
+                            : progress > 0
+                              ? "bg-orange-100 text-orange-800 border border-orange-300 dark:bg-orange-900/30 dark:text-orange-400"
+                              : "bg-gray-100 text-gray-800 border border-gray-300 dark:bg-gray-700 dark:text-gray-400"
                             }`}
                         >
-                          {progress === 100 && item.end_time
+                          {progress === 100
                             ? "Completed"
                             : progress > 0
                               ? "In Progress"
@@ -1110,22 +1112,18 @@ ${item.remarks
                   {/* Work Breakdown */}
                   <div className="border-l-4 border-indigo-500 pl-4">
                     <h5 className="text-base font-bold text-gray-800 dark:text-gray-200 mb-3 uppercase tracking-wide">Work Breakdown</h5>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md text-center border border-gray-200 dark:border-gray-600">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1 uppercase tracking-wider font-semibold">Total Phases</p>
-                        <p className="text-2xl font-bold text-gray-800 dark:text-gray-200">{totalPhases}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1 uppercase tracking-wider font-semibold">Phases</p>
+                        <p className="text-2xl font-bold text-gray-800 dark:text-gray-200">{completedPhases}/{totalPhases}</p>
                       </div>
                       <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md text-center border border-gray-200 dark:border-gray-600">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1 uppercase tracking-wider font-semibold">Completed Phases</p>
-                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">{completedPhases}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1 uppercase tracking-wider font-semibold">Tasks</p>
+                        <p className="text-2xl font-bold text-gray-800 dark:text-gray-200">{completedTasks}/{totalTasks}</p>
                       </div>
                       <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md text-center border border-gray-200 dark:border-gray-600">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1 uppercase tracking-wider font-semibold">Total Tasks</p>
-                        <p className="text-2xl font-bold text-gray-800 dark:text-gray-200">{totalTasks}</p>
-                      </div>
-                      <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md text-center border border-gray-200 dark:border-gray-600">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1 uppercase tracking-wider font-semibold">Completed Tasks</p>
-                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">{completedTasks}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1 uppercase tracking-wider font-semibold">Total Employees</p>
+                        <p className="text-2xl font-bold text-gray-800 dark:text-gray-200">{employeeCount}</p>
                       </div>
                     </div>
                     <div className="mt-3 text-center">
@@ -1184,9 +1182,96 @@ ${item.remarks
                         </span>
                       </div>
                       {employeeCount > 0 && (
-                        <div>
-                          <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Assigned Employees:</span>
-                          <p className="text-gray-800 dark:text-gray-200 mt-1">{Array.from(allEmployees).join(", ")}</p>
+                        <div className="mt-2">
+                          <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider block mb-3">Employee Assignments:</span>
+                          <div className="space-y-3">
+                            {(() => {
+                              const employeeMap = new Map();
+                              item.phases?.forEach((phase) => {
+                                phase.subphases?.forEach((subphase) => {
+                                  if (subphase.employee_name) {
+                                    const key = `${subphase.employee_name} (${subphase.employee_barcode})`;
+                                    if (!employeeMap.has(key)) {
+                                      employeeMap.set(key, []);
+                                    }
+                                    employeeMap.get(key).push({
+                                      phaseName: phase.name,
+                                      subphaseName: subphase.name,
+                                      actualHours: subphase.actual_hours || 0,
+                                      expectedHours: subphase.expected_duration || 0,
+                                      completed: subphase.completed == 1
+                                    });
+                                  }
+                                });
+                              });
+
+                              const entries = Array.from(employeeMap.entries());
+                              const visibleEntries = showAll ? entries : entries.slice(0, 1);
+
+                              return (
+                                <>
+                                  {visibleEntries.map(([employeeName, assignments], idx) => {
+                                    const totalActual = assignments.reduce((sum, a) => sum + parseFloat(a.actualHours), 0);
+                                    const totalExpected = assignments.reduce((sum, a) => sum + parseFloat(a.expectedHours), 0);
+                                    const completedCount = assignments.filter(a => a.completed).length;
+                                    const completionPercent = Math.round((completedCount / assignments.length) * 100);
+
+                                    return (
+                                      <div key={idx} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md border border-gray-200 dark:border-gray-600">
+                                        <div className="flex justify-between items-start mb-2">
+                                          <p className="font-bold text-gray-800 dark:text-gray-200">{employeeName}</p>
+                                          <div className="text-right text-xs space-y-1">
+                                            <p className="text-gray-600 dark:text-gray-400">
+                                              <span className="font-semibold">Tasks:</span> {completedCount}/{assignments.length}
+                                            </p>
+                                            <p className="text-gray-600 dark:text-gray-400">
+                                              <span className="font-semibold">Complete:</span> {completionPercent}%
+                                            </p>
+                                            <div className="w-28 h-2 bg-gray-300 dark:bg-gray-600 rounded-full overflow-hidden">
+                                              <div
+                                                className="h-full bg-green-500 rounded-full transition-all"
+                                                style={{ width: `${completionPercent}%` }}
+                                              />
+                                            </div>
+                                            <p className="text-gray-600 dark:text-gray-400">
+                                              <span className="font-semibold">Hours:</span> {totalActual.toFixed(1)}h / {totalExpected.toFixed(1)}h
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <div className="space-y-1.5 mt-2">
+                                          {assignments.map((assignment, assignIdx) => (
+                                            <div key={assignIdx} className="text-xs bg-white dark:bg-gray-800 p-2 rounded border-l-2 border-blue-400">
+                                              <div className="flex justify-between items-start">
+                                                <div className="flex-1">
+                                                  <span className={assignment.completed ? "text-green-600 dark:text-green-400 font-semibold" : "text-orange-600 dark:text-orange-400 font-semibold"}>
+                                                    {assignment.completed ? "✓" : "○"}
+                                                  </span>
+                                                  <span className="ml-2 text-gray-800 dark:text-gray-200">
+                                                    {assignment.phaseName} → {assignment.subphaseName}
+                                                  </span>
+                                                </div>
+                                                <span className="text-gray-600 dark:text-gray-400 text-xs ml-2 whitespace-nowrap">
+                                                  {assignment.actualHours}h / {assignment.expectedHours}h
+                                                </span>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                  {entries.length > 1 && (
+                                    <button
+                                      onClick={() => setShowAll(!showAll)}
+                                      className="text-sm text-blue-600 dark:text-blue-400 mt-2 underline"
+                                    >
+                                      {showAll ? "Show Less" : `Show ${entries.length - 1} More`}
+                                    </button>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1226,8 +1311,8 @@ ${item.remarks
                         <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Efficiency Rate:</span>
                         <p
                           className={`font-bold text-base mt-1 ${efficiency !== "N/A" && Number.parseFloat(efficiency) < 100
-                              ? "text-gray-600"
-                              : "text-green-600"
+                            ? "text-gray-600"
+                            : "text-green-600"
                             }`}
                         >
                           {efficiency}
@@ -1371,9 +1456,6 @@ ${item.remarks
                                           <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-400 mt-2">
                                             <div>
                                               <strong>Expected:</strong> {subphase.expected_duration || 0}h
-                                            </div>
-                                            <div>
-                                              <strong>Actual:</strong> {subphase.actual_hours || 0}h
                                             </div>
                                             {subphase.expected_quantity > 0 && (
                                               <>
