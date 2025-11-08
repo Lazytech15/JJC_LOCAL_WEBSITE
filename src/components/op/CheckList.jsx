@@ -84,6 +84,8 @@ function Checklist({
     );
   };
 
+
+
   const updateSubphaseInState = (partNumber, phaseId, subphaseId, updates) => {
     setItems(prevItems =>
       prevItems.map(item => {
@@ -108,21 +110,21 @@ function Checklist({
     );
   };
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const hasActivePhases = items.some(item =>
-        item.phases?.some(phase =>
-          phase.start_time && !phase.end_time && !phase.pause_time
-        )
-      );
+useEffect(() => {
+  const interval = setInterval(() => {
+    const hasActivePhases = items.some(item =>
+      item.phases?.some(phase =>
+        phase.start_time && !phase.end_time && !phase.pause_time // Only active, not paused
+      )
+    );
 
-      if (hasActivePhases) {
-        forceUpdate(prev => prev + 1); // Force component to re-render
-      }
-    }, 1000);
+    if (hasActivePhases) {
+      forceUpdate(prev => prev + 1); // Force component to re-render
+    }
+  }, 1000);
 
-    return () => clearInterval(interval);
-  }, [items]);
+  return () => clearInterval(interval);
+}, [items]);
 
   // Load clients on mount
   useEffect(() => {
@@ -236,44 +238,12 @@ function Checklist({
       // ADD THIS NEW CODE:
       // If auto-unchecked, update via API
       if (subphase.completed == 1 && newQuantity < subphase.expected_quantity) {
-        await apiService.operations.completeSubphase(subphase.id, false);
+        await apiService.operations.completeSubphaseWithDuration(subphase.id, false);
       }
     } catch (error) {
       console.error("Error updating completed quantity:", error);
       alert("Failed to update completed quantity: " + error.message);
       await loadData();
-    }
-  };
-
-  const handleStartItem = async (partNumber) => {
-    try {
-      await apiService.operations.startItemProcess(partNumber);
-      await loadData();
-    } catch (error) {
-      console.error("Error starting item:", error);
-      alert("Failed to start item: " + error.message);
-    }
-  };
-
-  const handleStopItem = async (partNumber) => {
-    try {
-      await apiService.operations.stopItemProcess(partNumber);
-      await loadData();
-    } catch (error) {
-      console.error("Error stopping item:", error);
-      alert("Failed to stop item: " + error.message);
-    }
-  };
-
-  const handleResetItem = async (partNumber) => {
-    if (window.confirm("Reset process times for this item?")) {
-      try {
-        await apiService.operations.resetItemProcess(partNumber);
-        await loadData();
-      } catch (error) {
-        console.error("Error resetting item:", error);
-        alert("Failed to reset item: " + error.message);
-      }
     }
   };
 
@@ -373,7 +343,7 @@ function Checklist({
         );
 
         // Also update via API
-        await apiService.operations.completeSubphase(selectedSubphase.id, false);
+        await apiService.operations.completeSubphaseWithDuration(selectedSubphase.id, false);
       }
 
 
@@ -451,48 +421,60 @@ function Checklist({
       await loadData();
     }
   };
-  const getPhaseElapsedTime = (phase) => {
-    if (!phase.start_time) return 0;
 
-    const start = new Date(phase.start_time);
+  const formatDuration = (hours) => {
+    const totalMinutes = Math.round(hours * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
 
-    // If phase is completed, calculate total time minus pauses
-    if (phase.end_time) {
-      const end = new Date(phase.end_time);
-      let elapsed = Math.floor((end - start) / 1000);
+    if (h > 0 && m > 0) return `${h}h ${m}m`;
+    if (h > 0) return `${h} hour${h > 1 ? 's' : ''}`;
+    return `${m} minute${m !== 1 ? 's' : ''}`;
+  }
 
-      // Subtract accumulated paused duration
-      if (phase.paused_duration) {
-        elapsed -= phase.paused_duration;
-      }
 
-      return Math.max(0, elapsed);
-    }
+ function getPhaseElapsedTime(phase) {
+  if (!phase.start_time) return 0;
 
-    // If phase is currently paused, show time up to pause
-    if (phase.pause_time) {
-      const pause = new Date(phase.pause_time);
-      let elapsed = Math.floor((pause - start) / 1000);
+  const start = new Date(phase.start_time);
 
-      // Subtract accumulated paused duration
-      if (phase.paused_duration) {
-        elapsed -= phase.paused_duration;
-      }
-
-      return Math.max(0, elapsed);
-    }
-
-    // Phase is running - calculate from start to now minus pauses
-    const now = new Date();
-    let elapsed = Math.floor((now - start) / 1000);
+  // If phase is completed, calculate total time minus pauses
+  if (phase.end_time) {
+    const end = new Date(phase.end_time);
+    let elapsed = Math.floor((end - start) / 1000);
 
     // Subtract accumulated paused duration
     if (phase.paused_duration) {
-      elapsed -= phase.paused_duration;
+      elapsed -= parseInt(phase.paused_duration);
     }
 
     return Math.max(0, elapsed);
-  };
+  }
+
+  // If phase is currently paused, show time up to pause (frozen)
+  if (phase.pause_time) {
+    const pause = new Date(phase.pause_time);
+    let elapsed = Math.floor((pause - start) / 1000);
+
+    // Subtract accumulated paused duration from BEFORE this pause
+    if (phase.paused_duration) {
+      elapsed -= parseInt(phase.paused_duration);
+    }
+
+    return Math.max(0, elapsed);
+  }
+
+  // Phase is running - calculate from start to now minus ALL pauses
+  const now = new Date();
+  let elapsed = Math.floor((now - start) / 1000);
+
+  // Subtract accumulated paused duration
+  if (phase.paused_duration) {
+    elapsed -= parseInt(phase.paused_duration);
+  }
+
+  return Math.max(0, elapsed);
+}
 
   const handleStartPhase = async (partNumber, phaseId) => {
     try {
@@ -705,8 +687,30 @@ function Checklist({
     return true;
   };
 
-  // If toggleSubPhase is passed from parent, wrap it with optimistic update
   const handleToggleSubPhase = async (partNumber, phaseId, subphaseId, currentStatus) => {
+    if (!currentStatus) { // If trying to mark as complete
+      const item = items.find(i => i.part_number === partNumber);
+      const phase = item?.phases?.find(p => p.id === phaseId);
+      
+      // Prevent completing subphases while phase is paused
+      if (phase && phase.pause_time && !phase.end_time) {
+        alert('Cannot mark subphase as complete while the phase is paused. Please resume the phase first.');
+        return;
+      }
+      
+      // Prevent completing subphases if phase hasn't started
+      if (phase && !phase.start_time) {
+        alert('Cannot mark subphase as complete. Please start the phase first.');
+        return;
+      }
+      
+      // Prevent completing subphases if phase is already completed
+      if (phase && phase.end_time) {
+        alert('Cannot mark subphase as complete. This phase is already completed.');
+        return;
+      }
+    }
+    
     try {
       // If trying to mark as complete, check quantity requirement
       if (!currentStatus) {
@@ -718,21 +722,85 @@ function Checklist({
           const currentQty = subphase.current_completed_quantity || 0;
           if (currentQty < subphase.expected_quantity) {
             alert(`Cannot mark as complete. Current quantity (${currentQty}) is less than expected quantity (${subphase.expected_quantity}).`);
-            return; // Don't proceed with completion
+            return;
           }
         }
       }
 
       const now = new Date().toISOString();
-
-      // Optimistic update
-      updateSubphaseInState(partNumber, phaseId, subphaseId, {
-        completed: currentStatus ? 0 : 1,
-        completed_at: currentStatus ? null : now
-      });
+      
+      // Find the item and phase
+      const item = items.find(i => i.part_number === partNumber);
+      const phase = item?.phases?.find(p => p.id === phaseId);
+      
+      if (phase && phase.start_time) {
+        // Get current subphase index
+        const currentSubphaseIndex = phase.subphases.findIndex(sp => sp.id === subphaseId);
+        
+        // Calculate time_duration for THIS subphase when marking as complete
+        if (!currentStatus) { // If marking as complete
+          // Get the current phase elapsed time (from stopwatch display)
+          const currentPhaseElapsedSeconds = getPhaseElapsedTime(phase);
+          
+          // Get the last completed subphase's cumulative time
+          let previousCumulativeSeconds = 0;
+          if (currentSubphaseIndex > 0) {
+            // Look at the previous subphase
+            const previousSubphase = phase.subphases[currentSubphaseIndex - 1];
+            if (previousSubphase.time_duration) {
+              previousCumulativeSeconds = Math.floor(parseFloat(previousSubphase.time_duration) * 3600);
+            }
+          }
+          
+          // This subphase duration = current stopwatch time - previous subphase's time
+          const thisSubphaseSeconds = Math.max(0, currentPhaseElapsedSeconds - previousCumulativeSeconds);
+          const durationInHours = thisSubphaseSeconds / 3600;
+          
+          // Update this subphase with its time_duration
+          updateSubphaseInState(partNumber, phaseId, subphaseId, {
+            completed: 1,
+            completed_at: now,
+            time_duration: durationInHours // Store as hours (decimal)
+          });
+        } else {
+          // If unchecking, clear the time_duration for this subphase
+          updateSubphaseInState(partNumber, phaseId, subphaseId, {
+            completed: 0,
+            completed_at: null,
+            time_duration: 0
+          });
+        }
+      } else {
+        // If phase not started, just toggle completion without duration
+        updateSubphaseInState(partNumber, phaseId, subphaseId, {
+          completed: currentStatus ? 0 : 1,
+          completed_at: currentStatus ? null : now
+        });
+      }
 
       // API call in background
-      await apiService.operations.completeSubphase(subphaseId, !currentStatus);
+      if (!currentStatus && phase && phase.start_time) {
+        // If marking as complete and phase has started, calculate and send time_duration
+        const currentPhaseElapsedSeconds = getPhaseElapsedTime(phase);
+        const currentSubphaseIndex = phase.subphases.findIndex(sp => sp.id === subphaseId);
+        
+        let previousCumulativeSeconds = 0;
+        if (currentSubphaseIndex > 0) {
+          const previousSubphase = phase.subphases[currentSubphaseIndex - 1];
+          if (previousSubphase.time_duration) {
+            previousCumulativeSeconds = Math.floor(parseFloat(previousSubphase.time_duration) * 3600);
+          }
+        }
+        
+        const thisSubphaseSeconds = Math.max(0, currentPhaseElapsedSeconds - previousCumulativeSeconds);
+        const durationInHours = thisSubphaseSeconds / 3600;
+        
+        // Complete subphase with calculated time_duration
+        await apiService.operations.completeSubphaseWithDuration(subphaseId, true, durationInHours);
+      } else {
+        // Just toggle completion status without duration
+        await apiService.operations.completeSubphaseWithDuration(subphaseId, !currentStatus);
+      }
     } catch (error) {
       console.error("Error toggling subphase:", error);
       alert("Failed to toggle subphase: " + error.message);
@@ -1594,20 +1662,20 @@ function Checklist({
                                                     </div>
                                                   )}
 
-                                                  {subphase.subphase_condition && (
-                                                    <p className="text-sm text-gray-600 dark:text-gray-400 italic mt-1">
-                                                      📋 {subphase.subphase_condition}
+
+                                                  {subphase.time_duration > 0 && (
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 italic mt-1 flex items-center gap-1">
+                                                      <Clock size={12} />
+                                                      Duration: {formatDuration(subphase.time_duration)} completion
                                                     </p>
                                                   )}
+
 
                                                   <div className="mt-2 flex flex-wrap gap-2 items-center">
                                                     <span className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded flex items-center gap-1">
                                                       <Clock size={12} />
                                                       Expected:{" "}
-                                                      {
-                                                        subphase.expected_duration
-                                                      }
-                                                      h
+                                                      {formatDuration(subphase.expected_duration)}
                                                     </span>
 
                                                     {/* Quantity Tracking */}
@@ -1827,14 +1895,20 @@ function Checklist({
                                                     </button>
                                                   </div>
 
+                                                  {/* Show completion time with duration */}
                                                   {subphase.completed_at && (
-                                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 flex items-center gap-1">
-                                                      <CheckCircle size={12} />
-                                                      Completed:{" "}
-                                                      {new Date(
-                                                        subphase.completed_at
-                                                      ).toLocaleString()}
-                                                    </p>
+                                                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-2 space-y-1">
+                                                      <p className="flex items-center gap-1">
+                                                        <CheckCircle size={12} />
+                                                        Completed: {new Date(subphase.completed_at).toLocaleString()}
+                                                      </p>
+                                                      {/* {subphase.time_duration > 0 && (
+                      <p className="flex items-center gap-1">
+                      <Clock size={12} />
+                      Total Duration: {formatDuration(subphase.time_duration)}
+                    </p>
+                    )} */}
+                                                    </div>
                                                   )}
                                                 </div>
                                               </div>

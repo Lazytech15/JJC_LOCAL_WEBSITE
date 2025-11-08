@@ -26,6 +26,11 @@ function AddItems({
   const dropdownRef = useRef(null);
   const clientDropdownRef = useRef(null);
 
+  const convertMinutesToHours = (minutes) => {
+  const mins = parseFloat(minutes) || 0;
+  return (mins / 60).toFixed(2);
+};
+
   // Load existing clients on mount
   useEffect(() => {
     loadClients();
@@ -115,40 +120,41 @@ function AddItems({
   };
 
   const loadTemplateFromItem = async (item) => {
-    setLoadingTemplate(true);
-    setShowTemplateDropdown(false);
-    setSelectedTemplateId(item.id);
+  setLoadingTemplate(true);
+  setShowTemplateDropdown(false);
+  setSelectedTemplateId(item.id);
+  
+  try {
+    const fullItem = await apiService.operations.getItem(item.part_number);
     
-    try {
-      const fullItem = await apiService.operations.getItem(item.part_number);
-      
-      setPartNumber(fullItem.part_number.split('-')[0] || fullItem.part_number);
-      setItemName(fullItem.name || '');
-      setClientName(fullItem.client_name || '');
-      setPriority(fullItem.priority || 'Medium');
-      setQty(fullItem.qty || 1);
-      
-      // Load phases and subphases with expected_quantity
-      if (fullItem.phases && fullItem.phases.length > 0) {
-        const loadedPhases = fullItem.phases.map(phase => ({
+    setPartNumber(fullItem.part_number.split('-')[0] || fullItem.part_number);
+    setItemName(fullItem.name || '');
+    setClientName(fullItem.client_name || '');
+    setPriority(fullItem.priority || 'Medium');
+    setQty(fullItem.qty || 1);
+    
+    // Load phases and subphases with expected_quantity
+    if (fullItem.phases && fullItem.phases.length > 0) {
+      const loadedPhases = fullItem.phases.map(phase => ({
+        id: Date.now() + Math.random(),
+        name: phase.name || '',
+        subphases: phase.subphases?.map(sub => ({
           id: Date.now() + Math.random(),
-          name: phase.name || '',
-          subphases: phase.subphases?.map(sub => ({
-            id: Date.now() + Math.random(),
-            name: sub.name || '',
-            expectedDuration: sub.expected_duration || '',
-            expectedQuantity: sub.expected_quantity || ''
-          })) || []
-        }));
-        setPhases(loadedPhases);
-      }
-    } catch (error) {
-      console.error('Error loading template:', error);
-      alert('Error loading template: ' + error.message);
-    } finally {
-      setLoadingTemplate(false);
+          name: sub.name || '',
+          // CHANGED: Convert hours back to minutes for display
+          expectedDuration: sub.expected_duration ? Math.round(sub.expected_duration * 60).toString() : '',
+          expectedQuantity: sub.expected_quantity || ''
+        })) || []
+      }));
+      setPhases(loadedPhases);
     }
-  };
+  } catch (error) {
+    console.error('Error loading template:', error);
+    alert('Error loading template: ' + error.message);
+  } finally {
+    setLoadingTemplate(false);
+  }
+};
 
   const addNewPhase = () => {
     setPhases([...phases, {
@@ -214,6 +220,12 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
                 }
               }
               
+              // NEW: Convert minutes to hours for expectedDuration
+              if (field === 'expectedDuration') {
+                // Store the minutes value directly in the state for display
+                return { ...sub, expectedDuration: value };
+              }
+              
               return { ...sub, [field]: value };
             }
             return sub;
@@ -269,24 +281,25 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
 
   const uniquePartNumber = `${partNumber.trim()}-${batchNumber.trim()}`;
 
-    const itemData = {
-      part_number: uniquePartNumber,
-      name: itemName.trim(),
-      client_name: clientName.trim(),
-      priority: priority,
-      qty: parseInt(qty) || 1,
-      total_qty: totalQty,
-      phases: validPhases.map(phase => ({
-        name: phase.name.trim(),
-        subphases: phase.subphases
-          .filter(sub => sub.name.trim())
-          .map(sub => ({
-            name: sub.name.trim(),
-            expected_duration: parseFloat(sub.expectedDuration) || 0,
-            expected_quantity: parseInt(sub.expectedQuantity) || 0
-          }))
-      }))
-    };
+  const itemData = {
+    part_number: uniquePartNumber,
+    name: itemName.trim(),
+    client_name: clientName.trim(),
+    priority: priority,
+    qty: parseInt(qty) || 1,
+    total_qty: totalQty,
+    phases: validPhases.map(phase => ({
+      name: phase.name.trim(),
+      subphases: phase.subphases
+        .filter(sub => sub.name.trim())
+        .map(sub => ({
+          name: sub.name.trim(),
+          // CHANGED: Convert minutes to hours before saving
+          expected_duration: parseFloat(convertMinutesToHours(sub.expectedDuration)) || 0,
+          expected_quantity: parseInt(sub.expectedQuantity) || 0
+        }))
+    }))
+  };
 
     try {
       await apiService.operations.createItemWithStructure(itemData);
@@ -686,8 +699,9 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                             <input
                               type="number"
-                              step="0.5"
-                              placeholder="Duration (hours)"
+                              step="1"
+                              min="0"
+                              placeholder="Duration (minutes)"
                               value={subphase.expectedDuration}
                               onChange={(e) => updateSubphase(phase.id, subphase.id, 'expectedDuration', e.target.value)}
                               disabled={submitting}

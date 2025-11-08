@@ -38,22 +38,22 @@ export class OperationsService extends BaseAPIService {
   * @param {number} [itemData.total_qty] - Total quantity (calculated from subphases)
   * @returns {Promise} Created item data
  */
-async createItem(itemData) {
-  if (!itemData.part_number) {
-    throw new Error('part_number is required')
+  async createItem(itemData) {
+    if (!itemData.part_number) {
+      throw new Error('part_number is required')
+    }
+    if (!itemData.name) {
+      throw new Error('name is required')
+    }
+    // Validate priority if provided
+    if (itemData.priority && !['High', 'Medium', 'Low'].includes(itemData.priority)) {
+      throw new Error('priority must be High, Medium, or Low')
+    }
+    return this.request("/api/operations/items", {
+      method: "POST",
+      body: JSON.stringify(itemData),
+    })
   }
-  if (!itemData.name) {
-    throw new Error('name is required')
-  }
-  // Validate priority if provided
-  if (itemData.priority && !['High', 'Medium', 'Low'].includes(itemData.priority)) {
-    throw new Error('priority must be High, Medium, or Low')
-  }
-  return this.request("/api/operations/items", {
-    method: "POST",
-    body: JSON.stringify(itemData),
-  })
-}
 
   /**
    * Get all distinct client names
@@ -78,16 +78,16 @@ async createItem(itemData) {
  * @param {number} [itemData.total_qty] - Total quantity
  * @returns {Promise} Success confirmation
  */
-async updateItem(partNumber, itemData) {
-  // Validate priority if provided
-  if (itemData.priority && !['High', 'Medium', 'Low'].includes(itemData.priority)) {
-    throw new Error('priority must be High, Medium, or Low')
+  async updateItem(partNumber, itemData) {
+    // Validate priority if provided
+    if (itemData.priority && !['High', 'Medium', 'Low'].includes(itemData.priority)) {
+      throw new Error('priority must be High, Medium, or Low')
+    }
+    return this.request(`/api/operations/items?part_number=${encodeURIComponent(partNumber)}`, {
+      method: "PUT",
+      body: JSON.stringify(itemData),
+    })
   }
-  return this.request(`/api/operations/items?part_number=${encodeURIComponent(partNumber)}`, {
-    method: "PUT",
-    body: JSON.stringify(itemData),
-  })
-}
 
   /**
    * Delete item (cascades to phases and subphases)
@@ -138,18 +138,18 @@ async updateItem(partNumber, itemData) {
     })
   }
 
-/**
- * Update phase by ID
- * @param {number|string} id - Phase ID
- * @param {Object} phaseData - Updated phase information (name, phase_order, progress, actual_hours)
- * @returns {Promise} Success confirmation
- */
-async updatePhase(id, phaseData) {
-  return this.request(`/api/operations/phases?id=${id}`, {
-    method: "PUT",
-    body: JSON.stringify(phaseData),
-  })
-}
+  /**
+   * Update phase by ID
+   * @param {number|string} id - Phase ID
+   * @param {Object} phaseData - Updated phase information (name, phase_order, progress, actual_hours)
+   * @returns {Promise} Success confirmation
+   */
+  async updatePhase(id, phaseData) {
+    return this.request(`/api/operations/phases?id=${id}`, {
+      method: "PUT",
+      body: JSON.stringify(phaseData),
+    })
+  }
 
   /**
    * Delete phase (cascades to subphases)
@@ -182,37 +182,42 @@ async updatePhase(id, phaseData) {
     return this.request(`/api/operations/subphases?id=${id}`)
   }
 
-/**
- * Create new subphase
- * @param {Object} subphaseData - Subphase information
- * @param {string} subphaseData.part_number - Item part number (required)
- * @param {number} subphaseData.phase_id - Phase ID (required)
- * @param {string} subphaseData.name - Subphase name (required)
- * @param {string} [subphaseData.condition] - Subphase condition
- * @param {number} [subphaseData.expected_duration=0] - Expected duration in hours
- * @param {number} [subphaseData.expected_quantity=0] - Expected quantity
- * @returns {Promise} Created subphase data
- */
-async createSubphase(subphaseData) {
-  if (!subphaseData.part_number) {
-    throw new Error('part_number is required')
+  /**
+   * Create new subphase
+   * @param {Object} subphaseData - Subphase information
+   * @param {string} subphaseData.part_number - Item part number (required)
+   * @param {number} subphaseData.phase_id - Phase ID (required)
+   * @param {string} subphaseData.name - Subphase name (required)
+   * @param {number} [subphaseData.time_duration=0] - Duration in hours until subphase completion
+   * @param {number} [subphaseData.expected_duration=0] - Expected duration in hours
+   * @param {number} [subphaseData.expected_quantity=0] - Expected quantity
+   * @returns {Promise} Created subphase data
+   */
+  async createSubphase(subphaseData) {
+    if (!subphaseData.part_number) {
+      throw new Error('part_number is required')
+    }
+    if (!subphaseData.phase_id) {
+      throw new Error('phase_id is required')
+    }
+    if (!subphaseData.name) {
+      throw new Error('name is required')
+    }
+    return this.request("/api/operations/subphases", {
+      method: "POST",
+      body: JSON.stringify(subphaseData),
+    })
   }
-  if (!subphaseData.phase_id) {
-    throw new Error('phase_id is required')
-  }
-  if (!subphaseData.name) {
-    throw new Error('name is required')
-  }
-  return this.request("/api/operations/subphases", {
-    method: "POST",
-    body: JSON.stringify(subphaseData),
-  })
-}
 
   /**
    * Update subphase by ID
    * @param {number|string} id - Subphase ID
-   * @param {Object} subphaseData - Updated subphase information (name, condition, expected_duration, actual_hours, subphase_order)
+   * @param {Object} subphaseData - Updated subphase information
+   * @param {string} [subphaseData.name] - Subphase name
+   * @param {number} [subphaseData.time_duration] - Duration in hours until completion
+   * @param {number} [subphaseData.expected_duration] - Expected duration in hours
+   * @param {number} [subphaseData.actual_hours] - Actual hours spent
+   * @param {number} [subphaseData.subphase_order] - Display order
    * @returns {Promise} Success confirmation
    */
   async updateSubphase(id, subphaseData) {
@@ -221,7 +226,6 @@ async createSubphase(subphaseData) {
       body: JSON.stringify(subphaseData),
     })
   }
-
   /**
    * Delete subphase
    * @param {number|string} id - Subphase ID
@@ -235,18 +239,23 @@ async createSubphase(subphaseData) {
 
   // ==================== ACTION METHODS ====================
 
-  /**
-   * Mark subphase as completed or uncompleted
-   * @param {number|string} subphaseId - Subphase ID
-   * @param {boolean} completed - Completion status (default: true)
-   * @returns {Promise} Success confirmation
-   */
-  async completeSubphase(subphaseId, completed = true) {
-    return this.request("/api/operations/complete-subphase", {
-      method: "POST",
-      body: JSON.stringify({ subphase_id: subphaseId, completed }),
-    })
-  }
+/**
+ * Mark subphase as completed with time duration
+ * @param {number|string} subphaseId - Subphase ID
+ * @param {boolean} completed - Completion status
+ * @param {number} timeDuration - Duration in hours (decimal)
+ * @returns {Promise} Success confirmation
+ */
+async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = null) {
+  return this.request("/api/operations/complete-subphase", {
+    method: "POST",
+    body: JSON.stringify({ 
+      subphase_id: subphaseId, 
+      completed,
+      time_duration: timeDuration 
+    }),
+  })
+}
 
   /**
    * Assign employee to subphase
@@ -257,94 +266,94 @@ async createSubphase(subphaseData) {
   async assignEmployee(subphaseId, employeeBarcode) {
     return this.request("/api/operations/assign-employee", {
       method: "POST",
-      body: JSON.stringify({ 
-        subphase_id: subphaseId, 
-        employee_barcode: employeeBarcode 
+      body: JSON.stringify({
+        subphase_id: subphaseId,
+        employee_barcode: employeeBarcode
       }),
     })
   }
 
   // ==================== PROCESS CONTROL METHODS ====================
 
-/**
- * Start phase process - records start_time
- * @param {string} partNumber - Item part number
- * @param {number|string} phaseId - Phase ID
- * @returns {Promise} Success confirmation
- */
-async startPhaseProcess(partNumber, phaseId) {
-  return this.request(`/api/operations/start-item`, {
-    method: "POST",
-    body: JSON.stringify({ 
-      part_number: partNumber,
-      phase_id: phaseId 
-    }),
-  })
-}
+  /**
+   * Start phase process - records start_time
+   * @param {string} partNumber - Item part number
+   * @param {number|string} phaseId - Phase ID
+   * @returns {Promise} Success confirmation
+   */
+  async startPhaseProcess(partNumber, phaseId) {
+    return this.request(`/api/operations/start-item`, {
+      method: "POST",
+      body: JSON.stringify({
+        part_number: partNumber,
+        phase_id: phaseId
+      }),
+    })
+  }
 
-/**
- * Stop phase process - records end_time
- * @param {string} partNumber - Item part number
- * @param {number|string} phaseId - Phase ID
- * @returns {Promise} Success confirmation
- */
-async stopPhaseProcess(partNumber, phaseId) {
-  return this.request(`/api/operations/stop-item`, {
-    method: "POST",
-    body: JSON.stringify({ 
-      part_number: partNumber,
-      phase_id: phaseId 
-    }),
-  })
-}
+  /**
+   * Stop phase process - records end_time
+   * @param {string} partNumber - Item part number
+   * @param {number|string} phaseId - Phase ID
+   * @returns {Promise} Success confirmation
+   */
+  async stopPhaseProcess(partNumber, phaseId) {
+    return this.request(`/api/operations/stop-item`, {
+      method: "POST",
+      body: JSON.stringify({
+        part_number: partNumber,
+        phase_id: phaseId
+      }),
+    })
+  }
 
-/**
- * Pause phase process - records pause_time
- * @param {string} partNumber - Item part number
- * @param {number|string} phaseId - Phase ID
- * @returns {Promise} Success confirmation
- */
-async pausePhaseProcess(partNumber, phaseId) {
-  return this.request(`/api/operations/pause-phase`, {
-    method: "POST",
-    body: JSON.stringify({ 
-      part_number: partNumber,
-      phase_id: phaseId 
-    }),
-  })
-}
+  /**
+   * Pause phase process - records pause_time
+   * @param {string} partNumber - Item part number
+   * @param {number|string} phaseId - Phase ID
+   * @returns {Promise} Success confirmation
+   */
+  async pausePhaseProcess(partNumber, phaseId) {
+    return this.request(`/api/operations/pause-phase`, {
+      method: "POST",
+      body: JSON.stringify({
+        part_number: partNumber,
+        phase_id: phaseId
+      }),
+    })
+  }
 
-/**
- * Resume phase process - clears pause_time
- * @param {string} partNumber - Item part number
- * @param {number|string} phaseId - Phase ID
- * @returns {Promise} Success confirmation
- */
-async resumePhaseProcess(partNumber, phaseId) {
-  return this.request(`/api/operations/resume-phase`, {
-    method: "POST",
-    body: JSON.stringify({ 
-      part_number: partNumber,
-      phase_id: phaseId 
-    }),
-  })
-}
+  /**
+   * Resume phase process - clears pause_time
+   * @param {string} partNumber - Item part number
+   * @param {number|string} phaseId - Phase ID
+   * @returns {Promise} Success confirmation
+   */
+  async resumePhaseProcess(partNumber, phaseId) {
+    return this.request(`/api/operations/resume-phase`, {
+      method: "POST",
+      body: JSON.stringify({
+        part_number: partNumber,
+        phase_id: phaseId
+      }),
+    })
+  }
 
-/**
- * Reset phase process times - clears start_time, pause_time, and end_time
- * @param {string} partNumber - Item part number
- * @param {number|string} phaseId - Phase ID
- * @returns {Promise} Success confirmation
- */
-async resetPhaseProcess(partNumber, phaseId) {
-  return this.request(`/api/operations/reset-item`, {
-    method: "POST",
-    body: JSON.stringify({ 
-      part_number: partNumber,
-      phase_id: phaseId 
-    }),
-  })
-}
+  /**
+   * Reset phase process times - clears start_time, pause_time, and end_time
+   * @param {string} partNumber - Item part number
+   * @param {number|string} phaseId - Phase ID
+   * @returns {Promise} Success confirmation
+   */
+  async resetPhaseProcess(partNumber, phaseId) {
+    return this.request(`/api/operations/reset-item`, {
+      method: "POST",
+      body: JSON.stringify({
+        part_number: partNumber,
+        phase_id: phaseId
+      }),
+    })
+  }
 
   // ==================== REPORTING METHODS ====================
 
@@ -372,7 +381,7 @@ async resetPhaseProcess(partNumber, phaseId) {
    * @returns {Promise} Performance data for employee(s)
    */
   async getEmployeePerformance(employeeUid = null) {
-    const url = employeeUid 
+    const url = employeeUid
       ? `/api/operations/employee-performance?employee_uid=${employeeUid}`
       : "/api/operations/employee-performance"
     return this.request(url)
@@ -489,7 +498,7 @@ async resetPhaseProcess(partNumber, phaseId) {
    * @returns {Promise} Success confirmation
    */
   async toggleSubphaseCompletion(subphaseId, currentStatus) {
-    return this.completeSubphase(subphaseId, !currentStatus)
+    return this.completeSubphaseWithDuration(subphaseId, !currentStatus)
   }
 
   /**
@@ -526,58 +535,58 @@ async resetPhaseProcess(partNumber, phaseId) {
  * @param {Array} [itemData.phases] - Array of phases with subphases
  * @returns {Promise} Created item with all phases and subphases
  */
-async createItemWithStructure(itemData) {
-  // Calculate total_qty from subphases
-  let totalQty = 0;
-  if (itemData.phases && itemData.phases.length > 0) {
-    itemData.phases.forEach(phase => {
-      if (phase.subphases && phase.subphases.length > 0) {
-        phase.subphases.forEach(subphase => {
-          totalQty += parseInt(subphase.expected_quantity) || 0;
-        });
-      }
-    });
-  }
-  
-  // Create item first
-  const item = await this.createItem({
-    part_number: itemData.part_number,
-    name: itemData.name,
-    description: itemData.description,
-    client_name: itemData.client_name,
-    priority: itemData.priority || 'Medium',
-    remarks: itemData.remarks,
-    qty: itemData.qty || 1,
-    total_qty: totalQty || itemData.qty || 1
-  })
+  async createItemWithStructure(itemData) {
+    // Calculate total_qty from subphases
+    let totalQty = 0;
+    if (itemData.phases && itemData.phases.length > 0) {
+      itemData.phases.forEach(phase => {
+        if (phase.subphases && phase.subphases.length > 0) {
+          phase.subphases.forEach(subphase => {
+            totalQty += parseInt(subphase.expected_quantity) || 0;
+          });
+        }
+      });
+    }
 
-  // Create phases if provided
-  if (itemData.phases && itemData.phases.length > 0) {
-    for (const phaseData of itemData.phases) {
-      const phase = await this.createPhase({
-        part_number: itemData.part_number,
-        name: phaseData.name
-      })
+    // Create item first
+    const item = await this.createItem({
+      part_number: itemData.part_number,
+      name: itemData.name,
+      description: itemData.description,
+      client_name: itemData.client_name,
+      priority: itemData.priority || 'Medium',
+      remarks: itemData.remarks,
+      qty: itemData.qty || 1,
+      total_qty: totalQty || itemData.qty || 1
+    })
 
-      // Create subphases if provided
-      if (phaseData.subphases && phaseData.subphases.length > 0) {
-        for (const subphaseData of phaseData.subphases) {
-          await this.createSubphase({
-            part_number: itemData.part_number,
-            phase_id: phase.id,
-            name: subphaseData.name,
-            condition: subphaseData.condition,
-            expected_duration: subphaseData.expected_duration || 0,
-            expected_quantity: subphaseData.expected_quantity || 0
-          })
+    // Create phases if provided
+    if (itemData.phases && itemData.phases.length > 0) {
+      for (const phaseData of itemData.phases) {
+        const phase = await this.createPhase({
+          part_number: itemData.part_number,
+          name: phaseData.name
+        })
+
+        // Create subphases if provided
+        if (phaseData.subphases && phaseData.subphases.length > 0) {
+          for (const subphaseData of phaseData.subphases) {
+            await this.createSubphase({
+              part_number: itemData.part_number,
+              phase_id: phase.id,
+              name: subphaseData.name,
+              condition: subphaseData.condition,
+              expected_duration: subphaseData.expected_duration || 0,
+              expected_quantity: subphaseData.expected_quantity || 0
+            })
+          }
         }
       }
     }
-  }
 
-  // Return complete item with hierarchy
-  return this.getItemHierarchy(itemData.part_number)
-}
+    // Return complete item with hierarchy
+    return this.getItemHierarchy(itemData.part_number)
+  }
 
   /**
    * Get all incomplete items
@@ -675,7 +684,7 @@ async createItemWithStructure(itemData) {
     const allItems = await this.getItems()
     const cutoffDate = new Date()
     cutoffDate.setDate(cutoffDate.getDate() - days)
-    
+
     return allItems.filter(item => {
       const createdDate = new Date(item.created_at)
       return createdDate >= cutoffDate
@@ -735,7 +744,7 @@ async createItemWithStructure(itemData) {
   async getItemsGroupedByClient() {
     const allItems = await this.getItems()
     const grouped = {}
-    
+
     allItems.forEach(item => {
       const client = item.client_name || 'No Client'
       if (!grouped[client]) {
@@ -743,7 +752,7 @@ async createItemWithStructure(itemData) {
       }
       grouped[client].push(item)
     })
-    
+
     return grouped
   }
 
@@ -758,14 +767,14 @@ async createItemWithStructure(itemData) {
       Medium: [],
       Low: []
     }
-    
+
     allItems.forEach(item => {
       const priority = item.priority || 'Medium'
       if (grouped[priority]) {
         grouped[priority].push(item)
       }
     })
-    
+
     return grouped
   }
 
@@ -775,7 +784,7 @@ async createItemWithStructure(itemData) {
    */
   async getUrgentItems() {
     const highPriorityItems = await this.getItemsByPriority('High')
-    return highPriorityItems.filter(item => 
+    return highPriorityItems.filter(item =>
       item.status === 'in_progress' || item.status === 'not_started'
     )
   }
@@ -787,12 +796,12 @@ async createItemWithStructure(itemData) {
   async getClientSummary() {
     const allItems = await this.getItems()
     const summary = {}
-    
+
     allItems.forEach(item => {
       const client = item.client_name || 'No Client'
       summary[client] = (summary[client] || 0) + 1
     })
-    
+
     return Object.entries(summary).map(([client_name, item_count]) => ({
       client_name,
       item_count
@@ -810,14 +819,14 @@ async createItemWithStructure(itemData) {
       Medium: 0,
       Low: 0
     }
-    
+
     allItems.forEach(item => {
       const priority = item.priority || 'Medium'
       if (distribution[priority] !== undefined) {
         distribution[priority]++
       }
     })
-    
+
     return distribution
   }
 
@@ -828,7 +837,7 @@ async createItemWithStructure(itemData) {
    */
   async searchItemsByRemarks(searchTerm) {
     const allItems = await this.getItems({ search: searchTerm })
-    return allItems.filter(item => 
+    return allItems.filter(item =>
       item.remarks && item.remarks.toLowerCase().includes(searchTerm.toLowerCase())
     )
   }
@@ -858,13 +867,13 @@ async createItemWithStructure(itemData) {
   async getOverdueItems() {
     const allItems = await this.getItems()
     const overdueItems = []
-    
+
     for (const item of allItems) {
       if (item.status !== 'completed') {
         const detailedItem = await this.getItem(item.part_number)
         let totalExpected = 0
         let totalActual = 0
-        
+
         if (detailedItem.phases) {
           detailedItem.phases.forEach(phase => {
             if (phase.subphases) {
@@ -875,7 +884,7 @@ async createItemWithStructure(itemData) {
             }
           })
         }
-        
+
         if (totalActual > totalExpected && totalExpected > 0) {
           overdueItems.push({
             ...item,
@@ -886,7 +895,7 @@ async createItemWithStructure(itemData) {
         }
       }
     }
-    
+
     return overdueItems
   }
 
@@ -923,21 +932,21 @@ async createItemWithStructure(itemData) {
    */
   async getClientPerformance(clientName) {
     const clientItems = await this.getItemsByClient(clientName)
-    
+
     const totalItems = clientItems.length
     const completedItems = clientItems.filter(item => item.status === 'completed').length
     const inProgressItems = clientItems.filter(item => item.status === 'in_progress').length
     const notStartedItems = clientItems.filter(item => item.status === 'not_started').length
-    
-    const avgProgress = clientItems.reduce((sum, item) => 
+
+    const avgProgress = clientItems.reduce((sum, item) =>
       sum + (parseFloat(item.overall_progress) || 0), 0) / (totalItems || 1)
-    
+
     const priorityDistribution = {
       High: clientItems.filter(item => item.priority === 'High').length,
       Medium: clientItems.filter(item => item.priority === 'Medium').length,
       Low: clientItems.filter(item => item.priority === 'Low').length
     }
-    
+
     return {
       client_name: clientName,
       total_items: totalItems,
@@ -957,10 +966,10 @@ async createItemWithStructure(itemData) {
  * @param {number} currentCompletedQuantity - New completed quantity
  * @returns {Promise} Success confirmation
  */
-async updateSubphaseCompletedQuantity(subphaseId, currentCompletedQuantity) {
-  return this.request(`/api/operations/update-completed-quantity?id=${subphaseId}`, {
-    method: "POST",
-    body: JSON.stringify({ current_completed_quantity: currentCompletedQuantity }),
-  })
-}
+  async updateSubphaseCompletedQuantity(subphaseId, currentCompletedQuantity) {
+    return this.request(`/api/operations/update-completed-quantity?id=${subphaseId}`, {
+      method: "POST",
+      body: JSON.stringify({ current_completed_quantity: currentCompletedQuantity }),
+    })
+  }
 }
