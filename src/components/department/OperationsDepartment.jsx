@@ -5,6 +5,7 @@ import Dashboard from "../op/Dashboard.jsx"
 import AddItems from "../op/AddItem.jsx"
 import Checklist from "../op/CheckList.jsx"
 import Reports from "../op/Report.jsx"
+import { Menu, X } from 'lucide-react'
 
 function OperationsDepartment() {
   const { user, logout, isDarkMode, toggleDarkMode } = useAuth()
@@ -13,8 +14,9 @@ function OperationsDepartment() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [statistics, setStatistics] = useState(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  // Form states - UPDATED: Added part_number
+  // Form states
   const [newItem, setNewItem] = useState({
     part_number: "",
     name: "",
@@ -54,7 +56,6 @@ function OperationsDepartment() {
   }, [])
 
   useEffect(() => {
-    // Load full item details when switching to tabs that need phase information
     if (items.length > 0) {
       const needsDetails = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
 
@@ -70,15 +71,12 @@ function OperationsDepartment() {
     }
   }, [activeTab, items.length])
 
-  // NEW: Auto-refresh effect for active phases
   useEffect(() => {
-    // Clear existing interval
     if (refreshIntervalRef.current) {
       clearInterval(refreshIntervalRef.current)
       refreshIntervalRef.current = null
     }
 
-    // Only set up refresh if we have active phases and are on a relevant tab
     const needsRefresh = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
     
     if (needsRefresh && items.length > 0) {
@@ -89,12 +87,11 @@ function OperationsDepartment() {
       )
 
       if (hasActivePhases) {
-        // Refresh every 30 seconds to keep data synchronized
         refreshIntervalRef.current = setInterval(() => {
           if (isMountedRef.current) {
             refreshActiveData()
           }
-        }, 30000) // 30 seconds
+        }, 30000)
       }
     }
 
@@ -110,24 +107,20 @@ function OperationsDepartment() {
     loadData()
   }, [])
 
-  // NEW: Refresh active data without full page reload
   const refreshActiveData = async () => {
     try {
       console.log('Refreshing active data...')
       
-      // Get items with active phases
       const activeItems = items.filter(item =>
         item.phases?.some(phase => phase.start_time && !phase.end_time)
       )
 
       if (activeItems.length === 0) return
 
-      // Fetch fresh data for active items only
       const freshItems = await Promise.all(
         activeItems.map(item => apiService.operations.getItem(item.part_number))
       )
 
-      // Update state with fresh data
       if (isMountedRef.current) {
         setItems(prevItems => {
           const updatedItems = [...prevItems]
@@ -140,13 +133,11 @@ function OperationsDepartment() {
           return updatedItems
         })
 
-        // Also refresh statistics
         const statsResponse = await apiService.operations.getStatistics()
         setStatistics(statsResponse)
       }
     } catch (err) {
       console.error('Failed to refresh active data:', err)
-      // Don't show error to user for background refresh failures
     }
   }
 
@@ -157,7 +148,6 @@ function OperationsDepartment() {
 
       console.log('Loading items...')
 
-      // Load items and statistics in parallel
       const [itemsResponse, statsResponse] = await Promise.all([
         apiService.operations.getItems(),
         apiService.operations.getStatistics()
@@ -166,19 +156,15 @@ function OperationsDepartment() {
       console.log('Items response:', itemsResponse)
       console.log('Stats response:', statsResponse)
 
-      // FIX: Extract items array properly - handle both direct array and nested object responses
       let itemsArray = []
       if (Array.isArray(itemsResponse)) {
         itemsArray = itemsResponse
       } else if (itemsResponse && typeof itemsResponse === 'object') {
-        // Check if response has numeric keys (0, 1, 2, etc.) - convert to array
         const numericKeys = Object.keys(itemsResponse).filter(key => !isNaN(key))
         if (numericKeys.length > 0) {
-          // Convert object with numeric keys to array
           itemsArray = numericKeys.map(key => itemsResponse[key])
           console.log('Converted numeric-keyed object to array')
         } else {
-          // Try common response structures
           itemsArray = itemsResponse.items || itemsResponse.data || itemsResponse.results || []
         }
       }
@@ -192,9 +178,6 @@ function OperationsDepartment() {
         return
       }
 
-      // FIX: Instead of fetching full details for each item (which is slow),
-      // just use the items array directly and fetch full details only when needed
-      // This ensures dropdowns populate immediately
       setItems(itemsArray)
       setStatistics(statsResponse)
 
@@ -209,7 +192,6 @@ function OperationsDepartment() {
     }
   }
 
-  // Load full details for all items
   const loadAllItemDetails = async () => {
     try {
       console.log('Loading full details for all items...')
@@ -225,7 +207,6 @@ function OperationsDepartment() {
     }
   }
 
-  // UPDATED: Load full item details using part_number
   const loadItemDetails = async (partNumber) => {
     try {
       console.log('Loading details for item:', partNumber)
@@ -256,21 +237,55 @@ function OperationsDepartment() {
     return Math.floor((end - start) / 1000);
   };
 
-  const formatTime = (seconds) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, "0")}:${minutes
-      .toString()
-      .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
+const formatTime = (seconds) => {
+  const totalSeconds = Math.floor(Number(seconds)); // 👈 Ensures clean integer input
+
+  if (!totalSeconds || totalSeconds <= 0) {
+    return "Not Started";
+  }
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+
+  if (hours === 0 && minutes === 0 && secs === 0) {
+    return "Not Started";
+  }
+
+  const parts = [];
+
+  if (hours > 0) {
+    parts.push(`${hours} hour${hours !== 1 ? "s" : ""}`);
+  }
+
+  if (minutes > 0) {
+    parts.push(`${minutes} minute${minutes !== 1 ? "s" : ""}`);
+  }
+
+  if (secs > 0) {
+    parts.push(`${secs} second${secs !== 1 ? "s" : ""}`);
+  }
+
+  return parts.length > 0 ? parts.join(" ") : "Not Started";
+};
+
+function formatActionDuration(hours) {
+    const totalSeconds = Math.round(hours * 3600);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    if (seconds === 0) {
+      return `${minutes} minute${minutes !== 1 ? "s" : ""}`;
+    }
+
+    return `${minutes} minute${minutes !== 1 ? "s" : ""} ${seconds} second${seconds !== 1 ? "s" : ""}`;
+  }
 
   const getPhaseElapsedTime = (phase) => {
     if (!phase.start_time) return 0;
 
     const start = new Date(phase.start_time);
 
-    // If phase is completed, calculate total time minus pauses
     if (phase.end_time) {
       const end = new Date(phase.end_time);
       let elapsed = Math.floor((end - start) / 1000);
@@ -280,7 +295,6 @@ function OperationsDepartment() {
       return Math.max(0, elapsed);
     }
 
-    // If phase is currently paused, show time up to pause
     if (phase.pause_time) {
       const pause = new Date(phase.pause_time);
       let elapsed = Math.floor((pause - start) / 1000);
@@ -290,7 +304,6 @@ function OperationsDepartment() {
       return Math.max(0, elapsed);
     }
 
-    // Phase is running - calculate from start to now minus pauses
     const now = new Date();
     let elapsed = Math.floor((now - start) / 1000);
     if (phase.paused_duration) {
@@ -299,13 +312,9 @@ function OperationsDepartment() {
     return Math.max(0, elapsed);
   };
 
-  // UPDATED: Use part_number for reloading item details
   const toggleSubPhase = async (partNumber, phaseId, subPhaseId, currentStatus) => {
     try {
       await apiService.operations.completeSubphase(subPhaseId, !currentStatus)
-
-      // Instead of reloading all data (which loses phase details),
-      // just reload the specific item's full details
       await loadItemDetails(partNumber)
     } catch (err) {
       console.error('Failed to toggle sub-phase:', err)
@@ -313,7 +322,6 @@ function OperationsDepartment() {
     }
   }
 
-  // UPDATED: Use part_number for item identification
   const updateActualHours = async (partNumber, phaseId, subPhaseId, hours) => {
     try {
       await apiService.operations.updateSubphase(subPhaseId, {
@@ -352,13 +360,11 @@ function OperationsDepartment() {
     }
   }
 
-  // UPDATED: Pass part_number in scanning state
   const handleBarcodeScan = (partNumber, phaseId, subPhaseId) => {
     setScanningFor({ partNumber, phaseId, subPhaseId })
     setBarcodeInput("")
   }
 
-  // UPDATED: Use part_number for reloading
   const submitBarcode = async () => {
     if (!scanningFor || !barcodeInput.trim()) {
       setError('Please enter a barcode')
@@ -373,7 +379,6 @@ function OperationsDepartment() {
         barcodeInput.trim()
       )
 
-      // Reload the specific item instead of all data
       await loadItemDetails(scanningFor.partNumber)
 
       setScanningFor(null)
@@ -396,7 +401,6 @@ function OperationsDepartment() {
     return Math.round(totalProgress / item.phases.length)
   }
 
-  // UPDATED: Use part_number for deletion
   const deleteItem = async (partNumber) => {
     if (window.confirm('Are you sure you want to delete this item? This will also delete all phases and sub-phases.')) {
       try {
@@ -409,12 +413,10 @@ function OperationsDepartment() {
     }
   }
 
-  // UPDATED: Use part_number for item expansion
   const toggleItemExpansion = async (partNumber) => {
     const isExpanding = !expandedItems[partNumber]
     setExpandedItems(prev => ({ ...prev, [partNumber]: !prev[partNumber] }))
 
-    // Load full item details when expanding
     if (isExpanding) {
       const item = items.find(i => i.part_number === partNumber)
       if (!item.phases || item.phases.length === 0) {
@@ -427,50 +429,65 @@ function OperationsDepartment() {
     setExpandedPhases(prev => ({ ...prev, [phaseId]: !prev[phaseId] }))
   }
 
-  // UPDATED: Use part_number for phase selection
-  const handleItemSelectForPhase = async (partNumber) => {
-    setNewPhase({ ...newPhase, partNumber })
-    const item = items.find(i => i.part_number === partNumber)
-    if (item && !item.phases) {
-      await loadItemDetails(partNumber)
-    }
+  const handleTabChange = (tab) => {
+    setActiveTab(tab)
+    setMobileMenuOpen(false)
   }
 
-  // UPDATED: Use part_number for subphase selection
-  const handleItemSelectForSubphase = async (partNumber) => {
-    console.log('Selected item for subphase:', partNumber)
-    const item = items.find(i => i.part_number === partNumber)
-    console.log('Current item data:', item)
+  const tabs = [
+    { id: "dashboard", label: "Dashboard" },
+    { id: "add-items", label: "Add Items" },
+    { id: "checklist", label: "Checklist" },
+    { id: "reports", label: "Reports" }
+  ]
 
-    // Always load fresh details to ensure we have the latest phases
-    const fullItem = await loadItemDetails(partNumber)
-
-    // Update the state after loading
-    setNewSubPhase({ ...newSubPhase, partNumber, phaseId: "" })
-  }
+  const cardClass = isDarkMode 
+    ? "bg-gray-800/60 border-gray-700/50" 
+    : "bg-white/20 border-white/30"
+  
+  const textPrimaryClass = isDarkMode ? "text-gray-100" : "text-gray-800"
+  const textSecondaryClass = isDarkMode ? "text-gray-300" : "text-gray-600"
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-100 via-gray-50 to-stone-100 dark:from-slate-900 dark:via-gray-900 dark:to-stone-900 transition-colors duration-300 p-6">
+    <div className={`min-h-screen p-8 transition-colors duration-300 ${
+      isDarkMode
+        ? "bg-linear-to-br from-gray-950 via-gray-900 to-gray-950"
+        : "bg-linear-to-br from-gray-50 via-slate-50 to-stone-50"
+    }`}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-lg shadow-lg p-6 mb-6 border-l-4 border-slate-600 dark:border-slate-400">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-200">Operations Department</h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">Welcome, {user?.name || "Operations Manager"}</p>
+        <div className={`backdrop-blur-md rounded-2xl p-6 mb-6 border shadow-lg transition-all duration-300 ${cardClass}`}>
+          <div className="flex justify-between items-start sm:items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <h1 className={`text-2xl md:text-3xl font-bold ${textPrimaryClass}`}>
+                ⚙️ Operations Department
+              </h1>
+              <p className={`text-sm sm:text-base mt-2 ${textSecondaryClass}`}>
+                Welcome, {user?.name || "Operations Manager"}
+              </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2 sm:gap-3 flex-shrink-0">
               <button
                 onClick={toggleDarkMode}
-                className="p-2 rounded-lg bg-white/10 dark:bg-black/20 backdrop-blur-sm border border-gray-300/20 dark:border-gray-700/20 hover:bg-white/20 dark:hover:bg-black/30 transition-all duration-300"
+                className={`p-2 rounded-lg backdrop-blur-sm border transition-all duration-300 ${
+                  isDarkMode
+                    ? "bg-gray-800/60 border-gray-700/50 hover:bg-gray-800/80 text-yellow-400"
+                    : "bg-white/20 border-white/30 hover:bg-white/30 text-gray-700"
+                }`}
+                aria-label="Toggle dark mode"
               >
                 {isDarkMode ? "☀️" : "🌙"}
               </button>
               <button
                 onClick={logout}
-                className="bg-slate-600 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors"
+                className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${
+                  isDarkMode
+                    ? "bg-slate-700 hover:bg-slate-600 text-white"
+                    : "bg-slate-600 hover:bg-slate-700 text-white"
+                }`}
               >
-                Logout
+                <span className="hidden sm:inline">Logout</span>
+                <span className="sm:hidden">Exit</span>
               </button>
             </div>
           </div>
@@ -479,16 +496,27 @@ function OperationsDepartment() {
         {/* Loading State */}
         {loading && (
           <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-600 dark:border-slate-400 mx-auto"></div>
-            <p className="text-gray-600 dark:text-gray-400 mt-4">Loading operations data...</p>
+            <div className={`animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 mx-auto ${
+              isDarkMode ? "border-slate-400" : "border-slate-600"
+            }`}></div>
+            <p className={`text-sm sm:text-base mt-4 ${textSecondaryClass}`}>Loading operations data...</p>
           </div>
         )}
 
         {/* Error State */}
         {error && (
-          <div className="bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg p-4 mb-6">
-            <p className="text-red-700 dark:text-red-400">Error: {error}</p>
-            <button onClick={() => setError(null)} className="mt-2 text-red-600 dark:text-red-400 hover:underline">
+          <div className={`backdrop-blur-sm border rounded-lg p-4 mb-6 transition-all duration-300 ${
+            isDarkMode 
+              ? "bg-red-950/50 border-red-800/60 text-red-300" 
+              : "bg-red-100/80 border-red-300 text-red-700"
+          }`}>
+            <p className="text-sm sm:text-base break-words font-medium">Error: {error}</p>
+            <button 
+              onClick={() => setError(null)} 
+              className={`mt-2 text-sm hover:underline font-medium ${
+                isDarkMode ? "text-red-300" : "text-red-600"
+              }`}
+            >
               Dismiss
             </button>
           </div>
@@ -496,29 +524,74 @@ function OperationsDepartment() {
 
         {!loading && (
           <>
-            {/* Navigation Tabs */}
-            <div className="bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-lg shadow-lg mb-6">
-              <div className="flex border-b border-gray-300/20 dark:border-gray-700/20">
-                {["dashboard", "add-items", "checklist", "reports"].map((tab) => (
+            {/* Navigation Tabs - Desktop */}
+            <div className={`hidden md:block backdrop-blur-md rounded-2xl shadow-lg mb-6 border transition-all duration-300 ${cardClass}`}>
+              <div className={`flex border-b ${isDarkMode ? "border-gray-700/50" : "border-gray-300/20"}`}>
+                {tabs.map((tab) => (
                   <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-6 py-3 font-medium capitalize transition-colors ${activeTab === tab
-                        ? "border-b-2 border-slate-600 dark:border-slate-400 text-slate-700 dark:text-slate-300"
-                        : "text-gray-600 dark:text-gray-400 hover:text-slate-600 dark:hover:text-slate-400"
-                      }`}
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id)}
+                    className={`flex-1 px-4 py-3 font-medium transition-colors ${
+                      activeTab === tab.id
+                        ? isDarkMode
+                          ? "border-b-2 border-slate-400 text-slate-300"
+                          : "border-b-2 border-slate-600 text-slate-700"
+                        : isDarkMode
+                          ? "text-gray-400 hover:text-slate-400"
+                          : "text-gray-600 hover:text-slate-600"
+                    }`}
                   >
-                    {tab.replace("-", " ")}
+                    {tab.label}
                   </button>
                 ))}
               </div>
             </div>
 
+            {/* Navigation Tabs - Mobile */}
+            <div className={`md:hidden backdrop-blur-md rounded-2xl shadow-lg mb-4 border transition-all duration-300 ${cardClass}`}>
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className={`w-full flex items-center justify-between p-4 ${textPrimaryClass}`}
+              >
+                <span className="font-medium capitalize">
+                  {tabs.find(t => t.id === activeTab)?.label}
+                </span>
+                {mobileMenuOpen ? (
+                  <X className="w-5 h-5" />
+                ) : (
+                  <Menu className="w-5 h-5" />
+                )}
+              </button>
+              
+              {mobileMenuOpen && (
+                <div className={`border-t ${isDarkMode ? "border-gray-700/50" : "border-gray-300/20"}`}>
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleTabChange(tab.id)}
+                      className={`w-full text-left px-4 py-3 transition-colors ${
+                        activeTab === tab.id
+                          ? isDarkMode
+                            ? "bg-slate-700/40 text-slate-300 font-medium"
+                            : "bg-slate-500/20 text-slate-700 font-medium"
+                          : isDarkMode
+                            ? "text-gray-400 hover:bg-gray-800/40"
+                            : "text-gray-600 hover:bg-white/30"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Content */}
-            <div className="bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-lg shadow-lg p-6">
+            <div className={`backdrop-blur-md rounded-2xl shadow-lg p-4 md:p-6 border transition-all duration-300 ${cardClass}`}>
               {activeTab === "dashboard" && (
                 <Dashboard
                   items={items}
+                  isDarkMode={isDarkMode}
                   calculateItemProgress={calculateItemProgress}
                   loading={loading}
                   apiService={apiService}
@@ -530,6 +603,7 @@ function OperationsDepartment() {
                   items={items}
                   submitting={submitting}
                   apiService={apiService}
+                  isDarkMode={isDarkMode}
                 />
               )}
 
@@ -537,6 +611,8 @@ function OperationsDepartment() {
                 <Checklist
                   items={items}
                   setItems={setItems}
+                  formatTime={formatTime}
+                  formatActionDuration={formatActionDuration}
                   expandedItems={expandedItems}
                   expandedPhases={expandedPhases}
                   scanningFor={scanningFor}
@@ -554,16 +630,19 @@ function OperationsDepartment() {
                   deleteItem={deleteItem}
                   apiService={apiService}
                   loadData={loadData}
+                  isDarkMode={isDarkMode}
                 />
               )}
 
               {activeTab === "reports" && (
                 <Reports
                   items={items}
+                  isDarkMode={isDarkMode}
                   calculateItemProgress={calculateItemProgress}
                   calculatePhaseProgress={calculatePhaseProgress}
                   getItemElapsedTime={getItemElapsedTime}
                   formatTime={formatTime}
+                  formatActionDuration={formatActionDuration}
                   getPhaseElapsedTime={getPhaseElapsedTime}
                   apiService={apiService}
                 />

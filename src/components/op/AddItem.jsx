@@ -1,382 +1,398 @@
-import { useState, useEffect, useRef } from 'react';
-import { Trash2, Plus, Copy, Search, User, Flag, Package, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useRef } from "react"
+import { Trash2, Plus, Copy, Search, User, Flag, Package, AlertTriangle } from "lucide-react"
+import { useAuth } from "../../contexts/AuthContext"
 
-function AddItems({ 
-  items,
-  submitting,
-  apiService
-}) {
-  const [partNumber, setPartNumber] = useState('');
-  const [itemName, setItemName] = useState('');
-  const [clientName, setClientName] = useState('');
-  const [priority, setPriority] = useState('Medium');
-  const [qty, setQty] = useState(1);
-  const [phases, setPhases] = useState([]);
-  const [loadingTemplate, setLoadingTemplate] = useState(false);
-  const [batchNumber, setBatchNumber] = useState('');
-  const [autoBatch, setAutoBatch] = useState(true);
-  const [clients, setClients] = useState([]);
-  const [showClientDropdown, setShowClientDropdown] = useState(false);
-  const [filteredClients, setFilteredClients] = useState([]);
-  
+function AddItems({ items, submitting, apiService }) {
+  const [partNumber, setPartNumber] = useState("")
+  const [itemName, setItemName] = useState("")
+  const [clientName, setClientName] = useState("")
+  const [priority, setPriority] = useState("Medium")
+  const [qty, setQty] = useState(1)
+  const [phases, setPhases] = useState([])
+  const [loadingTemplate, setLoadingTemplate] = useState(false)
+  const [batchNumber, setBatchNumber] = useState("")
+  const [autoBatch, setAutoBatch] = useState(true)
+  const [clients, setClients] = useState([])
+  const [showClientDropdown, setShowClientDropdown] = useState(false)
+  const [filteredClients, setFilteredClients] = useState([])
+
   // Dropdown states
-  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
-  const [filteredItems, setFilteredItems] = useState([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState(null);
-  const dropdownRef = useRef(null);
-  const clientDropdownRef = useRef(null);
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false)
+  const [filteredItems, setFilteredItems] = useState([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState(null)
+  const dropdownRef = useRef(null)
+  const clientDropdownRef = useRef(null)
 
-  const convertMinutesToHours = (minutes) => {
-  const mins = parseFloat(minutes) || 0;
-  return (mins / 60).toFixed(2);
-};
+  const { isDarkMode } = useAuth()
+
 
   // Load existing clients on mount
   useEffect(() => {
-    loadClients();
-  }, []);
+    loadClients()
+  }, [])
 
   const loadClients = async () => {
     try {
-      const clientList = await apiService.operations.getClients();
-      setClients(clientList);
+      const clientList = await apiService.operations.getClients()
+      setClients(clientList)
     } catch (error) {
-      console.error('Error loading clients:', error);
+      console.error("Error loading clients:", error)
     }
-  };
+  }
 
   // Generate batch number automatically
   useEffect(() => {
     if (autoBatch && partNumber) {
-      const timestamp = new Date().getTime();
-      const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-      setBatchNumber(`BATCH-${timestamp}-${randomSuffix}`);
+      const timestamp = new Date().getTime()
+      const randomSuffix = Math.floor(Math.random() * 1000)
+        .toString()
+        .padStart(3, "0")
+      setBatchNumber(`BATCH-${timestamp}-${randomSuffix}`)
     }
-  }, [partNumber, autoBatch]);
+  }, [partNumber, autoBatch])
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowTemplateDropdown(false);
+        setShowTemplateDropdown(false)
       }
       if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target)) {
-        setShowClientDropdown(false);
+        setShowClientDropdown(false)
       }
-    };
+    }
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
 
   // Filter items based on item name search only
   useEffect(() => {
-    const searchTerm = itemName.trim().toLowerCase();
-    
+    const searchTerm = itemName.trim().toLowerCase()
+
     if (searchTerm.length >= 2) {
-      const matches = items.filter(item => 
-        item.name?.toLowerCase().includes(searchTerm)
-      );
-      setFilteredItems(matches);
-      setShowTemplateDropdown(matches.length > 0);
+      const matches = items.filter((item) => item.name?.toLowerCase().includes(searchTerm))
+      setFilteredItems(matches)
+      setShowTemplateDropdown(matches.length > 0)
     } else {
-      setFilteredItems([]);
-      setShowTemplateDropdown(false);
+      setFilteredItems([])
+      setShowTemplateDropdown(false)
     }
-  }, [itemName, items]);
+  }, [itemName, items])
 
   // Filter clients based on input
   useEffect(() => {
-    const searchTerm = clientName.trim().toLowerCase();
-    
+    const searchTerm = clientName.trim().toLowerCase()
+
     if (!Array.isArray(clients)) {
-      setFilteredClients([]);
-      setShowClientDropdown(false);
-      return;
+      setFilteredClients([])
+      setShowClientDropdown(false)
+      return
     }
-    
+
     if (searchTerm.length >= 1) {
-      const matches = clients.filter(client => 
-        client.toLowerCase().includes(searchTerm)
-      );
-      setFilteredClients(matches);
-      setShowClientDropdown(matches.length > 0);
+      const matches = clients.filter((client) => client.toLowerCase().includes(searchTerm))
+      setFilteredClients(matches)
+      setShowClientDropdown(matches.length > 0)
     } else {
-      setFilteredClients(clients);
-      setShowClientDropdown(false);
+      setFilteredClients(clients)
+      setShowClientDropdown(false)
     }
-  }, [clientName, clients]);
+  }, [clientName, clients])
 
   // Calculate total allocated quantity across all subphases
   const getTotalAllocatedQuantity = () => {
-    let total = 0;
-    phases.forEach(phase => {
-      phase.subphases.forEach(sub => {
-        const subQty = parseInt(sub.expectedQuantity) || 0;
-        total += subQty;
-      });
-    });
-    return total;
-  };
+    let total = 0
+    phases.forEach((phase) => {
+      phase.subphases.forEach((sub) => {
+        const subQty = Number.parseInt(sub.expectedQuantity) || 0
+        total += subQty
+      })
+    })
+    return total
+  }
 
   const loadTemplateFromItem = async (item) => {
-  setLoadingTemplate(true);
-  setShowTemplateDropdown(false);
-  setSelectedTemplateId(item.id);
-  
-  try {
-    const fullItem = await apiService.operations.getItem(item.part_number);
-    
-    setPartNumber(fullItem.part_number.split('-')[0] || fullItem.part_number);
-    setItemName(fullItem.name || '');
-    setClientName(fullItem.client_name || '');
-    setPriority(fullItem.priority || 'Medium');
-    setQty(fullItem.qty || 1);
-    
-    // Load phases and subphases with expected_quantity
-    if (fullItem.phases && fullItem.phases.length > 0) {
-      const loadedPhases = fullItem.phases.map(phase => ({
-        id: Date.now() + Math.random(),
-        name: phase.name || '',
-        subphases: phase.subphases?.map(sub => ({
-          id: Date.now() + Math.random(),
-          name: sub.name || '',
-          // CHANGED: Convert hours back to minutes for display
-          expectedDuration: sub.expected_duration ? Math.round(sub.expected_duration * 60).toString() : '',
-          expectedQuantity: sub.expected_quantity || ''
-        })) || []
-      }));
-      setPhases(loadedPhases);
-    }
-  } catch (error) {
-    console.error('Error loading template:', error);
-    alert('Error loading template: ' + error.message);
-  } finally {
-    setLoadingTemplate(false);
-  }
-};
-
-  const addNewPhase = () => {
-    setPhases([...phases, {
-      id: Date.now(),
-      name: '',
-      subphases: []
-    }]);
-  };
-
-  const updatePhase = (phaseId, field, value) => {
-    setPhases(phases.map(phase => 
-      phase.id === phaseId ? { ...phase, [field]: value } : phase
-    ));
-  };
-
-  const removePhase = (phaseId) => {
-    setPhases(phases.filter(phase => phase.id !== phaseId));
-  };
-
-  const addSubphaseToPhase = (phaseId) => {
-    setPhases(phases.map(phase => 
-      phase.id === phaseId 
-        ? { 
-            ...phase, 
-            subphases: [...phase.subphases, {
-              id: Date.now(),
-              name: '',
-              expectedDuration: '',
-              expectedQuantity: ''
-            }]
-          }
-        : phase
-    ));
-  };
-
-const updateSubphase = (phaseId, subphaseId, field, value) => {
-  setPhases(phases.map(phase => 
-    phase.id === phaseId 
-      ? {
-          ...phase,
-          subphases: phase.subphases.map(sub => {
-            if (sub.id === subphaseId) {
-              // If updating expectedQuantity, validate against batch quantity
-              if (field === 'expectedQuantity') {
-                const newValue = parseInt(value) || 0;
-                const batchQty = parseInt(qty) || 0;
-                
-                // Calculate total from other subphases (excluding current one)
-                let otherSubphasesTotal = 0;
-                phases.forEach(p => {
-                  p.subphases.forEach(s => {
-                    if (!(p.id === phaseId && s.id === subphaseId)) {
-                      otherSubphasesTotal += parseInt(s.expectedQuantity) || 0;
-                    }
-                  });
-                });
-                
-                const totalIfUpdated = otherSubphasesTotal + newValue;
-                
-                if (totalIfUpdated > batchQty) {
-                  alert(`Cannot exceed batch quantity of ${batchQty}. Current total would be ${totalIfUpdated}.`);
-                  return sub;
-                }
-              }
-              
-              // NEW: Convert minutes to hours for expectedDuration
-              if (field === 'expectedDuration') {
-                // Store the minutes value directly in the state for display
-                return { ...sub, expectedDuration: value };
-              }
-              
-              return { ...sub, [field]: value };
-            }
-            return sub;
-          })
-        }
-      : phase
-  ));
-};
-
-  const removeSubphase = (phaseId, subphaseId) => {
-    setPhases(phases.map(phase => 
-      phase.id === phaseId 
-        ? {
-            ...phase,
-            subphases: phase.subphases.filter(sub => sub.id !== subphaseId)
-          }
-        : phase
-    ));
-  };
-
-  const handleSave = async () => {
-  if (!partNumber.trim()) {
-    alert('Part Number is required');
-    return;
-  }
-  if (!itemName.trim()) {
-    alert('Item Name is required');
-    return;
-  }
-  if (!batchNumber.trim()) {
-    alert('Batch Number is required');
-    return;
-  }
-  if (!clientName.trim()) {
-    alert('Client Name is required');
-    return;
-  }
-
-  const validPhases = phases.filter(p => p.name.trim());
-  if (validPhases.length === 0) {
-    alert('Please add at least one phase');
-    return;
-  }
-
-  const totalQty = getTotalAllocatedQuantity();
-  const batchQty = parseInt(qty) || 0;
-  
-  // NEW: Validate total doesn't exceed batch quantity
-  if (totalQty > batchQty) {
-    alert(`Total allocated quantity (${totalQty}) cannot exceed batch quantity (${batchQty})`);
-    return;
-  }
-
-  const uniquePartNumber = `${partNumber.trim()}-${batchNumber.trim()}`;
-
-  const itemData = {
-    part_number: uniquePartNumber,
-    name: itemName.trim(),
-    client_name: clientName.trim(),
-    priority: priority,
-    qty: parseInt(qty) || 1,
-    total_qty: totalQty,
-    phases: validPhases.map(phase => ({
-      name: phase.name.trim(),
-      subphases: phase.subphases
-        .filter(sub => sub.name.trim())
-        .map(sub => ({
-          name: sub.name.trim(),
-          // CHANGED: Convert minutes to hours before saving
-          expected_duration: parseFloat(convertMinutesToHours(sub.expectedDuration)) || 0,
-          expected_quantity: parseInt(sub.expectedQuantity) || 0
-        }))
-    }))
-  };
+    setLoadingTemplate(true)
+    setShowTemplateDropdown(false)
+    setSelectedTemplateId(item.id)
 
     try {
-      await apiService.operations.createItemWithStructure(itemData);
-      
-      setPartNumber('');
-      setItemName('');
-      setClientName('');
-      setPriority('Medium');
-      setQty(1);
-      setPhases([]);
-      setBatchNumber('');
-      setSelectedTemplateId(null);
-      
-      alert('Item saved successfully!');
-      window.location.reload();
+      const fullItem = await apiService.operations.getItem(item.part_number)
+
+      setPartNumber(fullItem.part_number.split("-")[0] || fullItem.part_number)
+      setItemName(fullItem.name || "")
+      setClientName(fullItem.client_name || "")
+      setPriority(fullItem.priority || "Medium")
+      setQty(fullItem.qty || 1)
+
+      // Load phases and subphases with expected_quantity
+      if (fullItem.phases && fullItem.phases.length > 0) {
+        const loadedPhases = fullItem.phases.map((phase) => ({
+          id: Date.now() + Math.random(),
+          name: phase.name || "",
+          subphases:
+            phase.subphases?.map((sub) => ({
+              id: Date.now() + Math.random(),
+              name: sub.name || "",
+              // CHANGED: Convert hours back to minutes for display
+              expectedDuration: sub.expected_duration ? sub.expected_duration.toString() : "",
+              expectedQuantity: sub.expected_quantity || "",
+            })) || [],
+        }))
+        setPhases(loadedPhases)
+      }
     } catch (error) {
-      console.error('Error saving item:', error);
-      alert('Error saving item: ' + error.message);
+      console.error("Error loading template:", error)
+      alert("Error loading template: " + error.message)
+    } finally {
+      setLoadingTemplate(false)
     }
-  };
+  }
+
+  const addNewPhase = () => {
+    setPhases([
+      ...phases,
+      {
+        id: Date.now(),
+        name: "",
+        subphases: [],
+      },
+    ])
+  }
+
+  const updatePhase = (phaseId, field, value) => {
+    setPhases(phases.map((phase) => (phase.id === phaseId ? { ...phase, [field]: value } : phase)))
+  }
+
+  const removePhase = (phaseId) => {
+    setPhases(phases.filter((phase) => phase.id !== phaseId))
+  }
+
+  const addSubphaseToPhase = (phaseId) => {
+    setPhases(
+      phases.map((phase) =>
+        phase.id === phaseId
+          ? {
+              ...phase,
+              subphases: [
+                ...phase.subphases,
+                {
+                  id: Date.now(),
+                  name: "",
+                  expectedDuration: "",
+                  expectedQuantity: "",
+                },
+              ],
+            }
+          : phase,
+      ),
+    )
+  }
+
+  const updateSubphase = (phaseId, subphaseId, field, value) => {
+    setPhases(
+      phases.map((phase) =>
+        phase.id === phaseId
+          ? {
+              ...phase,
+              subphases: phase.subphases.map((sub) => {
+                if (sub.id === subphaseId) {
+                  // If updating expectedQuantity, validate against batch quantity
+                  if (field === "expectedQuantity") {
+                    const newValue = Number.parseInt(value) || 0
+                    const batchQty = Number.parseInt(qty) || 0
+
+                    // Calculate total from other subphases (excluding current one)
+                    let otherSubphasesTotal = 0
+                    phases.forEach((p) => {
+                      p.subphases.forEach((s) => {
+                        if (!(p.id === phaseId && s.id === subphaseId)) {
+                          otherSubphasesTotal += Number.parseInt(s.expectedQuantity) || 0
+                        }
+                      })
+                    })
+
+                    const totalIfUpdated = otherSubphasesTotal + newValue
+
+                    if (totalIfUpdated > batchQty) {
+                      alert(`Cannot exceed batch quantity of ${batchQty}. Current total would be ${totalIfUpdated}.`)
+                      return sub
+                    }
+                  }
+
+                  return { ...sub, [field]: value }
+                }
+                return sub
+              }),
+            }
+          : phase,
+      ),
+    )
+  }
+
+  const removeSubphase = (phaseId, subphaseId) => {
+    setPhases(
+      phases.map((phase) =>
+        phase.id === phaseId
+          ? {
+              ...phase,
+              subphases: phase.subphases.filter((sub) => sub.id !== subphaseId),
+            }
+          : phase,
+      ),
+    )
+  }
+
+  const handleSave = async () => {
+    if (!partNumber.trim()) {
+      alert("Part Number is required")
+      return
+    }
+    if (!itemName.trim()) {
+      alert("Item Name is required")
+      return
+    }
+    if (!batchNumber.trim()) {
+      alert("Batch Number is required")
+      return
+    }
+    if (!clientName.trim()) {
+      alert("Client Name is required")
+      return
+    }
+
+    const validPhases = phases.filter((p) => p.name.trim())
+    if (validPhases.length === 0) {
+      alert("Please add at least one phase")
+      return
+    }
+
+    const totalQty = getTotalAllocatedQuantity()
+    const batchQty = Number.parseInt(qty) || 0
+
+    // NEW: Validate total doesn't exceed batch quantity
+    if (totalQty > batchQty) {
+      alert(`Total allocated quantity (${totalQty}) cannot exceed batch quantity (${batchQty})`)
+      return
+    }
+
+    const uniquePartNumber = `${partNumber.trim()}-${batchNumber.trim()}`
+
+    const itemData = {
+      part_number: uniquePartNumber,
+      name: itemName.trim(),
+      client_name: clientName.trim(),
+      priority: priority,
+      qty: Number.parseInt(qty) || 1,
+      total_qty: totalQty,
+      phases: validPhases.map((phase) => ({
+        name: phase.name.trim(),
+        subphases: phase.subphases
+          .filter((sub) => sub.name.trim())
+          .map((sub) => ({
+            name: sub.name.trim(),
+            // CHANGED: Convert minutes to hours before saving
+            expected_duration: Number.parseFloat(sub.expectedDuration) || 0,
+            expected_quantity: Number.parseInt(sub.expectedQuantity) || 0,
+          })),
+      })),
+    }
+
+    try {
+      await apiService.operations.createItemWithStructure(itemData)
+
+      setPartNumber("")
+      setItemName("")
+      setClientName("")
+      setPriority("Medium")
+      setQty(1)
+      setPhases([])
+      setBatchNumber("")
+      setSelectedTemplateId(null)
+
+      alert("Item saved successfully!")
+      window.location.reload()
+    } catch (error) {
+      console.error("Error saving item:", error)
+      alert("Error saving item: " + error.message)
+    }
+  }
 
   const handleClear = () => {
-    if (confirm('Clear all fields?')) {
-      setPartNumber('');
-      setItemName('');
-      setClientName('');
-      setPriority('Medium');
-      setQty(1);
-      setPhases([]);
-      setBatchNumber('');
-      setSelectedTemplateId(null);
-      setShowTemplateDropdown(false);
-      setShowClientDropdown(false);
+    if (confirm("Clear all fields?")) {
+      setPartNumber("")
+      setItemName("")
+      setClientName("")
+      setPriority("Medium")
+      setQty(1)
+      setPhases([])
+      setBatchNumber("")
+      setSelectedTemplateId(null)
+      setShowTemplateDropdown(false)
+      setShowClientDropdown(false)
     }
-  };
+  }
 
   const getPriorityColor = (priorityValue) => {
-    switch(priorityValue) {
-      case 'High': return 'bg-red-500/20 text-red-700 border-red-500';
-      case 'Medium': return 'bg-yellow-500/20 text-yellow-700 border-yellow-500';
-      case 'Low': return 'bg-green-500/20 text-green-700 border-green-500';
-      default: return 'bg-gray-500/20 text-gray-700 border-gray-500';
+    switch (priorityValue) {
+      case "High":
+        return "bg-red-500/20 text-red-700 border-red-500"
+      case "Medium":
+        return "bg-yellow-500/20 text-yellow-700 border-yellow-500"
+      case "Low":
+        return "bg-green-500/20 text-green-700 border-green-500"
+      default:
+        return "bg-gray-500/20 text-gray-700 border-gray-500"
     }
-  };
+  }
 
-  const totalQty = getTotalAllocatedQuantity();
-  const batchQty = parseInt(qty) || 0;
+  const totalQty = getTotalAllocatedQuantity()
+  const batchQty = Number.parseInt(qty) || 0
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Add Item with Phases & Sub-Phases</h2>
+        <h2 className={`text-2xl font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+          Add Item with Phases & Sub-Phases
+        </h2>
         {loadingTemplate && (
-          <span className="text-sm text-blue-500 flex items-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+          <span className={`text-sm flex items-center gap-2 ${isDarkMode ? "text-blue-400" : "text-blue-500"}`}>
+            <div className={`animate-spin rounded-full h-4 w-4 border-b-2 ${isDarkMode ? "border-blue-400" : "border-blue-500"}`}></div>
             Loading template...
           </span>
         )}
       </div>
 
-      {items.length > 0 && (
-        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-          <p className="text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
+      {/* {items.length > 0 && (
+        <div
+          className={`rounded-lg p-4 border transition-all ${
+            isDarkMode ? "bg-blue-500/10 border-blue-500/30" : "bg-blue-500/10 border-blue-500/20"
+          }`}
+        >
+          <p className={`text-sm flex items-center gap-2 ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
             <Copy size={16} />
-            <strong>Tip:</strong> Start typing an item name to use an existing item as a template. Each new item will have a unique batch number.
+            <strong>Tip:</strong> Start typing an item name to use an existing item as a template. Each new item will
+            have a unique batch number.
           </p>
         </div>
-      )}
-      
+      )} */}
+
       {/* Item Basic Info */}
-      <div className="bg-white/5 dark:bg-black/10 rounded-lg p-6 border border-gray-300/20 dark:border-gray-700/20">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Item Information</h3>
+      <div
+        className={`backdrop-blur-md rounded-lg p-6 border transition-all shadow-sm ${
+          isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+        }`}
+      >
+        <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+          Item Information
+        </h3>
         <div className="space-y-3">
           {/* Part Number */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Part Number * <span className="text-xs text-gray-500">(Base part number)</span>
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Part Number *{" "}
+              <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}> (Base part number)</span>
             </label>
             <input
               type="text"
@@ -384,16 +400,24 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
               value={partNumber}
               onChange={(e) => setPartNumber(e.target.value)}
               disabled={submitting}
-              className="w-full px-4 py-2 rounded-lg bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+                isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+              }`}
             />
           </div>
 
           {/* Batch Number */}
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+            <label
+              className={`text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+            >
               <Package size={16} />
-              Batch Number * 
-              <span className="text-xs text-gray-500">(Unique identifier for this batch)</span>
+              Batch Number *
+              <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                (Unique identifier for this batch)
+              </span>
             </label>
             <div className="flex gap-2">
               <input
@@ -401,34 +425,43 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
                 placeholder="Batch number"
                 value={batchNumber}
                 onChange={(e) => {
-                  setBatchNumber(e.target.value);
-                  setAutoBatch(false);
+                  setBatchNumber(e.target.value)
+                  setAutoBatch(false)
                 }}
                 disabled={submitting || autoBatch}
-                className="flex-1 px-4 py-2 rounded-lg bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                className={`flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+                  isDarkMode
+                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                    : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                }`}
               />
               <button
                 onClick={() => setAutoBatch(!autoBatch)}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   autoBatch 
-                    ? 'bg-green-600 hover:bg-green-700 text-white' 
-                    : 'bg-gray-600 hover:bg-gray-700 text-white'
+                    ? "bg-green-600 hover:bg-green-700 text-white" 
+                    : isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-white"
+                      : "bg-gray-600 hover:bg-gray-700 text-white"
                 }`}
-                title={autoBatch ? 'Auto-generate enabled' : 'Auto-generate disabled'}
+                title={autoBatch ? "Auto-generate enabled" : "Auto-generate disabled"}
               >
-                {autoBatch ? 'Auto' : 'Manual'}
+                {autoBatch ? "Auto" : "Manual"}
               </button>
             </div>
             {partNumber && batchNumber && (
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                Final Part Number: <span className="font-mono font-bold text-gray-800 dark:text-gray-200">{partNumber}-{batchNumber}</span>
+              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                Final Part Number:{" "}
+                <span className={`font-mono font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+                  {partNumber}-{batchNumber}
+                </span>
               </p>
             )}
           </div>
 
           {/* Item Name with Template Search */}
           <div className="relative" ref={dropdownRef}>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               Item Name *
               {selectedTemplateId && (
                 <span className="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded">Template Loaded</span>
@@ -441,43 +474,57 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
                 disabled={submitting}
-                className="w-full px-4 py-2 pr-10 rounded-lg bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                className={`w-full px-4 py-2 pr-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+                  isDarkMode
+                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                    : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                }`}
               />
-              <Search size={18} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Search size={18} className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`} />
             </div>
 
             {showTemplateDropdown && filteredItems.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                <div className="p-2 bg-gray-100 dark:bg-gray-700 border-b border-gray-300 dark:border-gray-600">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">
+              <div
+                className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-60 overflow-y-auto border ${
+                  isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"
+                }`}
+              >
+                <div
+                  className={`p-2 border-b ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-gray-100 border-gray-300"}`}
+                >
+                  <p className={`text-xs font-medium ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
                     Select a template to copy ({filteredItems.length} found)
                   </p>
                 </div>
-                {filteredItems.map(item => {
-                  const itemKey = item.part_number || item.id;
+                {filteredItems.map((item) => {
+                  const itemKey = item.part_number || item.id
                   return (
                     <button
                       key={itemKey}
                       onClick={() => loadTemplateFromItem(item)}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 last:border-b-0 transition-colors"
+                      className={`w-full text-left px-4 py-3 border-b last:border-b-0 transition-colors ${
+                        isDarkMode
+                          ? "hover:bg-gray-700 border-gray-700 text-gray-100"
+                          : "hover:bg-gray-50 border-gray-200 text-gray-800"
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
-                          <p className="font-medium text-gray-800 dark:text-gray-200">{item.name}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Part #: {item.part_number}</p>
+                          <p className={`font-medium ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>{item.name}</p>
+                          <p className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>Part #: {item.part_number}</p>
                           {item.client_name && (
-                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Client: {item.client_name}</p>
+                            <p className={`text-xs mt-1 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>Client: {item.client_name}</p>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                          <span className="bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">
+                        <div className={`flex items-center gap-2 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          <span className={`px-2 py-1 rounded ${isDarkMode ? "bg-blue-500/20 text-blue-300" : "bg-blue-500/20 text-blue-700"}`}>
                             {item.phases?.length || item.phase_count || 0} phases
                           </span>
                           <Copy size={14} />
                         </div>
                       </div>
                     </button>
-                  );
+                  )
                 })}
               </div>
             )}
@@ -485,7 +532,9 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
 
           {/* Client Name with Dropdown */}
           <div className="relative" ref={clientDropdownRef}>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+            <label
+              className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+            >
               <User size={16} />
               Client Name *
             </label>
@@ -496,19 +545,31 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
               onChange={(e) => setClientName(e.target.value)}
               onFocus={() => setShowClientDropdown(clients.length > 0)}
               disabled={submitting}
-              className="w-full px-4 py-2 rounded-lg bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+                isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+              }`}
             />
 
             {showClientDropdown && filteredClients.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+              <div
+                className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto border ${
+                  isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"
+                }`}
+              >
                 {filteredClients.map((client, idx) => (
                   <button
                     key={idx}
                     onClick={() => {
-                      setClientName(client);
-                      setShowClientDropdown(false);
+                      setClientName(client)
+                      setShowClientDropdown(false)
                     }}
-                    className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 last:border-b-0 transition-colors text-gray-800 dark:text-gray-200"
+                    className={`w-full text-left px-4 py-2 border-b last:border-b-0 transition-colors ${
+                      isDarkMode
+                        ? "hover:bg-gray-700 border-gray-700 text-gray-100"
+                        : "hover:bg-gray-50 border-gray-200 text-gray-800"
+                    }`}
                   >
                     {client}
                   </button>
@@ -519,19 +580,23 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
 
           {/* Priority */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+            <label
+              className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+            >
               <Flag size={16} />
               Priority *
             </label>
             <div className="flex gap-2">
-              {['High', 'Medium', 'Low'].map(p => (
+              {["High", "Medium", "Low"].map((p) => (
                 <button
                   key={p}
                   onClick={() => setPriority(p)}
                   className={`flex-1 px-4 py-2 rounded-lg border-2 font-medium transition-colors ${
-                    priority === p 
+                    priority === p
                       ? getPriorityColor(p)
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : isDarkMode
+                        ? "bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-700"
+                        : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
                   }`}
                 >
                   {p}
@@ -542,10 +607,14 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
 
           {/* Batch Quantity */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+            <label
+              className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+            >
               <Package size={16} />
               Batch Quantity *
-              <span className="text-xs text-gray-500">(This is the qty field - items in this batch)</span>
+              <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                (This is the qty field - items in this batch)
+              </span>
             </label>
             <input
               type="number"
@@ -554,71 +623,100 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
               value={qty}
               onChange={(e) => setQty(e.target.value)}
               disabled={submitting}
-              className="w-full px-4 py-2 rounded-lg bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+                isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+              }`}
             />
           </div>
 
-          <div className="mt-4 p-4 rounded-lg border-2 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/30">
-  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Quantity Summary</h4>
-  
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-    <div className="flex justify-between items-center">
-      <span className="text-gray-600 dark:text-gray-400">Batch Quantity (qty):</span>
-      <span className="font-bold text-blue-700 dark:text-blue-300">{batchQty} units</span>
-    </div>
-    
-    <div className="flex justify-between items-center">
-      <span className="text-gray-600 dark:text-gray-400">Total Expected (from subphases):</span>
-      <span className="font-bold text-purple-700 dark:text-purple-300">{totalQty} units</span>
-    </div>
-  </div>
-  
-  {totalQty > 0 && (
-    <div className="mt-3 pt-3 border-t border-gray-300/30 dark:border-gray-600/30">
-      <p className="text-xs text-gray-600 dark:text-gray-400">
-        <strong>Note:</strong> qty = Expected batch quantity | total_qty = Sum of current completed quantities (updates as work progresses)
-      </p>
-    </div>
-  )}
-</div>
+          <div
+            className={`mt-4 p-4 rounded-lg border-2 ${
+              isDarkMode ? "bg-blue-500/10 border-blue-500/30" : "bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/30"
+            }`}
+          >
+            <h4 className={`text-sm font-semibold mb-3 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+              Quantity Summary
+            </h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+              <div className="flex justify-between items-center">
+                <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>Batch Quantity (qty):</span>
+                <span className={`font-bold ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>{batchQty} units</span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>Total Expected (from subphases):</span>
+                <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
+                  {totalQty} units
+                </span>
+              </div>
+            </div>
+
+            {totalQty > 0 && (
+              <div className={`mt-3 pt-3 border-t ${isDarkMode ? "border-gray-600/30" : "border-gray-300/30"}`}>
+                <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                  <strong>Note:</strong> qty = Expected batch quantity | total_qty = Sum of current completed quantities
+                  (updates as work progresses)
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Total Quantity Display */}
-{phases.length > 0 && (
-  <div className={`p-4 rounded-lg border-2 ${
-    totalQty > batchQty 
-      ? 'bg-red-500/10 border-red-500/30' 
-      : 'bg-blue-500/10 border-blue-500/30'
-  }`}>
-    <div className="flex items-center justify-between mb-2">
-      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Total Quantity Allocation</span>
-      <span className={`text-lg font-bold ${
-        totalQty > batchQty 
-          ? 'text-red-700 dark:text-red-300' 
-          : 'text-blue-700 dark:text-blue-300'
-      }`}>
-        {totalQty} / {batchQty} units
-      </span>
-    </div>
-    {totalQty > batchQty && (
-      <div className="flex items-center gap-2 mt-2 text-red-600 dark:text-red-400">
-        <AlertTriangle size={16} />
-        <p className="text-xs font-medium">
-          Total exceeds batch quantity by {totalQty - batchQty} units!
-        </p>
-      </div>
-    )}
-    <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-      This is the total_qty field - calculated from all subphase expected quantities
-    </p>
-  </div>
-)}
+          {phases.length > 0 && (
+            <div
+              className={`p-4 rounded-lg border-2 ${
+                totalQty > batchQty
+                  ? isDarkMode
+                    ? "bg-red-500/10 border-red-500/40"
+                    : "bg-red-500/10 border-red-500/30"
+                  : isDarkMode
+                    ? "bg-blue-500/10 border-blue-500/40"
+                    : "bg-blue-500/10 border-blue-500/30"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className={`text-sm font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                  Total Quantity Allocation
+                </span>
+                <span
+                  className={`text-lg font-bold ${
+                    totalQty > batchQty
+                      ? isDarkMode
+                        ? "text-red-300"
+                        : "text-red-700"
+                      : isDarkMode
+                        ? "text-blue-300"
+                        : "text-blue-700"
+                  }`}
+                >
+                  {totalQty} / {batchQty} units
+                </span>
+              </div>
+              {totalQty > batchQty && (
+                <div className={`flex items-center gap-2 mt-2 ${isDarkMode ? "text-red-300" : "text-red-600"}`}>
+                  <AlertTriangle size={16} />
+                  <p className="text-xs font-medium">Total exceeds batch quantity by {totalQty - batchQty} units!</p>
+                </div>
+              )}
+              <p className={`text-xs mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                This is the total_qty field - calculated from all subphase expected quantities
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Phases Section */}
-      <div className="bg-white/5 dark:bg-black/10 rounded-lg p-6 border border-gray-300/20 dark:border-gray-700/20">
+      <div
+        className={`backdrop-blur-md rounded-lg p-6 border transition-all shadow-sm ${
+          isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+        }`}
+      >
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Phases</h3>
+          <h3 className={`text-lg font-semibold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>Phases</h3>
           <button
             onClick={addNewPhase}
             disabled={submitting}
@@ -630,28 +728,42 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
         </div>
 
         {phases.length === 0 ? (
-          <p className="text-gray-500 dark:text-gray-400 text-center py-4">
-            No phases added yet. Click "Add Phase" to get started or search for an existing item above to use as template.
+          <p className={`text-center py-4 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+            No phases added yet. Click "Add Phase" to get started or search for an existing item above to use as
+            template.
           </p>
         ) : (
           <div className="space-y-4">
             {phases.map((phase, phaseIndex) => (
-              <div key={phase.id} className="bg-white/5 dark:bg-black/10 rounded-lg p-4 border border-gray-300/10 dark:border-gray-700/10">
+              <div
+                key={phase.id}
+                className={`rounded-lg p-4 border ${
+                  isDarkMode ? "bg-gray-700/40 border-gray-600/50" : "bg-white/40 border-gray-300/30"
+                }`}
+              >
                 <div className="flex gap-3 mb-3">
                   <div className="flex-1">
                     <input
                       type="text"
                       placeholder={`Phase ${phaseIndex + 1} Name (e.g., Design, Development)`}
                       value={phase.name}
-                      onChange={(e) => updatePhase(phase.id, 'name', e.target.value)}
+                      onChange={(e) => updatePhase(phase.id, "name", e.target.value)}
                       disabled={submitting}
-                      className="w-full px-3 py-2 rounded-lg bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                      className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+                        isDarkMode
+                          ? "bg-gray-800/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                          : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                      }`}
                     />
                   </div>
                   <button
                     onClick={() => removePhase(phase.id)}
                     disabled={submitting}
-                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
+                    className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${
+                      isDarkMode 
+                        ? "text-red-400 hover:bg-red-500/20" 
+                        : "text-red-500 hover:bg-red-500/10"
+                    }`}
                     title="Remove phase"
                   >
                     <Trash2 size={18} />
@@ -661,11 +773,17 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
                 {/* Subphases */}
                 <div className="ml-4 space-y-2">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sub-Phases</span>
+                    <span className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                      Sub-Phases
+                    </span>
                     <button
                       onClick={() => addSubphaseToPhase(phase.id)}
                       disabled={submitting}
-                      className="flex items-center gap-1 text-sm bg-slate-600 hover:bg-slate-700 text-white px-3 py-1 rounded transition-colors disabled:opacity-50"
+                      className={`flex items-center gap-1 text-sm px-3 py-1 rounded transition-colors disabled:opacity-50 ${
+                        isDarkMode
+                          ? "bg-slate-700 hover:bg-slate-600 text-white"
+                          : "bg-slate-600 hover:bg-slate-700 text-white"
+                      }`}
                     >
                       <Plus size={14} />
                       Add Sub-Phase
@@ -673,52 +791,79 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
                   </div>
 
                   {phase.subphases.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">No sub-phases yet</p>
+                    <p className={`text-sm italic ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                      No sub-phases yet
+                    </p>
                   ) : (
                     phase.subphases.map((subphase, subIndex) => {
                       return (
-                        <div key={subphase.id} className="bg-white/5 dark:bg-black/10 rounded p-3 space-y-2">
+                        <div
+                          key={subphase.id}
+                          className={`rounded p-3 space-y-2 ${
+                            isDarkMode ? "bg-gray-800/50" : "bg-white/50"
+                          }`}
+                        >
                           <div className="flex gap-2">
                             <input
                               type="text"
                               placeholder={`Sub-phase ${subIndex + 1} name`}
                               value={subphase.name}
-                              onChange={(e) => updateSubphase(phase.id, subphase.id, 'name', e.target.value)}
+                              onChange={(e) => updateSubphase(phase.id, subphase.id, "name", e.target.value)}
                               disabled={submitting}
-                              className="flex-1 px-3 py-1.5 text-sm rounded bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                              className={`flex-1 px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+                                isDarkMode
+                                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                                  : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                              }`}
                             />
                             <button
                               onClick={() => removeSubphase(phase.id, subphase.id)}
                               disabled={submitting}
-                              className="p-1.5 text-red-500 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50"
+                              className={`p-1.5 rounded transition-colors disabled:opacity-50 ${
+                                isDarkMode 
+                                  ? "text-red-400 hover:bg-red-500/20" 
+                                  : "text-red-500 hover:bg-red-500/10"
+                              }`}
                               title="Remove sub-phase"
                             >
                               <Trash2 size={14} />
                             </button>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <input
                               type="number"
                               step="1"
                               min="0"
                               placeholder="Duration (minutes)"
                               value={subphase.expectedDuration}
-                              onChange={(e) => updateSubphase(phase.id, subphase.id, 'expectedDuration', e.target.value)}
+                              onChange={(e) =>
+                                updateSubphase(phase.id, subphase.id, "expectedDuration", e.target.value)
+                              }
                               disabled={submitting}
-                              className="px-3 py-1.5 text-sm rounded bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                              className={`px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+                                isDarkMode
+                                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                                  : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                              }`}
                             />
                             <input
                               type="number"
                               min="0"
                               placeholder="Expected quantity"
                               value={subphase.expectedQuantity}
-                              onChange={(e) => updateSubphase(phase.id, subphase.id, 'expectedQuantity', e.target.value)}
+                              onChange={(e) =>
+                                updateSubphase(phase.id, subphase.id, "expectedQuantity", e.target.value)
+                              }
                               disabled={submitting}
-                              className="px-3 py-1.5 text-sm rounded bg-white/10 dark:bg-black/20 border border-gray-300/20 dark:border-gray-700/20 text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                              className={`px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+                                isDarkMode
+                                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                                  : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                              }`}
                             />
                           </div>
                         </div>
-                      );
+                      )
                     })
                   )}
                 </div>
@@ -729,11 +874,15 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
       </div>
 
       {/* Save Button at Bottom */}
-      <div className="flex gap-3 justify-end">
+      <div className="flex flex-col sm:flex-row gap-3 justify-end">
         <button
           onClick={handleClear}
           disabled={submitting}
-          className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`px-6 py-3 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
+            isDarkMode
+              ? "bg-gray-700 hover:bg-gray-600 text-white"
+              : "bg-gray-600 hover:bg-gray-700 text-white"
+          }`}
         >
           Clear All
         </button>
@@ -742,11 +891,11 @@ const updateSubphase = (phaseId, subphaseId, field, value) => {
           disabled={submitting}
           className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {submitting ? 'Saving...' : 'Save Item'}
+          {submitting ? "Saving..." : "Save Item"}
         </button>
       </div>
     </div>
-  );
+  )
 }
 
-export default AddItems;
+export default AddItems

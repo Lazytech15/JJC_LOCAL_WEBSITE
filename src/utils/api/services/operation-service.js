@@ -1,7 +1,7 @@
 // ============================================================================
 // services/operations-service.js - Updated for part_number schema with client_name, priority, remarks
 // ============================================================================
-import { BaseAPIService } from "../core/base-api.js"
+import { BaseAPIService } from "../core/base-api.js";
 
 export class OperationsService extends BaseAPIService {
   // ==================== ITEM METHODS ====================
@@ -12,8 +12,10 @@ export class OperationsService extends BaseAPIService {
    * @returns {Promise} Response with items array
    */
   async getItems(params = {}) {
-    const queryParams = new URLSearchParams(params).toString()
-    return this.request(`/api/operations/items${queryParams ? `?${queryParams}` : ""}`)
+    const queryParams = new URLSearchParams(params).toString();
+    return this.request(
+      `/api/operations/items${queryParams ? `?${queryParams}` : ""}`
+    );
   }
 
   /**
@@ -22,37 +24,42 @@ export class OperationsService extends BaseAPIService {
    * @returns {Promise} Item data with phases and subphases
    */
   async getItem(partNumber) {
-    return this.request(`/api/operations/items?part_number=${encodeURIComponent(partNumber)}`)
+    return this.request(
+      `/api/operations/items?part_number=${encodeURIComponent(partNumber)}`
+    );
   }
 
   /**
    * Create new operations item
    * @param {Object} itemData - Item information
-  * @param {string} itemData.part_number - Item part number (required)
-  * @param {string} itemData.name - Item name (required)
-  * @param {string} [itemData.description] - Item description
-  * @param {string} [itemData.client_name] - Client name
-  * @param {string} [itemData.priority='Medium'] - Priority (High, Medium, Low)
-  * @param {string} [itemData.remarks] - Additional remarks
-  * @param {number} [itemData.qty=1] - Batch quantity
-  * @param {number} [itemData.total_qty] - Total quantity (calculated from subphases)
-  * @returns {Promise} Created item data
- */
+   * @param {string} itemData.part_number - Item part number (required)
+   * @param {string} itemData.name - Item name (required)
+   * @param {string} [itemData.description] - Item description
+   * @param {string} [itemData.client_name] - Client name
+   * @param {string} [itemData.priority='Medium'] - Priority (High, Medium, Low)
+   * @param {string} [itemData.remarks] - Additional remarks
+   * @param {number} [itemData.qty=1] - Batch quantity
+   * @param {number} [itemData.total_qty] - Total quantity (calculated from subphases)
+   * @returns {Promise} Created item data
+   */
   async createItem(itemData) {
     if (!itemData.part_number) {
-      throw new Error('part_number is required')
+      throw new Error("part_number is required");
     }
     if (!itemData.name) {
-      throw new Error('name is required')
+      throw new Error("name is required");
     }
     // Validate priority if provided
-    if (itemData.priority && !['High', 'Medium', 'Low'].includes(itemData.priority)) {
-      throw new Error('priority must be High, Medium, or Low')
+    if (
+      itemData.priority &&
+      !["High", "Medium", "Low"].includes(itemData.priority)
+    ) {
+      throw new Error("priority must be High, Medium, or Low");
     }
     return this.request("/api/operations/items", {
       method: "POST",
       body: JSON.stringify(itemData),
-    })
+    });
   }
 
   /**
@@ -60,33 +67,39 @@ export class OperationsService extends BaseAPIService {
    * @returns {Promise} Array of client names
    */
   async getClients() {
-    return this.request("/api/operations/clients")
+    return this.request("/api/operations/clients");
   }
 
   /**
    * Update item by part_number
-    * @param {string} partNumber - Item part number
- * @param {Object} itemData - Updated item information
- * @param {string} [itemData.name] - Item name
- * @param {string} [itemData.description] - Item description
- * @param {string} [itemData.client_name] - Client name
- * @param {string} [itemData.priority] - Priority (High, Medium, Low)
- * @param {string} [itemData.remarks] - Additional remarks
- * @param {string} [itemData.status] - Status (not_started, in_progress, completed)
- * @param {number} [itemData.overall_progress] - Overall progress percentage
- * @param {number} [itemData.qty] - Batch quantity
- * @param {number} [itemData.total_qty] - Total quantity
- * @returns {Promise} Success confirmation
- */
+   * @param {string} partNumber - Item part number
+   * @param {Object} itemData - Updated item information
+   * @param {string} [itemData.name] - Item name
+   * @param {string} [itemData.description] - Item description
+   * @param {string} [itemData.client_name] - Client name
+   * @param {string} [itemData.priority] - Priority (High, Medium, Low)
+   * @param {string} [itemData.remarks] - Additional remarks
+   * @param {string} [itemData.status] - Status (not_started, in_progress, completed)
+   * @param {number} [itemData.overall_progress] - Overall progress percentage
+   * @param {number} [itemData.qty] - Batch quantity
+   * @param {number} [itemData.total_qty] - Total quantity
+   * @returns {Promise} Success confirmation
+   */
   async updateItem(partNumber, itemData) {
     // Validate priority if provided
-    if (itemData.priority && !['High', 'Medium', 'Low'].includes(itemData.priority)) {
-      throw new Error('priority must be High, Medium, or Low')
+    if (
+      itemData.priority &&
+      !["High", "Medium", "Low"].includes(itemData.priority)
+    ) {
+      throw new Error("priority must be High, Medium, or Low");
     }
-    return this.request(`/api/operations/items?part_number=${encodeURIComponent(partNumber)}`, {
-      method: "PUT",
-      body: JSON.stringify(itemData),
-    })
+    return this.request(
+      `/api/operations/items?part_number=${encodeURIComponent(partNumber)}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(itemData),
+      }
+    );
   }
 
   /**
@@ -95,9 +108,12 @@ export class OperationsService extends BaseAPIService {
    * @returns {Promise} Deletion confirmation
    */
   async deleteItem(partNumber) {
-    return this.request(`/api/operations/items?part_number=${encodeURIComponent(partNumber)}`, {
-      method: "DELETE",
-    })
+    return this.request(
+      `/api/operations/items?part_number=${encodeURIComponent(partNumber)}`,
+      {
+        method: "DELETE",
+      }
+    );
   }
 
   // ==================== PHASE METHODS ====================
@@ -108,7 +124,9 @@ export class OperationsService extends BaseAPIService {
    * @returns {Promise} Array of phases
    */
   async getPhases(partNumber) {
-    return this.request(`/api/operations/phases?part_number=${encodeURIComponent(partNumber)}`)
+    return this.request(
+      `/api/operations/phases?part_number=${encodeURIComponent(partNumber)}`
+    );
   }
 
   /**
@@ -117,7 +135,7 @@ export class OperationsService extends BaseAPIService {
    * @returns {Promise} Phase data
    */
   async getPhase(id) {
-    return this.request(`/api/operations/phases?id=${id}`)
+    return this.request(`/api/operations/phases?id=${id}`);
   }
 
   /**
@@ -127,15 +145,15 @@ export class OperationsService extends BaseAPIService {
    */
   async createPhase(phaseData) {
     if (!phaseData.part_number) {
-      throw new Error('part_number is required')
+      throw new Error("part_number is required");
     }
     if (!phaseData.name) {
-      throw new Error('name is required')
+      throw new Error("name is required");
     }
     return this.request("/api/operations/phases", {
       method: "POST",
       body: JSON.stringify(phaseData),
-    })
+    });
   }
 
   /**
@@ -148,7 +166,7 @@ export class OperationsService extends BaseAPIService {
     return this.request(`/api/operations/phases?id=${id}`, {
       method: "PUT",
       body: JSON.stringify(phaseData),
-    })
+    });
   }
 
   /**
@@ -159,7 +177,7 @@ export class OperationsService extends BaseAPIService {
   async deletePhase(id) {
     return this.request(`/api/operations/phases?id=${id}`, {
       method: "DELETE",
-    })
+    });
   }
 
   // ==================== SUBPHASE METHODS ====================
@@ -170,7 +188,7 @@ export class OperationsService extends BaseAPIService {
    * @returns {Promise} Array of subphases
    */
   async getSubphases(phaseId) {
-    return this.request(`/api/operations/subphases?phase_id=${phaseId}`)
+    return this.request(`/api/operations/subphases?phase_id=${phaseId}`);
   }
 
   /**
@@ -179,7 +197,7 @@ export class OperationsService extends BaseAPIService {
    * @returns {Promise} Subphase data
    */
   async getSubphase(id) {
-    return this.request(`/api/operations/subphases?id=${id}`)
+    return this.request(`/api/operations/subphases?id=${id}`);
   }
 
   /**
@@ -188,25 +206,25 @@ export class OperationsService extends BaseAPIService {
    * @param {string} subphaseData.part_number - Item part number (required)
    * @param {number} subphaseData.phase_id - Phase ID (required)
    * @param {string} subphaseData.name - Subphase name (required)
-   * @param {number} [subphaseData.time_duration=0] - Duration in hours until subphase completion
+   * @param {number} [subphaseData.time_duration=0] - Duration in seconds until subphase completion
    * @param {number} [subphaseData.expected_duration=0] - Expected duration in hours
    * @param {number} [subphaseData.expected_quantity=0] - Expected quantity
    * @returns {Promise} Created subphase data
    */
   async createSubphase(subphaseData) {
     if (!subphaseData.part_number) {
-      throw new Error('part_number is required')
+      throw new Error("part_number is required");
     }
     if (!subphaseData.phase_id) {
-      throw new Error('phase_id is required')
+      throw new Error("phase_id is required");
     }
     if (!subphaseData.name) {
-      throw new Error('name is required')
+      throw new Error("name is required");
     }
     return this.request("/api/operations/subphases", {
       method: "POST",
       body: JSON.stringify(subphaseData),
-    })
+    });
   }
 
   /**
@@ -214,7 +232,7 @@ export class OperationsService extends BaseAPIService {
    * @param {number|string} id - Subphase ID
    * @param {Object} subphaseData - Updated subphase information
    * @param {string} [subphaseData.name] - Subphase name
-   * @param {number} [subphaseData.time_duration] - Duration in hours until completion
+   * @param {number} [subphaseData.time_duration] - Duration in seconds until completion
    * @param {number} [subphaseData.expected_duration] - Expected duration in hours
    * @param {number} [subphaseData.actual_hours] - Actual hours spent
    * @param {number} [subphaseData.subphase_order] - Display order
@@ -224,7 +242,7 @@ export class OperationsService extends BaseAPIService {
     return this.request(`/api/operations/subphases?id=${id}`, {
       method: "PUT",
       body: JSON.stringify(subphaseData),
-    })
+    });
   }
   /**
    * Delete subphase
@@ -234,28 +252,32 @@ export class OperationsService extends BaseAPIService {
   async deleteSubphase(id) {
     return this.request(`/api/operations/subphases?id=${id}`, {
       method: "DELETE",
-    })
+    });
   }
 
   // ==================== ACTION METHODS ====================
 
-/**
- * Mark subphase as completed with time duration
- * @param {number|string} subphaseId - Subphase ID
- * @param {boolean} completed - Completion status
- * @param {number} timeDuration - Duration in hours (decimal)
- * @returns {Promise} Success confirmation
- */
-async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = null) {
-  return this.request("/api/operations/complete-subphase", {
-    method: "POST",
-    body: JSON.stringify({ 
-      subphase_id: subphaseId, 
-      completed,
-      time_duration: timeDuration 
-    }),
-  })
-}
+  /**
+   * Mark subphase as completed with time duration
+   * @param {number|string} subphaseId - Subphase ID
+   * @param {boolean} completed - Completion status
+   * @param {number} timeDuration - Duration in seconds (integer)
+   * @returns {Promise} Success confirmation
+   */
+  async completeSubphaseWithDuration(
+    subphaseId,
+    completed = true,
+    timeDuration = null
+  ) {
+    return this.request("/api/operations/complete-subphase", {
+      method: "POST",
+      body: JSON.stringify({
+        subphase_id: subphaseId,
+        completed,
+        time_duration: timeDuration,
+      }),
+    });
+  }
 
   /**
    * Assign employee to subphase
@@ -268,9 +290,9 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
       method: "POST",
       body: JSON.stringify({
         subphase_id: subphaseId,
-        employee_barcode: employeeBarcode
+        employee_barcode: employeeBarcode,
       }),
-    })
+    });
   }
 
   // ==================== PROCESS CONTROL METHODS ====================
@@ -286,9 +308,9 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
       method: "POST",
       body: JSON.stringify({
         part_number: partNumber,
-        phase_id: phaseId
+        phase_id: phaseId,
       }),
-    })
+    });
   }
 
   /**
@@ -302,9 +324,9 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
       method: "POST",
       body: JSON.stringify({
         part_number: partNumber,
-        phase_id: phaseId
+        phase_id: phaseId,
       }),
-    })
+    });
   }
 
   /**
@@ -318,9 +340,9 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
       method: "POST",
       body: JSON.stringify({
         part_number: partNumber,
-        phase_id: phaseId
+        phase_id: phaseId,
       }),
-    })
+    });
   }
 
   /**
@@ -334,9 +356,9 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
       method: "POST",
       body: JSON.stringify({
         part_number: partNumber,
-        phase_id: phaseId
+        phase_id: phaseId,
       }),
-    })
+    });
   }
 
   /**
@@ -350,9 +372,9 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
       method: "POST",
       body: JSON.stringify({
         part_number: partNumber,
-        phase_id: phaseId
+        phase_id: phaseId,
       }),
-    })
+    });
   }
 
   // ==================== REPORTING METHODS ====================
@@ -362,7 +384,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Statistics including items by status, overall stats, top performers, time statistics
    */
   async getStatistics() {
-    return this.request("/api/operations/statistics")
+    return this.request("/api/operations/statistics");
   }
 
   /**
@@ -371,8 +393,8 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Audit log entries with pagination
    */
   async getAuditLog(params = {}) {
-    const queryParams = new URLSearchParams(params).toString()
-    return this.request(`/api/operations/audit-log?${queryParams}`)
+    const queryParams = new URLSearchParams(params).toString();
+    return this.request(`/api/operations/audit-log?${queryParams}`);
   }
 
   /**
@@ -383,8 +405,8 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
   async getEmployeePerformance(employeeUid = null) {
     const url = employeeUid
       ? `/api/operations/employee-performance?employee_uid=${employeeUid}`
-      : "/api/operations/employee-performance"
-    return this.request(url)
+      : "/api/operations/employee-performance";
+    return this.request(url);
   }
 
   /**
@@ -393,8 +415,8 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Progress report data
    */
   async getProgressReport(params = {}) {
-    const queryParams = new URLSearchParams(params).toString()
-    return this.request(`/api/operations/progress-report?${queryParams}`)
+    const queryParams = new URLSearchParams(params).toString();
+    return this.request(`/api/operations/progress-report?${queryParams}`);
   }
 
   // ==================== CONVENIENCE METHODS ====================
@@ -406,7 +428,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Complete item hierarchy
    */
   async getItemHierarchy(partNumber) {
-    return this.getItem(partNumber)
+    return this.getItem(partNumber);
   }
 
   /**
@@ -415,7 +437,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Filtered items
    */
   async getItemsByStatus(status) {
-    return this.getItems({ status })
+    return this.getItems({ status });
   }
 
   /**
@@ -424,10 +446,10 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Filtered items
    */
   async getItemsByPriority(priority) {
-    if (!['High', 'Medium', 'Low'].includes(priority)) {
-      throw new Error('priority must be High, Medium, or Low')
+    if (!["High", "Medium", "Low"].includes(priority)) {
+      throw new Error("priority must be High, Medium, or Low");
     }
-    return this.getItems({ priority })
+    return this.getItems({ priority });
   }
 
   /**
@@ -436,7 +458,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Filtered items
    */
   async getItemsByClient(clientName) {
-    return this.getItems({ client_name: clientName })
+    return this.getItems({ client_name: clientName });
   }
 
   /**
@@ -444,7 +466,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} High priority items
    */
   async getHighPriorityItems() {
-    return this.getItemsByPriority('High')
+    return this.getItemsByPriority("High");
   }
 
   /**
@@ -453,7 +475,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Matching items
    */
   async searchItems(searchTerm) {
-    return this.getItems({ search: searchTerm })
+    return this.getItems({ search: searchTerm });
   }
 
   /**
@@ -462,7 +484,10 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Detailed report with all phases and subphases
    */
   async getDetailedItemReport(partNumber) {
-    return this.getProgressReport({ part_number: partNumber, format: "detailed" })
+    return this.getProgressReport({
+      part_number: partNumber,
+      format: "detailed",
+    });
   }
 
   /**
@@ -470,7 +495,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Summary report
    */
   async getSummaryReport() {
-    return this.getProgressReport({ format: "summary" })
+    return this.getProgressReport({ format: "summary" });
   }
 
   /**
@@ -478,8 +503,8 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Top performers from statistics
    */
   async getTopPerformers() {
-    const stats = await this.getStatistics()
-    return stats.top_performers || []
+    const stats = await this.getStatistics();
+    return stats.top_performers || [];
   }
 
   /**
@@ -487,8 +512,8 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Time-related metrics
    */
   async getTimeStatistics() {
-    const stats = await this.getStatistics()
-    return stats.time_statistics || {}
+    const stats = await this.getStatistics();
+    return stats.time_statistics || {};
   }
 
   /**
@@ -498,7 +523,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Success confirmation
    */
   async toggleSubphaseCompletion(subphaseId, currentStatus) {
-    return this.completeSubphaseWithDuration(subphaseId, !currentStatus)
+    return this.completeSubphaseWithDuration(subphaseId, !currentStatus);
   }
 
   /**
@@ -507,7 +532,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Recent audit entries
    */
   async getRecentAuditLog(limit = 50) {
-    return this.getAuditLog({ limit, offset: 0 })
+    return this.getAuditLog({ limit, offset: 0 });
   }
 
   /**
@@ -517,7 +542,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Item-specific audit entries
    */
   async getItemAuditLog(partNumber, limit = 100) {
-    return this.getAuditLog({ part_number: partNumber, limit })
+    return this.getAuditLog({ part_number: partNumber, limit });
   }
 
   // ==================== BULK OPERATIONS ====================
@@ -525,23 +550,23 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
   /**
    * Create item with phases and subphases in one call
    * @param {Object} itemData - Complete item structure
- * @param {string} itemData.part_number - Item part number
- * @param {string} itemData.name - Item name
- * @param {string} [itemData.description] - Item description
- * @param {string} [itemData.client_name] - Client name
- * @param {string} [itemData.priority='Medium'] - Priority (High, Medium, Low)
- * @param {string} [itemData.remarks] - Additional remarks
- * @param {number} [itemData.qty=1] - Batch quantity
- * @param {Array} [itemData.phases] - Array of phases with subphases
- * @returns {Promise} Created item with all phases and subphases
- */
+   * @param {string} itemData.part_number - Item part number
+   * @param {string} itemData.name - Item name
+   * @param {string} [itemData.description] - Item description
+   * @param {string} [itemData.client_name] - Client name
+   * @param {string} [itemData.priority='Medium'] - Priority (High, Medium, Low)
+   * @param {string} [itemData.remarks] - Additional remarks
+   * @param {number} [itemData.qty=1] - Batch quantity
+   * @param {Array} [itemData.phases] - Array of phases with subphases
+   * @returns {Promise} Created item with all phases and subphases
+   */
   async createItemWithStructure(itemData) {
     // Calculate total_qty from subphases
     let totalQty = 0;
     if (itemData.phases && itemData.phases.length > 0) {
-      itemData.phases.forEach(phase => {
+      itemData.phases.forEach((phase) => {
         if (phase.subphases && phase.subphases.length > 0) {
-          phase.subphases.forEach(subphase => {
+          phase.subphases.forEach((subphase) => {
             totalQty += parseInt(subphase.expected_quantity) || 0;
           });
         }
@@ -554,19 +579,19 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
       name: itemData.name,
       description: itemData.description,
       client_name: itemData.client_name,
-      priority: itemData.priority || 'Medium',
+      priority: itemData.priority || "Medium",
       remarks: itemData.remarks,
       qty: itemData.qty || 1,
-      total_qty: totalQty || itemData.qty || 1
-    })
+      total_qty: totalQty || itemData.qty || 1,
+    });
 
     // Create phases if provided
     if (itemData.phases && itemData.phases.length > 0) {
       for (const phaseData of itemData.phases) {
         const phase = await this.createPhase({
           part_number: itemData.part_number,
-          name: phaseData.name
-        })
+          name: phaseData.name,
+        });
 
         // Create subphases if provided
         if (phaseData.subphases && phaseData.subphases.length > 0) {
@@ -577,15 +602,15 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
               name: subphaseData.name,
               condition: subphaseData.condition,
               expected_duration: subphaseData.expected_duration || 0,
-              expected_quantity: subphaseData.expected_quantity || 0
-            })
+              expected_quantity: subphaseData.expected_quantity || 0,
+            });
           }
         }
       }
     }
 
     // Return complete item with hierarchy
-    return this.getItemHierarchy(itemData.part_number)
+    return this.getItemHierarchy(itemData.part_number);
   }
 
   /**
@@ -593,8 +618,8 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Items that are not completed
    */
   async getIncompleteItems() {
-    const allItems = await this.getItems()
-    return allItems.filter(item => item.status !== 'completed')
+    const allItems = await this.getItems();
+    return allItems.filter((item) => item.status !== "completed");
   }
 
   /**
@@ -603,8 +628,8 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Items with employee assignments
    */
   async getEmployeeItems(employeeUid) {
-    const performance = await this.getEmployeePerformance(employeeUid)
-    return performance.recent_tasks || []
+    const performance = await this.getEmployeePerformance(employeeUid);
+    return performance.recent_tasks || [];
   }
 
   /**
@@ -613,18 +638,18 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {boolean} True if valid
    */
   validatePartNumber(partNumber) {
-    if (!partNumber || typeof partNumber !== 'string') {
-      return false
+    if (!partNumber || typeof partNumber !== "string") {
+      return false;
     }
     // Basic validation - adjust rules as needed
     if (partNumber.length > 100) {
-      return false
+      return false;
     }
     // Part number should not be empty after trim
     if (partNumber.trim().length === 0) {
-      return false
+      return false;
     }
-    return true
+    return true;
   }
 
   /**
@@ -633,7 +658,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {boolean} True if valid
    */
   validatePriority(priority) {
-    return ['High', 'Medium', 'Low'].includes(priority)
+    return ["High", "Medium", "Low"].includes(priority);
   }
 
   /**
@@ -643,13 +668,13 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    */
   async itemExists(partNumber) {
     try {
-      await this.getItem(partNumber)
-      return true
+      await this.getItem(partNumber);
+      return true;
     } catch (error) {
-      if (error.message && error.message.includes('404')) {
-        return false
+      if (error.message && error.message.includes("404")) {
+        return false;
       }
-      throw error
+      throw error;
     }
   }
 
@@ -660,11 +685,11 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Filtered items
    */
   async getItemsByCompletionRange(minPercentage = 0, maxPercentage = 100) {
-    const allItems = await this.getItems()
-    return allItems.filter(item => {
-      const progress = item.overall_progress || 0
-      return progress >= minPercentage && progress <= maxPercentage
-    })
+    const allItems = await this.getItems();
+    return allItems.filter((item) => {
+      const progress = item.overall_progress || 0;
+      return progress >= minPercentage && progress <= maxPercentage;
+    });
   }
 
   /**
@@ -672,7 +697,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Items near completion
    */
   async getItemsNearingCompletion() {
-    return this.getItemsByCompletionRange(80, 99)
+    return this.getItemsByCompletionRange(80, 99);
   }
 
   /**
@@ -681,14 +706,14 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Recent items
    */
   async getRecentItems(days = 7) {
-    const allItems = await this.getItems()
-    const cutoffDate = new Date()
-    cutoffDate.setDate(cutoffDate.getDate() - days)
+    const allItems = await this.getItems();
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
 
-    return allItems.filter(item => {
-      const createdDate = new Date(item.created_at)
-      return createdDate >= cutoffDate
-    })
+    return allItems.filter((item) => {
+      const createdDate = new Date(item.created_at);
+      return createdDate >= cutoffDate;
+    });
   }
 
   /**
@@ -701,7 +726,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Filtered items
    */
   async getItemsByFilters(filters) {
-    return this.getItems(filters)
+    return this.getItems(filters);
   }
 
   /**
@@ -712,9 +737,9 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    */
   async updateItemPriority(partNumber, priority) {
     if (!this.validatePriority(priority)) {
-      throw new Error('priority must be High, Medium, or Low')
+      throw new Error("priority must be High, Medium, or Low");
     }
-    return this.updateItem(partNumber, { priority })
+    return this.updateItem(partNumber, { priority });
   }
 
   /**
@@ -724,7 +749,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Success confirmation
    */
   async updateItemClient(partNumber, clientName) {
-    return this.updateItem(partNumber, { client_name: clientName })
+    return this.updateItem(partNumber, { client_name: clientName });
   }
 
   /**
@@ -734,7 +759,7 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Success confirmation
    */
   async updateItemRemarks(partNumber, remarks) {
-    return this.updateItem(partNumber, { remarks })
+    return this.updateItem(partNumber, { remarks });
   }
 
   /**
@@ -742,18 +767,18 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Object with client names as keys and items as values
    */
   async getItemsGroupedByClient() {
-    const allItems = await this.getItems()
-    const grouped = {}
+    const allItems = await this.getItems();
+    const grouped = {};
 
-    allItems.forEach(item => {
-      const client = item.client_name || 'No Client'
+    allItems.forEach((item) => {
+      const client = item.client_name || "No Client";
       if (!grouped[client]) {
-        grouped[client] = []
+        grouped[client] = [];
       }
-      grouped[client].push(item)
-    })
+      grouped[client].push(item);
+    });
 
-    return grouped
+    return grouped;
   }
 
   /**
@@ -761,21 +786,21 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Object with priority levels as keys and items as values
    */
   async getItemsGroupedByPriority() {
-    const allItems = await this.getItems()
+    const allItems = await this.getItems();
     const grouped = {
       High: [],
       Medium: [],
-      Low: []
-    }
+      Low: [],
+    };
 
-    allItems.forEach(item => {
-      const priority = item.priority || 'Medium'
+    allItems.forEach((item) => {
+      const priority = item.priority || "Medium";
       if (grouped[priority]) {
-        grouped[priority].push(item)
+        grouped[priority].push(item);
       }
-    })
+    });
 
-    return grouped
+    return grouped;
   }
 
   /**
@@ -783,10 +808,10 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Urgent items
    */
   async getUrgentItems() {
-    const highPriorityItems = await this.getItemsByPriority('High')
-    return highPriorityItems.filter(item =>
-      item.status === 'in_progress' || item.status === 'not_started'
-    )
+    const highPriorityItems = await this.getItemsByPriority("High");
+    return highPriorityItems.filter(
+      (item) => item.status === "in_progress" || item.status === "not_started"
+    );
   }
 
   /**
@@ -794,18 +819,18 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Array of objects with client_name and item_count
    */
   async getClientSummary() {
-    const allItems = await this.getItems()
-    const summary = {}
+    const allItems = await this.getItems();
+    const summary = {};
 
-    allItems.forEach(item => {
-      const client = item.client_name || 'No Client'
-      summary[client] = (summary[client] || 0) + 1
-    })
+    allItems.forEach((item) => {
+      const client = item.client_name || "No Client";
+      summary[client] = (summary[client] || 0) + 1;
+    });
 
     return Object.entries(summary).map(([client_name, item_count]) => ({
       client_name,
-      item_count
-    }))
+      item_count,
+    }));
   }
 
   /**
@@ -813,21 +838,21 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Object with count for each priority level
    */
   async getPriorityDistribution() {
-    const allItems = await this.getItems()
+    const allItems = await this.getItems();
     const distribution = {
       High: 0,
       Medium: 0,
-      Low: 0
-    }
+      Low: 0,
+    };
 
-    allItems.forEach(item => {
-      const priority = item.priority || 'Medium'
+    allItems.forEach((item) => {
+      const priority = item.priority || "Medium";
       if (distribution[priority] !== undefined) {
-        distribution[priority]++
+        distribution[priority]++;
       }
-    })
+    });
 
-    return distribution
+    return distribution;
   }
 
   /**
@@ -836,10 +861,12 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Items with matching remarks
    */
   async searchItemsByRemarks(searchTerm) {
-    const allItems = await this.getItems({ search: searchTerm })
-    return allItems.filter(item =>
-      item.remarks && item.remarks.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    const allItems = await this.getItems({ search: searchTerm });
+    return allItems.filter(
+      (item) =>
+        item.remarks &&
+        item.remarks.toLowerCase().includes(searchTerm.toLowerCase())
+    );
   }
 
   /**
@@ -847,8 +874,10 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Items with no client_name
    */
   async getItemsWithoutClient() {
-    const allItems = await this.getItems()
-    return allItems.filter(item => !item.client_name || item.client_name.trim() === '')
+    const allItems = await this.getItems();
+    return allItems.filter(
+      (item) => !item.client_name || item.client_name.trim() === ""
+    );
   }
 
   /**
@@ -856,8 +885,10 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Items with no remarks
    */
   async getItemsWithoutRemarks() {
-    const allItems = await this.getItems()
-    return allItems.filter(item => !item.remarks || item.remarks.trim() === '')
+    const allItems = await this.getItems();
+    return allItems.filter(
+      (item) => !item.remarks || item.remarks.trim() === ""
+    );
   }
 
   /**
@@ -865,24 +896,24 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Items that are taking longer than expected
    */
   async getOverdueItems() {
-    const allItems = await this.getItems()
-    const overdueItems = []
+    const allItems = await this.getItems();
+    const overdueItems = [];
 
     for (const item of allItems) {
-      if (item.status !== 'completed') {
-        const detailedItem = await this.getItem(item.part_number)
-        let totalExpected = 0
-        let totalActual = 0
+      if (item.status !== "completed") {
+        const detailedItem = await this.getItem(item.part_number);
+        let totalExpected = 0;
+        let totalActual = 0;
 
         if (detailedItem.phases) {
-          detailedItem.phases.forEach(phase => {
+          detailedItem.phases.forEach((phase) => {
             if (phase.subphases) {
-              phase.subphases.forEach(subphase => {
-                totalExpected += parseFloat(subphase.expected_duration || 0)
-                totalActual += parseFloat(subphase.actual_hours || 0)
-              })
+              phase.subphases.forEach((subphase) => {
+                totalExpected += parseFloat(subphase.expected_duration || 0);
+                totalActual += parseFloat(subphase.actual_hours || 0);
+              });
             }
-          })
+          });
         }
 
         if (totalActual > totalExpected && totalExpected > 0) {
@@ -890,13 +921,13 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
             ...item,
             total_expected: totalExpected,
             total_actual: totalActual,
-            overdue_hours: totalActual - totalExpected
-          })
+            overdue_hours: totalActual - totalExpected,
+          });
         }
       }
     }
 
-    return overdueItems
+    return overdueItems;
   }
 
   /**
@@ -905,24 +936,24 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Array of items with flattened structure for CSV export
    */
   async exportItemsToCSV(filters = {}) {
-    const items = await this.getItems(filters)
-    return items.map(item => ({
+    const items = await this.getItems(filters);
+    return items.map((item) => ({
       part_number: item.part_number,
       name: item.name,
-      description: item.description || '',
-      client_name: item.client_name || '',
-      priority: item.priority || 'Medium',
-      remarks: item.remarks || '',
+      description: item.description || "",
+      client_name: item.client_name || "",
+      priority: item.priority || "Medium",
+      remarks: item.remarks || "",
       status: item.status,
       overall_progress: item.overall_progress || 0,
       phase_count: item.phase_count || 0,
       subphase_count: item.subphase_count || 0,
       completed_subphase_count: item.completed_subphase_count || 0,
-      start_time: item.start_time || '',
-      end_time: item.end_time || '',
+      start_time: item.start_time || "",
+      end_time: item.end_time || "",
       created_at: item.created_at,
-      completed_at: item.completed_at || ''
-    }))
+      completed_at: item.completed_at || "",
+    }));
   }
 
   /**
@@ -931,21 +962,30 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
    * @returns {Promise} Performance metrics for the client
    */
   async getClientPerformance(clientName) {
-    const clientItems = await this.getItemsByClient(clientName)
+    const clientItems = await this.getItemsByClient(clientName);
 
-    const totalItems = clientItems.length
-    const completedItems = clientItems.filter(item => item.status === 'completed').length
-    const inProgressItems = clientItems.filter(item => item.status === 'in_progress').length
-    const notStartedItems = clientItems.filter(item => item.status === 'not_started').length
+    const totalItems = clientItems.length;
+    const completedItems = clientItems.filter(
+      (item) => item.status === "completed"
+    ).length;
+    const inProgressItems = clientItems.filter(
+      (item) => item.status === "in_progress"
+    ).length;
+    const notStartedItems = clientItems.filter(
+      (item) => item.status === "not_started"
+    ).length;
 
-    const avgProgress = clientItems.reduce((sum, item) =>
-      sum + (parseFloat(item.overall_progress) || 0), 0) / (totalItems || 1)
+    const avgProgress =
+      clientItems.reduce(
+        (sum, item) => sum + (parseFloat(item.overall_progress) || 0),
+        0
+      ) / (totalItems || 1);
 
     const priorityDistribution = {
-      High: clientItems.filter(item => item.priority === 'High').length,
-      Medium: clientItems.filter(item => item.priority === 'Medium').length,
-      Low: clientItems.filter(item => item.priority === 'Low').length
-    }
+      High: clientItems.filter((item) => item.priority === "High").length,
+      Medium: clientItems.filter((item) => item.priority === "Medium").length,
+      Low: clientItems.filter((item) => item.priority === "Low").length,
+    };
 
     return {
       client_name: clientName,
@@ -956,20 +996,25 @@ async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = 
       avg_progress: avgProgress.toFixed(2),
       completion_rate: ((completedItems / (totalItems || 1)) * 100).toFixed(2),
       priority_distribution: priorityDistribution,
-      items: clientItems
-    }
+      items: clientItems,
+    };
   }
 
   /**
- * Update subphase current completed quantity
- * @param {number|string} subphaseId - Subphase ID
- * @param {number} currentCompletedQuantity - New completed quantity
- * @returns {Promise} Success confirmation
- */
+   * Update subphase current completed quantity
+   * @param {number|string} subphaseId - Subphase ID
+   * @param {number} currentCompletedQuantity - New completed quantity
+   * @returns {Promise} Success confirmation
+   */
   async updateSubphaseCompletedQuantity(subphaseId, currentCompletedQuantity) {
-    return this.request(`/api/operations/update-completed-quantity?id=${subphaseId}`, {
-      method: "POST",
-      body: JSON.stringify({ current_completed_quantity: currentCompletedQuantity }),
-    })
+    return this.request(
+      `/api/operations/update-completed-quantity?id=${subphaseId}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          current_completed_quantity: currentCompletedQuantity,
+        }),
+      }
+    );
   }
 }
