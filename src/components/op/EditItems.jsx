@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from "react"
-import { 
-  X, 
-  Save, 
-  Trash2, 
-  Plus, 
-  Edit2, 
-  User, 
-  Flag, 
-  Package, 
+import {
+  X,
+  Save,
+  Trash2,
+  Plus,
+  Edit2,
+  User,
+  Flag,
+  Package,
   Clock,
   AlertTriangle,
   ChevronDown,
@@ -43,7 +43,7 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
   useEffect(() => {
     const searchTerm = formData.client_name.trim().toLowerCase()
     if (searchTerm.length >= 1 && Array.isArray(clients)) {
-      const matches = clients.filter(client => 
+      const matches = clients.filter(client =>
         client.toLowerCase().includes(searchTerm)
       )
       setFilteredClients(matches)
@@ -74,26 +74,22 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto ${
-        isDarkMode ? "bg-gray-800" : "bg-white"
-      }`}>
-        {/* Header */}
-        <div className={`sticky top-0 flex justify-between items-center p-6 border-b ${
-          isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+      <div className={`rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto ${isDarkMode ? "bg-gray-800" : "bg-white"
         }`}>
-          <h2 className={`text-xl font-bold flex items-center gap-2 ${
-            isDarkMode ? "text-gray-100" : "text-gray-800"
+        {/* Header */}
+        <div className={`sticky top-0 flex justify-between items-center p-6 border-b ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
           }`}>
+          <h2 className={`text-xl font-bold flex items-center gap-2 ${isDarkMode ? "text-gray-100" : "text-gray-800"
+            }`}>
             <Edit2 size={20} />
             Edit Item: {item?.part_number}
           </h2>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${
-              isDarkMode 
-                ? "hover:bg-gray-700 text-gray-300" 
+            className={`p-2 rounded-lg transition-colors ${isDarkMode
+                ? "hover:bg-gray-700 text-gray-300"
                 : "hover:bg-gray-100 text-gray-600"
-            }`}
+              }`}
           >
             <X size={20} />
           </button>
@@ -103,47 +99,42 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Item Name */}
           <div>
-            <label className={`block text-sm font-medium mb-1 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               Item Name *
             </label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100"
                   : "bg-gray-100 border border-gray-300 text-gray-800"
-              }`}
+                }`}
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className={`block text-sm font-medium mb-1 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               Description
             </label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={3}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100"
                   : "bg-gray-100 border border-gray-300 text-gray-800"
-              }`}
+                }`}
             />
           </div>
 
           {/* Client Name */}
           <div className="relative" ref={clientDropdownRef}>
-            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               <User size={16} />
               Client Name
             </label>
@@ -152,16 +143,14 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
               value={formData.client_name}
               onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
               onFocus={() => setShowClientDropdown(clients.length > 0)}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100"
                   : "bg-gray-100 border border-gray-300 text-gray-800"
-              }`}
+                }`}
             />
             {showClientDropdown && filteredClients.length > 0 && (
-              <div className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto border ${
-                isDarkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"
-              }`}>
+              <div className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto border ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"
+                }`}>
                 {filteredClients.map((client, idx) => (
                   <button
                     key={idx}
@@ -170,11 +159,10 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
                       setFormData({ ...formData, client_name: client })
                       setShowClientDropdown(false)
                     }}
-                    className={`w-full text-left px-4 py-2 border-b last:border-b-0 transition-colors ${
-                      isDarkMode
+                    className={`w-full text-left px-4 py-2 border-b last:border-b-0 transition-colors ${isDarkMode
                         ? "hover:bg-gray-600 border-gray-600 text-gray-100"
                         : "hover:bg-gray-50 border-gray-200 text-gray-800"
-                    }`}
+                      }`}
                   >
                     {client}
                   </button>
@@ -185,9 +173,8 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
 
           {/* Priority */}
           <div>
-            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               <Flag size={16} />
               Priority
             </label>
@@ -197,13 +184,12 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
                   key={p}
                   type="button"
                   onClick={() => setFormData({ ...formData, priority: p })}
-                  className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors ${
-                    formData.priority === p
+                  className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors ${formData.priority === p
                       ? getPriorityColor(p)
                       : isDarkMode
                         ? "bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600"
                         : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
-                  }`}
+                    }`}
                 >
                   {p}
                 </button>
@@ -213,9 +199,8 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
 
           {/* Quantity */}
           <div>
-            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               <Package size={16} />
               Batch Quantity
             </label>
@@ -224,30 +209,27 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
               min="1"
               value={formData.qty}
               onChange={(e) => setFormData({ ...formData, qty: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100"
                   : "bg-gray-100 border border-gray-300 text-gray-800"
-              }`}
+                }`}
             />
           </div>
 
           {/* Remarks */}
           <div>
-            <label className={`block text-sm font-medium mb-1 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               Remarks
             </label>
             <textarea
               value={formData.remarks}
               onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
               rows={4}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100"
                   : "bg-gray-100 border border-gray-300 text-gray-800"
-              }`}
+                }`}
             />
           </div>
 
@@ -300,26 +282,22 @@ function EditPhaseModal({ phase, onClose, onSave, onDelete, isDarkMode }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`rounded-lg max-w-md w-full ${
-        isDarkMode ? "bg-gray-800" : "bg-white"
-      }`}>
-        {/* Header */}
-        <div className={`flex justify-between items-center p-6 border-b ${
-          isDarkMode ? "border-gray-700" : "border-gray-200"
+      <div className={`rounded-lg max-w-md w-full ${isDarkMode ? "bg-gray-800" : "bg-white"
         }`}>
-          <h2 className={`text-xl font-bold flex items-center gap-2 ${
-            isDarkMode ? "text-gray-100" : "text-gray-800"
+        {/* Header */}
+        <div className={`flex justify-between items-center p-6 border-b ${isDarkMode ? "border-gray-700" : "border-gray-200"
           }`}>
+          <h2 className={`text-xl font-bold flex items-center gap-2 ${isDarkMode ? "text-gray-100" : "text-gray-800"
+            }`}>
             <Edit2 size={20} />
             Edit Phase
           </h2>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${
-              isDarkMode 
-                ? "hover:bg-gray-700 text-gray-300" 
+            className={`p-2 rounded-lg transition-colors ${isDarkMode
+                ? "hover:bg-gray-700 text-gray-300"
                 : "hover:bg-gray-100 text-gray-600"
-            }`}
+              }`}
           >
             <X size={20} />
           </button>
@@ -328,27 +306,24 @@ function EditPhaseModal({ phase, onClose, onSave, onDelete, isDarkMode }) {
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className={`block text-sm font-medium mb-1 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               Phase Name *
             </label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100"
                   : "bg-gray-100 border border-gray-300 text-gray-800"
-              }`}
+                }`}
             />
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-1 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               Phase Order
             </label>
             <input
@@ -356,11 +331,10 @@ function EditPhaseModal({ phase, onClose, onSave, onDelete, isDarkMode }) {
               min="0"
               value={formData.phase_order}
               onChange={(e) => setFormData({ ...formData, phase_order: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100"
                   : "bg-gray-100 border border-gray-300 text-gray-800"
-              }`}
+                }`}
             />
           </div>
 
@@ -412,13 +386,13 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
       alert("Subphase name is required")
       return
     }
-    
+
     const expectedQty = parseInt(formData.expected_quantity) || 0
     if (expectedQty > batchQty) {
       alert(`Expected quantity (${expectedQty}) cannot exceed batch quantity (${batchQty})`)
       return
     }
-    
+
     onSave(formData)
   }
 
@@ -430,26 +404,22 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`rounded-lg max-w-md w-full ${
-        isDarkMode ? "bg-gray-800" : "bg-white"
-      }`}>
-        {/* Header */}
-        <div className={`flex justify-between items-center p-6 border-b ${
-          isDarkMode ? "border-gray-700" : "border-gray-200"
+      <div className={`rounded-lg max-w-md w-full ${isDarkMode ? "bg-gray-800" : "bg-white"
         }`}>
-          <h2 className={`text-xl font-bold flex items-center gap-2 ${
-            isDarkMode ? "text-gray-100" : "text-gray-800"
+        {/* Header */}
+        <div className={`flex justify-between items-center p-6 border-b ${isDarkMode ? "border-gray-700" : "border-gray-200"
           }`}>
+          <h2 className={`text-xl font-bold flex items-center gap-2 ${isDarkMode ? "text-gray-100" : "text-gray-800"
+            }`}>
             <Edit2 size={20} />
             Edit Subphase
           </h2>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${
-              isDarkMode 
-                ? "hover:bg-gray-700 text-gray-300" 
+            className={`p-2 rounded-lg transition-colors ${isDarkMode
+                ? "hover:bg-gray-700 text-gray-300"
                 : "hover:bg-gray-100 text-gray-600"
-            }`}
+              }`}
           >
             <X size={20} />
           </button>
@@ -458,27 +428,24 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className={`block text-sm font-medium mb-1 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               Subphase Name *
             </label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100"
                   : "bg-gray-100 border border-gray-300 text-gray-800"
-              }`}
+                }`}
             />
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               <Clock size={16} />
               Expected Duration (hours)
             </label>
@@ -488,18 +455,16 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
               min="0"
               value={formData.expected_duration}
               onChange={(e) => setFormData({ ...formData, expected_duration: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100"
                   : "bg-gray-100 border border-gray-300 text-gray-800"
-              }`}
+                }`}
             />
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               <Package size={16} />
               Expected Quantity
             </label>
@@ -509,11 +474,10 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
               max={batchQty}
               value={formData.expected_quantity}
               onChange={(e) => setFormData({ ...formData, expected_quantity: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100"
                   : "bg-gray-100 border border-gray-300 text-gray-800"
-              }`}
+                }`}
             />
             <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
               Max: {batchQty} (batch quantity)
@@ -521,9 +485,8 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-1 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               Subphase Order
             </label>
             <input
@@ -531,11 +494,10 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
               min="0"
               value={formData.subphase_order}
               onChange={(e) => setFormData({ ...formData, subphase_order: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100"
                   : "bg-gray-100 border border-gray-300 text-gray-800"
-              }`}
+                }`}
             />
           </div>
 
@@ -590,26 +552,22 @@ function AddPhaseModal({ item, onClose, onSave, isDarkMode }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`rounded-lg max-w-md w-full ${
-        isDarkMode ? "bg-gray-800" : "bg-white"
-      }`}>
-        {/* Header */}
-        <div className={`flex justify-between items-center p-6 border-b ${
-          isDarkMode ? "border-gray-700" : "border-gray-200"
+      <div className={`rounded-lg max-w-md w-full ${isDarkMode ? "bg-gray-800" : "bg-white"
         }`}>
-          <h2 className={`text-xl font-bold flex items-center gap-2 ${
-            isDarkMode ? "text-gray-100" : "text-gray-800"
+        {/* Header */}
+        <div className={`flex justify-between items-center p-6 border-b ${isDarkMode ? "border-gray-700" : "border-gray-200"
           }`}>
+          <h2 className={`text-xl font-bold flex items-center gap-2 ${isDarkMode ? "text-gray-100" : "text-gray-800"
+            }`}>
             <Plus size={20} />
             Add New Phase to {item?.name}
           </h2>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${
-              isDarkMode 
-                ? "hover:bg-gray-700 text-gray-300" 
+            className={`p-2 rounded-lg transition-colors ${isDarkMode
+                ? "hover:bg-gray-700 text-gray-300"
                 : "hover:bg-gray-100 text-gray-600"
-            }`}
+              }`}
           >
             <X size={20} />
           </button>
@@ -617,18 +575,16 @@ function AddPhaseModal({ item, onClose, onSave, isDarkMode }) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className={`p-3 rounded-lg ${
-            isDarkMode ? "bg-blue-500/10" : "bg-blue-500/10"
-          }`}>
+          <div className={`p-3 rounded-lg ${isDarkMode ? "bg-blue-500/10" : "bg-blue-500/10"
+            }`}>
             <p className={`text-sm ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
               <strong>Item:</strong> {item?.part_number}
             </p>
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-1 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               Phase Name *
             </label>
             <input
@@ -637,18 +593,16 @@ function AddPhaseModal({ item, onClose, onSave, isDarkMode }) {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               autoFocus
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
                   : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
-              }`}
+                }`}
             />
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-1 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               Phase Order (optional)
             </label>
             <input
@@ -656,11 +610,10 @@ function AddPhaseModal({ item, onClose, onSave, isDarkMode }) {
               min="0"
               value={formData.phase_order}
               onChange={(e) => setFormData({ ...formData, phase_order: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100"
                   : "bg-gray-100 border border-gray-300 text-gray-800"
-              }`}
+                }`}
             />
           </div>
 
@@ -704,38 +657,34 @@ function AddSubphaseModal({ item, phase, onClose, onSave, isDarkMode, batchQty =
       alert("Subphase name is required")
       return
     }
-    
+
     const expectedQty = parseInt(formData.expected_quantity) || 0
     if (expectedQty > batchQty) {
       alert(`Expected quantity (${expectedQty}) cannot exceed batch quantity (${batchQty})`)
       return
     }
-    
+
     onSave(formData)
   }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`rounded-lg max-w-md w-full ${
-        isDarkMode ? "bg-gray-800" : "bg-white"
-      }`}>
-        {/* Header */}
-        <div className={`flex justify-between items-center p-6 border-b ${
-          isDarkMode ? "border-gray-700" : "border-gray-200"
+      <div className={`rounded-lg max-w-md w-full ${isDarkMode ? "bg-gray-800" : "bg-white"
         }`}>
-          <h2 className={`text-xl font-bold flex items-center gap-2 ${
-            isDarkMode ? "text-gray-100" : "text-gray-800"
+        {/* Header */}
+        <div className={`flex justify-between items-center p-6 border-b ${isDarkMode ? "border-gray-700" : "border-gray-200"
           }`}>
+          <h2 className={`text-xl font-bold flex items-center gap-2 ${isDarkMode ? "text-gray-100" : "text-gray-800"
+            }`}>
             <Plus size={20} />
             Add New Subphase
           </h2>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${
-              isDarkMode 
-                ? "hover:bg-gray-700 text-gray-300" 
+            className={`p-2 rounded-lg transition-colors ${isDarkMode
+                ? "hover:bg-gray-700 text-gray-300"
                 : "hover:bg-gray-100 text-gray-600"
-            }`}
+              }`}
           >
             <X size={20} />
           </button>
@@ -743,9 +692,8 @@ function AddSubphaseModal({ item, phase, onClose, onSave, isDarkMode, batchQty =
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className={`p-3 rounded-lg space-y-1 ${
-            isDarkMode ? "bg-blue-500/10" : "bg-blue-500/10"
-          }`}>
+          <div className={`p-3 rounded-lg space-y-1 ${isDarkMode ? "bg-blue-500/10" : "bg-blue-500/10"
+            }`}>
             <p className={`text-sm ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
               <strong>Item:</strong> {item?.name}
             </p>
@@ -755,9 +703,8 @@ function AddSubphaseModal({ item, phase, onClose, onSave, isDarkMode, batchQty =
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-1 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               Subphase Name *
             </label>
             <input
@@ -766,18 +713,16 @@ function AddSubphaseModal({ item, phase, onClose, onSave, isDarkMode, batchQty =
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               autoFocus
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
                   : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
-              }`}
+                }`}
             />
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               <Clock size={16} />
               Expected Duration (hours)
             </label>
@@ -788,18 +733,16 @@ function AddSubphaseModal({ item, phase, onClose, onSave, isDarkMode, batchQty =
               placeholder="e.g., 2.5"
               value={formData.expected_duration}
               onChange={(e) => setFormData({ ...formData, expected_duration: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
                   : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
-              }`}
+                }`}
             />
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               <Package size={16} />
               Expected Quantity
             </label>
@@ -810,11 +753,10 @@ function AddSubphaseModal({ item, phase, onClose, onSave, isDarkMode, batchQty =
               placeholder="e.g., 50"
               value={formData.expected_quantity}
               onChange={(e) => setFormData({ ...formData, expected_quantity: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
                   : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
-              }`}
+                }`}
             />
             <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
               Max: {batchQty} (batch quantity)
@@ -822,9 +764,8 @@ function AddSubphaseModal({ item, phase, onClose, onSave, isDarkMode, batchQty =
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-1 ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
               Subphase Order (optional)
             </label>
             <input
@@ -832,11 +773,10 @@ function AddSubphaseModal({ item, phase, onClose, onSave, isDarkMode, batchQty =
               min="0"
               value={formData.subphase_order}
               onChange={(e) => setFormData({ ...formData, subphase_order: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100"
                   : "bg-gray-100 border border-gray-300 text-gray-800"
-              }`}
+                }`}
             />
           </div>
 
@@ -892,7 +832,7 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
   useEffect(() => {
     const searchTerm = formData.client_name.trim().toLowerCase()
     if (searchTerm.length >= 1 && Array.isArray(clients)) {
-      const matches = clients.filter(client => 
+      const matches = clients.filter(client =>
         client.toLowerCase().includes(searchTerm)
       )
       setFilteredClients(matches)
@@ -905,17 +845,17 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    
+
     if (!formData.updateClient && !formData.updatePriority && !formData.updateRemarks) {
       alert("Please select at least one field to update")
       return
     }
-    
+
     const updates = {}
     if (formData.updateClient) updates.client_name = formData.client_name
     if (formData.updatePriority) updates.priority = formData.priority
     if (formData.updateRemarks) updates.remarks = formData.remarks
-    
+
     onSave(updates)
   }
 
@@ -930,26 +870,22 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto ${
-        isDarkMode ? "bg-gray-800" : "bg-white"
-      }`}>
-        {/* Header */}
-        <div className={`sticky top-0 flex justify-between items-center p-6 border-b ${
-          isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+      <div className={`rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto ${isDarkMode ? "bg-gray-800" : "bg-white"
         }`}>
-          <h2 className={`text-xl font-bold flex items-center gap-2 ${
-            isDarkMode ? "text-gray-100" : "text-gray-800"
+        {/* Header */}
+        <div className={`sticky top-0 flex justify-between items-center p-6 border-b ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
           }`}>
+          <h2 className={`text-xl font-bold flex items-center gap-2 ${isDarkMode ? "text-gray-100" : "text-gray-800"
+            }`}>
             <Edit2 size={20} />
             Bulk Edit ({selectedItems?.length || 0} items)
           </h2>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${
-              isDarkMode 
-                ? "hover:bg-gray-700 text-gray-300" 
+            className={`p-2 rounded-lg transition-colors ${isDarkMode
+                ? "hover:bg-gray-700 text-gray-300"
                 : "hover:bg-gray-100 text-gray-600"
-            }`}
+              }`}
           >
             <X size={20} />
           </button>
@@ -962,9 +898,8 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
           </p>
           <div className="max-h-32 overflow-y-auto space-y-1">
             {selectedItems?.map((item, idx) => (
-              <div key={idx} className={`text-xs px-3 py-2 rounded ${
-                isDarkMode ? "bg-gray-700" : "bg-gray-100"
-              }`}>
+              <div key={idx} className={`text-xs px-3 py-2 rounded ${isDarkMode ? "bg-gray-700" : "bg-gray-100"
+                }`}>
                 <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
                   {item.name}
                 </span>
@@ -978,12 +913,10 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className={`p-4 rounded-lg border ${
-            isDarkMode ? "bg-yellow-500/10 border-yellow-500/30" : "bg-yellow-500/10 border-yellow-500/30"
-          }`}>
-            <p className={`text-sm flex items-center gap-2 ${
-              isDarkMode ? "text-yellow-300" : "text-yellow-700"
+          <div className={`p-4 rounded-lg border ${isDarkMode ? "bg-yellow-500/10 border-yellow-500/30" : "bg-yellow-500/10 border-yellow-500/30"
             }`}>
+            <p className={`text-sm flex items-center gap-2 ${isDarkMode ? "text-yellow-300" : "text-yellow-700"
+              }`}>
               <AlertTriangle size={16} />
               Only checked fields will be updated across all selected items
             </p>
@@ -998,9 +931,8 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
                 onChange={(e) => setFormData({ ...formData, updateClient: e.target.checked })}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
-              <label className={`text-sm font-medium flex items-center gap-2 ${
-                isDarkMode ? "text-gray-300" : "text-gray-700"
-              }`}>
+              <label className={`text-sm font-medium flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}>
                 <User size={16} />
                 Update Client Name
               </label>
@@ -1012,16 +944,14 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
               onFocus={() => setShowClientDropdown(clients.length > 0)}
               disabled={!formData.updateClient}
               placeholder="Enter new client name"
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
                   : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
-              }`}
+                }`}
             />
             {showClientDropdown && filteredClients.length > 0 && formData.updateClient && (
-              <div className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto border ${
-                isDarkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"
-              }`}>
+              <div className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto border ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"
+                }`}>
                 {filteredClients.map((client, idx) => (
                   <button
                     key={idx}
@@ -1030,11 +960,10 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
                       setFormData({ ...formData, client_name: client })
                       setShowClientDropdown(false)
                     }}
-                    className={`w-full text-left px-4 py-2 border-b last:border-b-0 transition-colors ${
-                      isDarkMode
+                    className={`w-full text-left px-4 py-2 border-b last:border-b-0 transition-colors ${isDarkMode
                         ? "hover:bg-gray-600 border-gray-600 text-gray-100"
                         : "hover:bg-gray-50 border-gray-200 text-gray-800"
-                    }`}
+                      }`}
                   >
                     {client}
                   </button>
@@ -1052,9 +981,8 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
                 onChange={(e) => setFormData({ ...formData, updatePriority: e.target.checked })}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
-              <label className={`text-sm font-medium flex items-center gap-2 ${
-                isDarkMode ? "text-gray-300" : "text-gray-700"
-              }`}>
+              <label className={`text-sm font-medium flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}>
                 <Flag size={16} />
                 Update Priority
               </label>
@@ -1066,13 +994,12 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
                   type="button"
                   onClick={() => setFormData({ ...formData, priority: p })}
                   disabled={!formData.updatePriority}
-                  className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors disabled:opacity-50 ${
-                    formData.priority === p && formData.updatePriority
+                  className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors disabled:opacity-50 ${formData.priority === p && formData.updatePriority
                       ? getPriorityColor(p)
                       : isDarkMode
                         ? "bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600"
                         : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
-                  }`}
+                    }`}
                 >
                   {p}
                 </button>
@@ -1089,9 +1016,8 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
                 onChange={(e) => setFormData({ ...formData, updateRemarks: e.target.checked })}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
-              <label className={`text-sm font-medium ${
-                isDarkMode ? "text-gray-300" : "text-gray-700"
-              }`}>
+              <label className={`text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}>
                 Update Remarks (Append)
               </label>
             </div>
@@ -1101,11 +1027,10 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
               disabled={!formData.updateRemarks}
               placeholder="Enter remarks to append to all selected items"
               rows={3}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50 ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50 ${isDarkMode
                   ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
                   : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
-              }`}
+                }`}
             />
             <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
               This will be appended to existing remarks, not replace them
@@ -1229,16 +1154,14 @@ export default function EditItemComponents() {
   ]
 
   return (
-    <div className={`min-h-screen p-8 transition-colors duration-300 ${
-      isDarkMode 
-        ? "bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950" 
+    <div className={`min-h-screen p-8 transition-colors duration-300 ${isDarkMode
+        ? "bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950"
         : "bg-gradient-to-br from-gray-50 via-slate-50 to-stone-50"
-    }`}>
+      }`}>
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className={`backdrop-blur-md rounded-2xl p-6 mb-6 border shadow-lg ${
-          isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-        }`}>
+        <div className={`backdrop-blur-md rounded-2xl p-6 mb-6 border shadow-lg ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+          }`}>
           <div className="flex justify-between items-center">
             <div>
               <h1 className={`text-3xl font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
@@ -1250,11 +1173,10 @@ export default function EditItemComponents() {
             </div>
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`p-3 rounded-lg transition-all ${
-                isDarkMode
+              className={`p-3 rounded-lg transition-all ${isDarkMode
                   ? "bg-gray-700 hover:bg-gray-600 text-yellow-400"
                   : "bg-white/50 hover:bg-white/70 text-gray-700"
-              }`}
+                }`}
             >
               {isDarkMode ? "☀️" : "🌙"}
             </button>
@@ -1262,9 +1184,8 @@ export default function EditItemComponents() {
         </div>
 
         {/* Demo Buttons */}
-        <div className={`backdrop-blur-md rounded-2xl p-6 border shadow-lg space-y-4 ${
-          isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-        }`}>
+        <div className={`backdrop-blur-md rounded-2xl p-6 border shadow-lg space-y-4 ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+          }`}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <button
               onClick={() => setShowItemModal(true)}
@@ -1317,9 +1238,8 @@ export default function EditItemComponents() {
         </div>
 
         {/* Info Card */}
-        <div className={`mt-6 backdrop-blur-md rounded-2xl p-6 border shadow-lg ${
-          isDarkMode ? "bg-blue-500/10 border-blue-500/30" : "bg-blue-500/10 border-blue-500/20"
-        }`}>
+        <div className={`mt-6 backdrop-blur-md rounded-2xl p-6 border shadow-lg ${isDarkMode ? "bg-blue-500/10 border-blue-500/30" : "bg-blue-500/10 border-blue-500/20"
+          }`}>
           <h3 className={`text-lg font-semibold mb-3 ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
             All Components Features:
           </h3>

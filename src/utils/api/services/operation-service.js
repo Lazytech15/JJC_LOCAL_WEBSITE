@@ -30,18 +30,8 @@ export class OperationsService extends BaseAPIService {
   }
 
   /**
-   * Create new operations item
-   * @param {Object} itemData - Item information
-   * @param {string} itemData.part_number - Item part number (required)
-   * @param {string} itemData.name - Item name (required)
-   * @param {string} [itemData.description] - Item description
-   * @param {string} [itemData.client_name] - Client name
-   * @param {string} [itemData.priority='Medium'] - Priority (High, Medium, Low)
-   * @param {string} [itemData.remarks] - Additional remarks
-   * @param {number} [itemData.qty=1] - Batch quantity
-   * @param {number} [itemData.total_qty] - Total quantity (calculated from subphases)
-   * @returns {Promise} Created item data
-   */
+ * Create new operations item
+ */
   async createItem(itemData) {
     if (!itemData.part_number) {
       throw new Error("part_number is required");
@@ -49,71 +39,64 @@ export class OperationsService extends BaseAPIService {
     if (!itemData.name) {
       throw new Error("name is required");
     }
-    // Validate priority if provided
     if (
       itemData.priority &&
       !["High", "Medium", "Low"].includes(itemData.priority)
     ) {
       throw new Error("priority must be High, Medium, or Low");
     }
-    return this.request("/api/operations/items", {
+
+    const result = await this.request("/api/operations/items", {
       method: "POST",
       body: JSON.stringify(itemData),
     });
-  }
 
-  /**
-   * Get all distinct client names
-   * @returns {Promise} Array of client names
-   */
-  async getClients() {
-    return this.request("/api/operations/clients");
+    // Invalidate cache after creating
+    this.invalidateAllItemsCache();
+
+    return result;
   }
 
   /**
    * Update item by part_number
-   * @param {string} partNumber - Item part number
-   * @param {Object} itemData - Updated item information
-   * @param {string} [itemData.name] - Item name
-   * @param {string} [itemData.description] - Item description
-   * @param {string} [itemData.client_name] - Client name
-   * @param {string} [itemData.priority] - Priority (High, Medium, Low)
-   * @param {string} [itemData.remarks] - Additional remarks
-   * @param {string} [itemData.status] - Status (not_started, in_progress, completed)
-   * @param {number} [itemData.overall_progress] - Overall progress percentage
-   * @param {number} [itemData.qty] - Batch quantity
-   * @param {number} [itemData.total_qty] - Total quantity
-   * @returns {Promise} Success confirmation
    */
   async updateItem(partNumber, itemData) {
-    // Validate priority if provided
     if (
       itemData.priority &&
       !["High", "Medium", "Low"].includes(itemData.priority)
     ) {
       throw new Error("priority must be High, Medium, or Low");
     }
-    return this.request(
+
+    const result = await this.request(
       `/api/operations/items?part_number=${encodeURIComponent(partNumber)}`,
       {
         method: "PUT",
         body: JSON.stringify(itemData),
       }
     );
+
+    // Invalidate cache for this item
+    this.invalidateItemCache(partNumber);
+
+    return result;
   }
 
   /**
    * Delete item (cascades to phases and subphases)
-   * @param {string} partNumber - Item part number
-   * @returns {Promise} Deletion confirmation
    */
   async deleteItem(partNumber) {
-    return this.request(
+    const result = await this.request(
       `/api/operations/items?part_number=${encodeURIComponent(partNumber)}`,
       {
         method: "DELETE",
       }
     );
+
+    // Invalidate cache after deleting
+    this.invalidateAllItemsCache();
+
+    return result;
   }
 
   // ==================== PHASE METHODS ====================
@@ -139,10 +122,8 @@ export class OperationsService extends BaseAPIService {
   }
 
   /**
-   * Create new phase
-   * @param {Object} phaseData - Phase information (part_number, name)
-   * @returns {Promise} Created phase data
-   */
+ * Create new phase
+ */
   async createPhase(phaseData) {
     if (!phaseData.part_number) {
       throw new Error("part_number is required");
@@ -150,34 +131,45 @@ export class OperationsService extends BaseAPIService {
     if (!phaseData.name) {
       throw new Error("name is required");
     }
-    return this.request("/api/operations/phases", {
+
+    const result = await this.request("/api/operations/phases", {
       method: "POST",
       body: JSON.stringify(phaseData),
     });
+
+    // Invalidate cache for the item
+    this.invalidateItemCache(phaseData.part_number);
+
+    return result;
   }
 
   /**
    * Update phase by ID
-   * @param {number|string} id - Phase ID
-   * @param {Object} phaseData - Updated phase information (name, phase_order, progress, actual_hours)
-   * @returns {Promise} Success confirmation
    */
   async updatePhase(id, phaseData) {
-    return this.request(`/api/operations/phases?id=${id}`, {
+    const result = await this.request(`/api/operations/phases?id=${id}`, {
       method: "PUT",
       body: JSON.stringify(phaseData),
     });
+
+    // Invalidate all items cache since we don't know which item this phase belongs to
+    this.invalidateAllItemsCache();
+
+    return result;
   }
 
   /**
    * Delete phase (cascades to subphases)
-   * @param {number|string} id - Phase ID
-   * @returns {Promise} Deletion confirmation
    */
   async deletePhase(id) {
-    return this.request(`/api/operations/phases?id=${id}`, {
+    const result = await this.request(`/api/operations/phases?id=${id}`, {
       method: "DELETE",
     });
+
+    // Invalidate all items cache
+    this.invalidateAllItemsCache();
+
+    return result;
   }
 
   // ==================== SUBPHASE METHODS ====================
@@ -201,16 +193,8 @@ export class OperationsService extends BaseAPIService {
   }
 
   /**
-   * Create new subphase
-   * @param {Object} subphaseData - Subphase information
-   * @param {string} subphaseData.part_number - Item part number (required)
-   * @param {number} subphaseData.phase_id - Phase ID (required)
-   * @param {string} subphaseData.name - Subphase name (required)
-   * @param {number} [subphaseData.time_duration=0] - Duration in seconds until subphase completion
-   * @param {number} [subphaseData.expected_duration=0] - Expected duration in hours
-   * @param {number} [subphaseData.expected_quantity=0] - Expected quantity
-   * @returns {Promise} Created subphase data
-   */
+  * Create new subphase
+  */
   async createSubphase(subphaseData) {
     if (!subphaseData.part_number) {
       throw new Error("part_number is required");
@@ -221,38 +205,45 @@ export class OperationsService extends BaseAPIService {
     if (!subphaseData.name) {
       throw new Error("name is required");
     }
-    return this.request("/api/operations/subphases", {
+
+    const result = await this.request("/api/operations/subphases", {
       method: "POST",
       body: JSON.stringify(subphaseData),
     });
+
+    // Invalidate cache for the item
+    this.invalidateItemCache(subphaseData.part_number);
+
+    return result;
   }
 
   /**
    * Update subphase by ID
-   * @param {number|string} id - Subphase ID
-   * @param {Object} subphaseData - Updated subphase information
-   * @param {string} [subphaseData.name] - Subphase name
-   * @param {number} [subphaseData.time_duration] - Duration in seconds until completion
-   * @param {number} [subphaseData.expected_duration] - Expected duration in hours
-   * @param {number} [subphaseData.actual_hours] - Actual hours spent
-   * @param {number} [subphaseData.subphase_order] - Display order
-   * @returns {Promise} Success confirmation
    */
   async updateSubphase(id, subphaseData) {
-    return this.request(`/api/operations/subphases?id=${id}`, {
+    const result = await this.request(`/api/operations/subphases?id=${id}`, {
       method: "PUT",
       body: JSON.stringify(subphaseData),
     });
+
+    // Invalidate all items cache
+    this.invalidateAllItemsCache();
+
+    return result;
   }
+
   /**
    * Delete subphase
-   * @param {number|string} id - Subphase ID
-   * @returns {Promise} Deletion confirmation
    */
   async deleteSubphase(id) {
-    return this.request(`/api/operations/subphases?id=${id}`, {
+    const result = await this.request(`/api/operations/subphases?id=${id}`, {
       method: "DELETE",
     });
+
+    // Invalidate all items cache
+    this.invalidateAllItemsCache();
+
+    return result;
   }
 
   // ==================== ACTION METHODS ====================
@@ -1016,5 +1007,164 @@ export class OperationsService extends BaseAPIService {
         }),
       }
     );
+  }
+
+  async completeSubphaseWithDuration(subphaseId, completed = true, timeDuration = null) {
+    const result = await this.request("/api/operations/complete-subphase", {
+      method: "POST",
+      body: JSON.stringify({
+        subphase_id: subphaseId,
+        completed,
+        time_duration: timeDuration,
+      }),
+    });
+
+    this.invalidateAllItemsCache();
+    return result;
+  }
+
+  async assignEmployee(subphaseId, employeeBarcode) {
+    const result = await this.request("/api/operations/assign-employee", {
+      method: "POST",
+      body: JSON.stringify({
+        subphase_id: subphaseId,
+        employee_barcode: employeeBarcode,
+      }),
+    });
+
+    this.invalidateAllItemsCache();
+    return result;
+  }
+
+  async startPhaseProcess(partNumber, phaseId) {
+    const result = await this.request(`/api/operations/start-item`, {
+      method: "POST",
+      body: JSON.stringify({
+        part_number: partNumber,
+        phase_id: phaseId,
+      }),
+    });
+
+    this.invalidateItemCache(partNumber);
+    return result;
+  }
+
+  async stopPhaseProcess(partNumber, phaseId) {
+    const result = await this.request(`/api/operations/stop-item`, {
+      method: "POST",
+      body: JSON.stringify({
+        part_number: partNumber,
+        phase_id: phaseId,
+      }),
+    });
+
+    this.invalidateItemCache(partNumber);
+    return result;
+  }
+
+  async pausePhaseProcess(partNumber, phaseId) {
+    const result = await this.request(`/api/operations/pause-phase`, {
+      method: "POST",
+      body: JSON.stringify({
+        part_number: partNumber,
+        phase_id: phaseId,
+      }),
+    });
+
+    this.invalidateItemCache(partNumber);
+    return result;
+  }
+
+  async resumePhaseProcess(partNumber, phaseId) {
+    const result = await this.request(`/api/operations/resume-phase`, {
+      method: "POST",
+      body: JSON.stringify({
+        part_number: partNumber,
+        phase_id: phaseId,
+      }),
+    });
+
+    this.invalidateItemCache(partNumber);
+    return result;
+  }
+
+  async resetPhaseProcess(partNumber, phaseId) {
+    const result = await this.request(`/api/operations/reset-item`, {
+      method: "POST",
+      body: JSON.stringify({
+        part_number: partNumber,
+        phase_id: phaseId,
+      }),
+    });
+
+    this.invalidateItemCache(partNumber);
+    return result;
+  }
+
+  async updateSubphaseCompletedQuantity(subphaseId, currentCompletedQuantity) {
+    const result = await this.request(
+      `/api/operations/update-completed-quantity?id=${subphaseId}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          current_completed_quantity: currentCompletedQuantity,
+        }),
+      }
+    );
+
+    this.invalidateAllItemsCache();
+    return result;
+  }
+
+  // ==================== CACHE MANAGEMENT METHODS ====================
+
+  /**
+   * Invalidate cache for specific item
+   * @param {string} partNumber - Part number to invalidate
+   */
+  async invalidateItemCache(partNumber) {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'REFRESH_ITEM',
+        partNumber
+      })
+    }
+  }
+
+  /**
+   * Invalidate entire items cache
+   */
+  async invalidateAllItemsCache() {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'REFRESH_ALL_ITEMS'
+      })
+    }
+  }
+
+  /**
+   * Force update items from server
+   */
+  async forceUpdateItemsCache() {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      const messageChannel = new MessageChannel()
+
+      return new Promise((resolve, reject) => {
+        messageChannel.port1.onmessage = (event) => {
+          if (event.data.success) {
+            resolve()
+          } else {
+            reject(new Error(event.data.error))
+          }
+        }
+
+        navigator.serviceWorker.controller.postMessage(
+          { type: 'FORCE_UPDATE_ITEMS' },
+          [messageChannel.port2]
+        )
+
+        setTimeout(() => reject(new Error('Timeout')), 30000)
+      })
+    }
   }
 }

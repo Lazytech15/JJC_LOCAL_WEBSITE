@@ -45,7 +45,6 @@ function Checklist({
   setScanningFor,
   apiService,
   formatTime,
-  formatActionDuration,
   loadData,
 }) {
   const { isDarkMode } = useAuth() // Get dark mode status from AuthContext
@@ -55,6 +54,7 @@ function Checklist({
   const [filterClient, setFilterClient] = useState("")
   const [filterPriority, setFilterPriority] = useState("")
   const [showFilters, setShowFilters] = useState(false)
+  const [sortBy, setSortBy] = useState("name-asc")
   const [transferModalOpen, setTransferModalOpen] = useState(false)
   const [selectedSubphase, setSelectedSubphase] = useState(null)
   const [selectedItem, setSelectedItem] = useState(null)
@@ -129,20 +129,23 @@ function Checklist({
   }
 
   // Auto-stop item when it reaches 100%
-  useEffect(() => {
-    items.forEach((item) => {
-      if (item.phases) {
-        item.phases.forEach((phase) => {
-          const phaseProgress = calculatePhaseProgress(phase)
-          // Auto-stop phase when all subphases are complete
-          if (phaseProgress === 100 && phase.start_time && !phase.end_time && !phase.pause_time) {
-            // Use silent completion (no reload) and auto-start next phase
-            handleStopPhase(item.part_number, phase.id)
-          }
-        })
-      }
-    })
-  }, [items])
+useEffect(() => {
+  items.forEach((item) => {
+    // ADD SAFETY CHECK HERE
+    if (!item || !item.phases) return;
+    
+    if (item.phases) {
+      item.phases.forEach((phase) => {
+        const phaseProgress = calculatePhaseProgress(phase)
+        // Auto-stop phase when all subphases are complete
+        if (phaseProgress === 100 && phase.start_time && !phase.end_time && !phase.pause_time) {
+          // Use silent completion (no reload) and auto-start next phase
+          handleStopPhase(item.part_number, phase.id)
+        }
+      })
+    }
+  })
+}, [items])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -191,15 +194,19 @@ function Checklist({
     })
   }, [items])
 
-  // Load items for selected client
-  useEffect(() => {
-    if (newClient.trim() && transferModalOpen) {
-      const filtered = items.filter((item) => item.client_name === newClient.trim() && item.name === selectedItem?.name)
-      setClientItems(filtered)
-    } else {
-      setClientItems([])
-    }
-  }, [newClient, items, selectedItem, transferModalOpen])
+ // Load items for selected client
+useEffect(() => {
+  if (newClient.trim() && transferModalOpen) {
+    const basePartNumber = getBasePartNumber(selectedItem?.part_number);
+    const filtered = items.filter((item) => {
+      const itemBasePartNumber = getBasePartNumber(item.part_number);
+      return item.client_name === newClient.trim() && itemBasePartNumber === basePartNumber;
+    });
+    setClientItems(filtered)
+  } else {
+    setClientItems([])
+  }
+}, [newClient, items, selectedItem, transferModalOpen])
 
   // Filter clients for dropdown
   useEffect(() => {
@@ -616,16 +623,6 @@ function Checklist({
     const end = item.end_time ? new Date(item.end_time) : new Date()
     return Math.floor((end - start) / 1000)
   }
-
-  // const formatTime = (seconds) => {
-  //   const hours = Math.floor(seconds / 3600)
-  //   const minutes = Math.floor((seconds % 3600) / 60)
-  //   const secs = seconds % 60
-  //   return `${hours.toString().padStart(2, "0")}:${minutes
-  //     .toString()
-  //     .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
-  // }
-
   const formatDateTime = (isoString) => {
     if (!isoString) return "Not started"
     return new Date(isoString).toLocaleString("en-PH", {
@@ -653,26 +650,58 @@ function Checklist({
     }
   }
 
-  // Filter items based on search and filters
-  const filteredItems = items.filter((item) => {
-    const matchesSearch =
-      !searchTerm ||
-      item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.part_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
+// Filter items based on search and filters
+const filteredItems = items.filter((item) => {
+  // Safety check for item structure - ADD part_number check here
+  if (!item || !item.part_number) return false  // ← Changed from just "if (!item)"
 
-    const matchesClient = !filterClient || item.client_name === filterClient
-    const matchesPriority = !filterPriority || item.priority === filterPriority
+  const matchesSearch =
+    !searchTerm ||
+    item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.part_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
 
-    return matchesSearch && matchesClient && matchesPriority
+  const matchesClient = !filterClient || item.client_name === filterClient
+  const matchesPriority = !filterPriority || item.priority === filterPriority
+
+  return matchesSearch && matchesClient && matchesPriority
+})
+
+  // Separate completed and in-progress items with safety checks
+  const completedItems = filteredItems.filter((item) => {
+    try {
+      return calculateItemProgress(item) === 100
+    } catch (err) {
+      console.warn('Error calculating progress for item:', item?.part_number, err)
+      return false
+    }
+  })
+  const inProgressItems = filteredItems.filter((item) => {
+    try {
+      return calculateItemProgress(item) < 100
+    } catch (err) {
+      console.warn('Error calculating progress for item:', item?.part_number, err)
+      return true // Include items with errors in "in progress"
+    }
   })
 
-  // Separate completed and in-progress items
-  const completedItems = filteredItems.filter((item) => calculateItemProgress(item) === 100)
-  const inProgressItems = filteredItems.filter((item) => calculateItemProgress(item) < 100)
-
-  // Sort in-progress items by priority
+  // Sort in-progress items
   const sortedInProgressItems = [...inProgressItems].sort((a, b) => {
+    // Apply custom sort if selected
+    if (sortBy === "name-asc") {
+      return (a.name || "").localeCompare(b.name || "")
+    }
+    if (sortBy === "name-desc") {
+      return (b.name || "").localeCompare(a.name || "")
+    }
+    if (sortBy === "date-newest") {
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0)
+    }
+    if (sortBy === "date-oldest") {
+      return new Date(a.created_at || 0) - new Date(b.created_at || 0)
+    }
+
+    // Default: sort by priority
     const priorityOrder = { High: 0, Medium: 1, Low: 2 }
     const aPriority = a.priority || "Medium"
     const bPriority = b.priority || "Medium"
@@ -680,7 +709,11 @@ function Checklist({
   })
 
   // Get unique clients for filter
-  const uniqueClients = [...new Set(items.map((item) => item.client_name).filter(Boolean))]
+  const uniqueClients = [...new Set(
+  items
+    .filter(item => item && item.client_name)
+    .map((item) => item.client_name)
+)]
 
   // Helper function to check if previous subphase is completed
   const isPreviousSubphaseCompleted = (item, phase, currentSubphaseIndex) => {
@@ -864,6 +897,14 @@ function Checklist({
     // Previous phase must be completed (100% progress)
     return calculatePhaseProgress(previousPhase) === 100 && previousPhase.end_time
   }
+
+  // Helper function to extract base part number (remove batch suffix)
+const getBasePartNumber = (partNumber) => {
+  if (!partNumber) return '';
+  // Extract only the numeric part before "-BATCH-"
+  const match = partNumber.match(/^(\d+)/);
+  return match ? match[1] : partNumber;
+};
 
   // Edit Component
   // Edit Item Handler - OPTIMISTIC UPDATE
@@ -1272,13 +1313,13 @@ function Checklist({
           >
             <Filter size={18} />
             <span className="hidden sm:inline">Filters</span>
-            {(filterClient || filterPriority) && `(${[filterClient, filterPriority].filter(Boolean).length})`}
+            {(filterClient || filterPriority || sortBy) && `(${[filterClient, filterPriority, sortBy].filter(Boolean).length})`}
           </button>
         </div>
 
         {/* Filter Options */}
         {showFilters && (
-          <div className="mt-3 pt-3 border-t border-gray-300/20 dark:border-gray-700/20 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="mt-3 pt-3 border-t border-gray-300/20 dark:border-gray-700/20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Filter by Client
@@ -1319,12 +1360,33 @@ function Checklist({
               </select>
             </div>
 
-            {(filterClient || filterPriority) && (
-              <div className="sm:col-span-2">
+            <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Sort by
+                  </label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all ${isDarkMode
+                        ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                        : "bg-white/50 border border-gray-300/30 text-gray-800"
+                      }`}
+                  >
+                    <option value="">Default</option>
+                    <option value="name-asc">Name (A-Z)</option>
+                    <option value="name-desc">Name (Z-A)</option>
+                    <option value="date-newest">Date Added (Newest)</option>
+                    <option value="date-oldest">Date Added (Oldest)</option>
+                  </select>
+                </div>
+
+            {(filterClient || filterPriority || sortBy) && (
+              <div className="sm:col-span-2 lg:col-span-3">
                 <button
                   onClick={() => {
                     setFilterClient("")
                     setFilterPriority("")
+                    setSortBy("")
                   }}
                   className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                 >
@@ -1513,7 +1575,7 @@ function Checklist({
                         className={`text-sm p-3 rounded ${isDarkMode ? "text-yellow-400 bg-yellow-500/10" : "text-yellow-600 bg-yellow-500/10"
                           }`}
                       >
-                        No matching items found for "{selectedItem.name}" under client "{newClient}"
+                        No matching items found for part number "{getBasePartNumber(selectedItem?.part_number)}" under client "{newClient}"
                       </p>
                     )}
                   </div>
@@ -1784,10 +1846,10 @@ function Checklist({
                                   key={p}
                                   onClick={() => handleUpdatePriority(item.part_number, p)}
                                   className={`px-2 py-1 text-xs rounded transition-colors ${priority === p
-                                      ? getPriorityColor(p)
-                                      : isDarkMode
-                                        ? "text-gray-400 hover:text-gray-300"
-                                        : "text-gray-400 hover:text-gray-600"
+                                    ? getPriorityColor(p)
+                                    : isDarkMode
+                                      ? "text-gray-400 hover:text-gray-300"
+                                      : "text-gray-400 hover:text-gray-600"
                                     }`}
                                   title={`Set ${p} priority`}
                                 >
@@ -1832,6 +1894,33 @@ function Checklist({
                                 title="Add phase"
                               >
                                 <Plus size={16} />
+                              </button>
+
+                              {/* DELETE ITEM BUTTON */}
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm(`Delete "${item.name}" (${item.part_number})?\n\nThis will permanently delete all phases and subphases. This action cannot be undone.`)) {
+                                    try {
+                                      // Optimistically remove from UI
+                                      setItems(prevItems => prevItems.filter(i => i.part_number !== item.part_number));
+
+                                      // API call in background
+                                      await apiService.operations.deleteItem(item.part_number);
+
+                                      alert(`"${item.name}" has been deleted successfully.`);
+                                    } catch (error) {
+                                      console.error("Error deleting item:", error);
+                                      alert("Failed to delete item: " + error.message);
+                                      // Reload on error to restore state
+                                      await loadData();
+                                    }
+                                  }
+                                }}
+                                className="px-2 py-1 text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                title="Delete item"
+                              >
+                                <Trash2 size={16} />
                               </button>
 
                               {/* TRANSFER BUTTON */}

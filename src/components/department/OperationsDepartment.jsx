@@ -1,11 +1,12 @@
 import { useAuth } from "../../contexts/AuthContext"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, lazy } from "react"
 import apiService from "../../utils/api/api-service"
 import Dashboard from "../op/Dashboard.jsx"
 import AddItems from "../op/AddItem.jsx"
 import Checklist from "../op/CheckList.jsx"
 import Reports from "../op/Report.jsx"
 import ItemComparison from "../op/ItemComparison.jsx"
+const GearLoadingSpinner = lazy(() => import("../../../public/LoadingGear.jsx"))
 import { Menu, X, ArrowUp } from 'lucide-react'
 
 function OperationsDepartment() {
@@ -19,6 +20,8 @@ function OperationsDepartment() {
   const [showScrollTop, setShowScrollTop] = useState(false)
   const [scanningFor, setScanningFor] = useState(null)
   const [barcodeInput, setBarcodeInput] = useState("")
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false)
+  const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0, message: '' })
 
   // UI states
   const [expandedItems, setExpandedItems] = useState({})
@@ -62,20 +65,23 @@ function OperationsDepartment() {
 
 
   useEffect(() => {
-    if (items.length > 0) {
+    if (items.length > 0 && !initialLoadComplete) {
       const needsDetails = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
 
       if (needsDetails) {
         const hasItemsWithoutDetails = items.some(item =>
-          !item.phases || (item.phase_count > 0 && (!item.phases || item.phases.length === 0))
+          !item.phases || !Array.isArray(item.phases) ||
+          (item.phase_count > 0 && item.phases.length === 0)
         )
 
         if (hasItemsWithoutDetails) {
           loadAllItemDetails()
+        } else {
+          setInitialLoadComplete(true)
         }
       }
     }
-  }, [activeTab, items.length])
+  }, [activeTab, items.length, initialLoadComplete])
 
   useEffect(() => {
     if (refreshIntervalRef.current) {
@@ -87,8 +93,8 @@ function OperationsDepartment() {
 
     if (needsRefresh && items.length > 0) {
       const hasActivePhases = items.some(item =>
-        item.phases?.some(phase =>
-          phase.start_time && !phase.end_time
+        item && Array.isArray(item.phases) && item.phases.some(phase =>
+          phase && phase.start_time && !phase.end_time
         )
       )
 
@@ -100,7 +106,6 @@ function OperationsDepartment() {
         }, 30000)
       }
     }
-
     return () => {
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current)
@@ -118,7 +123,9 @@ function OperationsDepartment() {
       console.log('Refreshing active data...')
 
       const activeItems = items.filter(item =>
-        item.phases?.some(phase => phase.start_time && !phase.end_time)
+        item && Array.isArray(item.phases) && item.phases.some(phase =>
+          phase && phase.start_time && !phase.end_time
+        )
       )
 
       if (activeItems.length === 0) return
@@ -199,18 +206,142 @@ function OperationsDepartment() {
   }
 
   const loadAllItemDetails = async () => {
+    if (items.length === 0) {
+      console.log('[LoadDetails] No items to load')
+      return
+    }
+
     try {
-      console.log('Loading full details for all items...')
-      const itemsWithDetails = await Promise.all(
-        items.map(item => apiService.operations.getItem(item.part_number))
-      )
-      console.log('All items with details:', itemsWithDetails)
+      console.log(`[LoadDetails] Starting to load ${items.length} items with full details`)
+      setLoadingProgress({
+        current: 0,
+        total: items.length,
+        message: 'Starting to load item details...'
+      })
+
+      const batchSize = 5 // Reduced from 10 for more reliability
+      const batches = []
+
+      for (let i = 0; i < items.length; i += batchSize) {
+        batches.push(items.slice(i, i + batchSize))
+      }
+
+      const allItemsWithDetails = []
+      const failedItems = []
+
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex]
+
+        console.log(`[Batch ${batchIndex + 1}/${batches.length}] Processing ${batch.length} items`)
+
+        setLoadingProgress({
+          current: allItemsWithDetails.length,
+          total: items.length,
+          message: `Loading batch ${batchIndex + 1} of ${batches.length}...`
+        })
+
+        const batchResults = await Promise.allSettled(
+          batch.map(item => loadItemWithRetry(item.part_number, 3))
+        )
+
+        batchResults.forEach((result, index) => {
+          const item = batch[index]
+
+          if (result.status === 'fulfilled' && result.value) {
+            allItemsWithDetails.push(result.value)
+            console.log(`[Success] ${item.part_number} loaded`)
+          } else {
+            console.warn(`[Failed] ${item.part_number}:`, result.reason?.message)
+
+            // Keep the basic item data even if details failed to load
+            allItemsWithDetails.push({
+              ...item,
+              _loadError: true,
+              _errorMessage: result.reason?.message || 'Failed to load details'
+            })
+
+            failedItems.push({
+              part_number: item.part_number,
+              error: result.reason?.message
+            })
+          }
+        })
+
+        setLoadingProgress({
+          current: allItemsWithDetails.length,
+          total: items.length,
+          message: `Loaded ${allItemsWithDetails.length} of ${items.length} items...`
+        })
+
+        // Longer delay between batches to avoid overwhelming the server
+        if (batchIndex < batches.length - 1) {
+          console.log('[Batch] Waiting 1s before next batch...')
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+      }
+
+      console.log(`[LoadDetails] Complete: ${allItemsWithDetails.length} items loaded`)
+
+      if (failedItems.length > 0) {
+        console.warn(`[LoadDetails] ${failedItems.length} items failed to load details:`, failedItems)
+
+        // Show a warning to the user
+        setError(`Loaded ${allItemsWithDetails.length - failedItems.length} of ${items.length} items. ${failedItems.length} items have limited details.`)
+      }
+
       if (isMountedRef.current) {
-        setItems(itemsWithDetails)
+        setItems(allItemsWithDetails)
+        setLoadingProgress({
+          current: allItemsWithDetails.length,
+          total: items.length,
+          message: failedItems.length > 0
+            ? `Complete with ${failedItems.length} warnings`
+            : 'Complete! Preparing dashboard...'
+        })
+
+        // Small delay to show completion message
+        setTimeout(() => {
+          setInitialLoadComplete(true)
+        }, 500)
       }
     } catch (err) {
-      console.error('Failed to load all item details:', err)
+      console.error('[LoadDetails] Critical error:', err)
+      setError('Failed to load item details: ' + err.message)
+      setInitialLoadComplete(true)
     }
+  }
+
+  const loadItemWithRetry = async (partNumber, maxRetries = 3) => {
+    let lastError
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[Attempt ${attempt}/${maxRetries}] Loading ${partNumber}`)
+        const result = await apiService.operations.getItem(partNumber)
+        console.log(`[Success] Loaded ${partNumber}`)
+        return result
+      } catch (error) {
+        lastError = error
+        console.warn(`[Attempt ${attempt}/${maxRetries}] Failed for ${partNumber}:`, error.message)
+
+        // If it's a 404 or item not found, don't retry
+        if (error.message && (error.message.includes('404') || error.message.includes('not found'))) {
+          console.log(`[Skip] Item ${partNumber} not found, skipping retries`)
+          throw error
+        }
+
+        // Only retry if we haven't exhausted attempts
+        if (attempt < maxRetries) {
+          // Exponential backoff: 1s, 2s, 4s
+          const delay = Math.pow(2, attempt - 1) * 1000
+          console.log(`[Wait] Retrying ${partNumber} in ${delay}ms...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+        }
+      }
+    }
+
+    console.error(`[Failed] All retries exhausted for ${partNumber}`)
+    throw lastError
   }
 
   const loadItemDetails = async (partNumber) => {
@@ -394,15 +525,16 @@ function OperationsDepartment() {
       setError('Failed to assign employee: ' + err.message)
     }
   }
-
   const calculatePhaseProgress = (phase) => {
-    if (!phase.subphases || phase.subphases.length === 0) return 0
+    if (!phase || !Array.isArray(phase.subphases) || phase.subphases.length === 0) return 0
+
     const completed = phase.subphases.filter(sp => sp.completed == 1).length
     return Math.round((completed / phase.subphases.length) * 100)
   }
 
   const calculateItemProgress = (item) => {
-    if (!item.phases || item.phases.length === 0) return 0
+    if (!item || !Array.isArray(item.phases) || item.phases.length === 0) return 0
+
     const totalProgress = item.phases.reduce((sum, phase) => sum + calculatePhaseProgress(phase), 0)
     return Math.round(totalProgress / item.phases.length)
   }
@@ -436,6 +568,10 @@ function OperationsDepartment() {
   }
 
   const handleTabChange = (tab) => {
+    if (!initialLoadComplete && (tab === "checklist" || tab === "dashboard" || tab === "reports")) {
+      alert("Please wait for all items to finish loading...")
+      return
+    }
     setActiveTab(tab)
     setMobileMenuOpen(false)
   }
@@ -497,15 +633,150 @@ function OperationsDepartment() {
           </div>
         </div>
 
-        {/* Loading State */}
+        {/* Custom Gear Loading State - Show while initial data loads */}
         {loading && (
-          <div className="text-center py-8">
-            <div className={`animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 mx-auto ${isDarkMode ? "border-slate-400" : "border-slate-600"
-              }`}></div>
-            <p className={`text-sm sm:text-base mt-4 ${textSecondaryClass}`}>Loading operations data...</p>
-          </div>
+          <GearLoadingSpinner isDarkMode={isDarkMode} />
         )}
 
+        {/* Loading Progress for Item Details - Show after initial load */}
+        {!loading && !initialLoadComplete && loadingProgress.total > 0 && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/30">
+            <div className={`max-w-md w-full mx-4 backdrop-blur-md rounded-2xl p-8 border shadow-2xl transition-all duration-300 ${isDarkMode
+                ? "bg-gray-800/90 border-gray-700/50"
+                : "bg-white/90 border-white/50"
+              }`}>
+              {/* Gear Animation */}
+              <div className="flex justify-center mb-6">
+                <div className="relative flex items-center justify-center">
+                  {/* Left Small Gear */}
+                  <div className="absolute -left-6 bottom-2">
+                    <svg
+                      className="w-12 h-12 animate-spin"
+                      style={{ animationDuration: '2s' }}
+                      viewBox="0 0 120 120"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <g transform="translate(60, 60)">
+                        {[...Array(8)].map((_, i) => {
+                          const angle = (i * 360) / 8;
+                          return (
+                            <rect
+                              key={i}
+                              x="-6"
+                              y="-40"
+                              width="12"
+                              height="15"
+                              fill={isDarkMode ? "#64748B" : "#546E7A"}
+                              transform={`rotate(${angle})`}
+                            />
+                          );
+                        })}
+                        <circle cx="0" cy="0" r="32" fill={isDarkMode ? "#64748B" : "#546E7A"} />
+                        <circle cx="0" cy="0" r="20" fill="none" stroke={isDarkMode ? "#38BDF8" : "#7DD3C0"} strokeWidth="3" />
+                        <circle cx="0" cy="0" r="20" fill={isDarkMode ? "#1E293B" : "#F3F4F6"} />
+                      </g>
+                    </svg>
+                  </div>
+
+                  {/* Center Large Gear */}
+                  <div className="z-10">
+                    <svg
+                      className="w-28 h-28 animate-spin"
+                      style={{ animationDuration: '3s', animationDirection: 'reverse' }}
+                      viewBox="0 0 140 140"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <g transform="translate(70, 70)">
+                        {[...Array(12)].map((_, i) => {
+                          const angle = (i * 360) / 12;
+                          return (
+                            <rect
+                              key={i}
+                              x="-8"
+                              y="-55"
+                              width="16"
+                              height="20"
+                              fill="#546E7A"
+                              transform={`rotate(${angle})`}
+                            />
+                          );
+                        })}
+                        <circle cx="0" cy="0" r="45" fill={isDarkMode ? "#64748B" : "#546E7A"} />
+                        <circle cx="0" cy="0" r="28" fill="none" stroke={isDarkMode ? "#38BDF8" : "#7DD3C0"} strokeWidth="4" />
+                        <circle cx="0" cy="0" r="28" fill={isDarkMode ? "#1E293B" : "#F3F4F6"} />
+                      </g>
+                    </svg>
+                  </div>
+
+                  {/* Right Small Gear */}
+                  <div className="absolute -right-6 bottom-2">
+                    <svg
+                      className="w-12 h-12 animate-spin"
+                      style={{ animationDuration: '2s' }}
+                      viewBox="0 0 120 120"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <g transform="translate(60, 60)">
+                        {[...Array(8)].map((_, i) => {
+                          const angle = (i * 360) / 8;
+                          return (
+                            <rect
+                              key={i}
+                              x="-6"
+                              y="-40"
+                              width="12"
+                              height="15"
+                              fill={isDarkMode ? "#64748B" : "#546E7A"}
+                              transform={`rotate(${angle})`}
+                            />
+                          );
+                        })}
+                        <circle cx="0" cy="0" r="32" fill={isDarkMode ? "#64748B" : "#546E7A"} />
+                        <circle cx="0" cy="0" r="20" fill="none" stroke={isDarkMode ? "#38BDF8" : "#7DD3C0"} strokeWidth="3" />
+                        <circle cx="0" cy="0" r="20" fill={isDarkMode ? "#1E293B" : "#F3F4F6"} />
+                      </g>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Loading Text */}
+              <h3 className={`text-xl font-bold text-center mb-3 ${textPrimaryClass}`}>
+                Loading Item Details
+              </h3>
+
+              <p className={`text-center mb-4 ${textSecondaryClass}`}>
+                {loadingProgress.message || `Processing ${loadingProgress.current} of ${loadingProgress.total} items...`}
+              </p>
+
+              {/* Progress Bar */}
+              <div className={`w-full rounded-full h-3 mb-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
+                <div
+                  className="bg-gradient-to-r from-blue-500 to-cyan-500 h-3 rounded-full transition-all duration-300 relative overflow-hidden"
+                  style={{ width: `${(loadingProgress.current / loadingProgress.total) * 100}%` }}
+                >
+                  <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                </div>
+              </div>
+
+              {/* Percentage */}
+              <p className={`text-center text-sm font-mono ${textSecondaryClass}`}>
+                {Math.round((loadingProgress.current / loadingProgress.total) * 100)}%
+              </p>
+
+              {/* Warning Message */}
+              <div className={`mt-4 p-3 rounded-lg ${isDarkMode ? "bg-yellow-900/20 border border-yellow-700/50" : "bg-yellow-50 border border-yellow-300"
+                }`}>
+                <p className={`text-xs text-center ${isDarkMode ? "text-yellow-300" : "text-yellow-700"}`}>
+                  ⏳ Please wait... Do not close or refresh the page
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Error State */}
         {error && (
           <div className={`backdrop-blur-sm border rounded-lg p-4 mb-6 transition-all duration-300 ${isDarkMode
@@ -532,16 +803,23 @@ function OperationsDepartment() {
                   <button
                     key={tab.id}
                     onClick={() => handleTabChange(tab.id)}
+                    disabled={!initialLoadComplete && (tab.id === "checklist" || tab.id === "dashboard" || tab.id === "reports")}
                     className={`flex-1 px-4 py-3 font-medium transition-colors ${activeTab === tab.id
-                      ? isDarkMode
-                        ? "border-b-2 border-slate-400 text-slate-300"
-                        : "border-b-2 border-slate-600 text-slate-700"
-                      : isDarkMode
-                        ? "text-gray-400 hover:text-slate-400"
-                        : "text-gray-600 hover:text-slate-600"
+                        ? isDarkMode
+                          ? "border-b-2 border-slate-400 text-slate-300"
+                          : "border-b-2 border-slate-600 text-slate-700"
+                        : isDarkMode
+                          ? "text-gray-400 hover:text-slate-400"
+                          : "text-gray-600 hover:text-slate-600"
+                      } ${!initialLoadComplete && (tab.id === "checklist" || tab.id === "dashboard" || tab.id === "reports")
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
                       }`}
                   >
                     {tab.label}
+                    {!initialLoadComplete && (tab.id === "checklist" || tab.id === "dashboard" || tab.id === "reports") && (
+                      <span className="ml-2 text-xs">⏳</span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -569,16 +847,23 @@ function OperationsDepartment() {
                     <button
                       key={tab.id}
                       onClick={() => handleTabChange(tab.id)}
-                      className={`w-full text-left px-4 py-3 transition-colors ${activeTab === tab.id
-                        ? isDarkMode
-                          ? "bg-slate-700/40 text-slate-300 font-medium"
-                          : "bg-slate-500/20 text-slate-700 font-medium"
-                        : isDarkMode
-                          ? "text-gray-400 hover:bg-gray-800/40"
-                          : "text-gray-600 hover:bg-white/30"
+                      disabled={!initialLoadComplete && (tab.id === "checklist" || tab.id === "dashboard" || tab.id === "reports")}
+                      className={`flex-1 px-4 py-3 font-medium transition-colors ${activeTab === tab.id
+                          ? isDarkMode
+                            ? "border-b-2 border-slate-400 text-slate-300"
+                            : "border-b-2 border-slate-600 text-slate-700"
+                          : isDarkMode
+                            ? "text-gray-400 hover:text-slate-400"
+                            : "text-gray-600 hover:text-slate-600"
+                        } ${!initialLoadComplete && (tab.id === "checklist" || tab.id === "dashboard" || tab.id === "reports")
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
                         }`}
                     >
                       {tab.label}
+                      {!initialLoadComplete && (tab.id === "checklist" || tab.id === "dashboard" || tab.id === "reports") && (
+                        <span className="ml-2 text-xs">⏳</span>
+                      )}
                     </button>
                   ))}
                 </div>

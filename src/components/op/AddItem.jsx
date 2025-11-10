@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react"
-import { Trash2, Plus, Copy, Search, User, Flag, Package, AlertTriangle } from "lucide-react"
+import { Trash2, Plus, Copy, Search, User, Flag, Package, AlertTriangle, Sheet } from "lucide-react"
 import { useAuth } from "../../contexts/AuthContext"
+import ExcelImportModal from "./ImportExcelItem"
 
 function AddItems({ items, submitting, apiService }) {
   const [partNumber, setPartNumber] = useState("")
@@ -24,6 +25,7 @@ function AddItems({ items, submitting, apiService }) {
   const clientDropdownRef = useRef(null)
 
   const { isDarkMode, user } = useAuth()
+  const [showImportModal, setShowImportModal] = useState(false)
 
 
   // Load existing clients on mount
@@ -353,16 +355,28 @@ function AddItems({ items, submitting, apiService }) {
 
   return (
     <div className="space-y-6">
+      {/* UPDATED HEADER - Add Import Button */}
       <div className="flex justify-between items-center">
-        <h2 className={`text-2xl font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
-          Add Item with Phases & Sub-Phases
-        </h2>
-        {loadingTemplate && (
-          <span className={`text-sm flex items-center gap-2 ${isDarkMode ? "text-blue-400" : "text-blue-500"}`}>
-            <div className={`animate-spin rounded-full h-4 w-4 border-b-2 ${isDarkMode ? "border-blue-400" : "border-blue-500"}`}></div>
-            Loading template...
-          </span>
-        )}
+        <div>
+          <h2 className={`text-2xl font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+            Add Item with Phases & Sub-Phases
+          </h2>
+          {loadingTemplate && (
+            <span className={`text-sm flex items-center gap-2 mt-2 ${isDarkMode ? "text-blue-400" : "text-blue-500"}`}>
+              <div className={`animate-spin rounded-full h-4 w-4 border-b-2 ${isDarkMode ? "border-blue-400" : "border-blue-500"}`}></div>
+              Loading template...
+            </span>
+          )}
+        </div>
+
+        {/* NEW: Import Button */}
+        <button
+          onClick={() => setShowImportModal(true)}
+          className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white px-6 py-3 rounded-lg transition-all shadow-lg hover:shadow-xl font-medium"
+        >
+          <Sheet size={20} />
+          Import from Excel
+        </button>
       </div>
 
       {/* {items.length > 0 && (
@@ -401,8 +415,8 @@ function AddItems({ items, submitting, apiService }) {
               onChange={(e) => setPartNumber(e.target.value)}
               disabled={submitting}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
                 }`}
             />
           </div>
@@ -429,17 +443,17 @@ function AddItems({ items, submitting, apiService }) {
                 }}
                 disabled={submitting || autoBatch}
                 className={`flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                    : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
                   }`}
               />
               <button
                 onClick={() => setAutoBatch(!autoBatch)}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${autoBatch
-                    ? "bg-green-600 hover:bg-green-700 text-white"
-                    : isDarkMode
-                      ? "bg-gray-700 hover:bg-gray-600 text-white"
-                      : "bg-gray-600 hover:bg-gray-700 text-white"
+                  ? "bg-green-600 hover:bg-green-700 text-white"
+                  : isDarkMode
+                    ? "bg-gray-700 hover:bg-gray-600 text-white"
+                    : "bg-gray-600 hover:bg-gray-700 text-white"
                   }`}
                 title={autoBatch ? "Auto-generate enabled" : "Auto-generate disabled"}
               >
@@ -472,8 +486,8 @@ function AddItems({ items, submitting, apiService }) {
                 onChange={(e) => setItemName(e.target.value)}
                 disabled={submitting}
                 className={`w-full px-4 py-2 pr-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                    : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
                   }`}
               />
               <Search size={18} className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`} />
@@ -498,8 +512,8 @@ function AddItems({ items, submitting, apiService }) {
                       key={itemKey}
                       onClick={() => loadTemplateFromItem(item)}
                       className={`w-full text-left px-4 py-3 border-b last:border-b-0 transition-colors ${isDarkMode
-                          ? "hover:bg-gray-700 border-gray-700 text-gray-100"
-                          : "hover:bg-gray-50 border-gray-200 text-gray-800"
+                        ? "hover:bg-gray-700 border-gray-700 text-gray-100"
+                        : "hover:bg-gray-50 border-gray-200 text-gray-800"
                         }`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -540,8 +554,8 @@ function AddItems({ items, submitting, apiService }) {
               onFocus={() => setShowClientDropdown(clients.length > 0)}
               disabled={submitting}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
                 }`}
             />
 
@@ -558,8 +572,8 @@ function AddItems({ items, submitting, apiService }) {
                       setShowClientDropdown(false)
                     }}
                     className={`w-full text-left px-4 py-2 border-b last:border-b-0 transition-colors ${isDarkMode
-                        ? "hover:bg-gray-700 border-gray-700 text-gray-100"
-                        : "hover:bg-gray-50 border-gray-200 text-gray-800"
+                      ? "hover:bg-gray-700 border-gray-700 text-gray-100"
+                      : "hover:bg-gray-50 border-gray-200 text-gray-800"
                       }`}
                   >
                     {client}
@@ -583,10 +597,10 @@ function AddItems({ items, submitting, apiService }) {
                   key={p}
                   onClick={() => setPriority(p)}
                   className={`flex-1 px-4 py-2 rounded-lg border-2 font-medium transition-colors ${priority === p
-                      ? getPriorityColor(p)
-                      : isDarkMode
-                        ? "bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-700"
-                        : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
+                    ? getPriorityColor(p)
+                    : isDarkMode
+                      ? "bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-700"
+                      : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
                     }`}
                 >
                   {p}
@@ -614,8 +628,8 @@ function AddItems({ items, submitting, apiService }) {
               onChange={(e) => setQty(e.target.value)}
               disabled={submitting}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
                 }`}
             />
           </div>
@@ -656,12 +670,12 @@ function AddItems({ items, submitting, apiService }) {
           {phases.length > 0 && (
             <div
               className={`p-4 rounded-lg border-2 ${totalQty > batchQty
-                  ? isDarkMode
-                    ? "bg-red-500/10 border-red-500/40"
-                    : "bg-red-500/10 border-red-500/30"
-                  : isDarkMode
-                    ? "bg-blue-500/10 border-blue-500/40"
-                    : "bg-blue-500/10 border-blue-500/30"
+                ? isDarkMode
+                  ? "bg-red-500/10 border-red-500/40"
+                  : "bg-red-500/10 border-red-500/30"
+                : isDarkMode
+                  ? "bg-blue-500/10 border-blue-500/40"
+                  : "bg-blue-500/10 border-blue-500/30"
                 }`}
             >
               <div className="flex items-center justify-between mb-2">
@@ -670,12 +684,12 @@ function AddItems({ items, submitting, apiService }) {
                 </span>
                 <span
                   className={`text-lg font-bold ${totalQty > batchQty
-                      ? isDarkMode
-                        ? "text-red-300"
-                        : "text-red-700"
-                      : isDarkMode
-                        ? "text-blue-300"
-                        : "text-blue-700"
+                    ? isDarkMode
+                      ? "text-red-300"
+                      : "text-red-700"
+                    : isDarkMode
+                      ? "text-blue-300"
+                      : "text-blue-700"
                     }`}
                 >
                   {totalQty} / {batchQty} units
@@ -734,8 +748,8 @@ function AddItems({ items, submitting, apiService }) {
                       onChange={(e) => updatePhase(phase.id, "name", e.target.value)}
                       disabled={submitting}
                       className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                          ? "bg-gray-800/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                          : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                        ? "bg-gray-800/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                        : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
                         }`}
                     />
                   </div>
@@ -743,8 +757,8 @@ function AddItems({ items, submitting, apiService }) {
                     onClick={() => removePhase(phase.id)}
                     disabled={submitting}
                     className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${isDarkMode
-                        ? "text-red-400 hover:bg-red-500/20"
-                        : "text-red-500 hover:bg-red-500/10"
+                      ? "text-red-400 hover:bg-red-500/20"
+                      : "text-red-500 hover:bg-red-500/10"
                       }`}
                     title="Remove phase"
                   >
@@ -762,8 +776,8 @@ function AddItems({ items, submitting, apiService }) {
                       onClick={() => addSubphaseToPhase(phase.id)}
                       disabled={submitting}
                       className={`flex items-center gap-1 text-sm px-3 py-1 rounded transition-colors disabled:opacity-50 ${isDarkMode
-                          ? "bg-slate-700 hover:bg-slate-600 text-white"
-                          : "bg-slate-600 hover:bg-slate-700 text-white"
+                        ? "bg-slate-700 hover:bg-slate-600 text-white"
+                        : "bg-slate-600 hover:bg-slate-700 text-white"
                         }`}
                     >
                       <Plus size={14} />
@@ -791,16 +805,16 @@ function AddItems({ items, submitting, apiService }) {
                               onChange={(e) => updateSubphase(phase.id, subphase.id, "name", e.target.value)}
                               disabled={submitting}
                               className={`flex-1 px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                                  : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                                ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                                : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
                                 }`}
                             />
                             <button
                               onClick={() => removeSubphase(phase.id, subphase.id)}
                               disabled={submitting}
                               className={`p-1.5 rounded transition-colors disabled:opacity-50 ${isDarkMode
-                                  ? "text-red-400 hover:bg-red-500/20"
-                                  : "text-red-500 hover:bg-red-500/10"
+                                ? "text-red-400 hover:bg-red-500/20"
+                                : "text-red-500 hover:bg-red-500/10"
                                 }`}
                               title="Remove sub-phase"
                             >
@@ -819,8 +833,8 @@ function AddItems({ items, submitting, apiService }) {
                               }
                               disabled={submitting}
                               className={`px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                                  : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                                ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                                : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
                                 }`}
                             />
                             <input
@@ -833,8 +847,8 @@ function AddItems({ items, submitting, apiService }) {
                               }
                               disabled={submitting}
                               className={`px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                                  : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                                ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                                : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
                                 }`}
                             />
                           </div>
@@ -855,8 +869,8 @@ function AddItems({ items, submitting, apiService }) {
           onClick={handleClear}
           disabled={submitting}
           className={`px-6 py-3 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode
-              ? "bg-gray-700 hover:bg-gray-600 text-white"
-              : "bg-gray-600 hover:bg-gray-700 text-white"
+            ? "bg-gray-700 hover:bg-gray-600 text-white"
+            : "bg-gray-600 hover:bg-gray-700 text-white"
             }`}
         >
           Clear All
@@ -869,6 +883,17 @@ function AddItems({ items, submitting, apiService }) {
           {submitting ? "Saving..." : "Save Item"}
         </button>
       </div>
+      {/* NEW: Import Modal at the bottom */}
+      <ExcelImportModal
+        isDarkMode={isDarkMode}
+        apiService={apiService}
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportComplete={() => {
+          setShowImportModal(false)
+          window.location.reload()
+        }}
+      />
     </div>
   )
 }

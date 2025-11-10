@@ -7,6 +7,33 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
   const [selectedItem, setSelectedItem] = useState(null);
   const [itemDetails, setItemDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [filters, setFilters] = useState({
+    status: 'all', // 'all', 'completed', 'in-progress', 'not-started'
+    priority: 'all', // 'all', 'High', 'Medium', 'Low'
+    client: 'all' // 'all' or specific client name
+  });
+
+  const uniqueClients = [...new Set(items.map(item => item.client_name).filter(Boolean))];
+
+  // Apply filters to items
+  const filteredItems = items.filter(item => {
+    const progress = calculateItemProgress(item);
+
+    // Status filter
+    if (filters.status !== 'all') {
+      if (filters.status === 'completed' && progress !== 100) return false;
+      if (filters.status === 'in-progress' && (progress === 0 || progress === 100)) return false;
+      if (filters.status === 'not-started' && progress !== 0) return false;
+    }
+
+    // Priority filter
+    if (filters.priority !== 'all' && item.priority !== filters.priority) return false;
+
+    // Client filter
+    if (filters.client !== 'all' && item.client_name !== filters.client) return false;
+
+    return true;
+  });
 
   const getStatistics = () => {
     const totalItems = items.length;
@@ -56,19 +83,18 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
     setItemDetails(null);
   };
 
-  const cardClass = isDarkMode 
-    ? "bg-gray-800/60 border-gray-700/50" 
+  const cardClass = isDarkMode
+    ? "bg-gray-800/60 border-gray-700/50"
     : "bg-white/20 border-white/30";
-  
+
   const textPrimaryClass = isDarkMode ? "text-gray-100" : "text-gray-800";
   const textSecondaryClass = isDarkMode ? "text-gray-300" : "text-gray-600";
 
   if (loading) {
     return (
       <div className="text-center py-8">
-        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 mx-auto ${
-          isDarkMode ? "border-slate-400" : "border-slate-600"
-        }`}></div>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 mx-auto ${isDarkMode ? "border-slate-400" : "border-slate-600"
+          }`}></div>
         <p className={`mt-4 ${textSecondaryClass}`}>Loading dashboard...</p>
       </div>
     );
@@ -77,6 +103,71 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
   return (
     <div className="px-2 sm:px-4 lg:px-0">
       <h2 className={`text-xl sm:text-2xl font-bold mb-4 sm:mb-6 ${textPrimaryClass}`}>Operations Dashboard</h2>
+
+      {/* Filters */}
+      <div className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border mb-4 sm:mb-6 ${cardClass}`}>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Status Filter */}
+          <div>
+            <label className={`block text-xs sm:text-sm font-medium mb-1 ${textSecondaryClass}`}>
+              Status
+            </label>
+            <select
+              value={filters.status}
+              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+              className={`w-full px-3 py-2 rounded-lg border text-sm ${isDarkMode
+                  ? 'bg-gray-700 border-gray-600 text-gray-100'
+                  : 'bg-white border-gray-300 text-gray-800'
+                }`}
+            >
+              <option value="all">All Status</option>
+              <option value="completed">Completed</option>
+              <option value="in-progress">In Progress</option>
+              <option value="not-started">Not Started</option>
+            </select>
+          </div>
+
+          {/* Priority Filter */}
+          <div>
+            <label className={`block text-xs sm:text-sm font-medium mb-1 ${textSecondaryClass}`}>
+              Priority
+            </label>
+            <select
+              value={filters.priority}
+              onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+              className={`w-full px-3 py-2 rounded-lg border text-sm ${isDarkMode
+                  ? 'bg-gray-700 border-gray-600 text-gray-100'
+                  : 'bg-white border-gray-300 text-gray-800'
+                }`}
+            >
+              <option value="all">All Priorities</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+
+          {/* Client Filter */}
+          <div>
+            <label className={`block text-xs sm:text-sm font-medium mb-1 ${textSecondaryClass}`}>
+              Client
+            </label>
+            <select
+              value={filters.client}
+              onChange={(e) => setFilters({ ...filters, client: e.target.value })}
+              className={`w-full px-3 py-2 rounded-lg border text-sm ${isDarkMode
+                  ? 'bg-gray-700 border-gray-600 text-gray-100'
+                  : 'bg-white border-gray-300 text-gray-800'
+                }`}
+            >
+              <option value="all">All Clients</option>
+              {uniqueClients.map(client => (
+                <option key={client} value={client}>{client}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
@@ -130,8 +221,8 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
       {/* Items Progress List */}
       <div className="space-y-3">
         <h3 className={`text-lg sm:text-xl font-semibold ${textPrimaryClass}`}>Items Overview</h3>
-        {items.length > 0 ? (
-          items.map(item => {
+        {filteredItems.length > 0 ? (
+          filteredItems.map(item => {
             const progress = calculateItemProgress(item);
             const itemKey = item.part_number || item.id;
             const isSelected = selectedItem?.part_number === item.part_number;
@@ -140,15 +231,14 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
               <div key={itemKey}>
                 <div
                   onClick={() => handleItemClick(item)}
-                  className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border cursor-pointer transition-all duration-200 hover:shadow-lg ${
-                    isSelected
+                  className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border cursor-pointer transition-all duration-200 hover:shadow-lg ${isSelected
                       ? isDarkMode
                         ? 'border-blue-400 bg-blue-900/20'
                         : 'border-blue-500 bg-blue-50/20'
                       : isDarkMode
                         ? 'border-gray-700/50 bg-gray-800/40 hover:bg-gray-800/60'
                         : 'border-white/30 bg-white/10 hover:bg-white/20'
-                  }`}
+                    }`}
                 >
                   <div className="flex justify-between items-start mb-2 gap-2">
                     <div className="flex-1 min-w-0">
@@ -167,11 +257,10 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
                     </div>
                     <div className="flex flex-col items-end gap-2 flex-shrink-0">
                       <div className="flex items-center gap-2">
-                        <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
-                          progress === 100 ? 'bg-green-500 text-white' :
-                          progress > 0 ? 'bg-yellow-500 text-white' :
-                          'bg-gray-500 text-white'
-                        }`}>
+                        <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${progress === 100 ? 'bg-green-500 text-white' :
+                            progress > 0 ? 'bg-yellow-500 text-white' :
+                              'bg-gray-500 text-white'
+                          }`}>
                           {progress}%
                         </span>
                         {isSelected ? (
@@ -181,13 +270,12 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
                         )}
                       </div>
                       {item.priority && (
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          item.priority === 'High' 
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${item.priority === 'High'
                             ? isDarkMode ? 'bg-red-500/20 text-red-300' : 'bg-red-500/20 text-red-700'
-                            : item.priority === 'Medium' 
+                            : item.priority === 'Medium'
                               ? isDarkMode ? 'bg-yellow-500/20 text-yellow-300' : 'bg-yellow-500/20 text-yellow-700'
                               : isDarkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-500/20 text-blue-700'
-                        }`}>
+                          }`}>
                           {item.priority}
                         </span>
                       )}
@@ -195,11 +283,10 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
                   </div>
                   <div className={`w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
                     <div
-                      className={`h-2 rounded-full transition-all duration-300 ${
-                        progress === 100 ? 'bg-green-500' :
-                        progress > 0 ? 'bg-yellow-500' :
-                        'bg-gray-500'
-                      }`}
+                      className={`h-2 rounded-full transition-all duration-300 ${progress === 100 ? 'bg-green-500' :
+                          progress > 0 ? 'bg-yellow-500' :
+                            'bg-gray-500'
+                        }`}
                       style={{ width: `${progress}%` }}
                     ></div>
                   </div>
@@ -225,7 +312,9 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
           })
         ) : (
           <p className={`text-center py-8 text-sm sm:text-base ${textSecondaryClass}`}>
-            No items yet. Go to "Add Items" to create your first item.
+            {items.length === 0
+              ? "No items yet. Go to 'Add Items' to create your first item."
+              : "No items match the current filters."}
           </p>
         )}
       </div>
@@ -359,25 +448,23 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
     });
   });
 
-  const cardClass = isDarkMode 
-    ? "bg-gray-800/80 border-gray-700/50" 
+  const cardClass = isDarkMode
+    ? "bg-gray-800/80 border-gray-700/50"
     : "bg-white/30 border-white/40";
-  
+
   const textPrimaryClass = isDarkMode ? "text-gray-100" : "text-gray-800";
   const textSecondaryClass = isDarkMode ? "text-gray-300" : "text-gray-600";
 
   return (
     <div className="mt-2 animate-slideDown">
-      <div className={`backdrop-blur-md rounded-lg border-2 overflow-hidden ${
-        isDarkMode 
-          ? "bg-gradient-to-r from-slate-800 to-slate-900 border-blue-400/30" 
+      <div className={`backdrop-blur-md rounded-lg border-2 overflow-hidden ${isDarkMode
+          ? "bg-gradient-to-r from-slate-800 to-slate-900 border-blue-400/30"
           : "bg-gradient-to-r from-slate-50 to-slate-100 border-blue-500/30"
-      }`}>
+        }`}>
         {loadingDetails ? (
           <div className="p-8 text-center">
-            <div className={`animate-spin rounded-full h-8 w-8 border-b-2 mx-auto ${
-              isDarkMode ? "border-slate-400" : "border-slate-600"
-            }`}></div>
+            <div className={`animate-spin rounded-full h-8 w-8 border-b-2 mx-auto ${isDarkMode ? "border-slate-400" : "border-slate-600"
+              }`}></div>
             <p className={`mt-4 text-sm ${textSecondaryClass}`}>Loading details...</p>
           </div>
         ) : (
@@ -436,11 +523,10 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                     <TrendingUp className={`w-3 h-3 sm:w-4 sm:h-4 ${isDarkMode ? "text-teal-400" : "text-teal-600"}`} />
                     <p className={`text-xs ${textSecondaryClass}`}>Efficiency</p>
                   </div>
-                  <p className={`text-xs sm:text-sm font-semibold ${
-                    parseFloat(efficiency) >= 100 
+                  <p className={`text-xs sm:text-sm font-semibold ${parseFloat(efficiency) >= 100
                       ? isDarkMode ? 'text-green-400' : 'text-green-600'
                       : isDarkMode ? 'text-orange-400' : 'text-orange-600'
-                  }`}>{efficiency}%</p>
+                    }`}>{efficiency}%</p>
                 </div>
               )}
 
@@ -459,30 +545,27 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
 
             {/* Remarks Section */}
             {item.remarks && (
-              <div className={`p-3 sm:p-4 rounded-lg border mb-3 sm:mb-4 ${
-                isDarkMode 
-                  ? "bg-amber-900/20 border-amber-700" 
+              <div className={`p-3 sm:p-4 rounded-lg border mb-3 sm:mb-4 ${isDarkMode
+                  ? "bg-amber-900/20 border-amber-700"
                   : "bg-amber-50 border-amber-200"
-              }`}>
-                <p className={`text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
-                  isDarkMode ? "text-amber-300" : "text-amber-800"
-                }`}>Remarks Summary:</p>
+                }`}>
+                <p className={`text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${isDarkMode ? "text-amber-300" : "text-amber-800"
+                  }`}>Remarks Summary:</p>
                 <div className="space-y-2 sm:space-y-3">
                   {parseRemarks(item.remarks)?.map((transaction, idx) => {
                     if (transaction.type === 'OUT') {
                       return (
-                        <div key={idx} className={`p-2 sm:p-3 rounded border ${
-                          isDarkMode 
-                            ? "bg-slate-800 border-amber-700" 
+                        <div key={idx} className={`p-2 sm:p-3 rounded border ${isDarkMode
+                            ? "bg-slate-800 border-amber-700"
                             : "bg-white border-amber-200"
-                        }`}>
+                          }`}>
                           <p className={`font-semibold text-xs sm:text-sm mb-1 sm:mb-2 ${textPrimaryClass}`}>
                             Transaction {transaction.index} – Transferred OUT
                           </p>
                           <div className={`text-xs sm:text-sm space-y-1 ${textSecondaryClass}`}>
                             <p className="break-words"><span className="font-medium">Date & Time:</span> {transaction.timestamp}</p>
                             <p className="break-words">
-                              <span className="font-medium">To:</span> <strong>{transaction.client}</strong> 
+                              <span className="font-medium">To:</span> <strong>{transaction.client}</strong>
                               (<code className={`px-1 rounded text-xs ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}>
                                 Part: {transaction.partNumber}
                               </code>)
@@ -496,18 +579,17 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                       );
                     } else if (transaction.type === 'IN') {
                       return (
-                        <div key={idx} className={`p-2 sm:p-3 rounded border ${
-                          isDarkMode 
-                            ? "bg-slate-800 border-amber-700" 
+                        <div key={idx} className={`p-2 sm:p-3 rounded border ${isDarkMode
+                            ? "bg-slate-800 border-amber-700"
                             : "bg-white border-amber-200"
-                        }`}>
+                          }`}>
                           <p className={`font-semibold text-xs sm:text-sm mb-1 sm:mb-2 ${textPrimaryClass}`}>
                             Transaction {transaction.index} – Received IN
                           </p>
                           <div className={`text-xs sm:text-sm space-y-1 ${textSecondaryClass}`}>
                             <p className="break-words"><span className="font-medium">Date & Time:</span> {transaction.timestamp}</p>
                             <p className="break-words">
-                              <span className="font-medium">From:</span> <strong>{transaction.client}</strong> 
+                              <span className="font-medium">From:</span> <strong>{transaction.client}</strong>
                               (<code className={`px-1 rounded text-xs ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}>
                                 Part: {transaction.partNumber}
                               </code>)
@@ -521,11 +603,10 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                       );
                     } else if (transaction.type === 'OTHER') {
                       return (
-                        <div key={idx} className={`p-2 sm:p-3 rounded border ${
-                          isDarkMode 
-                            ? "bg-slate-800 border-amber-700" 
+                        <div key={idx} className={`p-2 sm:p-3 rounded border ${isDarkMode
+                            ? "bg-slate-800 border-amber-700"
                             : "bg-white border-amber-200"
-                        }`}>
+                          }`}>
                           <p className={`text-xs sm:text-sm break-words ${textSecondaryClass}`}>{transaction.text}</p>
                         </div>
                       );
@@ -548,52 +629,44 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                     const isExpanded = expandedPhases[phase.id];
 
                     return (
-                      <div key={phase.id} className={`rounded-lg border ${
-                        isDarkMode ? "bg-slate-800 border-gray-700" : "bg-white border-gray-200"
-                      }`}>
+                      <div key={phase.id} className={`rounded-lg border ${isDarkMode ? "bg-slate-800 border-gray-700" : "bg-white border-gray-200"
+                        }`}>
                         <div
-                          className={`p-2 sm:p-3 cursor-pointer transition-colors ${
-                            isDarkMode ? "hover:bg-slate-700/50" : "hover:bg-gray-50"
-                          }`}
+                          className={`p-2 sm:p-3 cursor-pointer transition-colors ${isDarkMode ? "hover:bg-slate-700/50" : "hover:bg-gray-50"
+                            }`}
                           onClick={() => togglePhase(phase.id)}
                         >
                           <div className="flex justify-between items-center mb-2 gap-2">
                             <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <span className={`text-xs font-medium flex-shrink-0 ${
-                                isDarkMode ? "text-gray-400" : "text-gray-500"
-                              }`}>Phase {index + 1}</span>
+                              <span className={`text-xs font-medium flex-shrink-0 ${isDarkMode ? "text-gray-400" : "text-gray-500"
+                                }`}>Phase {index + 1}</span>
                               <span className={`text-xs sm:text-sm font-semibold truncate ${textPrimaryClass}`}>
                                 {phase.name}
                               </span>
                               {isExpanded ? (
-                                <ChevronUp className={`w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 ${
-                                  isDarkMode ? "text-gray-500" : "text-gray-500"
-                                }`} />
+                                <ChevronUp className={`w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 ${isDarkMode ? "text-gray-500" : "text-gray-500"
+                                  }`} />
                               ) : (
-                                <ChevronDown className={`w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 ${
-                                  isDarkMode ? "text-gray-500" : "text-gray-500"
-                                }`} />
+                                <ChevronDown className={`w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 ${isDarkMode ? "text-gray-500" : "text-gray-500"
+                                  }`} />
                               )}
                             </div>
-                            <span className={`text-xs font-medium px-2 py-1 rounded flex-shrink-0 ${
-                              phaseProgress === 100 
+                            <span className={`text-xs font-medium px-2 py-1 rounded flex-shrink-0 ${phaseProgress === 100
                                 ? isDarkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700'
-                                : phaseProgress > 0 
+                                : phaseProgress > 0
                                   ? isDarkMode ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-100 text-yellow-700'
                                   : isDarkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
-                            }`}>
+                              }`}>
                               {phaseCompleted}/{phaseTotal} tasks
                             </span>
                           </div>
-                          <div className={`w-full rounded-full h-1.5 ${
-                            isDarkMode ? "bg-gray-700" : "bg-gray-200"
-                          }`}>
+                          <div className={`w-full rounded-full h-1.5 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                            }`}>
                             <div
-                              className={`h-1.5 rounded-full transition-all duration-300 ${
-                                phaseProgress === 100 ? 'bg-green-500' :
-                                phaseProgress > 0 ? 'bg-yellow-500' :
-                                'bg-gray-400'
-                              }`}
+                              className={`h-1.5 rounded-full transition-all duration-300 ${phaseProgress === 100 ? 'bg-green-500' :
+                                  phaseProgress > 0 ? 'bg-yellow-500' :
+                                    'bg-gray-400'
+                                }`}
                               style={{ width: `${phaseProgress}%` }}
                             ></div>
                           </div>
@@ -601,11 +674,10 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
 
                         {/* Subphases */}
                         {isExpanded && phase.subphases && phase.subphases.length > 0 && (
-                          <div className={`border-t p-2 sm:p-3 ${
-                            isDarkMode 
-                              ? "border-gray-700 bg-slate-900/50" 
+                          <div className={`border-t p-2 sm:p-3 ${isDarkMode
+                              ? "border-gray-700 bg-slate-900/50"
                               : "border-gray-200 bg-gray-50"
-                          }`}>
+                            }`}>
                             <div className="space-y-2">
                               {phase.subphases.map((subphase, subIdx) => {
                                 const isCompleted = subphase.completed == 1;
@@ -615,30 +687,26 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                                 const expectedMinutes = subphase.expected_duration ? (parseFloat(subphase.expected_duration) * 60).toFixed(0) : '0';
 
                                 return (
-                                  <div key={subphase.id} className={`p-2 rounded border ${
-                                    isCompleted
-                                      ? isDarkMode 
-                                        ? 'bg-green-900/20 border-green-700' 
+                                  <div key={subphase.id} className={`p-2 rounded border ${isCompleted
+                                      ? isDarkMode
+                                        ? 'bg-green-900/20 border-green-700'
                                         : 'bg-green-50 border-green-200'
                                       : isDarkMode
                                         ? 'bg-slate-800 border-gray-700'
                                         : 'bg-white border-gray-200'
-                                  }`}>
+                                    }`}>
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
                                           {isCompleted ? (
-                                            <CheckCircle className={`w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 ${
-                                              isDarkMode ? "text-green-400" : "text-green-600"
-                                            }`} />
+                                            <CheckCircle className={`w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 ${isDarkMode ? "text-green-400" : "text-green-600"
+                                              }`} />
                                           ) : (
-                                            <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 flex-shrink-0 ${
-                                              isDarkMode ? "border-gray-400" : "border-gray-400"
-                                            }`}></div>
+                                            <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 flex-shrink-0 ${isDarkMode ? "border-gray-400" : "border-gray-400"
+                                              }`}></div>
                                           )}
-                                          <span className={`text-xs sm:text-sm font-medium break-words ${
-                                            isCompleted ? textSecondaryClass : textPrimaryClass
-                                          }`}>
+                                          <span className={`text-xs sm:text-sm font-medium break-words ${isCompleted ? textSecondaryClass : textPrimaryClass
+                                            }`}>
                                             {subphase.name}
                                           </span>
                                         </div>
@@ -646,9 +714,8 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                                         <div className="ml-5 sm:ml-6 mt-1 space-y-1">
                                           {subphase.employee_name && (
                                             <div className="flex items-center gap-2">
-                                              <Users className={`w-3 h-3 flex-shrink-0 ${
-                                                isDarkMode ? "text-gray-500" : "text-gray-500"
-                                              }`} />
+                                              <Users className={`w-3 h-3 flex-shrink-0 ${isDarkMode ? "text-gray-500" : "text-gray-500"
+                                                }`} />
                                               <span className={`text-xs break-words ${textSecondaryClass}`}>
                                                 {subphase.employee_name}
                                               </span>
@@ -656,9 +723,8 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                                           )}
 
                                           <div className="flex items-center gap-2">
-                                            <Clock className={`w-3 h-3 flex-shrink-0 ${
-                                              isDarkMode ? "text-gray-500" : "text-gray-500"
-                                            }`} />
+                                            <Clock className={`w-3 h-3 flex-shrink-0 ${isDarkMode ? "text-gray-500" : "text-gray-500"
+                                              }`} />
                                             <span className={`text-xs ${textSecondaryClass}`}>
                                               {isCompleted ? (
                                                 <>
@@ -677,9 +743,8 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
 
                                           {subphase.expected_quantity > 0 && (
                                             <div className="flex items-center gap-2">
-                                              <Package className={`w-3 h-3 flex-shrink-0 ${
-                                                isDarkMode ? "text-gray-500" : "text-gray-500"
-                                              }`} />
+                                              <Package className={`w-3 h-3 flex-shrink-0 ${isDarkMode ? "text-gray-500" : "text-gray-500"
+                                                }`} />
                                               <span className={`text-xs ${textSecondaryClass}`}>
                                                 Qty: {subphase.current_completed_quantity || 0}/{subphase.expected_quantity}
                                               </span>
@@ -688,15 +753,14 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                                         </div>
                                       </div>
 
-                                      <span className={`text-xs font-medium px-2 py-1 rounded flex-shrink-0 ${
-                                        isCompleted
-                                          ? isDarkMode 
-                                            ? 'bg-green-900/30 text-green-300' 
+                                      <span className={`text-xs font-medium px-2 py-1 rounded flex-shrink-0 ${isCompleted
+                                          ? isDarkMode
+                                            ? 'bg-green-900/30 text-green-300'
                                             : 'bg-green-100 text-green-700'
                                           : isDarkMode
                                             ? 'bg-gray-700 text-gray-400'
                                             : 'bg-gray-100 text-gray-600'
-                                      }`}>
+                                        }`}>
                                         {isCompleted ? 'Done' : 'Pending'}
                                       </span>
                                     </div>

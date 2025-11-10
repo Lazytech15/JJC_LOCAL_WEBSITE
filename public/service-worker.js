@@ -10,6 +10,9 @@ const PROFILE_CACHE = `jjc-profiles-${CACHE_VERSION}`
 const UI_CACHE = `jjc-ui-${CACHE_VERSION}`
 const LANDING_CACHE = `jjc-landing-${CACHE_VERSION}`
 const GALLERY_CACHE = `jjc-gallery-${CACHE_VERSION}`
+const DB_NAME = 'jjc-api-cache'
+const DB_VERSION = 1
+const STORE_NAME = 'operations-items'
 
 // Cache expiration times (in milliseconds)
 const CACHE_EXPIRATION = {
@@ -80,6 +83,209 @@ self.addEventListener("fetch", (event) => {
   const acceptHeader = request.headers.get('accept') || ''
   if (url.pathname.startsWith('/api/events/') || acceptHeader.includes('text/event-stream')) {
     event.respondWith(fetch(request))
+    return
+  }
+
+  
+
+    // ============================================================================
+  // Operations API - Use IndexedDB for caching
+  // ============================================================================
+
+// Handle get single item request
+async function handleGetSingleItem(request, partNumber) {
+  console.log('[Service Worker] 📄 Handling get single item:', partNumber)
+  
+  try {
+    // First, try to get from IndexedDB
+    const cachedItem = await getItemFromDB(partNumber)
+    
+    if (cachedItem) {
+      console.log('[Service Worker] ✅ Returning item from IndexedDB:', partNumber)
+      
+      // Update from network in background (refresh cache)
+      updateSingleItemInBackground(request, partNumber)
+      
+      return new Response(JSON.stringify(cachedItem), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Cache-Source': 'indexeddb',
+          'X-Cached-At': cachedItem.cached_at
+        }
+      })
+    }
+    
+    // No cache - fetch from network
+    console.log('[Service Worker] 🌐 Fetching item from network:', partNumber)
+    const response = await fetchWithTimeout(request, 10000)
+    
+    if (response.ok) {
+      const data = await response.clone().json()
+      
+      // Save to IndexedDB in background
+      if (data && data.part_number) {
+        saveItemToDB(data).catch(err => {
+          console.warn('[Service Worker] Background save failed:', err)
+        })
+      }
+      
+      return response
+    }
+    
+    // Non-OK response from server - return it as-is instead of 503
+    console.warn('[Service Worker] ⚠️ Server returned non-OK status:', response.status)
+    return response
+    
+  } catch (error) {
+    console.error('[Service Worker] ❌ Error handling get single item:', error)
+    
+    // Try to return cached data even if expired
+    const cachedItem = await getItemFromDB(partNumber).catch(() => null)
+    if (cachedItem) {
+      console.log('[Service Worker] 📦 Using expired cache as emergency fallback:', partNumber)
+      return new Response(JSON.stringify(cachedItem), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Cache-Source': 'indexeddb-emergency'
+        }
+      })
+    }
+    
+    // No cache available - let the request fail naturally so the app can handle it
+    console.error('[Service Worker] ❌ No cache available, passing through error')
+    throw error
+  }
+}
+
+// Helper function to fetch with timeout
+async function fetchWithTimeout(request, timeout = 10000) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
+  
+  try {
+    const response = await fetch(request, { 
+      signal: controller.signal,
+      cache: 'no-cache'
+    })
+    clearTimeout(timeoutId)
+    return response
+  } catch (error) {
+    clearTimeout(timeoutId)
+    throw error
+  }
+}
+
+// Background update function
+async function updateSingleItemInBackground(request, partNumber) {
+  try {
+    const response = await fetchWithTimeout(request, 10000)
+    if (response.ok) {
+      const data = await response.json()
+      if (data && data.part_number) {
+        await saveItemToDB(data)
+        console.log('[Service Worker] 🔄 Background update completed:', partNumber)
+      }
+    }
+  } catch (error) {
+    console.warn('[Service Worker] Background update failed:', error)
+  }
+}
+
+async function handleGetAllItems(request) {
+  console.log('[Service Worker] 📋 Handling get all items')
+  
+  try {
+    // First, try to get from IndexedDB
+    const cachedItems = await getAllItemsFromDB()
+    
+    if (cachedItems && cachedItems.length > 0) {
+      console.log('[Service Worker] ✅ Returning items from IndexedDB:', cachedItems.length)
+      
+      // Update from network in background
+      updateAllItemsInBackground(request)
+      
+      return new Response(JSON.stringify(cachedItems), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Cache-Source': 'indexeddb',
+          'X-Item-Count': cachedItems.length.toString()
+        }
+      })
+    }
+    
+    // No cache - fetch from network
+    console.log('[Service Worker] 🌐 No cache, fetching all items from network')
+    const response = await fetchWithTimeout(request, 15000)
+    
+    if (response.ok) {
+      const data = await response.clone().json()
+      
+      // Save to IndexedDB in background
+      if (Array.isArray(data) && data.length > 0) {
+        batchSaveItemsToDB(data).catch(err => {
+          console.warn('[Service Worker] Background batch save failed:', err)
+        })
+      }
+      
+      return response
+    }
+    
+    // Non-OK response - return it as-is
+    console.warn('[Service Worker] ⚠️ Server returned non-OK status:', response.status)
+    return response
+    
+  } catch (error) {
+    console.error('[Service Worker] ❌ Error handling get all items:', error)
+    
+    // Try to return cached data even if expired
+    const cachedItems = await getAllItemsFromDB().catch(() => [])
+    if (cachedItems.length > 0) {
+      console.log('[Service Worker] 📦 Using cached items as emergency fallback:', cachedItems.length)
+      return new Response(JSON.stringify(cachedItems), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Cache-Source': 'indexeddb-emergency'
+        }
+      })
+    }
+    
+    // No cache available - let the error propagate
+    console.error('[Service Worker] ❌ No cache available, passing through error')
+    throw error
+  }
+}
+
+// Background update for all items
+async function updateAllItemsInBackground(request) {
+  try {
+    const response = await fetchWithTimeout(request, 15000)
+    if (response.ok) {
+      const data = await response.json()
+      if (Array.isArray(data) && data.length > 0) {
+        await batchSaveItemsToDB(data)
+        console.log('[Service Worker] 🔄 Background update completed for all items')
+      }
+    }
+  } catch (error) {
+    console.warn('[Service Worker] Background update failed for all items:', error)
+  }
+}
+
+  
+  // Get all items - check IndexedDB first
+  if (url.pathname === '/api/operations/items' && !url.searchParams.has('part_number')) {
+    event.respondWith(handleGetAllItems(request))
+    return
+  }
+  
+  // Get single item by part_number query param - check IndexedDB first
+  if (url.pathname === '/api/operations/items' && url.searchParams.has('part_number')) {
+    const partNumber = url.searchParams.get('part_number')
+    event.respondWith(handleGetSingleItem(request, partNumber))
     return
   }
 
@@ -410,6 +616,76 @@ self.addEventListener("message", (event) => {
     const urls = event.data.urls || []
     event.waitUntil(prefetchImages(urls))
   }
+
+  // Clear IndexedDB cache
+  if (event.data && event.data.type === "CLEAR_INDEXEDDB") {
+    event.waitUntil(
+      clearAllItemsFromDB().then(() => {
+        console.log("[Service Worker] IndexedDB cleared")
+        if (event.ports[0]) {
+          event.ports[0].postMessage({ success: true })
+        }
+      }).catch(err => {
+        console.error("[Service Worker] Failed to clear IndexedDB:", err)
+        if (event.ports[0]) {
+          event.ports[0].postMessage({ success: false, error: err.message })
+        }
+      })
+    )
+  }
+  
+  // Refresh specific item in IndexedDB (after update/create)
+  if (event.data && event.data.type === "REFRESH_ITEM") {
+    const partNumber = event.data.partNumber
+    event.waitUntil(
+      deleteItemFromDB(partNumber).then(() => {
+        console.log("[Service Worker] Item cache invalidated:", partNumber)
+        // Fetch fresh data and cache it
+        return fetch(`/api/operations/items?part_number=${encodeURIComponent(partNumber)}`)
+          .then(response => response.json())
+          .then(item => saveItemToDB(item))
+      }).catch(err => {
+        console.warn("[Service Worker] Failed to refresh item:", err)
+      })
+    )
+  }
+  
+  // Refresh all items (after bulk operations)
+  if (event.data && event.data.type === "REFRESH_ALL_ITEMS") {
+    event.waitUntil(
+      clearAllItemsFromDB().then(() => {
+        console.log("[Service Worker] All items cache cleared, will refresh on next fetch")
+      }).catch(err => {
+        console.warn("[Service Worker] Failed to clear all items:", err)
+      })
+    )
+  }
+  
+  // Force update items from network
+  if (event.data && event.data.type === "FORCE_UPDATE_ITEMS") {
+    event.waitUntil(
+      fetch('/api/operations/items', { cache: 'no-cache' })
+        .then(response => response.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            return batchSaveItemsToDB(data)
+          }
+          throw new Error('Invalid data format')
+        })
+        .then(() => {
+          console.log("[Service Worker] Forced update completed")
+          if (event.ports[0]) {
+            event.ports[0].postMessage({ success: true })
+          }
+        })
+        .catch(err => {
+          console.error("[Service Worker] Forced update failed:", err)
+          if (event.ports[0]) {
+            event.ports[0].postMessage({ success: false, error: err.message })
+          }
+        })
+    )
+  }
 })
 
 // Prefetch images only when requested
@@ -438,3 +714,197 @@ async function prefetchImages(urls) {
   }
   console.log("[Service Worker] Prefetch completed")
 }
+
+// ============================================================================
+// IndexedDB Utility Functions for Caching Data for Operations Department
+// ============================================================================
+
+// Initialize IndexedDB
+async function initDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION)
+    
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => resolve(request.result)
+    
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result
+      
+      // Create object store if it doesn't exist
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const objectStore = db.createObjectStore(STORE_NAME, { keyPath: 'part_number' })
+        objectStore.createIndex('timestamp', 'timestamp', { unique: false })
+        objectStore.createIndex('client_name', 'client_name', { unique: false })
+        console.log('[Service Worker] IndexedDB object store created')
+      }
+    }
+  })
+}
+
+// Save item to IndexedDB
+async function saveItemToDB(item) {
+  try {
+    const db = await initDB()
+    const transaction = db.transaction([STORE_NAME], 'readwrite')
+    const store = transaction.objectStore(STORE_NAME)
+    
+    // Add timestamp for cache invalidation
+    const itemWithTimestamp = {
+      ...item,
+      timestamp: Date.now(),
+      cached_at: new Date().toISOString()
+    }
+    
+    await store.put(itemWithTimestamp)
+    console.log(`[Service Worker] 💾 Saved item to IndexedDB:`, item.part_number)
+    
+    return new Promise((resolve, reject) => {
+      transaction.oncomplete = () => resolve(true)
+      transaction.onerror = () => reject(transaction.error)
+    })
+  } catch (error) {
+    console.warn('[Service Worker] Failed to save to IndexedDB:', error)
+    return false
+  }
+}
+
+// Get item from IndexedDB
+async function getItemFromDB(partNumber) {
+  try {
+    const db = await initDB()
+    const transaction = db.transaction([STORE_NAME], 'readonly')
+    const store = transaction.objectStore(STORE_NAME)
+    
+    return new Promise((resolve, reject) => {
+      const request = store.get(partNumber)
+      request.onsuccess = () => {
+        const item = request.result
+        if (item) {
+          // Check if cache is still valid (24 hours)
+          const cacheAge = Date.now() - item.timestamp
+          const maxAge = 24 * 60 * 60 * 1000 // 24 hours
+          
+          if (cacheAge < maxAge) {
+            console.log(`[Service Worker] ✅ IndexedDB cache hit:`, partNumber)
+            resolve(item)
+          } else {
+            console.log(`[Service Worker] ⏰ IndexedDB cache expired:`, partNumber)
+            resolve(null)
+          }
+        } else {
+          console.log(`[Service Worker] ❌ IndexedDB cache miss:`, partNumber)
+          resolve(null)
+        }
+      }
+      request.onerror = () => reject(request.error)
+    })
+  } catch (error) {
+    console.warn('[Service Worker] Failed to get from IndexedDB:', error)
+    return null
+  }
+}
+
+// Get all items from IndexedDB
+async function getAllItemsFromDB() {
+  try {
+    const db = await initDB()
+    const transaction = db.transaction([STORE_NAME], 'readonly')
+    const store = transaction.objectStore(STORE_NAME)
+    
+    return new Promise((resolve, reject) => {
+      const request = store.getAll()
+      request.onsuccess = () => {
+        const items = request.result || []
+        console.log(`[Service Worker] 📦 Retrieved ${items.length} items from IndexedDB`)
+        
+        // Filter out expired items (older than 24 hours)
+        const maxAge = 24 * 60 * 60 * 1000
+        const validItems = items.filter(item => {
+          const cacheAge = Date.now() - item.timestamp
+          return cacheAge < maxAge
+        })
+        
+        console.log(`[Service Worker] ✅ ${validItems.length} valid items (${items.length - validItems.length} expired)`)
+        resolve(validItems)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  } catch (error) {
+    console.warn('[Service Worker] Failed to get all from IndexedDB:', error)
+    return []
+  }
+}
+
+// Clear all items from IndexedDB
+async function clearAllItemsFromDB() {
+  try {
+    const db = await initDB()
+    const transaction = db.transaction([STORE_NAME], 'readwrite')
+    const store = transaction.objectStore(STORE_NAME)
+    
+    await store.clear()
+    console.log('[Service Worker] 🗑️ Cleared all items from IndexedDB')
+    
+    return new Promise((resolve, reject) => {
+      transaction.oncomplete = () => resolve(true)
+      transaction.onerror = () => reject(transaction.error)
+    })
+  } catch (error) {
+    console.warn('[Service Worker] Failed to clear IndexedDB:', error)
+    return false
+  }
+}
+
+// Delete specific item from IndexedDB
+async function deleteItemFromDB(partNumber) {
+  try {
+    const db = await initDB()
+    const transaction = db.transaction([STORE_NAME], 'readwrite')
+    const store = transaction.objectStore(STORE_NAME)
+    
+    await store.delete(partNumber)
+    console.log(`[Service Worker] 🗑️ Deleted item from IndexedDB:`, partNumber)
+    
+    return new Promise((resolve, reject) => {
+      transaction.oncomplete = () => resolve(true)
+      transaction.onerror = () => reject(transaction.error)
+    })
+  } catch (error) {
+    console.warn('[Service Worker] Failed to delete from IndexedDB:', error)
+    return false
+  }
+}
+
+// Batch save items to IndexedDB
+async function batchSaveItemsToDB(items) {
+  try {
+    const db = await initDB()
+    const transaction = db.transaction([STORE_NAME], 'readwrite')
+    const store = transaction.objectStore(STORE_NAME)
+    
+    const timestamp = Date.now()
+    const cachedAt = new Date().toISOString()
+    
+    for (const item of items) {
+      const itemWithTimestamp = {
+        ...item,
+        timestamp,
+        cached_at: cachedAt
+      }
+      store.put(itemWithTimestamp)
+    }
+    
+    return new Promise((resolve, reject) => {
+      transaction.oncomplete = () => {
+        console.log(`[Service Worker] 💾 Batch saved ${items.length} items to IndexedDB`)
+        resolve(true)
+      }
+      transaction.onerror = () => reject(transaction.error)
+    })
+  } catch (error) {
+    console.warn('[Service Worker] Failed to batch save to IndexedDB:', error)
+    return false
+  }
+}
+
+// End of Operations Department IndexedDB Utilities
