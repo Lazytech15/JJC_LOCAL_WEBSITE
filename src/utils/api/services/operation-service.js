@@ -498,7 +498,7 @@ export class OperationsService extends BaseAPIService {
     return this.getProgressReport({ format: "summary" });
   }
 
-  /**
+  /** 
    * Get top performing employees
    * @returns {Promise} Top performers from statistics
    */

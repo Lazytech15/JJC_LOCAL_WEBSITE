@@ -5,7 +5,8 @@ import Dashboard from "../op/Dashboard.jsx"
 import AddItems from "../op/AddItem.jsx"
 import Checklist from "../op/CheckList.jsx"
 import Reports from "../op/Report.jsx"
-import { Menu, X } from 'lucide-react'
+import ItemComparison from "../op/ItemComparison.jsx"
+import { Menu, X, ArrowUp } from 'lucide-react'
 
 function OperationsDepartment() {
   const { user, logout, isDarkMode, toggleDarkMode } = useAuth()
@@ -15,24 +16,7 @@ function OperationsDepartment() {
   const [error, setError] = useState(null)
   const [statistics, setStatistics] = useState(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
-  // Form states
-  const [newItem, setNewItem] = useState({
-    part_number: "",
-    name: "",
-    description: ""
-  })
-  const [newPhase, setNewPhase] = useState({
-    partNumber: "",
-    name: ""
-  })
-  const [newSubPhase, setNewSubPhase] = useState({
-    partNumber: "",
-    phaseId: "",
-    name: "",
-    condition: "",
-    expectedDuration: ""
-  })
+  const [showScrollTop, setShowScrollTop] = useState(false)
   const [scanningFor, setScanningFor] = useState(null)
   const [barcodeInput, setBarcodeInput] = useState("")
 
@@ -54,6 +38,28 @@ function OperationsDepartment() {
       }
     }
   }, [])
+
+  // Scroll to top button visibility
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 400) {
+        setShowScrollTop(true)
+      } else {
+        setShowScrollTop(false)
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    })
+  }
+
 
   useEffect(() => {
     if (items.length > 0) {
@@ -78,7 +84,7 @@ function OperationsDepartment() {
     }
 
     const needsRefresh = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
-    
+
     if (needsRefresh && items.length > 0) {
       const hasActivePhases = items.some(item =>
         item.phases?.some(phase =>
@@ -110,7 +116,7 @@ function OperationsDepartment() {
   const refreshActiveData = async () => {
     try {
       console.log('Refreshing active data...')
-      
+
       const activeItems = items.filter(item =>
         item.phases?.some(phase => phase.start_time && !phase.end_time)
       )
@@ -237,39 +243,39 @@ function OperationsDepartment() {
     return Math.floor((end - start) / 1000);
   };
 
-const formatTime = (seconds) => {
-  const totalSeconds = Math.floor(Number(seconds)); // 👈 Ensures clean integer input
+  const formatTime = (seconds) => {
+    const totalSeconds = Math.floor(Number(seconds)); // 👈 Ensures clean integer input
 
-  if (!totalSeconds || totalSeconds <= 0) {
-    return "Not Started";
-  }
+    if (!totalSeconds || totalSeconds <= 0) {
+      return "Not Started";
+    }
 
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const secs = totalSeconds % 60;
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
 
-  if (hours === 0 && minutes === 0 && secs === 0) {
-    return "Not Started";
-  }
+    if (hours === 0 && minutes === 0 && secs === 0) {
+      return "Not Started";
+    }
 
-  const parts = [];
+    const parts = [];
 
-  if (hours > 0) {
-    parts.push(`${hours} hour${hours !== 1 ? "s" : ""}`);
-  }
+    if (hours > 0) {
+      parts.push(`${hours} hour${hours !== 1 ? "s" : ""}`);
+    }
 
-  if (minutes > 0) {
-    parts.push(`${minutes} minute${minutes !== 1 ? "s" : ""}`);
-  }
+    if (minutes > 0) {
+      parts.push(`${minutes} minute${minutes !== 1 ? "s" : ""}`);
+    }
 
-  if (secs > 0) {
-    parts.push(`${secs} second${secs !== 1 ? "s" : ""}`);
-  }
+    if (secs > 0) {
+      parts.push(`${secs} second${secs !== 1 ? "s" : ""}`);
+    }
 
-  return parts.length > 0 ? parts.join(" ") : "Not Started";
-};
+    return parts.length > 0 ? parts.join(" ") : "Not Started";
+  };
 
-function formatActionDuration(hours) {
+  function formatActionDuration(hours) {
     const totalSeconds = Math.round(hours * 3600);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
@@ -438,22 +444,22 @@ function formatActionDuration(hours) {
     { id: "dashboard", label: "Dashboard" },
     { id: "add-items", label: "Add Items" },
     { id: "checklist", label: "Checklist" },
+    { id: "comparison", label: "Comparison" },
     { id: "reports", label: "Reports" }
   ]
 
-  const cardClass = isDarkMode 
-    ? "bg-gray-800/60 border-gray-700/50" 
+  const cardClass = isDarkMode
+    ? "bg-gray-800/60 border-gray-700/50"
     : "bg-white/20 border-white/30"
-  
+
   const textPrimaryClass = isDarkMode ? "text-gray-100" : "text-gray-800"
   const textSecondaryClass = isDarkMode ? "text-gray-300" : "text-gray-600"
 
   return (
-    <div className={`min-h-screen p-8 transition-colors duration-300 ${
-      isDarkMode
-        ? "bg-linear-to-br from-gray-950 via-gray-900 to-gray-950"
-        : "bg-linear-to-br from-gray-50 via-slate-50 to-stone-50"
-    }`}>
+    <div className={`min-h-screen p-8 transition-colors duration-300 ${isDarkMode
+      ? "bg-linear-to-br from-gray-950 via-gray-900 to-gray-950"
+      : "bg-linear-to-br from-gray-50 via-slate-50 to-stone-50"
+      }`}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className={`backdrop-blur-md rounded-2xl p-6 mb-6 border shadow-lg transition-all duration-300 ${cardClass}`}>
@@ -469,22 +475,20 @@ function formatActionDuration(hours) {
             <div className="flex gap-2 sm:gap-3 flex-shrink-0">
               <button
                 onClick={toggleDarkMode}
-                className={`p-2 rounded-lg backdrop-blur-sm border transition-all duration-300 ${
-                  isDarkMode
-                    ? "bg-gray-800/60 border-gray-700/50 hover:bg-gray-800/80 text-yellow-400"
-                    : "bg-white/20 border-white/30 hover:bg-white/30 text-gray-700"
-                }`}
+                className={`p-2 rounded-lg backdrop-blur-sm border transition-all duration-300 ${isDarkMode
+                  ? "bg-gray-800/60 border-gray-700/50 hover:bg-gray-800/80 text-yellow-400"
+                  : "bg-white/20 border-white/30 hover:bg-white/30 text-gray-700"
+                  }`}
                 aria-label="Toggle dark mode"
               >
                 {isDarkMode ? "☀️" : "🌙"}
               </button>
               <button
                 onClick={logout}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${
-                  isDarkMode
-                    ? "bg-slate-700 hover:bg-slate-600 text-white"
-                    : "bg-slate-600 hover:bg-slate-700 text-white"
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${isDarkMode
+                  ? "bg-slate-700 hover:bg-slate-600 text-white"
+                  : "bg-slate-600 hover:bg-slate-700 text-white"
+                  }`}
               >
                 <span className="hidden sm:inline">Logout</span>
                 <span className="sm:hidden">Exit</span>
@@ -496,26 +500,23 @@ function formatActionDuration(hours) {
         {/* Loading State */}
         {loading && (
           <div className="text-center py-8">
-            <div className={`animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 mx-auto ${
-              isDarkMode ? "border-slate-400" : "border-slate-600"
-            }`}></div>
+            <div className={`animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 mx-auto ${isDarkMode ? "border-slate-400" : "border-slate-600"
+              }`}></div>
             <p className={`text-sm sm:text-base mt-4 ${textSecondaryClass}`}>Loading operations data...</p>
           </div>
         )}
 
         {/* Error State */}
         {error && (
-          <div className={`backdrop-blur-sm border rounded-lg p-4 mb-6 transition-all duration-300 ${
-            isDarkMode 
-              ? "bg-red-950/50 border-red-800/60 text-red-300" 
-              : "bg-red-100/80 border-red-300 text-red-700"
-          }`}>
+          <div className={`backdrop-blur-sm border rounded-lg p-4 mb-6 transition-all duration-300 ${isDarkMode
+            ? "bg-red-950/50 border-red-800/60 text-red-300"
+            : "bg-red-100/80 border-red-300 text-red-700"
+            }`}>
             <p className="text-sm sm:text-base break-words font-medium">Error: {error}</p>
-            <button 
-              onClick={() => setError(null)} 
-              className={`mt-2 text-sm hover:underline font-medium ${
-                isDarkMode ? "text-red-300" : "text-red-600"
-              }`}
+            <button
+              onClick={() => setError(null)}
+              className={`mt-2 text-sm hover:underline font-medium ${isDarkMode ? "text-red-300" : "text-red-600"
+                }`}
             >
               Dismiss
             </button>
@@ -531,15 +532,14 @@ function formatActionDuration(hours) {
                   <button
                     key={tab.id}
                     onClick={() => handleTabChange(tab.id)}
-                    className={`flex-1 px-4 py-3 font-medium transition-colors ${
-                      activeTab === tab.id
-                        ? isDarkMode
-                          ? "border-b-2 border-slate-400 text-slate-300"
-                          : "border-b-2 border-slate-600 text-slate-700"
-                        : isDarkMode
-                          ? "text-gray-400 hover:text-slate-400"
-                          : "text-gray-600 hover:text-slate-600"
-                    }`}
+                    className={`flex-1 px-4 py-3 font-medium transition-colors ${activeTab === tab.id
+                      ? isDarkMode
+                        ? "border-b-2 border-slate-400 text-slate-300"
+                        : "border-b-2 border-slate-600 text-slate-700"
+                      : isDarkMode
+                        ? "text-gray-400 hover:text-slate-400"
+                        : "text-gray-600 hover:text-slate-600"
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -562,22 +562,21 @@ function formatActionDuration(hours) {
                   <Menu className="w-5 h-5" />
                 )}
               </button>
-              
+
               {mobileMenuOpen && (
                 <div className={`border-t ${isDarkMode ? "border-gray-700/50" : "border-gray-300/20"}`}>
                   {tabs.map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => handleTabChange(tab.id)}
-                      className={`w-full text-left px-4 py-3 transition-colors ${
-                        activeTab === tab.id
-                          ? isDarkMode
-                            ? "bg-slate-700/40 text-slate-300 font-medium"
-                            : "bg-slate-500/20 text-slate-700 font-medium"
-                          : isDarkMode
-                            ? "text-gray-400 hover:bg-gray-800/40"
-                            : "text-gray-600 hover:bg-white/30"
-                      }`}
+                      className={`w-full text-left px-4 py-3 transition-colors ${activeTab === tab.id
+                        ? isDarkMode
+                          ? "bg-slate-700/40 text-slate-300 font-medium"
+                          : "bg-slate-500/20 text-slate-700 font-medium"
+                        : isDarkMode
+                          ? "text-gray-400 hover:bg-gray-800/40"
+                          : "text-gray-600 hover:bg-white/30"
+                        }`}
                     >
                       {tab.label}
                     </button>
@@ -634,6 +633,16 @@ function formatActionDuration(hours) {
                 />
               )}
 
+              {activeTab === "comparison" && (
+                <ItemComparison
+                  items={items}
+                  isDarkMode={isDarkMode}
+                  apiService={apiService}
+                  formatTime={formatTime}
+                  calculateItemProgress={calculateItemProgress}
+                />
+              )}
+
               {activeTab === "reports" && (
                 <Reports
                   items={items}
@@ -651,6 +660,16 @@ function formatActionDuration(hours) {
           </>
         )}
       </div>
+      {/* Scroll to Top Button */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 z-40 w-14 h-14 bg-zinc-900 hover:bg-zinc-800 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+          aria-label="Scroll to top"
+        >
+          <ArrowUp className="w-6 h-6" />
+        </button>
+      )}
     </div>
   )
 }

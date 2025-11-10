@@ -22,33 +22,15 @@ function Reports({
   const [filterItemName, setFilterItemName] = useState("")
   const [filterClient, setFilterClient] = useState("")
   const [showFilters, setShowFilters] = useState(false)
-  const [showScrollTop, setShowScrollTop] = useState(false)
+
 
   // Sync with parent items when they change
   useEffect(() => {
     setItems(initialItems)
   }, [initialItems])
 
-// Scroll to top button visibility
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 400) {
-        setShowScrollTop(true)
-      } else {
-        setShowScrollTop(false)
-      }
-    }
 
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
 
-    const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    })
-  }
 
   const refreshData = async () => {
     if (!apiService) return
@@ -89,78 +71,78 @@ function Reports({
   }
 
   const getStatistics = () => {
-  // Filter items by all criteria
-  let filteredItems = items
+    // Filter items by all criteria
+    let filteredItems = items
 
-  // Date range filter
-  if (startDate || endDate) {
-    filteredItems = filteredItems.filter(item => {
-      const itemStartTime = item.phases?.[0]?.start_time || item.start_time
-      if (!itemStartTime) return false
+    // Date range filter
+    if (startDate || endDate) {
+      filteredItems = filteredItems.filter(item => {
+        const itemStartTime = item.phases?.[0]?.start_time || item.start_time
+        if (!itemStartTime) return false
 
-      const itemDate = new Date(itemStartTime)
-      const start = startDate ? new Date(startDate) : null
-      const end = endDate ? new Date(endDate + "T23:59:59") : null
+        const itemDate = new Date(itemStartTime)
+        const start = startDate ? new Date(startDate) : null
+        const end = endDate ? new Date(endDate + "T23:59:59") : null
 
-      if (start && end) {
-        return itemDate >= start && itemDate <= end
-      } else if (start) {
-        return itemDate >= start
-      } else if (end) {
-        return itemDate <= end
-      }
-      return true
-    })
-  }
+        if (start && end) {
+          return itemDate >= start && itemDate <= end
+        } else if (start) {
+          return itemDate >= start
+        } else if (end) {
+          return itemDate <= end
+        }
+        return true
+      })
+    }
 
-  // Priority filter
-  if (filterPriority) {
-    filteredItems = filteredItems.filter(item => item.priority === filterPriority)
-  }
+    // Priority filter
+    if (filterPriority) {
+      filteredItems = filteredItems.filter(item => item.priority === filterPriority)
+    }
 
-  // Status filter
-  if (filterStatus) {
-    filteredItems = filteredItems.filter(item => {
+    // Status filter
+    if (filterStatus) {
+      filteredItems = filteredItems.filter(item => {
+        const progress = calculateItemProgress(item)
+        if (filterStatus === "Completed") return progress === 100
+        if (filterStatus === "In Progress") return progress > 0 && progress < 100
+        if (filterStatus === "Not Started") return progress === 0
+        return true
+      })
+    }
+
+    // Item name filter
+    if (filterItemName) {
+      filteredItems = filteredItems.filter(item =>
+        item.name?.toLowerCase().includes(filterItemName.toLowerCase())
+      )
+    }
+
+    // Client filter
+    if (filterClient) {
+      filteredItems = filteredItems.filter(item =>
+        item.client_name?.toLowerCase().includes(filterClient.toLowerCase())
+      )
+    }
+
+    const totalItems = filteredItems.length
+    const completedItems = filteredItems.filter((item) => calculateItemProgress(item) === 100).length
+    const inProgressItems = filteredItems.filter((item) => {
       const progress = calculateItemProgress(item)
-      if (filterStatus === "Completed") return progress === 100
-      if (filterStatus === "In Progress") return progress > 0 && progress < 100
-      if (filterStatus === "Not Started") return progress === 0
-      return true
-    })
-  }
+      return progress > 0 && progress < 100
+    }).length
+    const notStartedItems = filteredItems.filter((item) => calculateItemProgress(item) === 0).length
 
-  // Item name filter
-  if (filterItemName) {
-    filteredItems = filteredItems.filter(item => 
-      item.name?.toLowerCase().includes(filterItemName.toLowerCase())
-    )
+    return {
+      totalItems,
+      completedItems,
+      inProgressItems,
+      notStartedItems,
+      overallProgress:
+        totalItems > 0 ? Math.round(filteredItems.reduce((sum, item) => sum + calculateItemProgress(item), 0) / totalItems) : 0,
+      filteredItems, // Return filtered items
+    }
   }
-
-  // Client filter
-  if (filterClient) {
-    filteredItems = filteredItems.filter(item => 
-      item.client_name?.toLowerCase().includes(filterClient.toLowerCase())
-    )
-  }
-
-  const totalItems = filteredItems.length
-  const completedItems = filteredItems.filter((item) => calculateItemProgress(item) === 100).length
-  const inProgressItems = filteredItems.filter((item) => {
-    const progress = calculateItemProgress(item)
-    return progress > 0 && progress < 100
-  }).length
-  const notStartedItems = filteredItems.filter((item) => calculateItemProgress(item) === 0).length
-
-  return {
-    totalItems,
-    completedItems,
-    inProgressItems,
-    notStartedItems,
-    overallProgress:
-      totalItems > 0 ? Math.round(filteredItems.reduce((sum, item) => sum + calculateItemProgress(item), 0) / totalItems) : 0,
-    filteredItems, // Return filtered items
-  }
-}
 
   const stats = getStatistics()
   const displayItems = stats.filteredItems || items
@@ -178,65 +160,65 @@ function Reports({
     })
   }
 
-const exportPDF = async () => {
-  // Refresh data before exporting to ensure latest information
-  await refreshData()
+  const exportPDF = async () => {
+    // Refresh data before exporting to ensure latest information
+    await refreshData()
 
-  // Get filtered items after refresh
-  const stats = getStatistics()
-  let freshItems = stats.filteredItems || items
+    // Get filtered items after refresh
+    const stats = getStatistics()
+    let freshItems = stats.filteredItems || items
 
-  if (startDate || endDate) {
-    freshItems = freshItems.filter(item => {
-      const itemStartTime = item.phases?.[0]?.start_time || item.start_time
-      if (!itemStartTime) return false
+    if (startDate || endDate) {
+      freshItems = freshItems.filter(item => {
+        const itemStartTime = item.phases?.[0]?.start_time || item.start_time
+        if (!itemStartTime) return false
 
-      const itemDate = new Date(itemStartTime)
-      const start = startDate ? new Date(startDate) : null
-      const end = endDate ? new Date(endDate + "T23:59:59") : null
+        const itemDate = new Date(itemStartTime)
+        const start = startDate ? new Date(startDate) : null
+        const end = endDate ? new Date(endDate + "T23:59:59") : null
 
-      if (start && end) {
-        return itemDate >= start && itemDate <= end
-      } else if (start) {
-        return itemDate >= start
-      } else if (end) {
-        return itemDate <= end
-      }
-      return true
+        if (start && end) {
+          return itemDate >= start && itemDate <= end
+        } else if (start) {
+          return itemDate >= start
+        } else if (end) {
+          return itemDate <= end
+        }
+        return true
+      })
+    }
+
+    // Apply all other filters
+    if (filterPriority) {
+      freshItems = freshItems.filter(item => item.priority === filterPriority)
+    }
+
+    if (filterStatus) {
+      freshItems = freshItems.filter(item => {
+        const progress = calculateItemProgress(item)
+        if (filterStatus === "Completed") return progress === 100
+        if (filterStatus === "In Progress") return progress > 0 && progress < 100
+        if (filterStatus === "Not Started") return progress === 0
+        return true
+      })
+    }
+
+    if (filterItemName) {
+      freshItems = freshItems.filter(item =>
+        item.name?.toLowerCase().includes(filterItemName.toLowerCase())
+      )
+    }
+
+    if (filterClient) {
+      freshItems = freshItems.filter(item =>
+        item.client_name?.toLowerCase().includes(filterClient.toLowerCase())
+      )
+    }
+
+    const sortedItems = [...freshItems].sort((a, b) => {
+      const priorityOrder = { High: 0, Medium: 1, Low: 2 }
+      return (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1)
     })
-  }
-
-  // Apply all other filters
-  if (filterPriority) {
-    freshItems = freshItems.filter(item => item.priority === filterPriority)
-  }
-
-  if (filterStatus) {
-    freshItems = freshItems.filter(item => {
-      const progress = calculateItemProgress(item)
-      if (filterStatus === "Completed") return progress === 100
-      if (filterStatus === "In Progress") return progress > 0 && progress < 100
-      if (filterStatus === "Not Started") return progress === 0
-      return true
-    })
-  }
-
-  if (filterItemName) {
-    freshItems = freshItems.filter(item => 
-      item.name?.toLowerCase().includes(filterItemName.toLowerCase())
-    )
-  }
-
-  if (filterClient) {
-    freshItems = freshItems.filter(item => 
-      item.client_name?.toLowerCase().includes(filterClient.toLowerCase())
-    )
-  }
-
-  const sortedItems = [...freshItems].sort((a, b) => {
-    const priorityOrder = { High: 0, Medium: 1, Low: 2 }
-    return (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1)
-  })
 
     const printWindow = window.open("", "_blank")
     if (!printWindow) {
@@ -1095,193 +1077,193 @@ ${item.remarks ? `
       </div>
 
       {/* Date Range Filter */}
-<div className={`backdrop-blur-md rounded-lg border transition-all shadow-sm mb-6 no-print ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-  }`}>
-  <button
-    onClick={() => setShowFilters(!showFilters)}
-    className={`w-full p-4 flex items-center justify-between hover:bg-opacity-80 transition-all ${isDarkMode ? "hover:bg-gray-700/40" : "hover:bg-gray-100/40"
-      }`}
-  >
-    <h3 className={`text-lg font-semibold uppercase tracking-wide ${isDarkMode ? "text-gray-200" : "text-gray-800"
-      }`}>
-      Filters & Export
-      {(startDate || endDate || filterPriority || filterStatus || filterItemName || filterClient) && (
-        <span className={`ml-2 text-xs px-2 py-1 rounded-full ${isDarkMode ? "bg-blue-900/40 text-blue-300" : "bg-blue-100 text-blue-700"
-          }`}>
-          {[startDate, endDate, filterPriority, filterStatus, filterItemName, filterClient].filter(Boolean).length} active
-        </span>
-      )}
-    </h3>
-    <svg
-      className={`w-5 h-5 transition-transform ${showFilters ? "rotate-180" : ""} ${isDarkMode ? "text-gray-400" : "text-gray-600"
-        }`}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  </button>
+      <div className={`backdrop-blur-md rounded-lg border transition-all shadow-sm mb-6 no-print ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+        }`}>
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`w-full p-4 flex items-center justify-between hover:bg-opacity-80 transition-all ${isDarkMode ? "hover:bg-gray-700/40" : "hover:bg-gray-100/40"
+            }`}
+        >
+          <h3 className={`text-lg font-semibold uppercase tracking-wide ${isDarkMode ? "text-gray-200" : "text-gray-800"
+            }`}>
+            Filters & Export
+            {(startDate || endDate || filterPriority || filterStatus || filterItemName || filterClient) && (
+              <span className={`ml-2 text-xs px-2 py-1 rounded-full ${isDarkMode ? "bg-blue-900/40 text-blue-300" : "bg-blue-100 text-blue-700"
+                }`}>
+                {[startDate, endDate, filterPriority, filterStatus, filterItemName, filterClient].filter(Boolean).length} active
+              </span>
+            )}
+          </h3>
+          <svg
+            className={`w-5 h-5 transition-transform ${showFilters ? "rotate-180" : ""} ${isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
 
-  {showFilters && (
-    <div className="p-4 pt-0">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div>
-          <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
-            Start Date
-          </label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className={`w-full px-3 py-2 rounded-md border ${isDarkMode
-                ? "bg-gray-700 border-gray-600 text-gray-200"
-                : "bg-white border-gray-300 text-gray-800"
-              }`}
-          />
-        </div>
-        <div>
-          <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
-            End Date
-          </label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className={`w-full px-3 py-2 rounded-md border ${isDarkMode
-                ? "bg-gray-700 border-gray-600 text-gray-200"
-                : "bg-white border-gray-300 text-gray-800"
-              }`}
-          />
-        </div>
-        <div>
-          <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
-            Priority
-          </label>
-          <select
-            value={filterPriority}
-            onChange={(e) => setFilterPriority(e.target.value)}
-            className={`w-full px-3 py-2 rounded-md border ${isDarkMode
-                ? "bg-gray-700 border-gray-600 text-gray-200"
-                : "bg-white border-gray-300 text-gray-800"
-              }`}
-          >
-            <option value="">All Priorities</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
-        </div>
-        <div>
-          <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
-            Status
-          </label>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className={`w-full px-3 py-2 rounded-md border ${isDarkMode
-                ? "bg-gray-700 border-gray-600 text-gray-200"
-                : "bg-white border-gray-300 text-gray-800"
-              }`}
-          >
-            <option value="">All Statuses</option>
-            <option value="Completed">Completed</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Not Started">Not Started</option>
-          </select>
-        </div>
-        <div>
-          <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
-            Item Name
-          </label>
-          <input
-            type="text"
-            value={filterItemName}
-            onChange={(e) => setFilterItemName(e.target.value)}
-            placeholder="Search by item name..."
-            className={`w-full px-3 py-2 rounded-md border ${isDarkMode
-                ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                : "bg-white border-gray-300 text-gray-800 placeholder-gray-500"
-              }`}
-          />
-        </div>
-        <div>
-          <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-            }`}>
-            Client
-          </label>
-          <input
-            type="text"
-            value={filterClient}
-            onChange={(e) => setFilterClient(e.target.value)}
-            placeholder="Search by client..."
-            className={`w-full px-3 py-2 rounded-md border ${isDarkMode
-                ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                : "bg-white border-gray-300 text-gray-800 placeholder-gray-500"
-              }`}
-          />
-        </div>
-      </div>
-      {(startDate || endDate || filterPriority || filterStatus || filterItemName || filterClient) && (
-        <div className="mt-3 flex gap-2 flex-wrap items-center">
-          <button
-            onClick={() => {
-              setStartDate("")
-              setEndDate("")
-              setFilterPriority("")
-              setFilterStatus("")
-              setFilterItemName("")
-              setFilterClient("")
-            }}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isDarkMode
-                ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                : "bg-gray-200 hover:bg-gray-300 text-gray-800"
-              }`}
-          >
-            Clear All Filters
-          </button>
-          <span className={`px-4 py-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"
-            }`}>
-            Showing {stats.totalItems} item(s)
-            {startDate || endDate ? ` from ${startDate || "beginning"} to ${endDate || "now"}` : ""}
-            {filterPriority ? ` | Priority: ${filterPriority}` : ""}
-            {filterStatus ? ` | Status: ${filterStatus}` : ""}
-            {filterItemName ? ` | Item: "${filterItemName}"` : ""}
-            {filterClient ? ` | Client: "${filterClient}"` : ""}
-          </span>
-        </div>
-      )}
+        {showFilters && (
+          <div className="p-4 pt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                  }`}>
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-md border ${isDarkMode
+                    ? "bg-gray-700 border-gray-600 text-gray-200"
+                    : "bg-white border-gray-300 text-gray-800"
+                    }`}
+                />
+              </div>
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                  }`}>
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-md border ${isDarkMode
+                    ? "bg-gray-700 border-gray-600 text-gray-200"
+                    : "bg-white border-gray-300 text-gray-800"
+                    }`}
+                />
+              </div>
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                  }`}>
+                  Priority
+                </label>
+                <select
+                  value={filterPriority}
+                  onChange={(e) => setFilterPriority(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-md border ${isDarkMode
+                    ? "bg-gray-700 border-gray-600 text-gray-200"
+                    : "bg-white border-gray-300 text-gray-800"
+                    }`}
+                >
+                  <option value="">All Priorities</option>
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                  }`}>
+                  Status
+                </label>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-md border ${isDarkMode
+                    ? "bg-gray-700 border-gray-600 text-gray-200"
+                    : "bg-white border-gray-300 text-gray-800"
+                    }`}
+                >
+                  <option value="">All Statuses</option>
+                  <option value="Completed">Completed</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Not Started">Not Started</option>
+                </select>
+              </div>
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                  }`}>
+                  Item Name
+                </label>
+                <input
+                  type="text"
+                  value={filterItemName}
+                  onChange={(e) => setFilterItemName(e.target.value)}
+                  placeholder="Search by item name..."
+                  className={`w-full px-3 py-2 rounded-md border ${isDarkMode
+                    ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-800 placeholder-gray-500"
+                    }`}
+                />
+              </div>
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                  }`}>
+                  Client
+                </label>
+                <input
+                  type="text"
+                  value={filterClient}
+                  onChange={(e) => setFilterClient(e.target.value)}
+                  placeholder="Search by client..."
+                  className={`w-full px-3 py-2 rounded-md border ${isDarkMode
+                    ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-800 placeholder-gray-500"
+                    }`}
+                />
+              </div>
+            </div>
+            {(startDate || endDate || filterPriority || filterStatus || filterItemName || filterClient) && (
+              <div className="mt-3 flex gap-2 flex-wrap items-center">
+                <button
+                  onClick={() => {
+                    setStartDate("")
+                    setEndDate("")
+                    setFilterPriority("")
+                    setFilterStatus("")
+                    setFilterItemName("")
+                    setFilterClient("")
+                  }}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isDarkMode
+                    ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                    : "bg-gray-200 hover:bg-gray-300 text-gray-800"
+                    }`}
+                >
+                  Clear All Filters
+                </button>
+                <span className={`px-4 py-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}>
+                  Showing {stats.totalItems} item(s)
+                  {startDate || endDate ? ` from ${startDate || "beginning"} to ${endDate || "now"}` : ""}
+                  {filterPriority ? ` | Priority: ${filterPriority}` : ""}
+                  {filterStatus ? ` | Status: ${filterStatus}` : ""}
+                  {filterItemName ? ` | Item: "${filterItemName}"` : ""}
+                  {filterClient ? ` | Client: "${filterClient}"` : ""}
+                </span>
+              </div>
+            )}
 
-      {/* Export Options */}
-      <div className={`mt-4 pt-4 border-t ${isDarkMode ? "border-gray-700/50" : "border-gray-200/50"}`}>
-        <h4 className={`text-base font-semibold mb-3 uppercase tracking-wide ${isDarkMode ? "text-gray-200" : "text-gray-800"
-          }`}>
-          Export Options
-        </h4>
-        <div className="flex gap-3">
-          <button
-            onClick={exportPDF}
-            className={`px-6 py-2 rounded-md transition-colors font-medium flex items-center gap-2 shadow-sm ${isDarkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-800 hover:bg-gray-900"
-              } text-white`}
-          >
-            <FileText size={18} />
-            Export as PDF
-          </button>
-        </div>
-        <p className={`text-sm mt-3 ${isDarkMode ? "text-gray-400" : "text-gray-600"
-          }`}>
-          Click the button above to open the print dialog. Data will be refreshed before export. Use "Save as PDF" or
-          "Microsoft Print to PDF" option to export the report as a PDF file.
-        </p>
+            {/* Export Options */}
+            <div className={`mt-4 pt-4 border-t ${isDarkMode ? "border-gray-700/50" : "border-gray-200/50"}`}>
+              <h4 className={`text-base font-semibold mb-3 uppercase tracking-wide ${isDarkMode ? "text-gray-200" : "text-gray-800"
+                }`}>
+                Export Options
+              </h4>
+              <div className="flex gap-3">
+                <button
+                  onClick={exportPDF}
+                  className={`px-6 py-2 rounded-md transition-colors font-medium flex items-center gap-2 shadow-sm ${isDarkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-800 hover:bg-gray-900"
+                    } text-white`}
+                >
+                  <FileText size={18} />
+                  Export as PDF
+                </button>
+              </div>
+              <p className={`text-sm mt-3 ${isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}>
+                Click the button above to open the print dialog. Data will be refreshed before export. Use "Save as PDF" or
+                "Microsoft Print to PDF" option to export the report as a PDF file.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  )}
-</div>
 
       {/* Summary Report */}
       <div className={`backdrop-blur-md rounded-lg p-6 border transition-all shadow-sm mb-6 avoid-break ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
@@ -2123,44 +2105,7 @@ ${item.remarks ? `
           </div>
         )}
       </div>
-
-      {/* Export Options */}
-      <div className={`mt-6 backdrop-blur-md rounded-lg p-5 border no-print shadow-sm ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-        }`}>
-        <h3 className={`text-lg font-semibold mb-3 uppercase tracking-wide ${isDarkMode ? "text-gray-200" : "text-gray-800"
-          }`}>
-          Export Options
-        </h3>
-        <div className="flex gap-3">
-          <button
-            onClick={exportPDF}
-            className={`px-6 py-2 rounded-md transition-colors font-medium flex items-center gap-2 shadow-sm ${isDarkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-800 hover:bg-gray-900"
-              } text-white`}
-          >
-            <FileText size={18} />
-            Export as PDF
-          </button>
-        </div>
-        <p className={`text-sm mt-3 ${isDarkMode ? "text-gray-400" : "text-gray-600"
-          }`}>
-          Click the button above to open the print dialog. Data will be refreshed before export. Use "Save as PDF" or
-          "Microsoft Print to PDF" option to export the report as a PDF file.
-        </p>
-        {/* Scroll to Top Button */}
-            {showScrollTop && (
-              <button
-                onClick={scrollToTop}
-                className="fixed bottom-8 right-8 z-40 w-14 h-14 bg-zinc-900 hover:bg-zinc-800 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-                aria-label="Scroll to top"
-              >
-                <ArrowUp className="w-6 h-6" />
-              </button>
-            )}
-      </div>
-      
     </div>
-
-    
   )
 }
 

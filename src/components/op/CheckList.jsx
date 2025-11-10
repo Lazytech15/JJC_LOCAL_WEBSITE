@@ -14,8 +14,19 @@ import {
   Package,
   FileText,
   Pause,
+  Edit2,
+  Plus,
+  Trash2,
 } from "lucide-react"
 import { useAuth } from "../../contexts/AuthContext"
+import {
+  EditItemModal,
+  EditPhaseModal,
+  EditSubphaseModal,
+  AddPhaseModal,
+  AddSubphaseModal,
+  BulkEditModal
+} from "./EditItems"
 
 function Checklist({
   items,
@@ -60,6 +71,19 @@ function Checklist({
   const [selectedTargetPhase, setSelectedTargetPhase] = useState(null)
   const [selectedTargetSubphase, setSelectedTargetSubphase] = useState(null)
   const [, forceUpdate] = useState(0)
+
+  const [showEditItemModal, setShowEditItemModal] = useState(false)
+  const [showEditPhaseModal, setShowEditPhaseModal] = useState(false)
+  const [showEditSubphaseModal, setShowEditSubphaseModal] = useState(false)
+  const [showAddPhaseModal, setShowAddPhaseModal] = useState(false)
+  const [showAddSubphaseModal, setShowAddSubphaseModal] = useState(false)
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false)
+
+  const [selectedItemForEdit, setSelectedItemForEdit] = useState(null)
+  const [selectedPhaseForEdit, setSelectedPhaseForEdit] = useState(null)
+  const [selectedSubphaseForEdit, setSelectedSubphaseForEdit] = useState(null)
+  const [selectedItemsForBulk, setSelectedItemsForBulk] = useState([])
+  const [itemCheckboxes, setItemCheckboxes] = useState({})
 
   // Optimistic update helpers - update local state without full reload
   const updateItemInState = (partNumber, updates) => {
@@ -840,6 +864,380 @@ function Checklist({
     // Previous phase must be completed (100% progress)
     return calculatePhaseProgress(previousPhase) === 100 && previousPhase.end_time
   }
+
+  // Edit Component
+  // Edit Item Handler - OPTIMISTIC UPDATE
+  const handleEditItem = async (itemData) => {
+    try {
+      // Optimistically update the UI immediately
+      setItems(prevItems =>
+        prevItems.map(item =>
+          item.part_number === selectedItemForEdit.part_number
+            ? { ...item, ...itemData }
+            : item
+        )
+      )
+
+      // Close modal immediately
+      setShowEditItemModal(false)
+      setSelectedItemForEdit(null)
+
+      // API call in background
+      await apiService.operations.updateItem(selectedItemForEdit.part_number, itemData)
+
+    } catch (error) {
+      console.error("Error updating item:", error)
+      alert("Failed to update item: " + error.message)
+      // Reload only on error to fix state
+      await loadData()
+    }
+  }
+
+  // Edit Phase Handler - OPTIMISTIC UPDATE
+  const handleEditPhase = async (phaseData) => {
+    try {
+      // Optimistically update the UI immediately
+      setItems(prevItems =>
+        prevItems.map(item => {
+          if (item.phases) {
+            return {
+              ...item,
+              phases: item.phases.map(phase =>
+                phase.id === selectedPhaseForEdit.id
+                  ? { ...phase, ...phaseData }
+                  : phase
+              )
+            }
+          }
+          return item
+        })
+      )
+
+      // Close modal immediately
+      setShowEditPhaseModal(false)
+      setSelectedPhaseForEdit(null)
+
+      // API call in background
+      await apiService.operations.updatePhase(selectedPhaseForEdit.id, phaseData)
+
+    } catch (error) {
+      console.error("Error updating phase:", error)
+      alert("Failed to update phase: " + error.message)
+      await loadData()
+    }
+  }
+
+  // Delete Phase Handler - OPTIMISTIC UPDATE
+  const handleDeletePhase = async () => {
+    try {
+      const phaseId = selectedPhaseForEdit.id
+
+      // Optimistically remove from UI immediately
+      setItems(prevItems =>
+        prevItems.map(item => {
+          if (item.phases) {
+            return {
+              ...item,
+              phases: item.phases.filter(phase => phase.id !== phaseId)
+            }
+          }
+          return item
+        })
+      )
+
+      // Close modal immediately
+      setShowEditPhaseModal(false)
+      setSelectedPhaseForEdit(null)
+
+      // API call in background
+      await apiService.operations.deletePhase(phaseId)
+
+    } catch (error) {
+      console.error("Error deleting phase:", error)
+      alert("Failed to delete phase: " + error.message)
+      await loadData()
+    }
+  }
+
+  // Edit Subphase Handler - OPTIMISTIC UPDATE
+  const handleEditSubphase = async (subphaseData) => {
+    try {
+      // Optimistically update the UI immediately
+      setItems(prevItems =>
+        prevItems.map(item => {
+          if (item.phases) {
+            return {
+              ...item,
+              phases: item.phases.map(phase => {
+                if (phase.subphases) {
+                  return {
+                    ...phase,
+                    subphases: phase.subphases.map(subphase =>
+                      subphase.id === selectedSubphaseForEdit.id
+                        ? { ...subphase, ...subphaseData }
+                        : subphase
+                    )
+                  }
+                }
+                return phase
+              })
+            }
+          }
+          return item
+        })
+      )
+
+      // Close modal immediately
+      setShowEditSubphaseModal(false)
+      setSelectedSubphaseForEdit(null)
+
+      // API call in background
+      await apiService.operations.updateSubphase(selectedSubphaseForEdit.id, subphaseData)
+
+    } catch (error) {
+      console.error("Error updating subphase:", error)
+      alert("Failed to update subphase: " + error.message)
+      await loadData()
+    }
+  }
+
+  // Delete Subphase Handler - OPTIMISTIC UPDATE
+  const handleDeleteSubphase = async () => {
+    try {
+      const subphaseId = selectedSubphaseForEdit.id
+
+      // Optimistically remove from UI immediately
+      setItems(prevItems =>
+        prevItems.map(item => {
+          if (item.phases) {
+            return {
+              ...item,
+              phases: item.phases.map(phase => {
+                if (phase.subphases) {
+                  return {
+                    ...phase,
+                    subphases: phase.subphases.filter(subphase => subphase.id !== subphaseId)
+                  }
+                }
+                return phase
+              })
+            }
+          }
+          return item
+        })
+      )
+
+      // Close modal immediately
+      setShowEditSubphaseModal(false)
+      setSelectedSubphaseForEdit(null)
+
+      // API call in background
+      await apiService.operations.deleteSubphase(subphaseId)
+
+    } catch (error) {
+      console.error("Error deleting subphase:", error)
+      alert("Failed to delete subphase: " + error.message)
+      await loadData()
+    }
+  }
+
+  // Add Phase Handler - OPTIMISTIC UPDATE
+  const handleAddPhase = async (phaseData) => {
+    try {
+      const partNumber = selectedItemForEdit.part_number
+
+      // Create temporary phase with fake ID
+      const tempPhase = {
+        id: Date.now(), // Temporary ID
+        name: phaseData.name,
+        phase_order: phaseData.phase_order,
+        subphases: []
+      }
+
+      // Optimistically add to UI immediately
+      setItems(prevItems =>
+        prevItems.map(item =>
+          item.part_number === partNumber
+            ? {
+              ...item,
+              phases: [...(item.phases || []), tempPhase]
+            }
+            : item
+        )
+      )
+
+      // Close modal immediately
+      setShowAddPhaseModal(false)
+      setSelectedItemForEdit(null)
+
+      // API call in background
+      const response = await apiService.operations.createPhase({
+        part_number: partNumber,
+        name: phaseData.name,
+        phase_order: phaseData.phase_order
+      })
+
+      // Update with real ID from server
+      if (response && response.id) {
+        setItems(prevItems =>
+          prevItems.map(item =>
+            item.part_number === partNumber
+              ? {
+                ...item,
+                phases: item.phases.map(phase =>
+                  phase.id === tempPhase.id ? { ...phase, id: response.id } : phase
+                )
+              }
+              : item
+          )
+        )
+      }
+
+    } catch (error) {
+      console.error("Error adding phase:", error)
+      alert("Failed to add phase: " + error.message)
+      await loadData()
+    }
+  }
+
+  // Add Subphase Handler - OPTIMISTIC UPDATE
+  const handleAddSubphase = async (subphaseData) => {
+    try {
+      const partNumber = selectedItemForEdit.part_number
+      const phaseId = selectedPhaseForEdit.id
+
+      // Create temporary subphase with fake ID
+      const tempSubphase = {
+        id: Date.now(), // Temporary ID
+        name: subphaseData.name,
+        expected_duration: parseFloat(subphaseData.expected_duration) || 0,
+        expected_quantity: parseInt(subphaseData.expected_quantity) || 0,
+        subphase_order: parseInt(subphaseData.subphase_order) || 0,
+        completed: 0,
+        current_completed_quantity: 0
+      }
+
+      // Optimistically add to UI immediately
+      setItems(prevItems =>
+        prevItems.map(item =>
+          item.part_number === partNumber
+            ? {
+              ...item,
+              phases: item.phases.map(phase =>
+                phase.id === phaseId
+                  ? {
+                    ...phase,
+                    subphases: [...(phase.subphases || []), tempSubphase]
+                  }
+                  : phase
+              )
+            }
+            : item
+        )
+      )
+
+      // Close modal immediately
+      setShowAddSubphaseModal(false)
+      setSelectedPhaseForEdit(null)
+      setSelectedItemForEdit(null)
+
+      // API call in background
+      const response = await apiService.operations.createSubphase({
+        part_number: partNumber,
+        phase_id: phaseId,
+        name: subphaseData.name,
+        expected_duration: parseFloat(subphaseData.expected_duration) || 0,
+        expected_quantity: parseInt(subphaseData.expected_quantity) || 0,
+        subphase_order: parseInt(subphaseData.subphase_order) || 0
+      })
+
+      // Update with real ID from server
+      if (response && response.id) {
+        setItems(prevItems =>
+          prevItems.map(item =>
+            item.part_number === partNumber
+              ? {
+                ...item,
+                phases: item.phases.map(phase =>
+                  phase.id === phaseId
+                    ? {
+                      ...phase,
+                      subphases: phase.subphases.map(subphase =>
+                        subphase.id === tempSubphase.id
+                          ? { ...subphase, id: response.id }
+                          : subphase
+                      )
+                    }
+                    : phase
+                )
+              }
+              : item
+          )
+        )
+      }
+
+    } catch (error) {
+      console.error("Error adding subphase:", error)
+      alert("Failed to add subphase: " + error.message)
+      await loadData()
+    }
+  }
+
+  // Bulk Edit Handler - OPTIMISTIC UPDATE
+  const handleBulkEdit = async (updates) => {
+    try {
+      const itemsToUpdate = Object.keys(itemCheckboxes)
+        .filter(partNumber => itemCheckboxes[partNumber])
+        .map(partNumber => items.find(item => item.part_number === partNumber))
+        .filter(Boolean)
+
+      // Optimistically update all items immediately
+      setItems(prevItems =>
+        prevItems.map(item => {
+          if (itemCheckboxes[item.part_number]) {
+            const updateData = { ...updates }
+            // If updating remarks, append to existing
+            if (updates.remarks && item.remarks) {
+              updateData.remarks = `${item.remarks}\n${updates.remarks}`
+            }
+            return { ...item, ...updateData }
+          }
+          return item
+        })
+      )
+
+      // Close modal and clear checkboxes immediately
+      setShowBulkEditModal(false)
+      setItemCheckboxes({})
+
+      // API calls in background
+      for (const item of itemsToUpdate) {
+        const updateData = { ...updates }
+        if (updates.remarks && item.remarks) {
+          updateData.remarks = `${item.remarks}\n${updates.remarks}`
+        }
+        await apiService.operations.updateItem(item.part_number, updateData)
+      }
+
+    } catch (error) {
+      console.error("Error in bulk edit:", error)
+      alert("Failed to update items: " + error.message)
+      await loadData()
+    }
+  }
+
+  // Toggle Item Checkbox
+  const toggleItemCheckbox = (partNumber) => {
+    setItemCheckboxes(prev => ({
+      ...prev,
+      [partNumber]: !prev[partNumber]
+    }))
+  }
+
+  // Get checked items count
+  const getCheckedItemsCount = () => {
+    return Object.values(itemCheckboxes).filter(Boolean).length
+  }
   return (
     <div>
       <h2 className={`text-2xl font-bold mb-6 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
@@ -937,6 +1335,40 @@ function Checklist({
           </div>
         )}
       </div>
+
+      {/* Bulk Edit Section */}
+      {getCheckedItemsCount() > 0 && (
+        <div className={`backdrop-blur-md rounded-lg p-4 mb-4 border transition-all shadow-sm ${isDarkMode ? "bg-purple-500/10 border-purple-500/30" : "bg-purple-500/10 border-purple-500/30"
+          }`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-sm font-medium ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
+              {getCheckedItemsCount()} item(s) selected
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const selected = Object.keys(itemCheckboxes)
+                    .filter(partNumber => itemCheckboxes[partNumber])
+                    .map(partNumber => items.find(item => item.part_number === partNumber))
+                    .filter(Boolean)
+                  setSelectedItemsForBulk(selected)
+                  setShowBulkEditModal(true)
+                }}
+                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+              >
+                <Edit2 size={16} />
+                Bulk Edit
+              </button>
+              <button
+                onClick={() => setItemCheckboxes({})}
+                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm font-medium"
+              >
+                Clear Selection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -1309,15 +1741,12 @@ function Checklist({
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
                                 <h3
-                                  className={`font-semibold text-lg sm:text-xl ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                    }`}
+                                  className={`font-semibold text-lg sm:text-xl ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}
                                 >
                                   {item.name}
                                 </h3>
                                 <div
-                                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${getPriorityColor(
-                                    priority,
-                                  )}`}
+                                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${getPriorityColor(priority)}`}
                                 >
                                   <Flag size={12} />
                                   {priority}
@@ -1340,8 +1769,7 @@ function Checklist({
                               </p>
                               {item.remarks && (
                                 <p
-                                  className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"
-                                    } mt-1 italic flex items-start gap-1`}
+                                  className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"} mt-1 italic flex items-start gap-1`}
                                 >
                                   <FileText size={12} className="mt-0.5 shrink-0" />
                                   <span className="line-clamp-2">{item.remarks}</span>
@@ -1356,10 +1784,10 @@ function Checklist({
                                   key={p}
                                   onClick={() => handleUpdatePriority(item.part_number, p)}
                                   className={`px-2 py-1 text-xs rounded transition-colors ${priority === p
-                                    ? getPriorityColor(p)
-                                    : isDarkMode
-                                      ? "text-gray-400 hover:text-gray-300"
-                                      : "text-gray-400 hover:text-gray-600"
+                                      ? getPriorityColor(p)
+                                      : isDarkMode
+                                        ? "text-gray-400 hover:text-gray-300"
+                                        : "text-gray-400 hover:text-gray-600"
                                     }`}
                                   title={`Set ${p} priority`}
                                 >
@@ -1367,19 +1795,63 @@ function Checklist({
                                 </button>
                               ))}
                             </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                openTransferModal(item)
-                              }}
-                              className="px-2 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
-                              title="Transfer to another client"
-                            >
-                              <ArrowRightLeft size={16} />
-                            </button>
-                            <span className={`text-lg font-bold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                              {progress}%
-                            </span>
+                            <div className="flex items-center gap-2 justify-end sm:justify-start w-full sm:w-auto">
+                              {/* ADD CHECKBOX FOR BULK SELECTION */}
+                              <input
+                                type="checkbox"
+                                checked={itemCheckboxes[item.part_number] || false}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  toggleItemCheckbox(item.part_number);
+                                }}
+                                className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                title="Select for bulk edit"
+                              />
+
+                              {/* EDIT ITEM BUTTON */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedItemForEdit(item);
+                                  setShowEditItemModal(true);
+                                }}
+                                className="px-2 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
+                                title="Edit item details"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+
+                              {/* ADD PHASE BUTTON */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedItemForEdit(item);
+                                  setShowAddPhaseModal(true);
+                                }}
+                                className="px-2 py-1 text-green-600 dark:text-green-400 hover:bg-green-500/10 rounded transition-colors"
+                                title="Add phase"
+                              >
+                                <Plus size={16} />
+                              </button>
+
+                              {/* TRANSFER BUTTON */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openTransferModal(item);
+                                }}
+                                className="px-2 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
+                                title="Transfer to another client"
+                              >
+                                <ArrowRightLeft size={16} />
+                              </button>
+
+
+                              {/* PROGRESS */}
+                              <span className={`text-lg font-bold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                {progress}%
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1437,9 +1909,34 @@ function Checklist({
                                             </span>
                                           )}
                                         </span>
+
                                         <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                                           ({phase.subphases?.length || 0} sub-phases)
                                         </span>
+                                      </div>
+                                      <div className="flex gap-1 ml-auto" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                          onClick={() => {
+                                            setSelectedItemForEdit(item)
+                                            setSelectedPhaseForEdit(phase)
+                                            setShowEditPhaseModal(true)
+                                          }}
+                                          className="px-2 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
+                                          title="Edit phase"
+                                        >
+                                          <Edit2 size={14} />
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setSelectedItemForEdit(item)
+                                            setSelectedPhaseForEdit(phase)
+                                            setShowAddSubphaseModal(true)
+                                          }}
+                                          className="px-2 py-1 text-green-600 dark:text-green-400 hover:bg-green-500/10 rounded transition-colors"
+                                          title="Add subphase"
+                                        >
+                                          <Plus size={14} />
+                                        </button>
                                       </div>
                                       <div className="flex items-center gap-3 w-full sm:w-auto">
                                         <div
@@ -1514,8 +2011,8 @@ function Checklist({
 
                                       <div
                                         className={`grid gap-2 w-full ${!phase.start_time || (phase.pause_time && !phase.end_time && calculatePhaseProgress(phase) < 100)
-                                            ? "grid-flow-col justify-center"
-                                            : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                                          ? "grid-flow-col justify-center"
+                                          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
                                           }`}
                                       >
                                         {!phase.start_time ? (
@@ -1673,16 +2170,30 @@ function Checklist({
                                                 </div>
                                                 <div className="flex-1">
                                                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                                                    <p
-                                                      className={`font-medium ${subphase.completed == 1
+                                                    <div className="flex items-center gap-2">
+                                                      <p className={`font-medium ${subphase.completed == 1
                                                         ? "line-through opacity-60"
                                                         : isDisabled
                                                           ? "opacity-50"
                                                           : ""
-                                                        } ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}
-                                                    >
-                                                      {subphase.name}
-                                                    </p>
+                                                        } ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                                        {subphase.name}
+                                                      </p>
+
+                                                      {/* ADD EDIT SUBPHASE BUTTON */}
+                                                      <button
+                                                        onClick={() => {
+                                                          setSelectedItemForEdit(item)
+                                                          setSelectedPhaseForEdit(phase)
+                                                          setSelectedSubphaseForEdit(subphase)
+                                                          setShowEditSubphaseModal(true)
+                                                        }}
+                                                        className="px-1.5 py-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
+                                                        title="Edit subphase"
+                                                      >
+                                                        <Edit2 size={12} />
+                                                      </button>
+                                                    </div>
                                                     {subphase.completed == 1 && (
                                                       <CheckCircle size={18} className="text-green-500 shrink-0 ml-2" />
                                                     )}
@@ -2196,6 +2707,95 @@ function Checklist({
             ? "No items match your search or filters."
             : 'No items yet. Go to "Add Items" to create your first item.'}
         </p>
+      )}
+
+
+      {/* Edit Item Modal */}
+      {showEditItemModal && selectedItemForEdit && (
+        <EditItemModal
+          item={selectedItemForEdit}
+          clients={clients}
+          isDarkMode={isDarkMode}
+          onClose={() => {
+            setShowEditItemModal(false)
+            setSelectedItemForEdit(null)
+          }}
+          onSave={handleEditItem}
+        />
+      )}
+
+      {/* Edit Phase Modal */}
+      {showEditPhaseModal && selectedPhaseForEdit && (
+        <EditPhaseModal
+          phase={selectedPhaseForEdit}
+          isDarkMode={isDarkMode}
+          onClose={() => {
+            setShowEditPhaseModal(false)
+            setSelectedPhaseForEdit(null)
+          }}
+          onSave={handleEditPhase}
+          onDelete={handleDeletePhase}
+        />
+      )}
+
+      {/* Edit Subphase Modal */}
+      {showEditSubphaseModal && selectedSubphaseForEdit && selectedItemForEdit && (
+        <EditSubphaseModal
+          subphase={selectedSubphaseForEdit}
+          batchQty={selectedItemForEdit.qty}
+          isDarkMode={isDarkMode}
+          onClose={() => {
+            setShowEditSubphaseModal(false)
+            setSelectedSubphaseForEdit(null)
+            setSelectedPhaseForEdit(null)
+            setSelectedItemForEdit(null)
+          }}
+          onSave={handleEditSubphase}
+          onDelete={handleDeleteSubphase}
+        />
+      )}
+
+      {/* Add Phase Modal */}
+      {showAddPhaseModal && selectedItemForEdit && (
+        <AddPhaseModal
+          item={selectedItemForEdit}
+          isDarkMode={isDarkMode}
+          onClose={() => {
+            setShowAddPhaseModal(false)
+            setSelectedItemForEdit(null)
+          }}
+          onSave={handleAddPhase}
+        />
+      )}
+
+      {/* Add Subphase Modal */}
+      {showAddSubphaseModal && selectedPhaseForEdit && selectedItemForEdit && (
+        <AddSubphaseModal
+          item={selectedItemForEdit}
+          phase={selectedPhaseForEdit}
+          batchQty={selectedItemForEdit.qty}
+          isDarkMode={isDarkMode}
+          onClose={() => {
+            setShowAddSubphaseModal(false)
+            setSelectedPhaseForEdit(null)
+            setSelectedItemForEdit(null)
+          }}
+          onSave={handleAddSubphase}
+        />
+      )}
+
+      {/* Bulk Edit Modal */}
+      {showBulkEditModal && selectedItemsForBulk.length > 0 && (
+        <BulkEditModal
+          selectedItems={selectedItemsForBulk}
+          clients={clients}
+          isDarkMode={isDarkMode}
+          onClose={() => {
+            setShowBulkEditModal(false)
+            setSelectedItemsForBulk([])
+          }}
+          onSave={handleBulkEdit}
+        />
       )}
     </div>
   )

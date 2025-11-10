@@ -23,7 +23,7 @@ function AddItems({ items, submitting, apiService }) {
   const dropdownRef = useRef(null)
   const clientDropdownRef = useRef(null)
 
-  const { isDarkMode } = useAuth()
+  const { isDarkMode, user } = useAuth()
 
 
   // Load existing clients on mount
@@ -174,17 +174,17 @@ function AddItems({ items, submitting, apiService }) {
       phases.map((phase) =>
         phase.id === phaseId
           ? {
-              ...phase,
-              subphases: [
-                ...phase.subphases,
-                {
-                  id: Date.now(),
-                  name: "",
-                  expectedDuration: "",
-                  expectedQuantity: "",
-                },
-              ],
-            }
+            ...phase,
+            subphases: [
+              ...phase.subphases,
+              {
+                id: Date.now(),
+                name: "",
+                expectedDuration: "",
+                expectedQuantity: "",
+              },
+            ],
+          }
           : phase,
       ),
     )
@@ -195,37 +195,37 @@ function AddItems({ items, submitting, apiService }) {
       phases.map((phase) =>
         phase.id === phaseId
           ? {
-              ...phase,
-              subphases: phase.subphases.map((sub) => {
-                if (sub.id === subphaseId) {
-                  // If updating expectedQuantity, validate against batch quantity
-                  if (field === "expectedQuantity") {
-                    const newValue = Number.parseInt(value) || 0
-                    const batchQty = Number.parseInt(qty) || 0
+            ...phase,
+            subphases: phase.subphases.map((sub) => {
+              if (sub.id === subphaseId) {
+                // If updating expectedQuantity, validate against batch quantity
+                if (field === "expectedQuantity") {
+                  const newValue = Number.parseInt(value) || 0
+                  const batchQty = Number.parseInt(qty) || 0
 
-                    // Calculate total from other subphases (excluding current one)
-                    let otherSubphasesTotal = 0
-                    phases.forEach((p) => {
-                      p.subphases.forEach((s) => {
-                        if (!(p.id === phaseId && s.id === subphaseId)) {
-                          otherSubphasesTotal += Number.parseInt(s.expectedQuantity) || 0
-                        }
-                      })
+                  // Calculate total from other subphases (excluding current one)
+                  let otherSubphasesTotal = 0
+                  phases.forEach((p) => {
+                    p.subphases.forEach((s) => {
+                      if (!(p.id === phaseId && s.id === subphaseId)) {
+                        otherSubphasesTotal += Number.parseInt(s.expectedQuantity) || 0
+                      }
                     })
+                  })
 
-                    const totalIfUpdated = otherSubphasesTotal + newValue
+                  const totalIfUpdated = otherSubphasesTotal + newValue
 
-                    if (totalIfUpdated > batchQty) {
-                      alert(`Cannot exceed batch quantity of ${batchQty}. Current total would be ${totalIfUpdated}.`)
-                      return sub
-                    }
+                  if (totalIfUpdated > batchQty) {
+                    alert(`Cannot exceed batch quantity of ${batchQty}. Current total would be ${totalIfUpdated}.`)
+                    return sub
                   }
-
-                  return { ...sub, [field]: value }
                 }
-                return sub
-              }),
-            }
+
+                return { ...sub, [field]: value }
+              }
+              return sub
+            }),
+          }
           : phase,
       ),
     )
@@ -236,9 +236,9 @@ function AddItems({ items, submitting, apiService }) {
       phases.map((phase) =>
         phase.id === phaseId
           ? {
-              ...phase,
-              subphases: phase.subphases.filter((sub) => sub.id !== subphaseId),
-            }
+            ...phase,
+            subphases: phase.subphases.filter((sub) => sub.id !== subphaseId),
+          }
           : phase,
       ),
     )
@@ -286,13 +286,14 @@ function AddItems({ items, submitting, apiService }) {
       priority: priority,
       qty: Number.parseInt(qty) || 1,
       total_qty: totalQty,
+      performed_by_uid: user?.uid || null,
+      performed_by_name: user?.name || null,
       phases: validPhases.map((phase) => ({
         name: phase.name.trim(),
         subphases: phase.subphases
           .filter((sub) => sub.name.trim())
           .map((sub) => ({
             name: sub.name.trim(),
-            // CHANGED: Convert minutes to hours before saving
             expected_duration: Number.parseFloat(sub.expectedDuration) || 0,
             expected_quantity: Number.parseInt(sub.expectedQuantity) || 0,
           })),
@@ -380,9 +381,8 @@ function AddItems({ items, submitting, apiService }) {
 
       {/* Item Basic Info */}
       <div
-        className={`backdrop-blur-md rounded-lg p-6 border transition-all shadow-sm ${
-          isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-        }`}
+        className={`backdrop-blur-md rounded-lg p-6 border transition-all shadow-sm ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+          }`}
       >
         <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
           Item Information
@@ -400,11 +400,10 @@ function AddItems({ items, submitting, apiService }) {
               value={partNumber}
               onChange={(e) => setPartNumber(e.target.value)}
               disabled={submitting}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
                   ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                   : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-              }`}
+                }`}
             />
           </div>
 
@@ -429,21 +428,19 @@ function AddItems({ items, submitting, apiService }) {
                   setAutoBatch(false)
                 }}
                 disabled={submitting || autoBatch}
-                className={`flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
-                  isDarkMode
+                className={`flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
                     ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                     : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                }`}
+                  }`}
               />
               <button
                 onClick={() => setAutoBatch(!autoBatch)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  autoBatch 
-                    ? "bg-green-600 hover:bg-green-700 text-white" 
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${autoBatch
+                    ? "bg-green-600 hover:bg-green-700 text-white"
                     : isDarkMode
                       ? "bg-gray-700 hover:bg-gray-600 text-white"
                       : "bg-gray-600 hover:bg-gray-700 text-white"
-                }`}
+                  }`}
                 title={autoBatch ? "Auto-generate enabled" : "Auto-generate disabled"}
               >
                 {autoBatch ? "Auto" : "Manual"}
@@ -474,20 +471,18 @@ function AddItems({ items, submitting, apiService }) {
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
                 disabled={submitting}
-                className={`w-full px-4 py-2 pr-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
-                  isDarkMode
+                className={`w-full px-4 py-2 pr-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
                     ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                     : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                }`}
+                  }`}
               />
               <Search size={18} className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`} />
             </div>
 
             {showTemplateDropdown && filteredItems.length > 0 && (
               <div
-                className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-60 overflow-y-auto border ${
-                  isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"
-                }`}
+                className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-60 overflow-y-auto border ${isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"
+                  }`}
               >
                 <div
                   className={`p-2 border-b ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-gray-100 border-gray-300"}`}
@@ -502,11 +497,10 @@ function AddItems({ items, submitting, apiService }) {
                     <button
                       key={itemKey}
                       onClick={() => loadTemplateFromItem(item)}
-                      className={`w-full text-left px-4 py-3 border-b last:border-b-0 transition-colors ${
-                        isDarkMode
+                      className={`w-full text-left px-4 py-3 border-b last:border-b-0 transition-colors ${isDarkMode
                           ? "hover:bg-gray-700 border-gray-700 text-gray-100"
                           : "hover:bg-gray-50 border-gray-200 text-gray-800"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
@@ -545,18 +539,16 @@ function AddItems({ items, submitting, apiService }) {
               onChange={(e) => setClientName(e.target.value)}
               onFocus={() => setShowClientDropdown(clients.length > 0)}
               disabled={submitting}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
                   ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                   : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-              }`}
+                }`}
             />
 
             {showClientDropdown && filteredClients.length > 0 && (
               <div
-                className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto border ${
-                  isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"
-                }`}
+                className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto border ${isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"
+                  }`}
               >
                 {filteredClients.map((client, idx) => (
                   <button
@@ -565,11 +557,10 @@ function AddItems({ items, submitting, apiService }) {
                       setClientName(client)
                       setShowClientDropdown(false)
                     }}
-                    className={`w-full text-left px-4 py-2 border-b last:border-b-0 transition-colors ${
-                      isDarkMode
+                    className={`w-full text-left px-4 py-2 border-b last:border-b-0 transition-colors ${isDarkMode
                         ? "hover:bg-gray-700 border-gray-700 text-gray-100"
                         : "hover:bg-gray-50 border-gray-200 text-gray-800"
-                    }`}
+                      }`}
                   >
                     {client}
                   </button>
@@ -591,13 +582,12 @@ function AddItems({ items, submitting, apiService }) {
                 <button
                   key={p}
                   onClick={() => setPriority(p)}
-                  className={`flex-1 px-4 py-2 rounded-lg border-2 font-medium transition-colors ${
-                    priority === p
+                  className={`flex-1 px-4 py-2 rounded-lg border-2 font-medium transition-colors ${priority === p
                       ? getPriorityColor(p)
                       : isDarkMode
                         ? "bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-700"
                         : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
-                  }`}
+                    }`}
                 >
                   {p}
                 </button>
@@ -623,18 +613,16 @@ function AddItems({ items, submitting, apiService }) {
               value={qty}
               onChange={(e) => setQty(e.target.value)}
               disabled={submitting}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
-                isDarkMode
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
                   ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                   : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-              }`}
+                }`}
             />
           </div>
 
           <div
-            className={`mt-4 p-4 rounded-lg border-2 ${
-              isDarkMode ? "bg-blue-500/10 border-blue-500/30" : "bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/30"
-            }`}
+            className={`mt-4 p-4 rounded-lg border-2 ${isDarkMode ? "bg-blue-500/10 border-blue-500/30" : "bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/30"
+              }`}
           >
             <h4 className={`text-sm font-semibold mb-3 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
               Quantity Summary
@@ -667,30 +655,28 @@ function AddItems({ items, submitting, apiService }) {
           {/* Total Quantity Display */}
           {phases.length > 0 && (
             <div
-              className={`p-4 rounded-lg border-2 ${
-                totalQty > batchQty
+              className={`p-4 rounded-lg border-2 ${totalQty > batchQty
                   ? isDarkMode
                     ? "bg-red-500/10 border-red-500/40"
                     : "bg-red-500/10 border-red-500/30"
                   : isDarkMode
                     ? "bg-blue-500/10 border-blue-500/40"
                     : "bg-blue-500/10 border-blue-500/30"
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between mb-2">
                 <span className={`text-sm font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                   Total Quantity Allocation
                 </span>
                 <span
-                  className={`text-lg font-bold ${
-                    totalQty > batchQty
+                  className={`text-lg font-bold ${totalQty > batchQty
                       ? isDarkMode
                         ? "text-red-300"
                         : "text-red-700"
                       : isDarkMode
                         ? "text-blue-300"
                         : "text-blue-700"
-                  }`}
+                    }`}
                 >
                   {totalQty} / {batchQty} units
                 </span>
@@ -711,9 +697,8 @@ function AddItems({ items, submitting, apiService }) {
 
       {/* Phases Section */}
       <div
-        className={`backdrop-blur-md rounded-lg p-6 border transition-all shadow-sm ${
-          isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-        }`}
+        className={`backdrop-blur-md rounded-lg p-6 border transition-all shadow-sm ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+          }`}
       >
         <div className="flex justify-between items-center mb-4">
           <h3 className={`text-lg font-semibold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>Phases</h3>
@@ -737,9 +722,8 @@ function AddItems({ items, submitting, apiService }) {
             {phases.map((phase, phaseIndex) => (
               <div
                 key={phase.id}
-                className={`rounded-lg p-4 border ${
-                  isDarkMode ? "bg-gray-700/40 border-gray-600/50" : "bg-white/40 border-gray-300/30"
-                }`}
+                className={`rounded-lg p-4 border ${isDarkMode ? "bg-gray-700/40 border-gray-600/50" : "bg-white/40 border-gray-300/30"
+                  }`}
               >
                 <div className="flex gap-3 mb-3">
                   <div className="flex-1">
@@ -749,21 +733,19 @@ function AddItems({ items, submitting, apiService }) {
                       value={phase.name}
                       onChange={(e) => updatePhase(phase.id, "name", e.target.value)}
                       disabled={submitting}
-                      className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
-                        isDarkMode
+                      className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
                           ? "bg-gray-800/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                           : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                      }`}
+                        }`}
                     />
                   </div>
                   <button
                     onClick={() => removePhase(phase.id)}
                     disabled={submitting}
-                    className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${
-                      isDarkMode 
-                        ? "text-red-400 hover:bg-red-500/20" 
+                    className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${isDarkMode
+                        ? "text-red-400 hover:bg-red-500/20"
                         : "text-red-500 hover:bg-red-500/10"
-                    }`}
+                      }`}
                     title="Remove phase"
                   >
                     <Trash2 size={18} />
@@ -779,11 +761,10 @@ function AddItems({ items, submitting, apiService }) {
                     <button
                       onClick={() => addSubphaseToPhase(phase.id)}
                       disabled={submitting}
-                      className={`flex items-center gap-1 text-sm px-3 py-1 rounded transition-colors disabled:opacity-50 ${
-                        isDarkMode
+                      className={`flex items-center gap-1 text-sm px-3 py-1 rounded transition-colors disabled:opacity-50 ${isDarkMode
                           ? "bg-slate-700 hover:bg-slate-600 text-white"
                           : "bg-slate-600 hover:bg-slate-700 text-white"
-                      }`}
+                        }`}
                     >
                       <Plus size={14} />
                       Add Sub-Phase
@@ -799,9 +780,8 @@ function AddItems({ items, submitting, apiService }) {
                       return (
                         <div
                           key={subphase.id}
-                          className={`rounded p-3 space-y-2 ${
-                            isDarkMode ? "bg-gray-800/50" : "bg-white/50"
-                          }`}
+                          className={`rounded p-3 space-y-2 ${isDarkMode ? "bg-gray-800/50" : "bg-white/50"
+                            }`}
                         >
                           <div className="flex gap-2">
                             <input
@@ -810,20 +790,18 @@ function AddItems({ items, submitting, apiService }) {
                               value={subphase.name}
                               onChange={(e) => updateSubphase(phase.id, subphase.id, "name", e.target.value)}
                               disabled={submitting}
-                              className={`flex-1 px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
-                                isDarkMode
+                              className={`flex-1 px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
                                   ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                                   : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                              }`}
+                                }`}
                             />
                             <button
                               onClick={() => removeSubphase(phase.id, subphase.id)}
                               disabled={submitting}
-                              className={`p-1.5 rounded transition-colors disabled:opacity-50 ${
-                                isDarkMode 
-                                  ? "text-red-400 hover:bg-red-500/20" 
+                              className={`p-1.5 rounded transition-colors disabled:opacity-50 ${isDarkMode
+                                  ? "text-red-400 hover:bg-red-500/20"
                                   : "text-red-500 hover:bg-red-500/10"
-                              }`}
+                                }`}
                               title="Remove sub-phase"
                             >
                               <Trash2 size={14} />
@@ -840,11 +818,10 @@ function AddItems({ items, submitting, apiService }) {
                                 updateSubphase(phase.id, subphase.id, "expectedDuration", e.target.value)
                               }
                               disabled={submitting}
-                              className={`px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
-                                isDarkMode
+                              className={`px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
                                   ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                                   : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                              }`}
+                                }`}
                             />
                             <input
                               type="number"
@@ -855,11 +832,10 @@ function AddItems({ items, submitting, apiService }) {
                                 updateSubphase(phase.id, subphase.id, "expectedQuantity", e.target.value)
                               }
                               disabled={submitting}
-                              className={`px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
-                                isDarkMode
+                              className={`px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
                                   ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                                   : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                              }`}
+                                }`}
                             />
                           </div>
                         </div>
@@ -878,11 +854,10 @@ function AddItems({ items, submitting, apiService }) {
         <button
           onClick={handleClear}
           disabled={submitting}
-          className={`px-6 py-3 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
-            isDarkMode
+          className={`px-6 py-3 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode
               ? "bg-gray-700 hover:bg-gray-600 text-white"
               : "bg-gray-600 hover:bg-gray-700 text-white"
-          }`}
+            }`}
         >
           Clear All
         </button>
