@@ -4,7 +4,7 @@ import apiService from "../../../utils/api/api-service"
 import { ModalPortal, useToast } from "../shared"
 import CreatePurchaseOrderWizard from "./CreatePurchaseOrderWizard"
 import { PurchaseOrderTrackerSkeleton } from "../../skeletons/ProcurementSkeletons"
-import { exportPurchaseOrderToPDF, exportPurchaseOrderToExcel } from "../../../utils/purchase-order-export"
+import { exportPurchaseOrderToPDF } from "../../../utils/purchase-order-export"
 // Realtime imports for live updates
 import { pollingManager } from "../../../utils/api/websocket/polling-manager.jsx"
 import { SOCKET_EVENTS, SOCKET_ROOMS } from "../../../utils/api/websocket/constants/events.js"
@@ -330,13 +330,6 @@ function PurchaseOrderTracker() {
     }
   }
 
-  const handleExportExcel = (order) => {
-    try {
-      exportPurchaseOrderToExcel(order)
-    } catch (err) {
-      showError('Export Error', err.message || 'Failed to export Excel')
-    }
-  }
 
   const handleAddItemToOrder = (item) => {
     setOrderForm(prev => {
@@ -798,12 +791,6 @@ function PurchaseOrderTracker() {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleExportExcel(order)}
-                        className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs font-medium transition-colors"
-                      >
-                        Excel
-                      </button>
-                      <button
                         onClick={() => handleDeleteOrder(order.id)}
                         className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
                       >
@@ -1039,12 +1026,6 @@ function PurchaseOrderTracker() {
                   className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
                 >
                   Export PDF
-                </button>
-                <button
-                  onClick={() => handleExportExcel(selectedOrder)}
-                  className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition-all"
-                >
-                  Export Excel
                 </button>
                 <button
                   onClick={() => setShowOrderDetails(false)}

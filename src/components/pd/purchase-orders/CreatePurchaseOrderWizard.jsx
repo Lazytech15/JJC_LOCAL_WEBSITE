@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { ModalPortal } from "../shared"
 import apiService from "../../../utils/api/api-service"
-import { exportPurchaseOrderToPDF, exportPurchaseOrderToExcel } from "../../../utils/purchase-order-export"
+import { exportPurchaseOrderToPDF } from "../../../utils/purchase-order-export"
 
 function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = null }) {
   // If editingOrder is provided, start at step 2 (skip PO Number & Supplier)
@@ -1903,15 +1903,6 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                         </svg>
                         Export PDF
-                      </button>
-                      <button
-                        onClick={() => exportPurchaseOrderToExcel(formData)}
-                        className="px-6 py-2 bg-green-700 text-white rounded-lg font-medium hover:bg-green-800 transition-colors flex items-center gap-2"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        Export Excel
                       </button>
                     </div>
 
