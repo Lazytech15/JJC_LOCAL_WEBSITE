@@ -1118,53 +1118,423 @@ export class OperationsService extends BaseAPIService {
 
   // ==================== CACHE MANAGEMENT METHODS ====================
 
-  /**
-   * Invalidate cache for specific item
-   * @param {string} partNumber - Part number to invalidate
-   */
-  async invalidateItemCache(partNumber) {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({
-        type: 'REFRESH_ITEM',
-        partNumber
-      })
-    }
+/**
+ * Invalidate cache for specific item
+ * @param {string} partNumber - Part number to invalidate
+ */
+async invalidateItemCache(partNumber) {
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'REFRESH_ITEM',
+      partNumber
+    })
+    console.log('🔄 Cache invalidation requested for:', partNumber)
   }
+}
+/**
+ * Invalidate entire items cache
+ */
+async invalidateAllItemsCache() {
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    const messageChannel = new MessageChannel()
+
+    return new Promise((resolve) => {
+      messageChannel.port1.onmessage = (event) => {
+        console.log('🔄 Cache invalidation response:', event.data)
+        resolve(event.data.success)
+      }
+
+      navigator.serviceWorker.controller.postMessage(
+        { type: 'REFRESH_ALL_ITEMS' },
+        [messageChannel.port2]
+      )
+
+      // Don't wait forever
+      setTimeout(() => {
+        console.warn('⚠️ Cache invalidation timeout, continuing anyway')
+        resolve(false)
+      }, 5000)
+    })
+  }
+}
 
   /**
-   * Invalidate entire items cache
-   */
-  async invalidateAllItemsCache() {
+ * ✅ FIXED: Force update items from server
+ */
+async forceUpdateItemsCache() {
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    const messageChannel = new MessageChannel()
+
+    return new Promise((resolve, reject) => {
+      messageChannel.port1.onmessage = (event) => {
+        if (event.data.success) {
+          console.log('✅ Cache force update successful:', event.data.count || 0, 'items')
+          resolve(event.data)
+        } else {
+          console.error('❌ Cache force update failed:', event.data.error)
+          reject(new Error(event.data.error || 'Cache update failed'))
+        }
+      }
+
+      navigator.serviceWorker.controller.postMessage(
+        { type: 'FORCE_UPDATE_ITEMS' },
+        [messageChannel.port2]
+      )
+
+      // Timeout after 30 seconds
+      setTimeout(() => {
+        console.warn('⚠️ Cache force update timeout')
+        reject(new Error('Cache update timeout'))
+      }, 30000)
+    })
+  } else {
+    console.warn('⚠️ Service worker not available')
+    throw new Error('Service worker not available')
+  }
+}
+
+  /**
+ * Import item from Google Sheets
+ * @param {Object} data - Import data from Google Sheets
+ * @param {string} data.part_number - Part number
+ * @param {string} data.client_name - Client name
+ * @param {number} data.qty - Quantity
+ * @param {number} [data.sheet_row] - Row number from sheet
+ * @returns {Promise} Created item
+ */
+async importFromGoogleSheets(data) {
+  return this.request("/api/operations/google-sheets-import", {
+    method: "POST",
+    body: JSON.stringify({
+      ...data,
+      source: "google_sheets",
+      timestamp: new Date().toISOString()
+    }),
+  });
+}
+
+/**
+ * Get items imported from Google Sheets
+ * @returns {Promise} Items with source='google_sheets'
+ */
+async getGoogleSheetsItems() {
+  const allItems = await this.getItems();
+  return allItems.filter(item => 
+    item.part_number && item.part_number.includes('GS-')
+  );
+}
+
+/**
+ * Get clients list (unique client names from all items)
+ * @returns {Promise<string[]>} Array of unique client names
+ */
+async getClients() {
+  try {
+    const allItems = await this.getItems();
+    const clientSet = new Set();
+    
+    allItems.forEach(item => {
+      if (item.client_name && item.client_name.trim()) {
+        clientSet.add(item.client_name.trim());
+      }
+    });
+    
+    return Array.from(clientSet).sort();
+  } catch (error) {
+    console.error('Error loading clients:', error);
+    return [];
+  }
+}
+
+/**
+ * Validate Google Sheets import data
+ * @param {Object} data - Data to validate
+ * @returns {Object} Validation result with isValid and errors
+ */
+validateGoogleSheetsImport(data) {
+  const errors = [];
+  
+  if (!data.part_number || !data.part_number.trim()) {
+    errors.push('Part number is required');
+  }
+  
+  if (!data.client_name || !data.client_name.trim()) {
+    errors.push('Client name is required');
+  }
+  
+  if (!data.qty) {
+    errors.push('Quantity is required');
+  } else {
+    const qty = parseInt(data.qty);
+    if (isNaN(qty) || qty <= 0) {
+      errors.push('Quantity must be a positive number');
+    }
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors: errors
+  };
+}
+
+/**
+ * Test connection to backend (for Google Sheets)
+ * @returns {Promise} Health check response
+ */
+async testConnection() {
+  return this.request("/api/operations/health");
+}
+
+/**
+ * Import item from Google Sheets and refresh cache
+ * @param {Object} data - Import data
+ * @returns {Promise} Created item
+ */
+async importFromGoogleSheets(data) {
+  const result = await this.request("/api/operations/google-sheets-import", {
+    method: "POST",
+    body: JSON.stringify({
+      ...data,
+      source: "google_sheets",
+      timestamp: new Date().toISOString()
+    }),
+  });
+  
+  // ✅ After successful import, refresh the cache
+  if (result.success) {
+    console.log('✅ Item imported successfully, refreshing cache...');
+    
+    // Clear IndexedDB cache to force fresh fetch
+    await this.forceUpdateItemsCache();
+    
+    // Also invalidate the specific item cache
+    if (result.data?.part_number) {
+      await this.invalidateItemCache(result.data.part_number);
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Batch import with cache refresh
+ */
+async batchImportFromGoogleSheets(items) {
+  const results = [];
+  
+  for (const item of items) {
+    try {
+      const validation = this.validateGoogleSheetsImport(item);
+      if (!validation.isValid) {
+        results.push({
+          success: false,
+          part_number: item.part_number,
+          errors: validation.errors
+        });
+        continue;
+      }
+      
+      const result = await this.importFromGoogleSheets(item);
+      results.push({
+        success: true,
+        part_number: item.part_number,
+        data: result
+      });
+      
+      // Small delay between imports
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      results.push({
+        success: false,
+        part_number: item.part_number,
+        error: error.message
+      });
+    }
+  }
+  
+  // ✅ After batch import, do a final cache refresh
+  console.log('✅ Batch import complete, doing final cache refresh...');
+  await this.forceUpdateItemsCache();
+  
+  return results;
+}
+
+/**
+ * ✅ NEW: Check for updates without blocking UI
+ * Use this for polling - it won't throw errors
+ */
+async checkForUpdates() {
+  try {
+    console.log('🔍 Checking for updates...')
+    
+    // Fetch directly, bypassing cache
+    const response = await this.request('/api/operations/items', {
+      cache: 'no-cache',
+      headers: {
+        'Accept': 'application/json',
+        'X-Skip-Cache': 'true'
+      }
+    })
+    
+    // Trigger cache refresh in background
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({
         type: 'REFRESH_ALL_ITEMS'
       })
     }
+    
+    return response
+  } catch (error) {
+    console.error('❌ Failed to check for updates:', error)
+    throw error
   }
+}
 
-  /**
-   * Force update items from server
-   */
-  async forceUpdateItemsCache() {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      const messageChannel = new MessageChannel()
+/**
+ * Get items imported from Google Sheets
+ * @returns {Promise} Items with source='google_sheets'
+ */
+async getGoogleSheetsItems() {
+  const allItems = await this.getItems();
+  return allItems.filter(item => 
+    item.part_number && item.part_number.includes('GS-')
+  );
+}
 
-      return new Promise((resolve, reject) => {
-        messageChannel.port1.onmessage = (event) => {
-          if (event.data.success) {
-            resolve()
-          } else {
-            reject(new Error(event.data.error))
-          }
-        }
-
-        navigator.serviceWorker.controller.postMessage(
-          { type: 'FORCE_UPDATE_ITEMS' },
-          [messageChannel.port2]
-        )
-
-        setTimeout(() => reject(new Error('Timeout')), 30000)
-      })
+/**
+ * Validate Google Sheets import data
+ * @param {Object} data - Data to validate
+ * @returns {Object} Validation result with isValid and errors
+ */
+validateGoogleSheetsImport(data) {
+  const errors = [];
+  
+  if (!data.part_number || !data.part_number.trim()) {
+    errors.push('Part number is required');
+  }
+  
+  // Item name is optional, but if provided, validate it's not too long
+  if (data.item_name && data.item_name.length > 200) {
+    errors.push('Item name must be 200 characters or less');
+  }
+  
+  if (!data.client_name || !data.client_name.trim()) {
+    errors.push('Client name is required');
+  }
+  
+  if (!data.qty) {
+    errors.push('Quantity is required');
+  } else {
+    const qty = parseInt(data.qty);
+    if (isNaN(qty) || qty <= 0) {
+      errors.push('Quantity must be a positive number');
     }
   }
+  
+  return {
+    isValid: errors.length === 0,
+    errors: errors
+  };
+}
+
+/**
+ * Import multiple items from Google Sheets in batch
+ * @param {Array<Object>} items - Array of import data objects
+ * @returns {Promise} Array of results with success/error for each item
+ */
+async batchImportFromGoogleSheets(items) {
+  const results = [];
+  
+  for (const item of items) {
+    try {
+      const validation = this.validateGoogleSheetsImport(item);
+      if (!validation.isValid) {
+        results.push({
+          success: false,
+          part_number: item.part_number,
+          errors: validation.errors
+        });
+        continue;
+      }
+      
+      const result = await this.importFromGoogleSheets(item);
+      results.push({
+        success: true,
+        part_number: item.part_number,
+        data: result
+      });
+      
+      // Small delay between imports to avoid overwhelming the server
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      results.push({
+        success: false,
+        part_number: item.part_number,
+        error: error.message
+      });
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * Get summary of Google Sheets imports
+ * @returns {Promise} Summary with counts and statistics
+ */
+async getGoogleSheetsImportSummary() {
+  const sheetsItems = await this.getGoogleSheetsItems();
+  
+  const summary = {
+    total_imports: sheetsItems.length,
+    by_status: {
+      not_started: 0,
+      in_progress: 0,
+      completed: 0
+    },
+    by_client: {},
+    recent_imports: [],
+    name_sources: {
+      provided: 0,
+      template: 0,
+      generated: 0
+    }
+  };
+  
+  sheetsItems.forEach(item => {
+    // Count by status
+    if (summary.by_status[item.status] !== undefined) {
+      summary.by_status[item.status]++;
+    }
+    
+    // Count by client
+    const client = item.client_name || 'No Client';
+    summary.by_client[client] = (summary.by_client[client] || 0) + 1;
+    
+    // Check remarks for name source
+    if (item.remarks) {
+      if (item.remarks.includes('Custom name provided')) {
+        summary.name_sources.provided++;
+      } else if (item.remarks.includes('Template:')) {
+        summary.name_sources.template++;
+      } else {
+        summary.name_sources.generated++;
+      }
+    }
+  });
+  
+  // Get 10 most recent imports
+  summary.recent_imports = sheetsItems
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 10)
+    .map(item => ({
+      part_number: item.part_number,
+      name: item.name,
+      client_name: item.client_name,
+      status: item.status,
+      created_at: item.created_at
+    }));
+  
+  return summary;
+}
 }

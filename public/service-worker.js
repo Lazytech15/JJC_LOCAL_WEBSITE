@@ -564,7 +564,6 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(clients.openWindow(event.notification.data))
 })
 
-// Message handler for cache management
 self.addEventListener("message", (event) => {
   // Clear specific cache
   if (event.data && event.data.type === "CLEAR_CACHE") {
@@ -640,10 +639,6 @@ self.addEventListener("message", (event) => {
     event.waitUntil(
       deleteItemFromDB(partNumber).then(() => {
         console.log("[Service Worker] Item cache invalidated:", partNumber)
-        // Fetch fresh data and cache it
-        return fetch(`/api/operations/items?part_number=${encodeURIComponent(partNumber)}`)
-          .then(response => response.json())
-          .then(item => saveItemToDB(item))
       }).catch(err => {
         console.warn("[Service Worker] Failed to refresh item:", err)
       })
@@ -655,35 +650,87 @@ self.addEventListener("message", (event) => {
     event.waitUntil(
       clearAllItemsFromDB().then(() => {
         console.log("[Service Worker] All items cache cleared, will refresh on next fetch")
+        if (event.ports[0]) {
+          event.ports[0].postMessage({ success: true })
+        }
       }).catch(err => {
         console.warn("[Service Worker] Failed to clear all items:", err)
+        if (event.ports[0]) {
+          event.ports[0].postMessage({ success: false, error: err.message })
+        }
       })
     )
   }
   
-  // Force update items from network
+  // ✅ FIXED: Force update items from network
   if (event.data && event.data.type === "FORCE_UPDATE_ITEMS") {
     event.waitUntil(
-      fetch('/api/operations/items', { cache: 'no-cache' })
-        .then(response => response.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            return batchSaveItemsToDB(data)
+      (async () => {
+        try {
+          console.log('[Service Worker] 🔄 Force update started...')
+          
+          // First clear the cache
+          await clearAllItemsFromDB()
+          console.log('[Service Worker] ✅ Cache cleared')
+          
+          // Fetch fresh data with explicit headers
+          const response = await fetch('/api/operations/items', {
+            method: 'GET',
+            cache: 'no-cache',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            }
+          })
+          
+          console.log('[Service Worker] Response status:', response.status)
+          console.log('[Service Worker] Response type:', response.headers.get('content-type'))
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
           }
-          throw new Error('Invalid data format')
-        })
-        .then(() => {
-          console.log("[Service Worker] Forced update completed")
+          
+          // Check if response is actually JSON
+          const contentType = response.headers.get('content-type')
+          if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text()
+            console.error('[Service Worker] Expected JSON but got:', text.substring(0, 200))
+            throw new Error('Server returned non-JSON response')
+          }
+          
+          const data = await response.json()
+          console.log('[Service Worker] Fetched data type:', typeof data, Array.isArray(data))
+          
+          if (Array.isArray(data) && data.length > 0) {
+            await batchSaveItemsToDB(data)
+            console.log('[Service Worker] ✅ Forced update completed:', data.length, 'items')
+            
+            if (event.ports[0]) {
+              event.ports[0].postMessage({ 
+                success: true, 
+                count: data.length 
+              })
+            }
+          } else {
+            console.warn('[Service Worker] No items to cache')
+            if (event.ports[0]) {
+              event.ports[0].postMessage({ 
+                success: true, 
+                count: 0,
+                message: 'No items found'
+              })
+            }
+          }
+        } catch (err) {
+          console.error('[Service Worker] ❌ Forced update failed:', err)
           if (event.ports[0]) {
-            event.ports[0].postMessage({ success: true })
+            event.ports[0].postMessage({ 
+              success: false, 
+              error: err.message 
+            })
           }
-        })
-        .catch(err => {
-          console.error("[Service Worker] Forced update failed:", err)
-          if (event.ports[0]) {
-            event.ports[0].postMessage({ success: false, error: err.message })
-          }
-        })
+        }
+      })()
     )
   }
 })

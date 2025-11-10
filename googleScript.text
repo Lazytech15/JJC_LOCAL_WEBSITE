@@ -1,0 +1,328 @@
+// ==================== CONFIGURATION ====================
+const WEBHOOK_URL = 'https://jjcenggworks.com/api/operations/google-sheets-import';
+const SHEET_NAME = 'AddItem'; // Name of your sheet tab
+
+// Column indices (0-based)
+const COLUMNS = {
+  PART_NUMBER: 0,      // Column A
+  CLIENT_NAME: 1,      // Column B
+  QUANTITY: 2,         // Column C
+  STATUS: 3,           // Column D (auto-filled)
+  TIMESTAMP: 4,        // Column E (auto-filled)
+  MESSAGE: 5           // Column F (auto-filled)
+};
+
+// ==================== MAIN FUNCTIONS ====================
+
+/**
+ * Extract base part number from full part number
+ * Example: "37256-BATCH-1762738550430-723" -> "37256"
+ */
+function extractBasePartNumber(fullPartNumber) {
+  const partStr = String(fullPartNumber).trim();
+  
+  // If it contains "-BATCH-" or similar patterns, extract the base
+  if (partStr.includes('-BATCH-') || partStr.includes('-GS-')) {
+    return partStr.split('-')[0];
+  }
+  
+  // Otherwise return as-is
+  return partStr;
+}
+
+function onEditInstallable(e) {
+  const sheet = e.source.getActiveSheet();
+  
+  // Only process if it's the correct sheet
+  if (sheet.getName() !== SHEET_NAME) return;
+  
+  const row = e.range.getRow();
+  const col = e.range.getColumn();
+  
+  // Skip header row
+  if (row === 1) return;
+  
+  // Only trigger when Part Number, Client Name, or Quantity is edited
+  if (col >= 1 && col <= 3) {
+    processRow(sheet, row);
+  }
+}
+
+/**
+ * Process a single row and send to backend
+ */
+function processRow(sheet, row) {
+  try {
+    const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
+    const clientName = sheet.getRange(row, COLUMNS.CLIENT_NAME + 1).getValue();
+    const quantity = sheet.getRange(row, COLUMNS.QUANTITY + 1).getValue();
+    
+    if (!partNumber || !clientName || !quantity) {
+      updateStatus(sheet, row, 'PENDING', 'Fill all fields: Part Number, Client Name, Quantity');
+      return;
+    }
+    
+    const qty = parseInt(quantity);
+    if (isNaN(qty) || qty <= 0) {
+      updateStatus(sheet, row, 'ERROR', 'Quantity must be a positive number');
+      return;
+    }
+    
+    const basePartNumber = extractBasePartNumber(partNumber);
+    updateStatus(sheet, row, 'PROCESSING', `Sending to system... (Base part: ${basePartNumber})`);
+    
+    const payload = {
+      part_number: basePartNumber,
+      client_name: String(clientName).trim(),
+      qty: qty,
+      source: 'google_sheets',
+      sheet_row: row,
+      timestamp: new Date().toISOString()
+    };
+    
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    
+    // ✅ Send to import endpoint
+    const response = UrlFetchApp.fetch(WEBHOOK_URL, options);
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+    
+    if (responseCode === 200 || responseCode === 201) {
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        Logger.log('Failed to parse response:', responseText);
+        updateStatus(sheet, row, 'ERROR', 'Invalid server response');
+        return;
+      }
+      
+      const createdPartNumber = result.data?.part_number || result.part_number || 'OK';
+      updateStatus(sheet, row, 'SUCCESS', `Item created: ${createdPartNumber}`);
+      
+      // ✅ CRITICAL: Notify cache refresh
+      // Wait a moment for the database transaction to complete
+      Utilities.sleep(1000); // 1 second delay
+      
+      notifyFrontendCacheRefresh(createdPartNumber);
+    } else {
+      let errorMsg = responseText || `HTTP ${responseCode}`;
+      try {
+        const errorJson = JSON.parse(responseText);
+        errorMsg = errorJson.error || errorMsg;
+      } catch (e) {
+        // Keep original error message
+      }
+      updateStatus(sheet, row, 'ERROR', `Failed: ${errorMsg}`);
+    }
+    
+  } catch (error) {
+    updateStatus(sheet, row, 'ERROR', `Error: ${error.message}`);
+    Logger.log(`Error processing row ${row}: ${error.message}`);
+  }
+}
+
+
+/**
+ * Update status columns
+ */
+function updateStatus(sheet, row, status, message) {
+  const timestamp = new Date().toLocaleString();
+  
+  // Status column
+  const statusCell = sheet.getRange(row, COLUMNS.STATUS + 1);
+  statusCell.setValue(status);
+  
+  // Color code the status
+  switch (status) {
+    case 'SUCCESS':
+      statusCell.setBackground('#d4edda').setFontColor('#155724');
+      break;
+    case 'ERROR':
+      statusCell.setBackground('#f8d7da').setFontColor('#721c24');
+      break;
+    case 'PROCESSING':
+      statusCell.setBackground('#fff3cd').setFontColor('#856404');
+      break;
+    case 'PENDING':
+      statusCell.setBackground('#e7e7e7').setFontColor('#666666');
+      break;
+  }
+  
+  // Timestamp column
+  sheet.getRange(row, COLUMNS.TIMESTAMP + 1).setValue(timestamp);
+  
+  // Message column
+  sheet.getRange(row, COLUMNS.MESSAGE + 1).setValue(message);
+}
+
+/**
+ * Initialize sheet with headers (run this once)
+ */
+function setupSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  
+  // Create sheet if it doesn't exist
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+  }
+  
+  // Set up headers
+  const headers = ['Part Number', 'Client Name', 'Quantity', 'Status', 'Timestamp', 'Message'];
+  const headerRange = sheet.getRange(1, 1, 1, headers.length);
+  headerRange.setValues([headers]);
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground('#4285f4');
+  headerRange.setFontColor('#ffffff');
+  
+  // Set column widths
+  sheet.setColumnWidth(1, 150); // Part Number
+  sheet.setColumnWidth(2, 150); // Client Name
+  sheet.setColumnWidth(3, 100); // Quantity
+  sheet.setColumnWidth(4, 120); // Status
+  sheet.setColumnWidth(5, 180); // Timestamp
+  sheet.setColumnWidth(6, 300); // Message
+  
+  // Freeze header row
+  sheet.setFrozenRows(1);
+  
+  // Add data validation for quantity (numbers only)
+  const qtyColumn = sheet.getRange(2, COLUMNS.QUANTITY + 1, 1000);
+  const qtyValidation = SpreadsheetApp.newDataValidation()
+    .requireNumberGreaterThan(0)
+    .setAllowInvalid(false)
+    .setHelpText('Enter a positive number')
+    .build();
+  qtyColumn.setDataValidation(qtyValidation);
+  
+  // Add instructions in a note
+  const instructionText = 
+    'HOW TO USE:\n' +
+    '1. Enter Part Number (e.g., 37256 or full: 37256-BATCH-123-456)\n' +
+    '2. Enter Client Name\n' +
+    '3. Enter Quantity\n' +
+    '4. System will auto-process when you complete the row\n\n' +
+    'The system will find an existing template for the part number\n' +
+    'and create a new batch with a unique identifier.';
+  
+  sheet.getRange('A1').setNote(instructionText);
+  
+  SpreadsheetApp.getUi().alert('Sheet setup complete! You can now start entering items.');
+}
+
+/**
+ * Process all pending rows (manual trigger)
+ */
+function processAllPendingRows() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const lastRow = sheet.getLastRow();
+  
+  let processedCount = 0;
+  
+  for (let row = 2; row <= lastRow; row++) {
+    const status = sheet.getRange(row, COLUMNS.STATUS + 1).getValue();
+    const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
+    
+    // Process if status is empty, PENDING, or ERROR and has a part number
+    if (partNumber && (!status || status === 'PENDING' || status === 'ERROR')) {
+      processRow(sheet, row);
+      processedCount++;
+      Utilities.sleep(500); // Wait 500ms between requests
+    }
+  }
+  
+  SpreadsheetApp.getUi().alert(`Processed ${processedCount} rows`);
+}
+
+/**
+ * Clear all status columns (useful for retry)
+ */
+function clearAllStatuses() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert('Clear All Statuses', 
+    'This will clear status, timestamp, and message columns. Continue?', 
+    ui.ButtonSet.YES_NO);
+  
+  if (response === ui.Button.YES) {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    const lastRow = sheet.getLastRow();
+    
+    if (lastRow > 1) {
+      sheet.getRange(2, COLUMNS.STATUS + 1, lastRow - 1, 3).clearContent();
+      sheet.getRange(2, COLUMNS.STATUS + 1, lastRow - 1, 1).setBackground(null);
+      ui.alert('Status columns cleared');
+    }
+  }
+}
+
+/**
+ * Create custom menu
+ */
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu('Item Import')
+    .addItem('Setup Sheet', 'setupSheet')
+    .addSeparator()
+    .addItem('Process All Pending', 'processAllPendingRows')
+    .addItem('Clear All Statuses', 'clearAllStatuses')
+    .addSeparator()
+    .addItem('Test Connection', 'testConnection')
+    .addToUi();
+}
+
+/**
+ * Test connection to backend
+ */
+function testConnection() {
+  try {
+    const response = UrlFetchApp.fetch('https://jjcenggworks.com/api/operations/health', {
+      method: 'get',
+      muteHttpExceptions: true
+    });
+    
+    if (response.getResponseCode() === 200) {
+      SpreadsheetApp.getUi().alert('Connection successful!');
+    } else {
+      SpreadsheetApp.getUi().alert('Connection failed: ' + response.getResponseCode());
+    }
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Connection error: ' + error.message);
+  }
+}
+
+/**
+ * ✅ NEW: Notify frontend to refresh cache
+ */
+function notifyFrontendCacheRefresh(partNumber) {
+  try {
+    // Simple ping to trigger cache check
+    // The frontend polling will pick up the new item
+    const pingUrl = 'https://jjcenggworks.com/api/operations/items?check=new&t=' + Date.now();
+    
+    const options = {
+      method: 'get',
+      muteHttpExceptions: true,
+      headers: {
+        'Accept': 'application/json',
+        'X-Trigger-Refresh': 'true'
+      }
+    };
+    
+    const response = UrlFetchApp.fetch(pingUrl, options);
+    
+    if (response.getResponseCode() === 200) {
+      Logger.log(`✅ Cache refresh ping sent for ${partNumber}`);
+    } else {
+      Logger.log(`⚠️ Cache refresh ping returned: ${response.getResponseCode()}`);
+    }
+  } catch (error) {
+    // Don't fail the import if ping fails
+    Logger.log(`⚠️ Cache refresh ping error: ${error.message}`);
+  }
+}

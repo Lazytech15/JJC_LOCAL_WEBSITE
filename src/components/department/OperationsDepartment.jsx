@@ -7,7 +7,7 @@ import Checklist from "../op/CheckList.jsx"
 import Reports from "../op/Report.jsx"
 import ItemComparison from "../op/ItemComparison.jsx"
 const GearLoadingSpinner = lazy(() => import("../../../public/LoadingGear.jsx"))
-import { Menu, X, ArrowUp } from 'lucide-react'
+import { Menu, X, ArrowUp, RefreshCw } from 'lucide-react'
 
 function OperationsDepartment() {
   const { user, logout, isDarkMode, toggleDarkMode } = useAuth()
@@ -31,6 +31,60 @@ function OperationsDepartment() {
   // Ref to track if component is mounted
   const isMountedRef = useRef(true)
   const refreshIntervalRef = useRef(null)
+
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [lastUpdateCheck, setLastUpdateCheck] = useState(null)
+  const pollIntervalRef = useRef(null)
+
+  useEffect(() => {
+  // Don't poll if not on a tab that needs it
+  const needsPolling = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
+
+  if (!needsPolling) {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+    return
+  }
+
+  // Check for updates every 30 seconds
+  pollIntervalRef.current = setInterval(async () => {
+    try {
+      console.log('🔄 Polling for new items...')
+
+      const currentCount = items.length
+
+      // Use checkForUpdates which bypasses cache
+      const freshItems = await apiService.operations.checkForUpdates()
+
+      if (Array.isArray(freshItems) && freshItems.length > currentCount) {
+        const newCount = freshItems.length - currentCount
+        console.log(`✅ Found ${newCount} new item(s)!`)
+
+        // Show notification
+        showNotification(`${newCount} new item(s) added from Google Sheets!`)
+
+        // Reload all data
+        await loadData()
+      } else {
+        console.log('✅ No new items')
+      }
+
+      setLastUpdateCheck(new Date())
+    } catch (error) {
+      console.warn('⚠️ Polling check failed:', error.message)
+      // Don't show error to user for polling failures
+    }
+  }, 30000) // 30 seconds
+
+  return () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+  }
+}, [activeTab, items.length])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -155,55 +209,94 @@ function OperationsDepartment() {
   }
 
   const loadData = async () => {
-    try {
-      setLoading(true)
-      setError(null)
+  try {
+    setLoading(true)
+    setError(null)
 
-      console.log('Loading items...')
+    console.log('📥 Loading items...')
 
-      const [itemsResponse, statsResponse] = await Promise.all([
-        apiService.operations.getItems(),
-        apiService.operations.getStatistics()
-      ])
+    const [itemsResponse, statsResponse] = await Promise.all([
+      apiService.operations.getItems().catch(err => {
+        console.error('Failed to load items:', err)
+        return [] // Return empty array on error
+      }),
+      apiService.operations.getStatistics().catch(err => {
+        console.error('Failed to load statistics:', err)
+        return null // Return null on error
+      })
+    ])
 
-      console.log('Items response:', itemsResponse)
-      console.log('Stats response:', statsResponse)
-
-      let itemsArray = []
-      if (Array.isArray(itemsResponse)) {
-        itemsArray = itemsResponse
-      } else if (itemsResponse && typeof itemsResponse === 'object') {
-        const numericKeys = Object.keys(itemsResponse).filter(key => !isNaN(key))
-        if (numericKeys.length > 0) {
-          itemsArray = numericKeys.map(key => itemsResponse[key])
-          console.log('Converted numeric-keyed object to array')
-        } else {
-          itemsArray = itemsResponse.items || itemsResponse.data || itemsResponse.results || []
-        }
+    // Handle different response formats
+    let itemsArray = []
+    if (Array.isArray(itemsResponse)) {
+      itemsArray = itemsResponse
+    } else if (itemsResponse && typeof itemsResponse === 'object') {
+      const numericKeys = Object.keys(itemsResponse).filter(key => !isNaN(key))
+      if (numericKeys.length > 0) {
+        itemsArray = numericKeys.map(key => itemsResponse[key])
+      } else {
+        itemsArray = itemsResponse.items || itemsResponse.data || []
       }
-
-      console.log('Items array:', itemsArray)
-
-      if (itemsArray.length === 0) {
-        console.log('No items found')
-        setItems([])
-        setStatistics(statsResponse)
-        return
-      }
-
-      setItems(itemsArray)
-      setStatistics(statsResponse)
-
-      console.log('Items loaded successfully:', itemsArray.length, 'items')
-
-    } catch (err) {
-      console.error('Failed to load operations data:', err)
-      setError('Failed to load data: ' + err.message)
-      setItems([])
-    } finally {
-      setLoading(false)
     }
+
+    console.log('✅ Loaded', itemsArray.length, 'items')
+
+    setItems(itemsArray)
+    setStatistics(statsResponse)
+
+  } catch (err) {
+    console.error('❌ Failed to load operations data:', err)
+    setError(`Failed to load data: ${err.message}`)
+    setItems([]) // Set empty array to prevent undefined errors
+  } finally {
+    setLoading(false)
   }
+}
+
+ const handleManualRefresh = async () => {
+  try {
+    setIsRefreshing(true)
+    setError(null)
+
+    console.log('🔄 Manual refresh triggered...')
+
+    // Method 1: Try force cache update (may fail if API has issues)
+    try {
+      await apiService.operations.forceUpdateItemsCache()
+      console.log('✅ Cache force update successful')
+    } catch (cacheError) {
+      console.warn('⚠️ Cache force update failed, will reload data anyway:', cacheError.message)
+      // Continue to reload data even if cache update fails
+    }
+
+    // Method 2: Always reload data from API
+    await loadData()
+
+    setLastUpdateCheck(new Date())
+    showNotification('Data refreshed successfully!')
+  } catch (error) {
+    console.error('❌ Failed to refresh:', error)
+    setError(`Failed to refresh: ${error.message}`)
+  } finally {
+    setIsRefreshing(false)
+  }
+}
+
+  const showNotification = (message) => {
+  console.log('📢 Notification:', message)
+
+  // Show browser notification if permitted
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('Operations Update', {
+      body: message,
+      icon: '/icons/icon-192.jpg',
+      tag: 'operations-update'
+    })
+  }
+
+  // You could also integrate with a toast library here
+  // Example: toast.success(message)
+}
 
   const loadAllItemDetails = async () => {
     if (items.length === 0) {
@@ -609,27 +702,49 @@ function OperationsDepartment() {
               </p>
             </div>
             <div className="flex gap-2 sm:gap-3 flex-shrink-0">
+              {/* ✅ NEW: Refresh button */}
+              <button
+                onClick={handleManualRefresh}
+                disabled={isRefreshing || loading}
+                className={`p-2 rounded-lg backdrop-blur-sm border transition-all duration-300 ${isDarkMode
+                    ? "bg-gray-800/60 border-gray-700/50 hover:bg-gray-800/80 text-cyan-400"
+                    : "bg-white/20 border-white/30 hover:bg-white/30 text-blue-700"
+                  } ${(isRefreshing || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                aria-label="Refresh data"
+                title={lastUpdateCheck ? `Last checked: ${lastUpdateCheck.toLocaleTimeString()}` : 'Refresh data'}
+              >
+                <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </button>
+
               <button
                 onClick={toggleDarkMode}
                 className={`p-2 rounded-lg backdrop-blur-sm border transition-all duration-300 ${isDarkMode
-                  ? "bg-gray-800/60 border-gray-700/50 hover:bg-gray-800/80 text-yellow-400"
-                  : "bg-white/20 border-white/30 hover:bg-white/30 text-gray-700"
+                    ? "bg-gray-800/60 border-gray-700/50 hover:bg-gray-800/80 text-yellow-400"
+                    : "bg-white/20 border-white/30 hover:bg-white/30 text-gray-700"
                   }`}
                 aria-label="Toggle dark mode"
               >
                 {isDarkMode ? "☀️" : "🌙"}
               </button>
+
               <button
                 onClick={logout}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${isDarkMode
-                  ? "bg-slate-700 hover:bg-slate-600 text-white"
-                  : "bg-slate-600 hover:bg-slate-700 text-white"
+                    ? "bg-slate-700 hover:bg-slate-600 text-white"
+                    : "bg-slate-600 hover:bg-slate-700 text-white"
                   }`}
               >
                 <span className="hidden sm:inline">Logout</span>
                 <span className="sm:hidden">Exit</span>
               </button>
             </div>
+
+            {lastUpdateCheck && (
+              <p className={`text-xs mt-1 ${textSecondaryClass}`}>
+                Last updated: {lastUpdateCheck.toLocaleTimeString()}
+              </p>
+            )}
+
           </div>
         </div>
 
@@ -642,8 +757,8 @@ function OperationsDepartment() {
         {!loading && !initialLoadComplete && loadingProgress.total > 0 && (
           <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/30">
             <div className={`max-w-md w-full mx-4 backdrop-blur-md rounded-2xl p-8 border shadow-2xl transition-all duration-300 ${isDarkMode
-                ? "bg-gray-800/90 border-gray-700/50"
-                : "bg-white/90 border-white/50"
+              ? "bg-gray-800/90 border-gray-700/50"
+              : "bg-white/90 border-white/50"
               }`}>
               {/* Gear Animation */}
               <div className="flex justify-center mb-6">
@@ -805,12 +920,12 @@ function OperationsDepartment() {
                     onClick={() => handleTabChange(tab.id)}
                     disabled={!initialLoadComplete && (tab.id === "checklist" || tab.id === "dashboard" || tab.id === "reports")}
                     className={`flex-1 px-4 py-3 font-medium transition-colors ${activeTab === tab.id
-                        ? isDarkMode
-                          ? "border-b-2 border-slate-400 text-slate-300"
-                          : "border-b-2 border-slate-600 text-slate-700"
-                        : isDarkMode
-                          ? "text-gray-400 hover:text-slate-400"
-                          : "text-gray-600 hover:text-slate-600"
+                      ? isDarkMode
+                        ? "border-b-2 border-slate-400 text-slate-300"
+                        : "border-b-2 border-slate-600 text-slate-700"
+                      : isDarkMode
+                        ? "text-gray-400 hover:text-slate-400"
+                        : "text-gray-600 hover:text-slate-600"
                       } ${!initialLoadComplete && (tab.id === "checklist" || tab.id === "dashboard" || tab.id === "reports")
                         ? "opacity-50 cursor-not-allowed"
                         : ""
@@ -849,12 +964,12 @@ function OperationsDepartment() {
                       onClick={() => handleTabChange(tab.id)}
                       disabled={!initialLoadComplete && (tab.id === "checklist" || tab.id === "dashboard" || tab.id === "reports")}
                       className={`flex-1 px-4 py-3 font-medium transition-colors ${activeTab === tab.id
-                          ? isDarkMode
-                            ? "border-b-2 border-slate-400 text-slate-300"
-                            : "border-b-2 border-slate-600 text-slate-700"
-                          : isDarkMode
-                            ? "text-gray-400 hover:text-slate-400"
-                            : "text-gray-600 hover:text-slate-600"
+                        ? isDarkMode
+                          ? "border-b-2 border-slate-400 text-slate-300"
+                          : "border-b-2 border-slate-600 text-slate-700"
+                        : isDarkMode
+                          ? "text-gray-400 hover:text-slate-400"
+                          : "text-gray-600 hover:text-slate-600"
                         } ${!initialLoadComplete && (tab.id === "checklist" || tab.id === "dashboard" || tab.id === "reports")
                           ? "opacity-50 cursor-not-allowed"
                           : ""
