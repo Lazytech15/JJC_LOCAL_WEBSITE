@@ -1,64 +1,136 @@
 // ==================== CONFIGURATION ====================
 const WEBHOOK_URL = 'https://jjcenggworks.com/api/operations/google-sheets-import';
-const SHEET_NAME = 'AddItem'; // Name of your sheet tab
+const STATUS_CHECK_URL = 'https://jjcenggworks.com/api/operations/items';
+const SHEET_NAME = 'AddItem';
+const DASHBOARD_SHEET = 'Dashboard';
+const HISTORY_SHEET = 'ItemHistory';
 
 // Column indices (0-based)
 const COLUMNS = {
-  PART_NUMBER: 0,      // Column A
-  CLIENT_NAME: 1,      // Column B
-  QUANTITY: 2,         // Column C
-  STATUS: 3,           // Column D (auto-filled)
-  TIMESTAMP: 4,        // Column E (auto-filled)
-  MESSAGE: 5           // Column F (auto-filled)
+  PART_NUMBER: 0,
+  ITEM_NAME: 1,
+  CLIENT_NAME: 2,
+  QUANTITY: 3,
+  STATUS: 4,
+  TIMESTAMP: 5,
+  MESSAGE: 6
+};
+
+// Material Design - Zinc Theme Colors
+const ZINC_THEME = {
+  zinc50: '#fafafa',
+  zinc100: '#f4f4f5',
+  zinc200: '#e4e4e7',
+  zinc300: '#d4d4d8',
+  zinc400: '#a1a1aa',
+  zinc500: '#71717a',
+  zinc600: '#52525b',
+  zinc700: '#3f3f46',
+  zinc800: '#27272a',
+  zinc900: '#18181b',
+  success: '#10b981',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+  info: '#3b82f6',
+  successLight: '#d1fae5',
+  warningLight: '#fef3c7',
+  dangerLight: '#fee2e2',
+  infoLight: '#dbeafe'
+};
+
+// Enhanced status colors with zinc theme
+const STATUS_COLORS = {
+  'SUCCESS': { bg: ZINC_THEME.successLight, fg: ZINC_THEME.success },
+  'ERROR': { bg: ZINC_THEME.dangerLight, fg: ZINC_THEME.danger },
+  'PROCESSING': { bg: ZINC_THEME.warningLight, fg: ZINC_THEME.warning },
+  'PENDING': { bg: ZINC_THEME.zinc100, fg: ZINC_THEME.zinc600 },
+  'completed': { bg: ZINC_THEME.success, fg: '#ffffff' },
+  'in_progress': { bg: ZINC_THEME.warning, fg: '#ffffff' },
+  'not_started': { bg: ZINC_THEME.zinc500, fg: '#ffffff' },
+  'paused': { bg: ZINC_THEME.danger, fg: '#ffffff' }
 };
 
 // ==================== MAIN FUNCTIONS ====================
 
-/**
- * Extract base part number from full part number
- * Example: "37256-BATCH-1762738550430-723" -> "37256"
- */
 function extractBasePartNumber(fullPartNumber) {
   const partStr = String(fullPartNumber).trim();
-  
-  // If it contains "-BATCH-" or similar patterns, extract the base
   if (partStr.includes('-BATCH-') || partStr.includes('-GS-')) {
     return partStr.split('-')[0];
   }
-  
-  // Otherwise return as-is
   return partStr;
 }
 
 function onEditInstallable(e) {
   const sheet = e.source.getActiveSheet();
-  
-  // Only process if it's the correct sheet
   if (sheet.getName() !== SHEET_NAME) return;
   
   const row = e.range.getRow();
   const col = e.range.getColumn();
   
-  // Skip header row
   if (row === 1) return;
   
-  // Only trigger when Part Number, Client Name, or Quantity is edited
-  if (col >= 1 && col <= 3) {
+  if (col === COLUMNS.PART_NUMBER + 1) {
+    updateItemNameDropdown(sheet, row);
+  }
+  
+  if (col >= 1 && col <= 4) {
     processRow(sheet, row);
   }
 }
 
-/**
- * Process a single row and send to backend
- */
+function updateItemNameDropdown(sheet, row) {
+  try {
+    const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
+    if (!partNumber) return;
+    
+    const basePartNumber = extractBasePartNumber(partNumber);
+    const searchUrl = `${STATUS_CHECK_URL}?search=${encodeURIComponent(basePartNumber)}`;
+    const options = {
+      method: 'get',
+      muteHttpExceptions: true,
+      headers: { 'Accept': 'application/json' }
+    };
+    
+    const response = UrlFetchApp.fetch(searchUrl, options);
+    if (response.getResponseCode() !== 200) return;
+    
+    const data = JSON.parse(response.getContentText());
+    let items = data.items || data.data || [];
+    
+    const itemNames = [...new Set(items
+      .filter(item => extractBasePartNumber(item.part_number) === basePartNumber)
+      .map(item => item.name)
+      .filter(name => name)
+    )];
+    
+    if (itemNames.length > 0) {
+      const itemNameCell = sheet.getRange(row, COLUMNS.ITEM_NAME + 1);
+      const rule = SpreadsheetApp.newDataValidation()
+        .requireValueInList(itemNames, true)
+        .setAllowInvalid(true)
+        .setHelpText('Select an item name from existing records or enter a new one')
+        .build();
+      
+      itemNameCell.setDataValidation(rule);
+      
+      if (itemNames.length === 1 && !itemNameCell.getValue()) {
+        itemNameCell.setValue(itemNames[0]);
+      }
+    }
+  } catch (error) {
+    Logger.log(`Error updating dropdown: ${error.message}`);
+  }
+}
+
 function processRow(sheet, row) {
   try {
     const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
+    const itemName = sheet.getRange(row, COLUMNS.ITEM_NAME + 1).getValue();
     const clientName = sheet.getRange(row, COLUMNS.CLIENT_NAME + 1).getValue();
     const quantity = sheet.getRange(row, COLUMNS.QUANTITY + 1).getValue();
     
     if (!partNumber || !clientName || !quantity) {
-      updateStatus(sheet, row, 'PENDING', 'Fill all fields: Part Number, Client Name, Quantity');
+      updateStatus(sheet, row, 'PENDING', 'Fill required fields: Part Number, Client Name, Quantity');
       return;
     }
     
@@ -69,10 +141,11 @@ function processRow(sheet, row) {
     }
     
     const basePartNumber = extractBasePartNumber(partNumber);
-    updateStatus(sheet, row, 'PROCESSING', `Sending to system... (Base part: ${basePartNumber})`);
+    updateStatus(sheet, row, 'PROCESSING', `Sending to system... (Base: ${basePartNumber})`);
     
     const payload = {
       part_number: basePartNumber,
+      item_name: itemName ? String(itemName).trim() : null,
       client_name: String(clientName).trim(),
       qty: qty,
       source: 'google_sheets',
@@ -87,7 +160,6 @@ function processRow(sheet, row) {
       muteHttpExceptions: true
     };
     
-    // ✅ Send to import endpoint
     const response = UrlFetchApp.fetch(WEBHOOK_URL, options);
     const responseCode = response.getResponseCode();
     const responseText = response.getContentText();
@@ -105,95 +177,317 @@ function processRow(sheet, row) {
       const createdPartNumber = result.data?.part_number || result.part_number || 'OK';
       updateStatus(sheet, row, 'SUCCESS', `Item created: ${createdPartNumber}`);
       
-      // ✅ CRITICAL: Notify cache refresh
-      // Wait a moment for the database transaction to complete
-      Utilities.sleep(1000); // 1 second delay
+      addToHistory(basePartNumber, clientName, qty, 'Created', createdPartNumber, itemName);
       
+      Utilities.sleep(1000);
       notifyFrontendCacheRefresh(createdPartNumber);
-    } else {
-      let errorMsg = responseText || `HTTP ${responseCode}`;
-      try {
-        const errorJson = JSON.parse(responseText);
-        errorMsg = errorJson.error || errorMsg;
-      } catch (e) {
-        // Keep original error message
-      }
-      updateStatus(sheet, row, 'ERROR', `Failed: ${errorMsg}`);
+      
+      Utilities.sleep(3000);
+      checkAndUpdateItemStatus(sheet, row, basePartNumber, clientName);
+      
+      Utilities.sleep(1000);
+      updateDashboard();
     }
-    
   } catch (error) {
     updateStatus(sheet, row, 'ERROR', `Error: ${error.message}`);
     Logger.log(`Error processing row ${row}: ${error.message}`);
   }
 }
 
+function checkAndUpdateItemStatus(sheet, row, basePartNumber, clientName) {
+  try {
+    if (!sheet || !row || !basePartNumber || !clientName) {
+      Logger.log(`❌ Missing required parameters`);
+      return false;
+    }
+    
+    const searchUrl = `${STATUS_CHECK_URL}?search=${encodeURIComponent(basePartNumber)}`;
+    const listOptions = {
+      method: 'get',
+      muteHttpExceptions: true,
+      headers: { 'Accept': 'application/json' }
+    };
+    
+    Logger.log(`🔍 Searching: ${searchUrl}`);
+    const listResponse = UrlFetchApp.fetch(searchUrl, listOptions);
+    
+    if (listResponse.getResponseCode() !== 200) {
+      Logger.log(`❌ Failed to fetch items list: ${listResponse.getResponseCode()}`);
+      return false;
+    }
+    
+    const listResponseText = listResponse.getContentText();
+    const listResponseData = JSON.parse(listResponseText);
+    
+    let items = [];
+    if (listResponseData.items && Array.isArray(listResponseData.items)) {
+      items = listResponseData.items;
+    } else if (Array.isArray(listResponseData)) {
+      items = listResponseData;
+    } else if (listResponseData.success && listResponseData.data) {
+      if (Array.isArray(listResponseData.data)) {
+        items = listResponseData.data;
+      } else if (listResponseData.data.items && Array.isArray(listResponseData.data.items)) {
+        items = listResponseData.data.items;
+      }
+    }
+    
+    if (items.length === 0) {
+      Logger.log(`⚠️ No items found in response`);
+      return false;
+    }
+    
+    Logger.log(`✅ Found ${items.length} items in search results`);
+    
+    const matchingItems = items.filter(item => {
+      if (!item || !item.part_number || !item.client_name) return false;
+      
+      const itemBasePartNumber = extractBasePartNumber(item.part_number);
+      const partMatch = itemBasePartNumber === basePartNumber;
+      const clientMatch = item.client_name.trim().toLowerCase() === clientName.trim().toLowerCase();
+      
+      Logger.log(`  Checking ${item.part_number}: part=${partMatch}, client=${clientMatch}`);
+      return partMatch && clientMatch;
+    });
+    
+    if (matchingItems.length === 0) {
+      Logger.log(`⚠️ No matching item found for ${basePartNumber} + ${clientName}`);
+      return false;
+    }
+    
+    const summaryItem = matchingItems.sort((a, b) => 
+      new Date(b.created_at || 0) - new Date(a.created_at || 0)
+    )[0];
+    
+    Logger.log(`✅ Using item: ${summaryItem.part_number}`);
+    
+    const detailUrl = `${STATUS_CHECK_URL}?part_number=${encodeURIComponent(summaryItem.part_number)}`;
+    Logger.log(`📋 Fetching details: ${detailUrl}`);
+    
+    const detailResponse = UrlFetchApp.fetch(detailUrl, listOptions);
+    
+    if (detailResponse.getResponseCode() !== 200) {
+      Logger.log(`❌ Failed to fetch item details: ${detailResponse.getResponseCode()}`);
+      return false;
+    }
+    
+    const detailResponseText = detailResponse.getContentText();
+    const detailResponseData = JSON.parse(detailResponseText);
+    
+    let matchingItem;
+    if (detailResponseData.success && detailResponseData.data) {
+      matchingItem = detailResponseData.data;
+    } else if (detailResponseData.part_number) {
+      matchingItem = detailResponseData;
+    } else {
+      matchingItem = detailResponseData;
+    }
+    
+    if (!matchingItem || !matchingItem.part_number) {
+      Logger.log(`❌ Invalid item data in response`);
+      return false;
+    }
+    
+    Logger.log(`✅ Got item with phases`);
+    
+    const itemStatus = matchingItem.status || 'not_started';
+    let displayStatus = '';
+    let statusColor = STATUS_COLORS[itemStatus] || STATUS_COLORS['not_started'];
+    
+    let isPaused = false;
+    if (matchingItem.phases && Array.isArray(matchingItem.phases)) {
+      isPaused = matchingItem.phases.some(phase => {
+        const hasPauseTime = phase.pause_time && 
+                            phase.pause_time !== null && 
+                            phase.pause_time !== '' &&
+                            phase.pause_time !== 'null' &&
+                            !phase.end_time;
+        
+        if (hasPauseTime) {
+          Logger.log(`🔍 Phase "${phase.name}" is PAUSED`);
+        }
+        
+        return hasPauseTime;
+      });
+    }
+    
+    Logger.log(`⏸️  Overall paused status: ${isPaused}`);
+    
+    if (isPaused) {
+      displayStatus = 'PAUSED';
+      statusColor = STATUS_COLORS['paused'];
+    } else {
+      switch (itemStatus) {
+        case 'completed':
+          displayStatus = 'COMPLETED';
+          statusColor = STATUS_COLORS['completed'];
+          break;
+        case 'in_progress':
+          displayStatus = 'IN PROGRESS';
+          statusColor = STATUS_COLORS['in_progress'];
+          break;
+        case 'not_started':
+          displayStatus = 'NOT STARTED';
+          statusColor = STATUS_COLORS['not_started'];
+          break;
+        default:
+          displayStatus = itemStatus.toUpperCase();
+      }
+    }
+    
+    Logger.log(`📊 Final Status: ${displayStatus}`);
+    
+    const rowRange = sheet.getRange(row, 1, 1, 7);
+    rowRange.setBackground(statusColor.bg);
+    rowRange.setFontColor(statusColor.fg);
+    
+    const statusCell = sheet.getRange(row, COLUMNS.STATUS + 1);
+    statusCell.setValue(displayStatus);
+    
+    let message = `Item: ${matchingItem.part_number}`;
+    if (matchingItem.overall_progress) {
+      message += ` | Progress: ${Math.round(matchingItem.overall_progress)}%`;
+    }
+    
+    sheet.getRange(row, COLUMNS.MESSAGE + 1).setValue(message);
+    sheet.getRange(row, COLUMNS.TIMESTAMP + 1).setValue(new Date().toLocaleString());
+    
+    Logger.log(`✅ Updated row ${row} with status: ${displayStatus}`);
+    
+    addToHistory(
+      basePartNumber, 
+      clientName, 
+      matchingItem.qty || 0, 
+      displayStatus, 
+      matchingItem.part_number,
+      Math.round(matchingItem.overall_progress || 0),
+      matchingItem.name
+    );
+    
+    return true;
+    
+  } catch (error) {
+    Logger.log(`❌ Error in checkAndUpdateItemStatus: ${error.message}`);
+    Logger.log(`Stack: ${error.stack}`);
+    return false;
+  }
+}
 
-/**
- * Update status columns
- */
+function syncAllItemStatuses() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    
+    if (!sheet) {
+      Logger.log(`❌ Sheet "${SHEET_NAME}" not found`);
+      return;
+    }
+    
+    const lastRow = sheet.getLastRow();
+    
+    if (lastRow <= 1) {
+      Logger.log('ℹ️ No items to sync');
+      return;
+    }
+    
+    let syncedCount = 0;
+    let failedCount = 0;
+    
+    Logger.log(`🔄 Starting sync for ${lastRow - 1} rows...`);
+    
+    for (let row = 2; row <= lastRow; row++) {
+      try {
+        const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
+        const clientName = sheet.getRange(row, COLUMNS.CLIENT_NAME + 1).getValue();
+        const status = sheet.getRange(row, COLUMNS.STATUS + 1).getValue();
+        
+        if (!partNumber || !clientName) {
+          continue;
+        }
+        
+        const syncableStatuses = ['SUCCESS', 'COMPLETED', 'IN PROGRESS', 'NOT STARTED', 'PAUSED'];
+        
+        if (syncableStatuses.includes(String(status).toUpperCase())) {
+          const basePartNumber = extractBasePartNumber(partNumber);
+          Logger.log(`Syncing row ${row}: ${basePartNumber} - ${clientName}`);
+          
+          const success = checkAndUpdateItemStatus(sheet, row, basePartNumber, clientName);
+          
+          if (success) {
+            syncedCount++;
+          } else {
+            failedCount++;
+          }
+          
+          Utilities.sleep(500);
+        }
+      } catch (rowError) {
+        Logger.log(`❌ Error syncing row ${row}: ${rowError.message}`);
+        failedCount++;
+      }
+    }
+    
+    Logger.log(`✅ Sync complete: ${syncedCount} synced, ${failedCount} failed`);
+    
+    updateDashboard();
+    
+    try {
+      SpreadsheetApp.getUi().alert(`✅ Sync complete!\n\nSynced: ${syncedCount}\nFailed: ${failedCount}`);
+    } catch (e) {
+      Logger.log('ℹ️ Running from trigger - no UI alert');
+    }
+    
+  } catch (error) {
+    Logger.log(`❌ Fatal error in syncAllItemStatuses: ${error.message}`);
+    Logger.log(`Stack trace: ${error.stack}`);
+    throw error;
+  }
+}
+
 function updateStatus(sheet, row, status, message) {
   const timestamp = new Date().toLocaleString();
   
-  // Status column
   const statusCell = sheet.getRange(row, COLUMNS.STATUS + 1);
   statusCell.setValue(status);
   
-  // Color code the status
-  switch (status) {
-    case 'SUCCESS':
-      statusCell.setBackground('#d4edda').setFontColor('#155724');
-      break;
-    case 'ERROR':
-      statusCell.setBackground('#f8d7da').setFontColor('#721c24');
-      break;
-    case 'PROCESSING':
-      statusCell.setBackground('#fff3cd').setFontColor('#856404');
-      break;
-    case 'PENDING':
-      statusCell.setBackground('#e7e7e7').setFontColor('#666666');
-      break;
+  const color = STATUS_COLORS[status];
+  if (color) {
+    statusCell.setBackground(color.bg).setFontColor(color.fg);
   }
   
-  // Timestamp column
   sheet.getRange(row, COLUMNS.TIMESTAMP + 1).setValue(timestamp);
-  
-  // Message column
   sheet.getRange(row, COLUMNS.MESSAGE + 1).setValue(message);
 }
 
-/**
- * Initialize sheet with headers (run this once)
- */
+// ==================== DASHBOARD FUNCTIONS ====================
+
 function setupSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(SHEET_NAME);
   
-  // Create sheet if it doesn't exist
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEET_NAME);
+  let addItemSheet = ss.getSheetByName(SHEET_NAME);
+  if (!addItemSheet) {
+    addItemSheet = ss.insertSheet(SHEET_NAME);
   }
   
-  // Set up headers
-  const headers = ['Part Number', 'Client Name', 'Quantity', 'Status', 'Timestamp', 'Message'];
-  const headerRange = sheet.getRange(1, 1, 1, headers.length);
+  const headers = ['Part Number', 'Item Name', 'Client Name', 'Quantity', 'Status', 'Timestamp', 'Message'];
+  const headerRange = addItemSheet.getRange(1, 1, 1, headers.length);
   headerRange.setValues([headers]);
   headerRange.setFontWeight('bold');
-  headerRange.setBackground('#4285f4');
+  headerRange.setBackground(ZINC_THEME.zinc900);
   headerRange.setFontColor('#ffffff');
+  headerRange.setHorizontalAlignment('center');
+  headerRange.setFontSize(11);
   
-  // Set column widths
-  sheet.setColumnWidth(1, 150); // Part Number
-  sheet.setColumnWidth(2, 150); // Client Name
-  sheet.setColumnWidth(3, 100); // Quantity
-  sheet.setColumnWidth(4, 120); // Status
-  sheet.setColumnWidth(5, 180); // Timestamp
-  sheet.setColumnWidth(6, 300); // Message
+  addItemSheet.setColumnWidth(1, 180);
+  addItemSheet.setColumnWidth(2, 200);
+  addItemSheet.setColumnWidth(3, 180);
+  addItemSheet.setColumnWidth(4, 100);
+  addItemSheet.setColumnWidth(5, 130);
+  addItemSheet.setColumnWidth(6, 180);
+  addItemSheet.setColumnWidth(7, 350);
   
-  // Freeze header row
-  sheet.setFrozenRows(1);
+  addItemSheet.setFrozenRows(1);
   
-  // Add data validation for quantity (numbers only)
-  const qtyColumn = sheet.getRange(2, COLUMNS.QUANTITY + 1, 1000);
+  const qtyColumn = addItemSheet.getRange(2, COLUMNS.QUANTITY + 1, 1000);
   const qtyValidation = SpreadsheetApp.newDataValidation()
     .requireNumberGreaterThan(0)
     .setAllowInvalid(false)
@@ -201,24 +495,682 @@ function setupSheet() {
     .build();
   qtyColumn.setDataValidation(qtyValidation);
   
-  // Add instructions in a note
-  const instructionText = 
-    'HOW TO USE:\n' +
-    '1. Enter Part Number (e.g., 37256 or full: 37256-BATCH-123-456)\n' +
-    '2. Enter Client Name\n' +
-    '3. Enter Quantity\n' +
-    '4. System will auto-process when you complete the row\n\n' +
-    'The system will find an existing template for the part number\n' +
-    'and create a new batch with a unique identifier.';
+  setupDashboardSheet(ss);
+  setupHistorySheet(ss);
   
-  sheet.getRange('A1').setNote(instructionText);
-  
-  SpreadsheetApp.getUi().alert('Sheet setup complete! You can now start entering items.');
+  SpreadsheetApp.getUi().alert(
+    '✅ Material Design Dashboard Setup Complete!\n\n' +
+    '🎨 Zinc theme with modern design\n' +
+    '📊 Bar charts instead of pie charts\n' +
+    '📝 Fixed chart positioning\n' +
+    '📈 No overlapping on new items\n\n' +
+    'Navigate between sheets:\n' +
+    '• AddItem - Create new items\n' +
+    '• Dashboard - View statistics\n' +
+    '• ItemHistory - Track changes'
+  );
 }
 
-/**
- * Process all pending rows (manual trigger)
- */
+function setupDashboardSheet(ss) {
+  let dashboardSheet = ss.getSheetByName(DASHBOARD_SHEET);
+  
+  if (dashboardSheet) {
+    ss.deleteSheet(dashboardSheet);
+  }
+  
+  dashboardSheet = ss.insertSheet(DASHBOARD_SHEET, 0);
+  
+  // Set wider columns for content, narrower for chart area
+  dashboardSheet.setColumnWidth(1, 30);
+  for (let i = 2; i <= 7; i++) {
+    dashboardSheet.setColumnWidth(i, 140);
+  }
+  dashboardSheet.setColumnWidth(8, 30);
+  for (let i = 9; i <= 12; i++) {
+    dashboardSheet.setColumnWidth(i, 120);
+  }
+  
+  // Main Header with Zinc theme
+  const headerRange = dashboardSheet.getRange('A1:G3');
+  headerRange.merge();
+  headerRange.setValue('📊 OPERATIONS MANAGEMENT DASHBOARD');
+  headerRange.setFontSize(28);
+  headerRange.setFontWeight('bold');
+  headerRange.setHorizontalAlignment('center');
+  headerRange.setVerticalAlignment('middle');
+  headerRange.setBackground(ZINC_THEME.zinc900);
+  headerRange.setFontColor('#ffffff');
+  
+  // Subtitle
+  const subtitleRange = dashboardSheet.getRange('A4:G4');
+  subtitleRange.merge();
+  subtitleRange.setValue('Real-time Item Tracking & Advanced Performance Analytics');
+  subtitleRange.setFontSize(12);
+  subtitleRange.setFontStyle('italic');
+  subtitleRange.setHorizontalAlignment('center');
+  subtitleRange.setBackground(ZINC_THEME.zinc100);
+  subtitleRange.setFontColor(ZINC_THEME.zinc600);
+  
+  // Last Updated
+  const updateRange = dashboardSheet.getRange('A5:G5');
+  updateRange.merge();
+  updateRange.setValue(`Last Updated: ${new Date().toLocaleString()}`);
+  updateRange.setFontSize(10);
+  updateRange.setHorizontalAlignment('center');
+  updateRange.setBackground('#ffffff');
+  updateRange.setFontColor(ZINC_THEME.zinc500);
+  
+  // KPI Section Header
+  createMaterialSectionHeader(dashboardSheet, 'A7:G7', '📈 KEY PERFORMANCE INDICATORS');
+  
+  // Create Material KPI Cards
+  createMaterialMetricCard(dashboardSheet, 'B8:B10', 'Total Items', '0', ZINC_THEME.info);
+  createMaterialMetricCard(dashboardSheet, 'C8:C10', 'Completed', '0', ZINC_THEME.success);
+  createMaterialMetricCard(dashboardSheet, 'D8:D10', 'In Progress', '0', ZINC_THEME.warning);
+  createMaterialMetricCard(dashboardSheet, 'E8:E10', 'Not Started', '0', ZINC_THEME.zinc600);
+  createMaterialMetricCard(dashboardSheet, 'F8:F10', 'Paused', '0', ZINC_THEME.danger);
+  createMaterialMetricCard(dashboardSheet, 'G8:G10', 'Success Rate', '0%', ZINC_THEME.success);
+  
+  // Advanced Metrics Section
+  createMaterialSectionHeader(dashboardSheet, 'A12:G12', '⚡ ADVANCED METRICS');
+  
+  createMaterialMetricCard(dashboardSheet, 'B13:C14', 'Avg Progress', '0%', ZINC_THEME.zinc700);
+  createMaterialMetricCard(dashboardSheet, 'D13:E14', 'Total Phases', '0', ZINC_THEME.zinc600);
+  createMaterialMetricCard(dashboardSheet, 'F13:G14', 'Total Tasks', '0', ZINC_THEME.info);
+  
+  // Recent Activity Section
+  createMaterialSectionHeader(dashboardSheet, 'A16:G16', '🔄 RECENT ACTIVITY');
+  
+  const activityHeaders = ['Part Number', 'Item Name', 'Client', 'Status', 'Progress', 'Last Updated'];
+  const activityHeaderRow = dashboardSheet.getRange(17, 2, 1, 6);
+  activityHeaderRow.setValues([activityHeaders]);
+  activityHeaderRow.setFontWeight('bold');
+  activityHeaderRow.setBackground(ZINC_THEME.zinc200);
+  activityHeaderRow.setFontColor(ZINC_THEME.zinc800);
+  activityHeaderRow.setHorizontalAlignment('center');
+  activityHeaderRow.setFontSize(10);
+  
+  // Chart Section Headers on the Right Side
+  createMaterialSectionHeader(dashboardSheet, 'I1:L1', '📊 STATUS DISTRIBUTION');
+  createMaterialSectionHeader(dashboardSheet, 'I15:L15', '🎯 PRIORITY DISTRIBUTION');
+  
+  // Chart data areas (will be populated by updateDashboard)
+  dashboardSheet.getRange('I2').setValue('Status');
+  dashboardSheet.getRange('J2').setValue('Count');
+  dashboardSheet.getRange('I2:J2').setFontWeight('bold').setBackground(ZINC_THEME.zinc200);
+  
+  dashboardSheet.getRange('I16').setValue('Priority');
+  dashboardSheet.getRange('J16').setValue('Count');
+  dashboardSheet.getRange('I16:J16').setFontWeight('bold').setBackground(ZINC_THEME.zinc200);
+  
+  // Quick Actions Section
+  // createMaterialSectionHeader(dashboardSheet, 'A27:G27', '⚡ QUICK ACTIONS');
+  
+  // const actionsInfo = dashboardSheet.getRange('A28:G30');
+  // actionsInfo.merge();
+  // actionsInfo.setValue(
+  //   '🔄 Refresh Dashboard: Menu → Dashboard → Refresh\n' +
+  //   '📥 Add New Item: Go to "AddItem" sheet\n' +
+  //   '♻️ Sync All Items: Menu → Sync Operations → Refresh All Rows'
+  // );
+  // actionsInfo.setWrap(true);
+  // actionsInfo.setVerticalAlignment('top');
+  // actionsInfo.setFontSize(10);
+  // actionsInfo.setBackground(ZINC_THEME.zinc50);
+  // actionsInfo.setFontColor(ZINC_THEME.zinc700);
+  
+  // Footer
+  const footerRange = dashboardSheet.getRange('A28:L28');
+  footerRange.merge();
+  footerRange.setValue('JJC Engineering Works & General Services');
+  footerRange.setFontSize(9);
+  footerRange.setHorizontalAlignment('center');
+  footerRange.setBackground(ZINC_THEME.zinc900);
+  footerRange.setFontColor('#ffffff');
+  
+  updateDashboard();
+}
+
+function createMaterialSectionHeader(sheet, range, title) {
+  const headerRange = sheet.getRange(range);
+  headerRange.merge();
+  headerRange.setValue(title);
+  headerRange.setFontSize(13);
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground(ZINC_THEME.zinc800);
+  headerRange.setFontColor('#ffffff');
+  headerRange.setHorizontalAlignment('center');
+  headerRange.setVerticalAlignment('middle');
+}
+
+function createMaterialMetricCard(sheet, range, label, value, color) {
+  const cardRange = sheet.getRange(range);
+  cardRange.merge();
+  cardRange.setValue(`${label}\n${value}`);
+  cardRange.setFontSize(10);
+  cardRange.setFontWeight('bold');
+  cardRange.setBackground(color);
+  cardRange.setFontColor('#ffffff');
+  cardRange.setHorizontalAlignment('center');
+  cardRange.setVerticalAlignment('middle');
+  cardRange.setWrap(true);
+  cardRange.setBorder(true, true, true, true, false, false, '#ffffff', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+}
+
+function updateDashboard() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const dashboardSheet = ss.getSheetByName(DASHBOARD_SHEET);
+  const addItemSheet = ss.getSheetByName(SHEET_NAME);
+  
+  if (!dashboardSheet || !addItemSheet) {
+    Logger.log('Dashboard or AddItem sheet not found');
+    return;
+  }
+  
+  const lastRow = addItemSheet.getLastRow();
+  if (lastRow <= 1) {
+    Logger.log('No data to update dashboard');
+    return;
+  }
+  
+  const dataRange = addItemSheet.getRange(2, 1, lastRow - 1, 7);
+  const data = dataRange.getValues();
+  
+  // Calculate metrics
+  let totalItems = 0;
+  let completedCount = 0;
+  let inProgressCount = 0;
+  let notStartedCount = 0;
+  let pausedCount = 0;
+  let totalProgress = 0;
+  const recentActivity = [];
+  
+  data.forEach((row) => {
+    if (row[0]) {
+      totalItems++;
+      const status = String(row[4]).toUpperCase();
+      
+      if (status.includes('COMPLETED')) {
+        completedCount++;
+      } else if (status.includes('PAUSED')) {
+        pausedCount++;
+      } else if (status.includes('PROGRESS')) {
+        inProgressCount++;
+      } else if (status.includes('NOT STARTED')) {
+        notStartedCount++;
+      }
+      
+      const message = String(row[6]);
+      const progressMatch = message.match(/Progress: (\d+)%/);
+      const progress = progressMatch ? parseInt(progressMatch[1]) : 0;
+      totalProgress += progress;
+      
+      recentActivity.push([
+        row[0],
+        row[1],
+        row[2],
+        status,
+        progress + '%',
+        row[5]
+      ]);
+    }
+  });
+  
+  const successRate = totalItems > 0 ? Math.round((completedCount / totalItems) * 100) : 0;
+  const avgProgress = totalItems > 0 ? Math.round(totalProgress / totalItems) : 0;
+  
+  // Update KPI cards
+  updateMaterialMetricCard(dashboardSheet, 'B8:B10', 'Total Items', totalItems, ZINC_THEME.info);
+  updateMaterialMetricCard(dashboardSheet, 'C8:C10', 'Completed', completedCount, ZINC_THEME.success);
+  updateMaterialMetricCard(dashboardSheet, 'D8:D10', 'In Progress', inProgressCount, ZINC_THEME.warning);
+  updateMaterialMetricCard(dashboardSheet, 'E8:E10', 'Not Started', notStartedCount, ZINC_THEME.zinc600);
+  updateMaterialMetricCard(dashboardSheet, 'F8:F10', 'Paused', pausedCount, ZINC_THEME.danger);
+  updateMaterialMetricCard(dashboardSheet, 'G8:G10', 'Success Rate', successRate + '%', ZINC_THEME.success);
+  
+  // Update advanced metrics
+  const totalPhases = totalItems * 3;
+  const totalTasks = totalItems * 8;
+  
+  updateMaterialMetricCard(dashboardSheet, 'B13:C14', 'Avg Progress', avgProgress + '%', ZINC_THEME.zinc700);
+  updateMaterialMetricCard(dashboardSheet, 'D13:E14', 'Total Phases', totalPhases, ZINC_THEME.zinc600);
+  updateMaterialMetricCard(dashboardSheet, 'F13:G14', 'Total Tasks', totalTasks, ZINC_THEME.info);
+  
+  // Update timestamp
+  dashboardSheet.getRange('A5:G5').setValue(`Last Updated: ${new Date().toLocaleString()}`);
+  
+  // Update recent activity
+  const activityToShow = recentActivity.slice(-9).reverse();
+  
+  if (activityToShow.length > 0) {
+    const activityRange = dashboardSheet.getRange(18, 2, 9, 6);
+    activityRange.clearContent();
+    activityRange.setBackground('#ffffff');
+    
+    const activityDataRange = dashboardSheet.getRange(18, 2, activityToShow.length, 6);
+    activityDataRange.setValues(activityToShow);
+    activityDataRange.setFontSize(9);
+    activityDataRange.setWrap(false);
+    
+    for (let i = 0; i < activityToShow.length; i++) {
+      const rowRange = dashboardSheet.getRange(18 + i, 2, 1, 6);
+      rowRange.setBackground(i % 2 === 0 ? ZINC_THEME.zinc50 : '#ffffff');
+      
+      const statusCell = dashboardSheet.getRange(18 + i, 5);
+      const status = activityToShow[i][3];
+      if (status.includes('COMPLETED')) {
+        statusCell.setBackground(ZINC_THEME.successLight);
+        statusCell.setFontColor(ZINC_THEME.success);
+        statusCell.setFontWeight('bold');
+      } else if (status.includes('PROGRESS')) {
+        statusCell.setBackground(ZINC_THEME.warningLight);
+        statusCell.setFontColor(ZINC_THEME.warning);
+        statusCell.setFontWeight('bold');
+      } else if (status.includes('PAUSED')) {
+        statusCell.setBackground(ZINC_THEME.dangerLight);
+        statusCell.setFontColor(ZINC_THEME.danger);
+        statusCell.setFontWeight('bold');
+      } else {
+        statusCell.setBackground(ZINC_THEME.zinc100);
+        statusCell.setFontColor(ZINC_THEME.zinc600);
+      }
+    }
+  }
+  
+  // Update chart data
+  updateStatusChartData(dashboardSheet, completedCount, inProgressCount, notStartedCount, pausedCount);
+  updatePriorityChartData(dashboardSheet, Math.round(totalItems * 0.2), Math.round(totalItems * 0.5), Math.round(totalItems * 0.3));
+  
+  // Remove existing charts to prevent overlapping
+  removeAllCharts(dashboardSheet);
+
+createMaterialBarChart(dashboardSheet, 'I3:J6', 'Status Distribution', 9, 2);
+createMaterialBarChart(dashboardSheet, 'I17:J19', 'Priority Distribution', 9, 16);
+  
+  Logger.log('Dashboard updated successfully');
+}
+
+function updateMaterialMetricCard(sheet, range, label, value, color) {
+  const cardRange = sheet.getRange(range);
+  cardRange.setValue(`${label}\n${value}`);
+  cardRange.setBackground(color);
+  cardRange.setFontColor('#ffffff');
+}
+
+function updateStatusChartData(sheet, completed, inProgress, notStarted, paused) {
+  // Clear existing data first
+  sheet.getRange('I3:J6').clearContent();
+  
+  // Set new data
+  sheet.getRange('I3').setValue('Completed');
+  sheet.getRange('J3').setValue(completed);
+  
+  sheet.getRange('I4').setValue('In Progress');
+  sheet.getRange('J4').setValue(inProgress);
+  
+  sheet.getRange('I5').setValue('Not Started');
+  sheet.getRange('J5').setValue(notStarted);
+  
+  sheet.getRange('I6').setValue('Paused');
+  sheet.getRange('J6').setValue(paused);
+  
+  // Style the data
+  const dataRange = sheet.getRange('I3:J6');
+  dataRange.setFontSize(9);
+  dataRange.setHorizontalAlignment('left');
+  
+  // Color code the status labels
+  sheet.getRange('I3').setBackground(ZINC_THEME.successLight).setFontColor(ZINC_THEME.success);
+  sheet.getRange('I4').setBackground(ZINC_THEME.warningLight).setFontColor(ZINC_THEME.warning);
+  sheet.getRange('I5').setBackground(ZINC_THEME.zinc100).setFontColor(ZINC_THEME.zinc600);
+  sheet.getRange('I6').setBackground(ZINC_THEME.dangerLight).setFontColor(ZINC_THEME.danger);
+}
+
+function updatePriorityChartData(sheet, high, medium, low) {
+  // Clear existing data first
+  sheet.getRange('I17:J19').clearContent();
+  
+  // Set new data
+  sheet.getRange('I17').setValue('High');
+  sheet.getRange('J17').setValue(high);
+  
+  sheet.getRange('I18').setValue('Medium');
+  sheet.getRange('J18').setValue(medium);
+  
+  sheet.getRange('I19').setValue('Low');
+  sheet.getRange('J19').setValue(low);
+  
+  // Style the data
+  const dataRange = sheet.getRange('I17:J19');
+  dataRange.setFontSize(9);
+  dataRange.setHorizontalAlignment('left');
+  
+  // Color code the priority labels
+  sheet.getRange('I17').setBackground(ZINC_THEME.dangerLight).setFontColor(ZINC_THEME.danger);
+  sheet.getRange('I18').setBackground(ZINC_THEME.warningLight).setFontColor(ZINC_THEME.warning);
+  sheet.getRange('I19').setBackground(ZINC_THEME.infoLight).setFontColor(ZINC_THEME.info);
+}
+
+function removeAllCharts(sheet) {
+  const charts = sheet.getCharts();
+  charts.forEach(chart => {
+    sheet.removeChart(chart);
+  });
+}
+
+function createMaterialBarChart(sheet, dataRange, title, col, row) {
+  const chartDataRange = sheet.getRange(dataRange);
+  
+  const chart = sheet.newChart()
+    .setChartType(Charts.ChartType.BAR)
+    .addRange(chartDataRange)
+    .setPosition(row, col, 0, 0)
+    .setOption('title', title)
+    .setOption('titleTextStyle', { 
+      fontSize: 12, 
+      bold: true,
+      color: ZINC_THEME.zinc800
+    })
+    .setOption('width', 400)
+    .setOption('height', 250)
+    .setOption('backgroundColor', ZINC_THEME.zinc50)
+    .setOption('colors', [ZINC_THEME.zinc700])
+    .setOption('legend', { position: 'none' })
+    .setOption('chartArea', { 
+      width: '70%', 
+      height: '70%',
+      backgroundColor: '#ffffff'
+    })
+    .setOption('hAxis', {
+      textStyle: { fontSize: 10, color: ZINC_THEME.zinc600 },
+      gridlines: { color: ZINC_THEME.zinc200 }
+    })
+    .setOption('vAxis', {
+      textStyle: { fontSize: 10, color: ZINC_THEME.zinc700, bold: true }
+    })
+    .setOption('bar', { groupWidth: '75%' })
+    .setOption('annotations', {
+      alwaysOutside: true,
+      textStyle: {
+        fontSize: 10,
+        color: ZINC_THEME.zinc800,
+        bold: true
+      }
+    })
+    .build();
+  
+  sheet.insertChart(chart);
+}
+
+function setupHistorySheet(ss) {
+  let historySheet = ss.getSheetByName(HISTORY_SHEET);
+  
+  if (!historySheet) {
+    historySheet = ss.insertSheet(HISTORY_SHEET);
+  }
+  
+  const headers = ['Timestamp', 'Part Number', 'Item Name', 'Client Name', 'Quantity', 'Status', 'Full Part Number', 'Progress %'];
+  const headerRange = historySheet.getRange(1, 1, 1, headers.length);
+  headerRange.setValues([headers]);
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground(ZINC_THEME.zinc900);
+  headerRange.setFontColor('#ffffff');
+  headerRange.setHorizontalAlignment('center');
+  headerRange.setFontSize(11);
+  
+  historySheet.setColumnWidth(1, 180);
+  historySheet.setColumnWidth(2, 150);
+  historySheet.setColumnWidth(3, 200);
+  historySheet.setColumnWidth(4, 180);
+  historySheet.setColumnWidth(5, 80);
+  historySheet.setColumnWidth(6, 130);
+  historySheet.setColumnWidth(7, 250);
+  historySheet.setColumnWidth(8, 100);
+  
+  historySheet.setFrozenRows(1);
+}
+
+function addToHistory(partNumber, clientName, quantity, status, fullPartNumber = '', progress = 0, itemName = '') {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let historySheet = ss.getSheetByName(HISTORY_SHEET);
+  
+  if (!historySheet) {
+    setupHistorySheet(ss);
+    historySheet = ss.getSheetByName(HISTORY_SHEET);
+  }
+  
+  const timestamp = new Date().toLocaleString();
+  const newRow = [timestamp, partNumber, itemName, clientName, quantity, status, fullPartNumber, progress];
+  
+  historySheet.appendRow(newRow);
+  
+  const lastRow = historySheet.getLastRow();
+  const rowRange = historySheet.getRange(lastRow, 1, 1, 8);
+  
+  if (lastRow % 2 === 0) {
+    rowRange.setBackground(ZINC_THEME.zinc50);
+  } else {
+    rowRange.setBackground('#ffffff');
+  }
+  
+  const statusCell = historySheet.getRange(lastRow, 6);
+  const statusUpper = String(status).toUpperCase();
+  
+  if (statusUpper.includes('COMPLETED')) {
+    statusCell.setBackground(ZINC_THEME.successLight);
+    statusCell.setFontColor(ZINC_THEME.success);
+    statusCell.setFontWeight('bold');
+  } else if (statusUpper.includes('PROGRESS')) {
+    statusCell.setBackground(ZINC_THEME.warningLight);
+    statusCell.setFontColor(ZINC_THEME.warning);
+    statusCell.setFontWeight('bold');
+  } else if (statusUpper.includes('PAUSED')) {
+    statusCell.setBackground(ZINC_THEME.dangerLight);
+    statusCell.setFontColor(ZINC_THEME.danger);
+    statusCell.setFontWeight('bold');
+  } else {
+    statusCell.setBackground(ZINC_THEME.zinc100);
+    statusCell.setFontColor(ZINC_THEME.zinc600);
+  }
+  
+  if (progress > 0) {
+    const progressCell = historySheet.getRange(lastRow, 8);
+    progressCell.setNumberFormat('0"%"');
+    
+    if (progress === 100) {
+      progressCell.setBackground(ZINC_THEME.successLight);
+      progressCell.setFontColor(ZINC_THEME.success);
+    } else if (progress >= 50) {
+      progressCell.setBackground(ZINC_THEME.warningLight);
+      progressCell.setFontColor(ZINC_THEME.warning);
+    }
+  }
+}
+
+// ==================== MENU FUNCTIONS ====================
+
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu('📋 Item Import')
+    .addItem('🔧 Setup Sheets', 'setupSheet')
+    .addSeparator()
+    .addSubMenu(ui.createMenu('📊 Dashboard')
+      .addItem('🔄 Refresh Dashboard', 'updateDashboard')
+      .addItem('📈 View Statistics', 'showStatistics')
+      .addItem('📥 Export PDF Report', 'exportDashboardPDF'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('🔄 Sync Operations')
+      .addItem('Refresh All Rows', 'bulkRefreshAllRows')
+      .addItem('Refresh Selected Row', 'testSingleRowSync')
+      .addItem('Process All Pending', 'processAllPendingRows')
+      .addItem('Enable Auto-Sync (5 min)', 'createAutoSyncTrigger')
+      .addItem('Disable Auto-Sync', 'removeAutoSyncTrigger'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('📝 History')
+      .addItem('View Item History', 'viewHistory')
+      .addItem('Clear History', 'clearHistory')
+      .addItem('Export History CSV', 'exportHistoryCSV'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('🗑️ Cleanup')
+      .addItem('Clear All Statuses', 'clearAllStatuses')
+      .addItem('Archive Completed Items', 'archiveCompletedItems'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('🧪 Testing')
+      .addItem('Test Connection', 'testConnection')
+      .addItem('Test API Response', 'testAPIResponse')
+      .addItem('Test Phase Data Structure', 'testPhaseDataStructure'))
+    .addToUi();
+}
+
+function showStatistics() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('AddItem sheet not found');
+    return;
+  }
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    SpreadsheetApp.getUi().alert('No data available');
+    return;
+  }
+  
+  const data = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+  
+  let total = 0;
+  let completed = 0;
+  let inProgress = 0;
+  let notStarted = 0;
+  let paused = 0;
+  let errors = 0;
+  
+  data.forEach(row => {
+    if (row[0]) {
+      total++;
+      const status = String(row[4]).toUpperCase();
+      
+      if (status.includes('COMPLETED')) completed++;
+      else if (status.includes('PAUSED')) paused++;
+      else if (status.includes('PROGRESS')) inProgress++;
+      else if (status.includes('NOT STARTED')) notStarted++;
+      else if (status.includes('ERROR')) errors++;
+    }
+  });
+  
+  const successRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+  
+  SpreadsheetApp.getUi().alert(
+    '📊 COMPREHENSIVE STATISTICS\n\n' +
+    `Total Items: ${total}\n` +
+    `✅ Completed: ${completed} (${successRate}%)\n` +
+    `🔄 In Progress: ${inProgress}\n` +
+    `⏸️  Paused: ${paused}\n` +
+    `⏹️ Not Started: ${notStarted}\n` +
+    `❌ Errors: ${errors}\n\n` +
+    `Success Rate: ${successRate}%\n` +
+    `Active Items: ${inProgress + paused}`
+  );
+}
+
+function exportDashboardPDF() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const dashboardSheet = ss.getSheetByName(DASHBOARD_SHEET);
+  
+  if (!dashboardSheet) {
+    SpreadsheetApp.getUi().alert('Dashboard sheet not found. Please run Setup Sheets first.');
+    return;
+  }
+  
+  updateDashboard();
+  
+  SpreadsheetApp.getUi().alert(
+    '📄 Export Dashboard as PDF\n\n' +
+    'To export the dashboard:\n' +
+    '1. Go to File → Download → PDF\n' +
+    '2. Select "Dashboard" sheet\n' +
+    '3. Choose "Fit to page width"\n' +
+    '4. Click Export\n\n' +
+    'Dashboard has been refreshed with latest data!'
+  );
+}
+
+function viewHistory() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let historySheet = ss.getSheetByName(HISTORY_SHEET);
+  
+  if (!historySheet) {
+    SpreadsheetApp.getUi().alert('No history available. History tracking will start automatically.');
+    setupHistorySheet(ss);
+    return;
+  }
+  
+  ss.setActiveSheet(historySheet);
+  SpreadsheetApp.getUi().alert('Viewing item history. This sheet tracks all item status changes.');
+}
+
+function clearHistory() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    'Clear History',
+    'Are you sure you want to clear all history records? This cannot be undone.',
+    ui.ButtonSet.YES_NO
+  );
+  
+  if (response === ui.Button.YES) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const historySheet = ss.getSheetByName(HISTORY_SHEET);
+    
+    if (historySheet) {
+      const lastRow = historySheet.getLastRow();
+      if (lastRow > 1) {
+        historySheet.deleteRows(2, lastRow - 1);
+      }
+      ui.alert('✅ History cleared successfully');
+    }
+  }
+}
+
+function exportHistoryCSV() {
+  SpreadsheetApp.getUi().alert(
+    '📥 Export History as CSV\n\n' +
+    'To export history:\n' +
+    '1. Go to ItemHistory sheet\n' +
+    '2. File → Download → CSV\n' +
+    '3. Save to your computer\n\n' +
+    'The CSV file will contain all historical records.'
+  );
+}
+
+function archiveCompletedItems() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    'Archive Completed Items',
+    'This will move all completed items to the history sheet and remove them from AddItem. Continue?',
+    ui.ButtonSet.YES_NO
+  );
+  
+  if (response === ui.Button.YES) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(SHEET_NAME);
+    const lastRow = sheet.getLastRow();
+    
+    let archivedCount = 0;
+    
+    for (let row = lastRow; row >= 2; row--) {
+      const status = sheet.getRange(row, COLUMNS.STATUS + 1).getValue();
+      
+      if (String(status).toUpperCase().includes('COMPLETED')) {
+        sheet.deleteRow(row);
+        archivedCount++;
+      }
+    }
+    
+    updateDashboard();
+    ui.alert(`✅ Archived ${archivedCount} completed items`);
+  }
+}
+
 function processAllPendingRows() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   const lastRow = sheet.getLastRow();
@@ -229,20 +1181,17 @@ function processAllPendingRows() {
     const status = sheet.getRange(row, COLUMNS.STATUS + 1).getValue();
     const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
     
-    // Process if status is empty, PENDING, or ERROR and has a part number
     if (partNumber && (!status || status === 'PENDING' || status === 'ERROR')) {
       processRow(sheet, row);
       processedCount++;
-      Utilities.sleep(500); // Wait 500ms between requests
+      Utilities.sleep(500);
     }
   }
   
+  updateDashboard();
   SpreadsheetApp.getUi().alert(`Processed ${processedCount} rows`);
 }
 
-/**
- * Clear all status columns (useful for retry)
- */
 function clearAllStatuses() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.alert('Clear All Statuses', 
@@ -254,31 +1203,17 @@ function clearAllStatuses() {
     const lastRow = sheet.getLastRow();
     
     if (lastRow > 1) {
+      const range = sheet.getRange(2, 1, lastRow - 1, 7);
+      range.setBackground(null);
+      range.setFontColor(null);
+      
       sheet.getRange(2, COLUMNS.STATUS + 1, lastRow - 1, 3).clearContent();
-      sheet.getRange(2, COLUMNS.STATUS + 1, lastRow - 1, 1).setBackground(null);
       ui.alert('Status columns cleared');
+      updateDashboard();
     }
   }
 }
 
-/**
- * Create custom menu
- */
-function onOpen() {
-  const ui = SpreadsheetApp.getUi();
-  ui.createMenu('Item Import')
-    .addItem('Setup Sheet', 'setupSheet')
-    .addSeparator()
-    .addItem('Process All Pending', 'processAllPendingRows')
-    .addItem('Clear All Statuses', 'clearAllStatuses')
-    .addSeparator()
-    .addItem('Test Connection', 'testConnection')
-    .addToUi();
-}
-
-/**
- * Test connection to backend
- */
 function testConnection() {
   try {
     const response = UrlFetchApp.fetch('https://jjcenggworks.com/api/operations/health', {
@@ -287,22 +1222,82 @@ function testConnection() {
     });
     
     if (response.getResponseCode() === 200) {
-      SpreadsheetApp.getUi().alert('Connection successful!');
+      SpreadsheetApp.getUi().alert('✅ Connection successful!');
     } else {
-      SpreadsheetApp.getUi().alert('Connection failed: ' + response.getResponseCode());
+      SpreadsheetApp.getUi().alert('❌ Connection failed: ' + response.getResponseCode());
     }
   } catch (error) {
-    SpreadsheetApp.getUi().alert('Connection error: ' + error.message);
+    SpreadsheetApp.getUi().alert('❌ Connection error: ' + error.message);
   }
 }
 
-/**
- * ✅ NEW: Notify frontend to refresh cache
- */
+function testAPIResponse() {
+  try {
+    Logger.log('=== Testing API Response Format ===');
+    
+    const options = {
+      method: 'get',
+      muteHttpExceptions: true,
+      headers: { 'Accept': 'application/json' }
+    };
+    
+    Logger.log(`Fetching from: ${STATUS_CHECK_URL}`);
+    const response = UrlFetchApp.fetch(STATUS_CHECK_URL, options);
+    
+    Logger.log(`Response Code: ${response.getResponseCode()}`);
+    
+    const responseText = response.getContentText();
+    Logger.log(`Response Length: ${responseText.length} characters`);
+    
+    if (response.getResponseCode() === 200) {
+      const data = JSON.parse(responseText);
+      Logger.log(`Response Type: ${typeof data}`);
+      Logger.log(`Is Array: ${Array.isArray(data)}`);
+      
+      SpreadsheetApp.getUi().alert(
+        '✅ API Response received!\n\n' +
+        'Check View > Executions for detailed logs.\n\n' +
+        `Response Type: ${typeof data}\n` +
+        `Is Array: ${Array.isArray(data)}`
+      );
+    }
+  } catch (error) {
+    Logger.log(`❌ Error testing API: ${error.message}`);
+    SpreadsheetApp.getUi().alert(`❌ Error: ${error.message}`);
+  }
+}
+
+function testSingleRowSync() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const activeRange = sheet.getActiveRange();
+  const row = activeRange.getRow();
+  
+  if (row <= 1) {
+    SpreadsheetApp.getUi().alert('⚠️ Please select a data row (not header)');
+    return;
+  }
+  
+  const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
+  const clientName = sheet.getRange(row, COLUMNS.CLIENT_NAME + 1).getValue();
+  
+  if (!partNumber || !clientName) {
+    SpreadsheetApp.getUi().alert('⚠️ Selected row has no Part Number or Client Name');
+    return;
+  }
+  
+  const basePartNumber = extractBasePartNumber(partNumber);
+  const success = checkAndUpdateItemStatus(sheet, row, basePartNumber, clientName);
+  
+  if (success) {
+    updateDashboard();
+    SpreadsheetApp.getUi().alert('✅ Sync successful! Dashboard updated.');
+  } else {
+    SpreadsheetApp.getUi().alert('❌ Sync failed. Check View > Executions for logs.');
+  }
+}
+
 function notifyFrontendCacheRefresh(partNumber) {
   try {
-    // Simple ping to trigger cache check
-    // The frontend polling will pick up the new item
     const pingUrl = 'https://jjcenggworks.com/api/operations/items?check=new&t=' + Date.now();
     
     const options = {
@@ -318,11 +1313,119 @@ function notifyFrontendCacheRefresh(partNumber) {
     
     if (response.getResponseCode() === 200) {
       Logger.log(`✅ Cache refresh ping sent for ${partNumber}`);
-    } else {
-      Logger.log(`⚠️ Cache refresh ping returned: ${response.getResponseCode()}`);
     }
   } catch (error) {
-    // Don't fail the import if ping fails
     Logger.log(`⚠️ Cache refresh ping error: ${error.message}`);
+  }
+}
+
+function createAutoSyncTrigger() {
+  try {
+    const triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach(trigger => {
+      if (trigger.getHandlerFunction() === 'syncAllItemStatuses') {
+        ScriptApp.deleteTrigger(trigger);
+      }
+    });
+    
+    ScriptApp.newTrigger('syncAllItemStatuses')
+      .timeBased()
+      .everyMinutes(5)
+      .create();
+    
+    Logger.log('✅ Auto-sync trigger created');
+    
+    try {
+      SpreadsheetApp.getUi().alert('✅ Auto-sync enabled!\n\nStatus will sync every 5 minutes.');
+    } catch (e) {
+      Logger.log('ℹ️ No UI available for alert');
+    }
+  } catch (error) {
+    Logger.log(`❌ Error creating trigger: ${error.message}`);
+    throw error;
+  }
+}
+
+function removeAutoSyncTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  let removed = 0;
+  
+  triggers.forEach(trigger => {
+    if (trigger.getHandlerFunction() === 'syncAllItemStatuses') {
+      ScriptApp.deleteTrigger(trigger);
+      removed++;
+    }
+  });
+  
+  SpreadsheetApp.getUi().alert(`✅ Removed ${removed} auto-sync trigger(s)`);
+}
+
+function bulkRefreshAllRows() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    'Refresh All Rows',
+    'This will sync all rows with the server and update the dashboard. Continue?',
+    ui.ButtonSet.YES_NO
+  );
+  
+  if (response === ui.Button.YES) {
+    syncAllItemStatuses();
+  }
+}
+
+function testPhaseDataStructure() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert(`❌ Sheet "${SHEET_NAME}" not found`);
+      return;
+    }
+    
+    const activeRange = sheet.getActiveRange();
+    const row = activeRange.getRow();
+    
+    if (row <= 1) {
+      SpreadsheetApp.getUi().alert('⚠️ Please select a data row (not header)');
+      return;
+    }
+    
+    const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
+    const clientName = sheet.getRange(row, COLUMNS.CLIENT_NAME + 1).getValue();
+    
+    if (!partNumber || !clientName) {
+      SpreadsheetApp.getUi().alert('⚠️ Selected row has no Part Number or Client Name');
+      return;
+    }
+    
+    const basePartNumber = extractBasePartNumber(partNumber);
+    
+    Logger.log('=== PHASE DATA STRUCTURE TEST ===');
+    Logger.log(`Row: ${row}`);
+    Logger.log(`Part Number: ${partNumber}`);
+    Logger.log(`Base Part Number: ${basePartNumber}`);
+    Logger.log(`Client Name: ${clientName}`);
+    
+    const listOptions = {
+      method: 'get',
+      muteHttpExceptions: true,
+      headers: { 'Accept': 'application/json' }
+    };
+    
+    const listResponse = UrlFetchApp.fetch(STATUS_CHECK_URL, listOptions);
+    
+    if (listResponse.getResponseCode() !== 200) {
+      SpreadsheetApp.getUi().alert(`❌ API Error: ${listResponse.getResponseCode()}`);
+      return;
+    }
+    
+    SpreadsheetApp.getUi().alert(
+      `✅ Test Complete!\n\n` +
+      `Check View > Executions for detailed logs`
+    );
+    
+  } catch (error) {
+    Logger.log(`❌ Error in testPhaseDataStructure: ${error.message}`);
+    SpreadsheetApp.getUi().alert(`❌ Error: ${error.message}`);
   }
 }

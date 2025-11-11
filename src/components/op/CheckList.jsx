@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Clock,
   User,
@@ -27,6 +27,7 @@ import {
   AddSubphaseModal,
   BulkEditModal
 } from "./EditItems"
+import { pollingManager } from "../../utils/api/websocket/polling-manager.jsx"
 
 function Checklist({
   items,
@@ -47,7 +48,9 @@ function Checklist({
   formatTime,
   loadData,
 }) {
-  const { isDarkMode } = useAuth() // Get dark mode status from AuthContext
+  const { isDarkMode } = useAuth()
+  const pollingSubscriptionsRef = useRef([])
+  const isMountedRef = useRef(true)
 
   const [clients, setClients] = useState([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -55,6 +58,7 @@ function Checklist({
   const [filterPriority, setFilterPriority] = useState("")
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState("name-asc")
+  const [filterStatus, setFilterStatus] = useState("")
   const [transferModalOpen, setTransferModalOpen] = useState(false)
   const [selectedSubphase, setSelectedSubphase] = useState(null)
   const [selectedItem, setSelectedItem] = useState(null)
@@ -84,6 +88,20 @@ function Checklist({
   const [selectedSubphaseForEdit, setSelectedSubphaseForEdit] = useState(null)
   const [selectedItemsForBulk, setSelectedItemsForBulk] = useState([])
   const [itemCheckboxes, setItemCheckboxes] = useState({})
+
+    const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(20)
+  const [totalPages, setTotalPages] = useState(1)
+  const [isFiltering, setIsFiltering] = useState(false)
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    per_page: 20,
+    total_items: 0,
+    total_pages: 0,
+    has_next: false,
+    has_previous: false
+  })
+
 
   // Optimistic update helpers - update local state without full reload
   const updateItemInState = (partNumber, updates) => {
@@ -128,24 +146,112 @@ function Checklist({
     )
   }
 
-  // Auto-stop item when it reaches 100%
-useEffect(() => {
-  items.forEach((item) => {
-    // ADD SAFETY CHECK HERE
-    if (!item || !item.phases) return;
-    
-    if (item.phases) {
-      item.phases.forEach((phase) => {
-        const phaseProgress = calculatePhaseProgress(phase)
-        // Auto-stop phase when all subphases are complete
-        if (phaseProgress === 100 && phase.start_time && !phase.end_time && !phase.pause_time) {
-          // Use silent completion (no reload) and auto-start next phase
-          handleStopPhase(item.part_number, phase.id)
-        }
-      })
+  useEffect(() => {
+    isMountedRef.current = true
+
+    // Setup polling listeners
+    setupPollingListeners()
+
+    return () => {
+      isMountedRef.current = false
+      // Cleanup polling subscriptions
+      pollingSubscriptionsRef.current.forEach(unsubscribe => unsubscribe())
+      pollingSubscriptionsRef.current = []
     }
-  })
-}, [items])
+  }, [])
+
+  const setupPollingListeners = () => {
+    console.log('📡 Setting up Checklist polling listeners...')
+
+    // Subscribe to all operations refresh events
+    const unsubRefresh = pollingManager.subscribeToUpdates('operations:refresh', (event) => {
+      console.log('🔄 Checklist refresh event:', event.type)
+      handleOperationsRefresh(event)
+    })
+
+    // Subscribe to specific item events
+    const unsubItemCreated = pollingManager.subscribeToUpdates('operations:item_created', (data) => {
+      console.log('✨ New item created:', data.part_number)
+      showNotification(`New item created: ${data.part_number}`)
+      loadData() // Reload all data
+    })
+
+    const unsubItemUpdated = pollingManager.subscribeToUpdates('operations:item_updated', (data) => {
+      console.log('🔄 Item updated:', data.part_number)
+      loadItemDetails(data.part_number) // Reload specific item
+    })
+
+    const unsubItemDeleted = pollingManager.subscribeToUpdates('operations:item_deleted', (data) => {
+      console.log('🗑️ Item deleted:', data.part_number)
+      showNotification(`Item deleted: ${data.part_number}`)
+
+      // Optimistically remove from UI
+      if (isMountedRef.current) {
+        setItems(prevItems => prevItems.filter(item => item.part_number !== data.part_number))
+      }
+    })
+
+    const unsubPhaseUpdated = pollingManager.subscribeToUpdates('operations:phase_updated', (data) => {
+      console.log('🔄 Phase updated:', data.phase_id)
+      if (data.part_number) {
+        loadItemDetails(data.part_number)
+      }
+    })
+
+    const unsubSubphaseCompleted = pollingManager.subscribeToUpdates('operations:subphase_completed', (data) => {
+      console.log('✅ Subphase completed:', data.subphase_id)
+      if (data.part_number) {
+        loadItemDetails(data.part_number)
+      }
+    })
+
+    const unsubEmployeeAssigned = pollingManager.subscribeToUpdates('operations:employee_assigned', (data) => {
+      console.log('👤 Employee assigned:', data.employee_barcode)
+      if (data.part_number) {
+        loadItemDetails(data.part_number)
+      }
+    })
+
+    const unsubGoogleSheets = pollingManager.subscribeToUpdates('operations:google_sheets_import', (data) => {
+      console.log('📊 Google Sheets import:', data.part_number)
+      showNotification(`New item imported: ${data.part_number}`)
+      loadData() // Reload all data
+    })
+
+    // Store unsubscribe functions
+    pollingSubscriptionsRef.current = [
+      unsubRefresh,
+      unsubItemCreated,
+      unsubItemUpdated,
+      unsubItemDeleted,
+      unsubPhaseUpdated,
+      unsubSubphaseCompleted,
+      unsubEmployeeAssigned,
+      unsubGoogleSheets
+    ]
+
+    // Join operations room
+    pollingManager.joinRoom('operations')
+  }
+
+  // Auto-stop item when it reaches 100%
+  useEffect(() => {
+    items.forEach((item) => {
+      // ADD SAFETY CHECK HERE
+      if (!item || !item.phases) return;
+
+      if (item.phases) {
+        item.phases.forEach((phase) => {
+          const phaseProgress = calculatePhaseProgress(phase)
+          // Auto-stop phase when all subphases are complete
+          if (phaseProgress === 100 && phase.start_time && !phase.end_time && !phase.pause_time) {
+            // Use silent completion (no reload) and auto-start next phase
+            handleStopPhase(item.part_number, phase.id)
+          }
+        })
+      }
+    })
+  }, [items])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -194,19 +300,19 @@ useEffect(() => {
     })
   }, [items])
 
- // Load items for selected client
-useEffect(() => {
-  if (newClient.trim() && transferModalOpen) {
-    const basePartNumber = getBasePartNumber(selectedItem?.part_number);
-    const filtered = items.filter((item) => {
-      const itemBasePartNumber = getBasePartNumber(item.part_number);
-      return item.client_name === newClient.trim() && itemBasePartNumber === basePartNumber;
-    });
-    setClientItems(filtered)
-  } else {
-    setClientItems([])
-  }
-}, [newClient, items, selectedItem, transferModalOpen])
+  // Load items for selected client
+  useEffect(() => {
+    if (newClient.trim() && transferModalOpen) {
+      const basePartNumber = getBasePartNumber(selectedItem?.part_number);
+      const filtered = items.filter((item) => {
+        const itemBasePartNumber = getBasePartNumber(item.part_number);
+        return item.client_name === newClient.trim() && itemBasePartNumber === basePartNumber;
+      });
+      setClientItems(filtered)
+    } else {
+      setClientItems([])
+    }
+  }, [newClient, items, selectedItem, transferModalOpen])
 
   // Filter clients for dropdown
   useEffect(() => {
@@ -413,6 +519,81 @@ useEffect(() => {
       await loadData() // Reload on error
     }
   }
+
+  const handleOperationsRefresh = async (event) => {
+    if (!isMountedRef.current) return
+
+    const { type, data } = event
+
+    switch (type) {
+      case 'item_created':
+      case 'item_deleted':
+      case 'google_sheets_import':
+        // Full reload for these events
+        await loadData()
+        break
+
+      case 'item_updated':
+      case 'phase_created':
+      case 'phase_updated':
+      case 'phase_status':
+      case 'subphase_completed':
+      case 'employee_assigned':
+        // Reload specific item
+        if (data.part_number) {
+          await loadItemDetails(data.part_number)
+        }
+        break
+
+      default:
+        console.log('Unknown refresh type:', type)
+    }
+  }
+
+  const loadItemDetails = async (partNumber) => {
+    if (!isMountedRef.current) return
+
+    try {
+      console.log('🔄 Loading details for item:', partNumber)
+      const fullItem = await apiService.operations.getItem(partNumber)
+
+      if (isMountedRef.current) {
+        setItems(prevItems => {
+          return prevItems.map(item =>
+            item.part_number === partNumber ? fullItem : item
+          )
+        })
+      }
+    } catch (error) {
+      console.error('❌ Failed to load item details:', error)
+    }
+  }
+
+  const showNotification = (message, type = 'info') => {
+    console.log('📢 Notification:', message)
+
+    // Show browser notification if permitted
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('Operations Update', {
+        body: message,
+        icon: '/icons/icon-192.jpg',
+        tag: 'operations-update',
+        badge: '/icons/icon-192.jpg'
+      })
+    }
+
+    // You can also integrate a toast library here
+    const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : '📢'
+    console.log(`${emoji} ${message}`)
+  }
+
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(permission => {
+        console.log('Notification permission:', permission)
+      })
+    }
+  }, [])
 
   const handleUpdatePriority = async (partNumber, newPriority) => {
     try {
@@ -650,70 +831,117 @@ useEffect(() => {
     }
   }
 
-// Filter items based on search and filters
-const filteredItems = items.filter((item) => {
-  // Safety check for item structure - ADD part_number check here
-  if (!item || !item.part_number) return false  // ← Changed from just "if (!item)"
+  const applyFilters = async (page = 1) => {
+  setIsFiltering(true)
+  try {
+    // Build filter params
+    const params = {
+      page,
+      limit: itemsPerPage
+    }
 
-  const matchesSearch =
-    !searchTerm ||
-    item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.part_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    // Map dashboard filters to API filters - FIX status mapping
+    if (filterStatus && filterStatus !== 'all') {
+      if (filterStatus === 'completed') {
+        params.status = 'completed'
+      } else if (filterStatus === 'in-progress') {
+        params.status = 'in_progress'
+      } else if (filterStatus === 'not-started') {
+        params.status = 'not_started'
+      }
+    }
 
-  const matchesClient = !filterClient || item.client_name === filterClient
-  const matchesPriority = !filterPriority || item.priority === filterPriority
+    if (filterPriority && filterPriority !== 'all') {
+      params.priority = filterPriority
+    }
 
-  return matchesSearch && matchesClient && matchesPriority
+    if (filterClient && filterClient !== 'all') {
+      params.client_name = filterClient
+    }
+
+    if (searchTerm && searchTerm.trim()) {
+      params.search = searchTerm.trim()
+    }
+
+    const response = await apiService.operations.getItemsPaginated(page, itemsPerPage, params)
+
+    setItems(response.items || [])
+    setPagination(response.pagination || {
+      current_page: page,
+      per_page: itemsPerPage,
+      total_items: 0,
+      total_pages: 0,
+      has_next: false,
+      has_previous: false
+    })
+  } catch (error) {
+    console.error('Failed to apply filters:', error)
+    setItems([])
+  } finally {
+    setIsFiltering(false)
+  }
+}
+
+  useEffect(() => {
+    applyFilters(1) // Reset to page 1 when filters change
+  }, [filterStatus, filterPriority, filterClient, searchTerm])
+
+  const completedItems = items.filter((item) => {
+  if (!item) return false
+  try {
+    return calculateItemProgress(item) === 100
+  } catch (err) {
+    console.warn('Error calculating progress for item:', item?.part_number, err)
+    return false
+  }
 })
 
-  // Separate completed and in-progress items with safety checks
-  const completedItems = filteredItems.filter((item) => {
-    try {
-      return calculateItemProgress(item) === 100
-    } catch (err) {
-      console.warn('Error calculating progress for item:', item?.part_number, err)
-      return false
-    }
-  })
-  const inProgressItems = filteredItems.filter((item) => {
-    try {
-      return calculateItemProgress(item) < 100
-    } catch (err) {
-      console.warn('Error calculating progress for item:', item?.part_number, err)
-      return true // Include items with errors in "in progress"
-    }
-  })
+const inProgressItems = items.filter((item) => {
+  if (!item) return false
+  try {
+    return calculateItemProgress(item) < 100
+  } catch (err) {
+    console.warn('Error calculating progress for item:', item?.part_number, err)
+    return true
+  }
+})
 
-  // Sort in-progress items
+  // Sort in-progress items (keep existing sorting logic)
   const sortedInProgressItems = [...inProgressItems].sort((a, b) => {
-    // Apply custom sort if selected
-    if (sortBy === "name-asc") {
-      return (a.name || "").localeCompare(b.name || "")
-    }
-    if (sortBy === "name-desc") {
-      return (b.name || "").localeCompare(a.name || "")
-    }
-    if (sortBy === "date-newest") {
-      return new Date(b.created_at || 0) - new Date(a.created_at || 0)
-    }
-    if (sortBy === "date-oldest") {
-      return new Date(a.created_at || 0) - new Date(b.created_at || 0)
-    }
+    if (sortBy === "name-asc") return (a.name || "").localeCompare(b.name || "")
+    if (sortBy === "name-desc") return (b.name || "").localeCompare(a.name || "")
+    if (sortBy === "date-newest") return new Date(b.created_at || 0) - new Date(a.created_at || 0)
+    if (sortBy === "date-oldest") return new Date(a.created_at || 0) - new Date(b.created_at || 0)
 
-    // Default: sort by priority
     const priorityOrder = { High: 0, Medium: 1, Low: 2 }
-    const aPriority = a.priority || "Medium"
-    const bPriority = b.priority || "Medium"
-    return priorityOrder[aPriority] - priorityOrder[bPriority]
+    return priorityOrder[a.priority || "Medium"] - priorityOrder[b.priority || "Medium"]
   })
+
+const handlePageChange = (newPage) => {
+  if (newPage >= 1 && newPage <= pagination.total_pages) {
+    setCurrentPage(newPage) // ADD THIS LINE
+    applyFilters(newPage)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+  const handlePreviousPage = () => {
+    if (pagination.has_previous) {
+      handlePageChange(currentPage - 1)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (pagination.has_next) {
+      handlePageChange(currentPage + 1)
+    }
+  }
 
   // Get unique clients for filter
   const uniqueClients = [...new Set(
-  items
-    .filter(item => item && item.client_name)
-    .map((item) => item.client_name)
-)]
+    items
+      .filter(item => item && item.client_name)
+      .map((item) => item.client_name)
+  )]
 
   // Helper function to check if previous subphase is completed
   const isPreviousSubphaseCompleted = (item, phase, currentSubphaseIndex) => {
@@ -899,12 +1127,12 @@ const filteredItems = items.filter((item) => {
   }
 
   // Helper function to extract base part number (remove batch suffix)
-const getBasePartNumber = (partNumber) => {
-  if (!partNumber) return '';
-  // Extract only the numeric part before "-BATCH-"
-  const match = partNumber.match(/^(\d+)/);
-  return match ? match[1] : partNumber;
-};
+  const getBasePartNumber = (partNumber) => {
+    if (!partNumber) return '';
+    // Extract only the numeric part before "-BATCH-"
+    const match = partNumber.match(/^(\d+)/);
+    return match ? match[1] : partNumber;
+  };
 
   // Edit Component
   // Edit Item Handler - OPTIMISTIC UPDATE
@@ -1279,11 +1507,14 @@ const getBasePartNumber = (partNumber) => {
   const getCheckedItemsCount = () => {
     return Object.values(itemCheckboxes).filter(Boolean).length
   }
+
   return (
     <div>
-      <h2 className={`text-2xl font-bold mb-6 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-        Progress Checklist
-      </h2>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <h2 className={`text-2xl font-bold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+          Progress Checklist
+        </h2>
+      </div>
 
       {/* Search and Filter Bar */}
       <div
@@ -1298,7 +1529,10 @@ const getBasePartNumber = (partNumber) => {
               type="text"
               placeholder="Search by name, part number, or client..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value)
+                setCurrentPage(1) // ADD THIS LINE
+              }}
               className={`w-full pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all ${isDarkMode
                 ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                 : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
@@ -1313,13 +1547,15 @@ const getBasePartNumber = (partNumber) => {
           >
             <Filter size={18} />
             <span className="hidden sm:inline">Filters</span>
-            {(filterClient || filterPriority || sortBy) && `(${[filterClient, filterPriority, sortBy].filter(Boolean).length})`}
+            {(filterClient || filterPriority || filterStatus || sortBy) &&
+              `(${[filterClient, filterPriority, filterStatus, sortBy].filter(Boolean).length})`
+            }
           </button>
         </div>
 
         {/* Filter Options */}
         {showFilters && (
-          <div className="mt-3 pt-3 border-t border-gray-300/20 dark:border-gray-700/20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="mt-3 pt-3 border-t border-gray-300/20 dark:border-gray-700/20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Filter by Client
@@ -1360,33 +1596,56 @@ const getBasePartNumber = (partNumber) => {
               </select>
             </div>
 
+            {/* NEW: Status Filter */}
             <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Sort by
-                  </label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all ${isDarkMode
-                        ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                        : "bg-white/50 border border-gray-300/30 text-gray-800"
-                      }`}
-                  >
-                    <option value="">Default</option>
-                    <option value="name-asc">Name (A-Z)</option>
-                    <option value="name-desc">Name (Z-A)</option>
-                    <option value="date-newest">Date Added (Newest)</option>
-                    <option value="date-oldest">Date Added (Oldest)</option>
-                  </select>
-                </div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Filter by Status
+              </label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all ${isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800"
+                  }`}
+              >
+                <option value="">All Statuses</option>
+                <option value="not-started">Not Started</option>
+                <option value="in-progress">In Progress</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
 
-            {(filterClient || filterPriority || sortBy) && (
-              <div className="sm:col-span-2 lg:col-span-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Sort by
+              </label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all ${isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800"
+                  }`}
+              >
+                <option value="">Default</option>
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+                <option value="date-newest">Date Added (Newest)</option>
+                <option value="date-oldest">Date Added (Oldest)</option>
+              </select>
+            </div>
+
+            {/* UPDATE: Clear filters to include status */}
+            {(filterClient || filterPriority || filterStatus || sortBy) && (
+              <div className="sm:col-span-2 lg:col-span-4">
                 <button
                   onClick={() => {
                     setFilterClient("")
                     setFilterPriority("")
+                    setFilterStatus("")
                     setSortBy("")
+                    setCurrentPage(1)
                   }}
                   className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                 >
@@ -1397,6 +1656,15 @@ const getBasePartNumber = (partNumber) => {
           </div>
         )}
       </div>
+      {isFiltering && (
+        <div className="text-center py-8">
+          <div className={`animate-spin rounded-full h-8 w-8 border-b-2 mx-auto ${isDarkMode ? "border-slate-400" : "border-slate-600"
+            }`}></div>
+          <p className={`mt-4 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+            Filtering items...
+          </p>
+        </div>
+      )}
 
       {/* Bulk Edit Section */}
       {getCheckedItemsCount() > 0 && (
@@ -1767,7 +2035,7 @@ const getBasePartNumber = (partNumber) => {
         </div>
       )}
 
-      {filteredItems.length > 0 ? (
+      {!isFiltering && items.length > 0 ? (
         <div className="space-y-8">
           {/* In Progress Items */}
           {inProgressItems.length > 0 && (
@@ -2792,9 +3060,13 @@ const getBasePartNumber = (partNumber) => {
         </div>
       ) : (
         <p className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-          {searchTerm || filterClient || filterPriority
-            ? "No items match your search or filters."
-            : 'No items yet. Go to "Add Items" to create your first item.'}
+          {!isFiltering && items.length === 0 ? (
+  <p className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+    {searchTerm || filterClient || filterPriority || filterStatus
+      ? "No items match your search or filters."
+      : 'No items yet. Go to "Add Items" to create your first item.'}
+  </p>
+) : null}
         </p>
       )}
 
@@ -2886,6 +3158,119 @@ const getBasePartNumber = (partNumber) => {
           onSave={handleBulkEdit}
         />
       )}
+
+      {/* Pagination Controls */}
+{!isFiltering && pagination.total_pages > 1 && (
+  <div className={`backdrop-blur-md rounded-lg p-4 mt-6 border transition-all shadow-sm ${
+    isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+  }`}>
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+      {/* Page Info */}
+      <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+        Showing {((pagination.current_page - 1) * pagination.per_page) + 1} - {Math.min(pagination.current_page * pagination.per_page, pagination.total_items)} of {pagination.total_items} items
+      </div>
+      
+      {/* Pagination Buttons */}
+      <div className="flex items-center gap-2">
+        {/* First Page */}
+        <button
+          onClick={() => handlePageChange(1)}
+          disabled={!pagination.has_previous}
+          className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+            pagination.has_previous
+              ? isDarkMode
+                ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                : "bg-white/50 hover:bg-white/70 text-gray-700"
+              : "opacity-50 cursor-not-allowed"
+          }`}
+        >
+          ««
+        </button>
+
+        {/* Previous */}
+        <button
+          onClick={handlePreviousPage}
+          disabled={!pagination.has_previous}
+          className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+            pagination.has_previous
+              ? isDarkMode
+                ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                : "bg-white/50 hover:bg-white/70 text-gray-700"
+              : "opacity-50 cursor-not-allowed"
+          }`}
+        >
+          « Previous
+        </button>
+
+        {/* Page Numbers */}
+        <div className="flex gap-1">
+          {(() => {
+            const pages = []
+            const showPages = 5
+            let startPage = Math.max(1, pagination.current_page - Math.floor(showPages / 2))
+            let endPage = Math.min(pagination.total_pages, startPage + showPages - 1)
+
+            if (endPage - startPage < showPages - 1) {
+              startPage = Math.max(1, endPage - showPages + 1)
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+              pages.push(
+                <button
+                  key={i}
+                  onClick={() => handlePageChange(i)}
+                  className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                    pagination.current_page === i
+                      ? isDarkMode ? "bg-slate-600 text-white" : "bg-slate-600 text-white"
+                      : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-200" : "bg-white/50 hover:bg-white/70 text-gray-700"
+                  }`}
+                >
+                  {i}
+                </button>
+              )
+            }
+            return pages
+          })()}
+        </div>
+
+        {/* Next */}
+        <button
+          onClick={handleNextPage}
+          disabled={!pagination.has_next}
+          className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+            pagination.has_next
+              ? isDarkMode
+                ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                : "bg-white/50 hover:bg-white/70 text-gray-700"
+              : "opacity-50 cursor-not-allowed"
+          }`}
+        >
+          Next »
+        </button>
+
+        {/* Last Page */}
+        <button
+          onClick={() => handlePageChange(pagination.total_pages)}
+          disabled={!pagination.has_next}
+          className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+            pagination.has_next
+              ? isDarkMode
+                ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                : "bg-white/50 hover:bg-white/70 text-gray-700"
+              : "opacity-50 cursor-not-allowed"
+          }`}
+        >
+          »»
+        </button>
+      </div>
+
+      {/* Items per page selector */}
+      <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+        Page {pagination.current_page} of {pagination.total_pages}
+      </div>
+    </div>
+  </div>
+)}
     </div>
   )
 }

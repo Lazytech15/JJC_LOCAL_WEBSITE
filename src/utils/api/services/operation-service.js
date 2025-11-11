@@ -6,17 +6,259 @@ import { BaseAPIService } from "../core/base-api.js";
 export class OperationsService extends BaseAPIService {
   // ==================== ITEM METHODS ====================
 
-  /**
-   * Get all items with optional filtering
-   * @param {Object} params - Query parameters (status, search, priority, client_name)
-   * @returns {Promise} Response with items array
-   */
-  async getItems(params = {}) {
-    const queryParams = new URLSearchParams(params).toString();
-    return this.request(
-      `/api/operations/items${queryParams ? `?${queryParams}` : ""}`
-    );
+/**
+ * Get all items with optional filtering and pagination
+ * @param {Object} params - Query parameters
+ * @param {string} [params.status] - Status filter
+ * @param {string} [params.search] - Search term
+ * @param {string} [params.priority] - Priority filter
+ * @param {string} [params.client_name] - Client name filter
+ * @param {number} [params.page=1] - Page number (starts at 1)
+ * @param {number} [params.limit=20] - Items per page (max 100)
+ * @returns {Promise<{items: Array, pagination: Object}>} Response with items array and pagination info
+ */
+async getItems(params = {}) {
+  const queryParams = new URLSearchParams(params).toString();
+  const response = await this.request(
+    `/api/operations/items${queryParams ? `?${queryParams}` : ""}`
+  );
+  
+  // Handle both paginated and non-paginated responses
+  if (response && response.items && response.pagination) {
+    // Paginated response
+    return response;
+  } else if (Array.isArray(response)) {
+    // Legacy non-paginated response (single item query)
+    return {
+      items: response,
+      pagination: {
+        current_page: 1,
+        per_page: response.length,
+        total_items: response.length,
+        total_pages: 1,
+        has_next: false,
+        has_previous: false
+      }
+    };
+  } else {
+    // Unknown response format
+    return {
+      items: [],
+      pagination: {
+        current_page: 1,
+        per_page: 0,
+        total_items: 0,
+        total_pages: 0,
+        has_next: false,
+        has_previous: false
+      }
+    };
   }
+}
+
+/**
+ * Get items with pagination
+ * @param {number} page - Page number (starts at 1)
+ * @param {number} limit - Items per page
+ * @param {Object} filters - Additional filters (status, search, priority, client_name)
+ * @returns {Promise<{items: Array, pagination: Object}>}
+ */
+async getItemsPaginated(page = 1, limit = 20, filters = {}) {
+  return this.getItems({
+    page,
+    limit,
+    ...filters
+  });
+}
+
+/**
+ * Get next page of items
+ * @param {Object} currentPagination - Current pagination object
+ * @param {Object} filters - Current filters
+ * @returns {Promise<{items: Array, pagination: Object}>}
+ */
+async getNextPage(currentPagination, filters = {}) {
+  if (!currentPagination.has_next) {
+    throw new Error('No next page available');
+  }
+  return this.getItemsPaginated(
+    currentPagination.current_page + 1,
+    currentPagination.per_page,
+    filters
+  );
+}
+
+/**
+ * Get previous page of items
+ * @param {Object} currentPagination - Current pagination object
+ * @param {Object} filters - Current filters
+ * @returns {Promise<{items: Array, pagination: Object}>}
+ */
+async getPreviousPage(currentPagination, filters = {}) {
+  if (!currentPagination.has_previous) {
+    throw new Error('No previous page available');
+  }
+  return this.getItemsPaginated(
+    currentPagination.current_page - 1,
+    currentPagination.per_page,
+    filters
+  );
+}
+
+/**
+ * Get all items by fetching all pages
+ * @param {Object} filters - Filters to apply
+ * @param {number} maxPages - Maximum pages to fetch (safety limit)
+ * @returns {Promise<Array>} All items across all pages
+ */
+async getAllItems(filters = {}, maxPages = 50) {
+  let allItems = [];
+  let currentPage = 1;
+  let hasMore = true;
+  
+  while (hasMore && currentPage <= maxPages) {
+    const response = await this.getItemsPaginated(currentPage, 100, filters);
+    allItems = [...allItems, ...response.items];
+    hasMore = response.pagination.has_next;
+    currentPage++;
+  }
+  
+  return allItems;
+}
+
+/**
+ * Search items with pagination
+ * @param {string} searchTerm - Search query
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @returns {Promise<{items: Array, pagination: Object}>}
+ */
+async searchItemsPaginated(searchTerm, page = 1, limit = 20) {
+  return this.getItemsPaginated(page, limit, { search: searchTerm });
+}
+
+/**
+ * Get items by status with pagination
+ * @param {string} status - Status filter
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @returns {Promise<{items: Array, pagination: Object}>}
+ */
+async getItemsByStatusPaginated(status, page = 1, limit = 20) {
+  return this.getItemsPaginated(page, limit, { status });
+}
+
+/**
+ * Get items by client with pagination
+ * @param {string} clientName - Client name
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @returns {Promise<{items: Array, pagination: Object}>}
+ */
+async getItemsByClientPaginated(clientName, page = 1, limit = 20) {
+  return this.getItemsPaginated(page, limit, { client_name: clientName });
+}
+
+/**
+ * Get items by priority with pagination
+ * @param {string} priority - Priority level
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @returns {Promise<{items: Array, pagination: Object}>}
+ */
+async getItemsByPriorityPaginated(priority, page = 1, limit = 20) {
+  if (!["High", "Medium", "Low"].includes(priority)) {
+    throw new Error("priority must be High, Medium, or Low");
+  }
+  return this.getItemsPaginated(page, limit, { priority });
+}
+
+/**
+ * Get items with pagination and sorting
+ * @param {number} page - Page number (starts at 1)
+ * @param {number} limit - Items per page
+ * @param {Object} filters - Filters (status, search, priority, client_name)
+ * @param {string} sortBy - Field to sort by (part_number, name, client_name, priority, status, created_at, overall_progress)
+ * @param {string} sortOrder - Sort direction ('ASC' or 'DESC')
+ * @returns {Promise<{items: Array, pagination: Object, sorting: Object}>}
+ */
+async getItemsPaginatedSorted(page = 1, limit = 20, filters = {}, sortBy = 'created_at', sortOrder = 'DESC') {
+  return this.getItems({
+    page,
+    limit,
+    sort_by: sortBy,
+    sort_order: sortOrder,
+    ...filters
+  });
+}
+
+/**
+ * Get items sorted alphabetically (A-Z)
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @param {Object} filters - Additional filters
+ * @returns {Promise<{items: Array, pagination: Object}>}
+ */
+async getItemsSortedAlphabetically(page = 1, limit = 20, filters = {}) {
+  return this.getItemsPaginatedSorted(page, limit, filters, 'name', 'ASC');
+}
+
+/**
+ * Get items sorted by part number (A-Z)
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @param {Object} filters - Additional filters
+ * @returns {Promise<{items: Array, pagination: Object}>}
+ */
+async getItemsSortedByPartNumber(page = 1, limit = 20, filters = {}) {
+  return this.getItemsPaginatedSorted(page, limit, filters, 'part_number', 'ASC');
+}
+
+/**
+ * Get items sorted by client name (A-Z)
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @param {Object} filters - Additional filters
+ * @returns {Promise<{items: Array, pagination: Object}>}
+ */
+async getItemsSortedByClient(page = 1, limit = 20, filters = {}) {
+  return this.getItemsPaginatedSorted(page, limit, filters, 'client_name', 'ASC');
+}
+
+/**
+ * Get items sorted by priority (High > Medium > Low)
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @param {Object} filters - Additional filters
+ * @returns {Promise<{items: Array, pagination: Object}>}
+ */
+async getItemsSortedByPriority(page = 1, limit = 20, filters = {}) {
+  return this.getItemsPaginatedSorted(page, limit, filters, 'priority', 'ASC');
+}
+
+/**
+ * Get items sorted by progress (0-100%)
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @param {Object} filters - Additional filters
+ * @param {boolean} ascending - If true, sort 0-100%; if false, sort 100-0%
+ * @returns {Promise<{items: Array, pagination: Object}>}
+ */
+async getItemsSortedByProgress(page = 1, limit = 20, filters = {}, ascending = true) {
+  return this.getItemsPaginatedSorted(page, limit, filters, 'overall_progress', ascending ? 'ASC' : 'DESC');
+}
+
+/**
+ * Get items sorted by creation date
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @param {Object} filters - Additional filters
+ * @param {boolean} newestFirst - If true, newest first; if false, oldest first
+ * @returns {Promise<{items: Array, pagination: Object}>}
+ */
+async getItemsSortedByDate(page = 1, limit = 20, filters = {}, newestFirst = true) {
+  return this.getItemsPaginatedSorted(page, limit, filters, 'created_at', newestFirst ? 'DESC' : 'ASC');
+}
 
   /**
    * Get single item by part_number with full details (phases and subphases)
@@ -51,8 +293,6 @@ export class OperationsService extends BaseAPIService {
       body: JSON.stringify(itemData),
     });
 
-    // Invalidate cache after creating
-    this.invalidateAllItemsCache();
 
     return result;
   }
@@ -76,8 +316,6 @@ export class OperationsService extends BaseAPIService {
       }
     );
 
-    // Invalidate cache for this item
-    this.invalidateItemCache(partNumber);
 
     return result;
   }
@@ -93,8 +331,7 @@ export class OperationsService extends BaseAPIService {
       }
     );
 
-    // Invalidate cache after deleting
-    this.invalidateAllItemsCache();
+
 
     return result;
   }
@@ -137,8 +374,6 @@ export class OperationsService extends BaseAPIService {
       body: JSON.stringify(phaseData),
     });
 
-    // Invalidate cache for the item
-    this.invalidateItemCache(phaseData.part_number);
 
     return result;
   }
@@ -152,8 +387,7 @@ export class OperationsService extends BaseAPIService {
       body: JSON.stringify(phaseData),
     });
 
-    // Invalidate all items cache since we don't know which item this phase belongs to
-    this.invalidateAllItemsCache();
+
 
     return result;
   }
@@ -166,8 +400,7 @@ export class OperationsService extends BaseAPIService {
       method: "DELETE",
     });
 
-    // Invalidate all items cache
-    this.invalidateAllItemsCache();
+
 
     return result;
   }
@@ -211,8 +444,6 @@ export class OperationsService extends BaseAPIService {
       body: JSON.stringify(subphaseData),
     });
 
-    // Invalidate cache for the item
-    this.invalidateItemCache(subphaseData.part_number);
 
     return result;
   }
@@ -226,8 +457,7 @@ export class OperationsService extends BaseAPIService {
       body: JSON.stringify(subphaseData),
     });
 
-    // Invalidate all items cache
-    this.invalidateAllItemsCache();
+ 
 
     return result;
   }
@@ -240,8 +470,7 @@ export class OperationsService extends BaseAPIService {
       method: "DELETE",
     });
 
-    // Invalidate all items cache
-    this.invalidateAllItemsCache();
+
 
     return result;
   }
@@ -1019,7 +1248,6 @@ export class OperationsService extends BaseAPIService {
       }),
     });
 
-    this.invalidateAllItemsCache();
     return result;
   }
 
@@ -1032,7 +1260,6 @@ export class OperationsService extends BaseAPIService {
       }),
     });
 
-    this.invalidateAllItemsCache();
     return result;
   }
 
@@ -1045,7 +1272,6 @@ export class OperationsService extends BaseAPIService {
       }),
     });
 
-    this.invalidateItemCache(partNumber);
     return result;
   }
 
@@ -1058,7 +1284,6 @@ export class OperationsService extends BaseAPIService {
       }),
     });
 
-    this.invalidateItemCache(partNumber);
     return result;
   }
 
@@ -1071,7 +1296,6 @@ export class OperationsService extends BaseAPIService {
       }),
     });
 
-    this.invalidateItemCache(partNumber);
     return result;
   }
 
@@ -1084,7 +1308,6 @@ export class OperationsService extends BaseAPIService {
       }),
     });
 
-    this.invalidateItemCache(partNumber);
     return result;
   }
 
@@ -1097,7 +1320,6 @@ export class OperationsService extends BaseAPIService {
       }),
     });
 
-    this.invalidateItemCache(partNumber);
     return result;
   }
 
@@ -1112,86 +1334,8 @@ export class OperationsService extends BaseAPIService {
       }
     );
 
-    this.invalidateAllItemsCache();
     return result;
   }
-
-  // ==================== CACHE MANAGEMENT METHODS ====================
-
-/**
- * Invalidate cache for specific item
- * @param {string} partNumber - Part number to invalidate
- */
-async invalidateItemCache(partNumber) {
-  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-    navigator.serviceWorker.controller.postMessage({
-      type: 'REFRESH_ITEM',
-      partNumber
-    })
-    console.log('🔄 Cache invalidation requested for:', partNumber)
-  }
-}
-/**
- * Invalidate entire items cache
- */
-async invalidateAllItemsCache() {
-  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-    const messageChannel = new MessageChannel()
-
-    return new Promise((resolve) => {
-      messageChannel.port1.onmessage = (event) => {
-        console.log('🔄 Cache invalidation response:', event.data)
-        resolve(event.data.success)
-      }
-
-      navigator.serviceWorker.controller.postMessage(
-        { type: 'REFRESH_ALL_ITEMS' },
-        [messageChannel.port2]
-      )
-
-      // Don't wait forever
-      setTimeout(() => {
-        console.warn('⚠️ Cache invalidation timeout, continuing anyway')
-        resolve(false)
-      }, 5000)
-    })
-  }
-}
-
-  /**
- * ✅ FIXED: Force update items from server
- */
-async forceUpdateItemsCache() {
-  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-    const messageChannel = new MessageChannel()
-
-    return new Promise((resolve, reject) => {
-      messageChannel.port1.onmessage = (event) => {
-        if (event.data.success) {
-          console.log('✅ Cache force update successful:', event.data.count || 0, 'items')
-          resolve(event.data)
-        } else {
-          console.error('❌ Cache force update failed:', event.data.error)
-          reject(new Error(event.data.error || 'Cache update failed'))
-        }
-      }
-
-      navigator.serviceWorker.controller.postMessage(
-        { type: 'FORCE_UPDATE_ITEMS' },
-        [messageChannel.port2]
-      )
-
-      // Timeout after 30 seconds
-      setTimeout(() => {
-        console.warn('⚠️ Cache force update timeout')
-        reject(new Error('Cache update timeout'))
-      }, 30000)
-    })
-  } else {
-    console.warn('⚠️ Service worker not available')
-    throw new Error('Service worker not available')
-  }
-}
 
   /**
  * Import item from Google Sheets
@@ -1230,11 +1374,29 @@ async getGoogleSheetsItems() {
  */
 async getClients() {
   try {
-    const allItems = await this.getItems();
+    // Use the existing /api/operations/clients endpoint
+    const response = await this.request('/api/operations/clients');
+    
+    // If the endpoint returns an array directly
+    if (Array.isArray(response)) {
+      return response.filter(Boolean); // Remove any null/undefined values
+    }
+    
+    // Fallback: fetch all items if clients endpoint doesn't exist
+    const itemsResponse = await this.getAllItems({}, 100); // Fetch up to 100 pages
+    
+    // Handle paginated response
+    let allItems = [];
+    if (Array.isArray(itemsResponse)) {
+      allItems = itemsResponse;
+    } else if (itemsResponse && Array.isArray(itemsResponse.items)) {
+      allItems = itemsResponse.items;
+    }
+    
     const clientSet = new Set();
     
     allItems.forEach(item => {
-      if (item.client_name && item.client_name.trim()) {
+      if (item && item.client_name && item.client_name.trim()) {
         clientSet.add(item.client_name.trim());
       }
     });
@@ -1303,14 +1465,6 @@ async importFromGoogleSheets(data) {
   // ✅ After successful import, refresh the cache
   if (result.success) {
     console.log('✅ Item imported successfully, refreshing cache...');
-    
-    // Clear IndexedDB cache to force fresh fetch
-    await this.forceUpdateItemsCache();
-    
-    // Also invalidate the specific item cache
-    if (result.data?.part_number) {
-      await this.invalidateItemCache(result.data.part_number);
-    }
   }
   
   return result;
@@ -1352,43 +1506,31 @@ async batchImportFromGoogleSheets(items) {
     }
   }
   
-  // ✅ After batch import, do a final cache refresh
-  console.log('✅ Batch import complete, doing final cache refresh...');
-  await this.forceUpdateItemsCache();
   
   return results;
 }
 
-/**
- * ✅ NEW: Check for updates without blocking UI
- * Use this for polling - it won't throw errors
- */
-async checkForUpdates() {
-  try {
-    console.log('🔍 Checking for updates...')
-    
-    // Fetch directly, bypassing cache
-    const response = await this.request('/api/operations/items', {
-      cache: 'no-cache',
-      headers: {
-        'Accept': 'application/json',
-        'X-Skip-Cache': 'true'
-      }
-    })
-    
-    // Trigger cache refresh in background
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({
-        type: 'REFRESH_ALL_ITEMS'
+  /**
+   * ✅ SIMPLIFIED: Just fetch fresh data from network
+   */
+  async checkForUpdates() {
+    try {
+      console.log('🔍 Checking for updates...')
+      
+      const response = await this.request('/api/operations/items', {
+        cache: 'no-cache',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
       })
+      
+      return response
+    } catch (error) {
+      console.error('❌ Failed to check for updates:', error)
+      throw error
     }
-    
-    return response
-  } catch (error) {
-    console.error('❌ Failed to check for updates:', error)
-    throw error
   }
-}
 
 /**
  * Get items imported from Google Sheets

@@ -1,59 +1,125 @@
-import { useState, useEffect } from 'react';
-import { PieChart, Pie, BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ResponsiveContainer } from 'recharts';
-import { X, TrendingUp, Clock, Users, CheckCircle, AlertCircle, Activity, ChevronDown, ChevronUp, Calendar, Package } from 'lucide-react';
 
-// Enhanced Dashboard Component
+import { useState, useEffect } from 'react';
+import { ChevronDown, ChevronUp, Calendar, Package, CheckCircle, Clock, Users, Activity, TrendingUp, AlertCircle } from 'lucide-react';
+
 function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMode }) {
   const [selectedItem, setSelectedItem] = useState(null);
   const [itemDetails, setItemDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [filters, setFilters] = useState({
-    status: 'all', // 'all', 'completed', 'in-progress', 'not-started'
-    priority: 'all', // 'all', 'High', 'Medium', 'Low'
-    client: 'all' // 'all' or specific client name
+    status: 'all',
+    priority: 'all',
+    client: 'all',
+    search: ''
   });
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    per_page: 20,
+    total_items: 0,
+    total_pages: 0,
+    has_next: false,
+    has_previous: false
+  });
+  const [filteredItems, setFilteredItems] = useState([]);
+  const [isFiltering, setIsFiltering] = useState(false);
+  const [uniqueClients, setUniqueClients] = useState([]);
+  const [statistics, setStatistics] = useState(null);
 
-  const uniqueClients = [...new Set(items.map(item => item.client_name).filter(Boolean))];
+  // Load clients list
+  useEffect(() => {
+    loadClients();
+  }, []);
 
-  // Apply filters to items
-  const filteredItems = items.filter(item => {
-    const progress = calculateItemProgress(item);
+  // Load statistics
+  useEffect(() => {
+    loadStatistics();
+  }, [filters]);
 
-    // Status filter
-    if (filters.status !== 'all') {
-      if (filters.status === 'completed' && progress !== 100) return false;
-      if (filters.status === 'in-progress' && (progress === 0 || progress === 100)) return false;
-      if (filters.status === 'not-started' && progress !== 0) return false;
+  // Apply filters when they change
+  useEffect(() => {
+    applyFilters(1); // Reset to page 1 when filters change
+  }, [filters.status, filters.priority, filters.client, filters.search]);
+
+  const loadClients = async () => {
+    try {
+      const clients = await apiService.operations.getClients();
+      setUniqueClients(clients);
+    } catch (error) {
+      console.error('Failed to load clients:', error);
     }
-
-    // Priority filter
-    if (filters.priority !== 'all' && item.priority !== filters.priority) return false;
-
-    // Client filter
-    if (filters.client !== 'all' && item.client_name !== filters.client) return false;
-
-    return true;
-  });
-
-  const getStatistics = () => {
-    const totalItems = items.length;
-    const completedItems = items.filter(item => calculateItemProgress(item) === 100).length;
-    const inProgressItems = items.filter(item => {
-      const progress = calculateItemProgress(item);
-      return progress > 0 && progress < 100;
-    }).length;
-    const notStartedItems = items.filter(item => calculateItemProgress(item) === 0).length;
-
-    return {
-      totalItems,
-      completedItems,
-      inProgressItems,
-      notStartedItems,
-      overallProgress: totalItems > 0 ? Math.round(items.reduce((sum, item) => sum + calculateItemProgress(item), 0) / totalItems) : 0
-    };
   };
 
-  const stats = getStatistics();
+  const loadStatistics = async () => {
+    try {
+      const stats = await apiService.operations.getStatistics();
+      setStatistics(stats);
+    } catch (error) {
+      console.error('Failed to load statistics:', error);
+    }
+  };
+
+  const applyFilters = async (page = 1) => {
+    setIsFiltering(true);
+    try {
+      // Build filter params
+      const params = {
+        page,
+        limit: pagination.per_page
+      };
+
+      // Map dashboard filters to API filters
+      if (filters.status !== 'all') {
+        if (filters.status === 'completed') {
+          params.status = 'completed';
+        } else if (filters.status === 'in-progress') {
+          params.status = 'in_progress';
+        } else if (filters.status === 'not-started') {
+          params.status = 'not_started';
+        }
+      }
+
+      if (filters.priority !== 'all') {
+        params.priority = filters.priority;
+      }
+
+      if (filters.client !== 'all') {
+        params.client_name = filters.client;
+      }
+
+      if (filters.search && filters.search.trim()) {
+        params.search = filters.search.trim();
+      }
+
+      const response = await apiService.operations.getItemsPaginated(page, pagination.per_page, params);
+      
+      setFilteredItems(response.items || []);
+      setPagination(response.pagination || {
+        current_page: page,
+        per_page: pagination.per_page,
+        total_items: 0,
+        total_pages: 0,
+        has_next: false,
+        has_previous: false
+      });
+    } catch (error) {
+      console.error('Failed to apply filters:', error);
+      setFilteredItems([]);
+    } finally {
+      setIsFiltering(false);
+    }
+  };
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.total_pages) {
+      applyFilters(newPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleItemsPerPageChange = (newLimit) => {
+    setPagination(prev => ({ ...prev, per_page: newLimit }));
+    applyFilters(1);
+  };
 
   const loadItemDetails = async (item) => {
     setLoadingDetails(true);
@@ -90,11 +156,21 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
   const textPrimaryClass = isDarkMode ? "text-gray-100" : "text-gray-800";
   const textSecondaryClass = isDarkMode ? "text-gray-300" : "text-gray-600";
 
+  // Calculate statistics from statistics API
+  const stats = statistics?.overall || {
+    total_items: 0,
+    completed_items: 0,
+    in_progress_items: 0,
+    not_started_items: 0,
+    avg_progress: 0
+  };
+
   if (loading) {
     return (
       <div className="text-center py-8">
-        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 mx-auto ${isDarkMode ? "border-slate-400" : "border-slate-600"
-          }`}></div>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 mx-auto ${
+          isDarkMode ? "border-slate-400" : "border-slate-600"
+        }`}></div>
         <p className={`mt-4 ${textSecondaryClass}`}>Loading dashboard...</p>
       </div>
     );
@@ -102,11 +178,31 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
 
   return (
     <div className="px-2 sm:px-4 lg:px-0">
-      <h2 className={`text-xl sm:text-2xl font-bold mb-4 sm:mb-6 ${textPrimaryClass}`}>Operations Dashboard</h2>
+      <h2 className={`text-xl sm:text-2xl font-bold mb-4 sm:mb-6 ${textPrimaryClass}`}>
+        Operations Dashboard
+      </h2>
 
       {/* Filters */}
       <div className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border mb-4 sm:mb-6 ${cardClass}`}>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Search */}
+          <div>
+            <label className={`block text-xs sm:text-sm font-medium mb-1 ${textSecondaryClass}`}>
+              Search
+            </label>
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              placeholder="Search items..."
+              className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                isDarkMode
+                  ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400'
+                  : 'bg-white border-gray-300 text-gray-800 placeholder-gray-500'
+              }`}
+            />
+          </div>
+
           {/* Status Filter */}
           <div>
             <label className={`block text-xs sm:text-sm font-medium mb-1 ${textSecondaryClass}`}>
@@ -115,10 +211,11 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
             <select
               value={filters.status}
               onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              className={`w-full px-3 py-2 rounded-lg border text-sm ${isDarkMode
+              className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                isDarkMode
                   ? 'bg-gray-700 border-gray-600 text-gray-100'
                   : 'bg-white border-gray-300 text-gray-800'
-                }`}
+              }`}
             >
               <option value="all">All Status</option>
               <option value="completed">Completed</option>
@@ -135,10 +232,11 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
             <select
               value={filters.priority}
               onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
-              className={`w-full px-3 py-2 rounded-lg border text-sm ${isDarkMode
+              className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                isDarkMode
                   ? 'bg-gray-700 border-gray-600 text-gray-100'
                   : 'bg-white border-gray-300 text-gray-800'
-                }`}
+              }`}
             >
               <option value="all">All Priorities</option>
               <option value="High">High</option>
@@ -155,10 +253,11 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
             <select
               value={filters.client}
               onChange={(e) => setFilters({ ...filters, client: e.target.value })}
-              className={`w-full px-3 py-2 rounded-lg border text-sm ${isDarkMode
+              className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                isDarkMode
                   ? 'bg-gray-700 border-gray-600 text-gray-100'
                   : 'bg-white border-gray-300 text-gray-800'
-                }`}
+              }`}
             >
               <option value="all">All Clients</option>
               {uniqueClients.map(client => (
@@ -167,6 +266,51 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
             </select>
           </div>
         </div>
+
+        {/* Active Filters Summary */}
+        {(filters.status !== 'all' || filters.priority !== 'all' || filters.client !== 'all' || filters.search) && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className={`text-xs ${textSecondaryClass}`}>Active filters:</span>
+            {filters.status !== 'all' && (
+              <span className={`px-2 py-1 rounded text-xs ${
+                isDarkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'
+              }`}>
+                Status: {filters.status}
+              </span>
+            )}
+            {filters.priority !== 'all' && (
+              <span className={`px-2 py-1 rounded text-xs ${
+                isDarkMode ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-100 text-purple-700'
+              }`}>
+                Priority: {filters.priority}
+              </span>
+            )}
+            {filters.client !== 'all' && (
+              <span className={`px-2 py-1 rounded text-xs ${
+                isDarkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700'
+              }`}>
+                Client: {filters.client}
+              </span>
+            )}
+            {filters.search && (
+              <span className={`px-2 py-1 rounded text-xs ${
+                isDarkMode ? 'bg-orange-900/30 text-orange-300' : 'bg-orange-100 text-orange-700'
+              }`}>
+                Search: "{filters.search}"
+              </span>
+            )}
+            <button
+              onClick={() => setFilters({ status: 'all', priority: 'all', client: 'all', search: '' })}
+              className={`px-2 py-1 rounded text-xs font-medium ${
+                isDarkMode
+                  ? 'bg-red-900/30 text-red-300 hover:bg-red-900/50'
+                  : 'bg-red-100 text-red-700 hover:bg-red-200'
+              }`}
+            >
+              Clear all
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Statistics Cards */}
@@ -175,7 +319,7 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-xs sm:text-sm font-medium opacity-90">Total Items</h3>
-              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.totalItems}</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.total_items}</p>
             </div>
             <Activity className="w-6 h-6 sm:w-8 sm:h-8 opacity-80" />
           </div>
@@ -184,7 +328,7 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-xs sm:text-sm font-medium opacity-90">Completed</h3>
-              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.completedItems}</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.completed_items}</p>
             </div>
             <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 opacity-80" />
           </div>
@@ -193,7 +337,7 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-xs sm:text-sm font-medium opacity-90">In Progress</h3>
-              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.inProgressItems}</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.in_progress_items}</p>
             </div>
             <Clock className="w-6 h-6 sm:w-8 sm:h-8 opacity-80" />
           </div>
@@ -202,7 +346,7 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-xs sm:text-sm font-medium opacity-90">Not Started</h3>
-              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.notStartedItems}</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.not_started_items}</p>
             </div>
             <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 opacity-80" />
           </div>
@@ -211,7 +355,9 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-xs sm:text-sm font-medium opacity-90">Overall Progress</h3>
-              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.overallProgress}%</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">
+                {Math.round(parseFloat(stats.avg_progress) || 0)}%
+              </p>
             </div>
             <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 opacity-80" />
           </div>
@@ -220,101 +366,143 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
 
       {/* Items Progress List */}
       <div className="space-y-3">
-        <h3 className={`text-lg sm:text-xl font-semibold ${textPrimaryClass}`}>Items Overview</h3>
-        {filteredItems.length > 0 ? (
-          filteredItems.map(item => {
-            const progress = calculateItemProgress(item);
-            const itemKey = item.part_number || item.id;
-            const isSelected = selectedItem?.part_number === item.part_number;
+        <div className="flex justify-between items-center">
+          <h3 className={`text-lg sm:text-xl font-semibold ${textPrimaryClass}`}>
+            Items Overview
+            {pagination.total_items > 0 && (
+              <span className={`text-sm font-normal ml-2 ${textSecondaryClass}`}>
+                ({pagination.total_items} total)
+              </span>
+            )}
+          </h3>
+        </div>
 
-            return (
-              <div key={itemKey}>
-                <div
-                  onClick={() => handleItemClick(item)}
-                  className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border cursor-pointer transition-all duration-200 hover:shadow-lg ${isSelected
-                      ? isDarkMode
-                        ? 'border-blue-400 bg-blue-900/20'
-                        : 'border-blue-500 bg-blue-50/20'
-                      : isDarkMode
-                        ? 'border-gray-700/50 bg-gray-800/40 hover:bg-gray-800/60'
-                        : 'border-white/30 bg-white/10 hover:bg-white/20'
+        {isFiltering ? (
+          <div className="text-center py-8">
+            <div className={`animate-spin rounded-full h-8 w-8 border-b-2 mx-auto ${
+              isDarkMode ? "border-slate-400" : "border-slate-600"
+            }`}></div>
+            <p className={`mt-4 text-sm ${textSecondaryClass}`}>Filtering items...</p>
+          </div>
+        ) : filteredItems.length > 0 ? (
+          <>
+            {filteredItems.map(item => {
+              const progress = calculateItemProgress(item);
+              const itemKey = item.part_number || item.id;
+              const isSelected = selectedItem?.part_number === item.part_number;
+
+              return (
+                <div key={itemKey}>
+                  <div
+                    onClick={() => handleItemClick(item)}
+                    className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                      isSelected
+                        ? isDarkMode
+                          ? 'border-blue-400 bg-blue-900/20'
+                          : 'border-blue-500 bg-blue-50/20'
+                        : isDarkMode
+                          ? 'border-gray-700/50 bg-gray-800/40 hover:bg-gray-800/60'
+                          : 'border-white/30 bg-white/10 hover:bg-white/20'
                     }`}
-                >
-                  <div className="flex justify-between items-start mb-2 gap-2">
-                    <div className="flex-1 min-w-0">
-                      <h4 className={`font-semibold text-sm sm:text-base truncate ${textPrimaryClass}`}>{item.name}</h4>
-                      <p className={`text-xs sm:text-sm line-clamp-2 ${textSecondaryClass}`}>{item.description}</p>
-                      {item.part_number && (
-                        <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                          Part #: {item.part_number}
+                  >
+                    <div className="flex justify-between items-start mb-2 gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h4 className={`font-semibold text-sm sm:text-base truncate ${textPrimaryClass}`}>
+                          {item.name}
+                        </h4>
+                        <p className={`text-xs sm:text-sm line-clamp-2 ${textSecondaryClass}`}>
+                          {item.description}
                         </p>
-                      )}
-                      {item.client_name && (
-                        <p className={`text-xs mt-1 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
-                          Client: {item.client_name}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${progress === 100 ? 'bg-green-500 text-white' :
-                            progress > 0 ? 'bg-yellow-500 text-white' :
-                              'bg-gray-500 text-white'
-                          }`}>
-                          {progress}%
-                        </span>
-                        {isSelected ? (
-                          <ChevronUp className={`w-4 h-4 sm:w-5 sm:h-5 ${isDarkMode ? "text-blue-400" : "text-blue-500"}`} />
-                        ) : (
-                          <ChevronDown className={`w-4 h-4 sm:w-5 sm:h-5 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`} />
+                        {item.part_number && (
+                          <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                            Part #: {item.part_number}
+                          </p>
+                        )}
+                        {item.client_name && (
+                          <p className={`text-xs mt-1 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
+                            Client: {item.client_name}
+                          </p>
                         )}
                       </div>
-                      {item.priority && (
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${item.priority === 'High'
-                            ? isDarkMode ? 'bg-red-500/20 text-red-300' : 'bg-red-500/20 text-red-700'
-                            : item.priority === 'Medium'
-                              ? isDarkMode ? 'bg-yellow-500/20 text-yellow-300' : 'bg-yellow-500/20 text-yellow-700'
-                              : isDarkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-500/20 text-blue-700'
+                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
+                            progress === 100 ? 'bg-green-500 text-white' :
+                            progress > 0 ? 'bg-yellow-500 text-white' :
+                            'bg-gray-500 text-white'
                           }`}>
-                          {item.priority}
-                        </span>
-                      )}
+                            {progress}%
+                          </span>
+                          {isSelected ? (
+                            <ChevronUp className={`w-4 h-4 sm:w-5 sm:h-5 ${
+                              isDarkMode ? "text-blue-400" : "text-blue-500"
+                            }`} />
+                          ) : (
+                            <ChevronDown className={`w-4 h-4 sm:w-5 sm:h-5 ${
+                              isDarkMode ? "text-gray-400" : "text-gray-500"
+                            }`} />
+                          )}
+                        </div>
+                        {item.priority && (
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            item.priority === 'High'
+                              ? isDarkMode ? 'bg-red-500/20 text-red-300' : 'bg-red-500/20 text-red-700'
+                              : item.priority === 'Medium'
+                                ? isDarkMode ? 'bg-yellow-500/20 text-yellow-300' : 'bg-yellow-500/20 text-yellow-700'
+                                : isDarkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-500/20 text-blue-700'
+                          }`}>
+                            {item.priority}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className={`w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
+                      <div
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          progress === 100 ? 'bg-green-500' :
+                          progress > 0 ? 'bg-yellow-500' :
+                          'bg-gray-500'
+                        }`}
+                        style={{ width: `${progress}%` }}
+                      ></div>
+                    </div>
+                    <div className={`mt-2 text-xs sm:text-sm flex justify-between ${textSecondaryClass}`}>
+                      <span>{item.phase_count || item.phases?.length || 0} phases</span>
+                      <span className="hidden sm:inline">
+                        Created {new Date(item.created_at).toLocaleDateString()}
+                      </span>
+                      <span className="sm:hidden">
+                        {new Date(item.created_at).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
+                      </span>
                     </div>
                   </div>
-                  <div className={`w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
-                    <div
-                      className={`h-2 rounded-full transition-all duration-300 ${progress === 100 ? 'bg-green-500' :
-                          progress > 0 ? 'bg-yellow-500' :
-                            'bg-gray-500'
-                        }`}
-                      style={{ width: `${progress}%` }}
-                    ></div>
-                  </div>
-                  <div className={`mt-2 text-xs sm:text-sm flex justify-between ${textSecondaryClass}`}>
-                    <span>{item.phase_count || item.phases?.length || 0} phases</span>
-                    <span className="hidden sm:inline">Created {new Date(item.created_at).toLocaleDateString()}</span>
-                    <span className="sm:hidden">{new Date(item.created_at).toLocaleDateString('en', { month: 'short', day: 'numeric' })}</span>
-                  </div>
-                </div>
 
-                {/* Slide Down Panel */}
-                {isSelected && (
-                  <ItemDetailsSlidePanel
-                    item={selectedItem}
-                    itemDetails={itemDetails}
-                    loadingDetails={loadingDetails}
-                    onClose={closePanel}
-                    isDarkMode={isDarkMode}
-                  />
-                )}
-              </div>
-            );
-          })
+                  {/* Slide Down Panel */}
+                  {isSelected && (
+                    <ItemDetailsSlidePanel
+                      item={selectedItem}
+                      itemDetails={itemDetails}
+                      loadingDetails={loadingDetails}
+                      onClose={closePanel}
+                      isDarkMode={isDarkMode}
+                    />
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Pagination Controls */}
+            <PaginationControls
+              pagination={pagination}
+              onPageChange={handlePageChange}
+              onItemsPerPageChange={handleItemsPerPageChange}
+              isDarkMode={isDarkMode}
+              textSecondaryClass={textSecondaryClass}
+            />
+          </>
         ) : (
           <p className={`text-center py-8 text-sm sm:text-base ${textSecondaryClass}`}>
-            {items.length === 0
-              ? "No items yet. Go to 'Add Items' to create your first item."
-              : "No items match the current filters."}
+            No items match the current filters.
           </p>
         )}
       </div>
@@ -778,6 +966,139 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Pagination Controls Component
+function PaginationControls({ pagination, onPageChange, onItemsPerPageChange, isDarkMode, textSecondaryClass }) {
+  const { current_page, per_page, total_pages, total_items, has_next, has_previous } = pagination;
+
+  if (total_pages <= 1) return null;
+
+  const pageNumbers = [];
+  const maxVisiblePages = 5;
+
+  let startPage = Math.max(1, current_page - Math.floor(maxVisiblePages / 2));
+  let endPage = Math.min(total_pages, startPage + maxVisiblePages - 1);
+
+  if (endPage - startPage + 1 < maxVisiblePages) {
+    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+  }
+
+  for (let i = startPage; i <= endPage; i++) {
+    pageNumbers.push(i);
+  }
+
+  return (
+    <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t ${
+      isDarkMode ? 'border-gray-700' : 'border-gray-300'
+    }`}>
+      {/* Items per page */}
+      <div className="flex items-center gap-2">
+        <label className={`text-sm ${textSecondaryClass}`}>Items per page:</label>
+        <select
+          value={per_page}
+          onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
+          className={`px-3 py-1 rounded-lg border transition-colors ${
+            isDarkMode
+              ? 'bg-gray-800 border-gray-700 text-gray-200'
+              : 'bg-white border-gray-300 text-gray-800'
+          }`}
+        >
+          <option value={10}>10</option>
+          <option value={20}>20</option>
+          <option value={50}>50</option>
+          <option value={100}>100</option>
+        </select>
+      </div>
+
+      {/* Page info */}
+      <div className={`text-sm ${textSecondaryClass}`}>
+        Showing {((current_page - 1) * per_page) + 1} to{' '}
+        {Math.min(current_page * per_page, total_items)} of {total_items} items
+      </div>
+
+      {/* Page buttons */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onPageChange(current_page - 1)}
+          disabled={!has_previous}
+          className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+            has_previous
+              ? isDarkMode
+                ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+              : 'opacity-50 cursor-not-allowed bg-gray-600 text-gray-400'
+          }`}
+        >
+          Previous
+        </button>
+
+        {startPage > 1 && (
+          <>
+            <button
+              onClick={() => onPageChange(1)}
+              className={`px-3 py-1 rounded-lg transition-colors ${
+                isDarkMode
+                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+              }`}
+            >
+              1
+            </button>
+            {startPage > 2 && <span className={textSecondaryClass}>...</span>}
+          </>
+        )}
+
+        {pageNumbers.map((pageNum) => (
+          <button
+            key={pageNum}
+            onClick={() => onPageChange(pageNum)}
+            className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+              pageNum === current_page
+                ? isDarkMode
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-blue-500 text-white'
+                : isDarkMode
+                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+            }`}
+          >
+            {pageNum}
+          </button>
+        ))}
+
+        {endPage < total_pages && (
+          <>
+            {endPage < total_pages - 1 && <span className={textSecondaryClass}>...</span>}
+            <button
+              onClick={() => onPageChange(total_pages)}
+              className={`px-3 py-1 rounded-lg transition-colors ${
+                isDarkMode
+                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+              }`}
+            >
+              {total_pages}
+            </button>
+          </>
+        )}
+
+        <button
+          onClick={() => onPageChange(current_page + 1)}
+          disabled={!has_next}
+          className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+            has_next
+              ? isDarkMode
+                ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+              : 'opacity-50 cursor-not-allowed bg-gray-600 text-gray-400'
+          }`}
+        >
+          Next
+        </button>
       </div>
     </div>
   );

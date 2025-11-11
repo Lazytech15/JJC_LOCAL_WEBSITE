@@ -6,6 +6,7 @@ import AddItems from "../op/AddItem.jsx"
 import Checklist from "../op/CheckList.jsx"
 import Reports from "../op/Report.jsx"
 import ItemComparison from "../op/ItemComparison.jsx"
+import { pollingManager } from "../../utils/api/websocket/polling-manager.jsx"
 const GearLoadingSpinner = lazy(() => import("../../../public/LoadingGear.jsx"))
 import { Menu, X, ArrowUp, RefreshCw } from 'lucide-react'
 
@@ -36,55 +37,66 @@ function OperationsDepartment() {
   const [lastUpdateCheck, setLastUpdateCheck] = useState(null)
   const pollIntervalRef = useRef(null)
 
+  // WebSocket Polling for new items added via Google Sheets
+   const pollingSubscriptionsRef = useRef([])
+
+   const [pagination, setPagination] = useState({
+  current_page: 1,
+  per_page: 20,
+  total_items: 0,
+  total_pages: 0,
+  has_next: false,
+  has_previous: false
+  })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(20)
+
   useEffect(() => {
-  // Don't poll if not on a tab that needs it
-  const needsPolling = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
+    const needsPolling = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
 
-  if (!needsPolling) {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current)
-      pollIntervalRef.current = null
-    }
-    return
-  }
-
-  // Check for updates every 30 seconds
-  pollIntervalRef.current = setInterval(async () => {
-    try {
-      console.log('🔄 Polling for new items...')
-
-      const currentCount = items.length
-
-      // Use checkForUpdates which bypasses cache
-      const freshItems = await apiService.operations.checkForUpdates()
-
-      if (Array.isArray(freshItems) && freshItems.length > currentCount) {
-        const newCount = freshItems.length - currentCount
-        console.log(`✅ Found ${newCount} new item(s)!`)
-
-        // Show notification
-        showNotification(`${newCount} new item(s) added from Google Sheets!`)
-
-        // Reload all data
-        await loadData()
-      } else {
-        console.log('✅ No new items')
+    if (!needsPolling) {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
       }
-
-      setLastUpdateCheck(new Date())
-    } catch (error) {
-      console.warn('⚠️ Polling check failed:', error.message)
-      // Don't show error to user for polling failures
+      return
     }
-  }, 30000) // 30 seconds
 
-  return () => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current)
-      pollIntervalRef.current = null
+    // Check for updates every 30 seconds
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        console.log('🔄 Polling for new items...')
+
+        const currentCount = items.length
+
+        // Just fetch fresh data
+        const freshItems = await apiService.operations.checkForUpdates()
+
+        if (Array.isArray(freshItems) && freshItems.length > currentCount) {
+          const newCount = freshItems.length - currentCount
+          console.log(`✅ Found ${newCount} new item(s)!`)
+
+          showNotification(`${newCount} new item(s) added from Google Sheets!`)
+
+          // Reload all data
+          await loadData()
+        } else {
+          console.log('✅ No new items')
+        }
+
+        setLastUpdateCheck(new Date())
+      } catch (error) {
+        console.warn('⚠️ Polling check failed:', error.message)
+      }
+    }, 30000)
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+      }
     }
-  }
-}, [activeTab, items.length])
+  }, [activeTab, items.length])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -170,7 +182,100 @@ function OperationsDepartment() {
 
   useEffect(() => {
     loadData()
+    
+    // Setup polling subscriptions
+    setupPollingListeners()
+    
+    return () => {
+      // Cleanup polling subscriptions
+      pollingSubscriptionsRef.current.forEach(unsubscribe => unsubscribe())
+      pollingSubscriptionsRef.current = []
+    }
   }, [])
+
+  useEffect(() => {
+  if ('Notification' in window && Notification.permission === 'default') {
+    // Request permission silently
+    Notification.requestPermission().then(permission => {
+      console.log('Notification permission:', permission)
+    })
+  }
+}, [])
+
+  const setupPollingListeners = () => {
+    console.log('📡 Setting up Operations polling listeners...')
+    
+    // Subscribe to all operations refresh events
+    const unsubRefresh = pollingManager.subscribeToUpdates('operations:refresh', (event) => {
+      console.log('🔄 Operations refresh event:', event.type)
+      handleOperationsRefresh(event)
+    })
+    
+    // Subscribe to specific item events
+    const unsubItemCreated = pollingManager.subscribeToUpdates('operations:item_created', (data) => {
+      console.log('✨ New item created:', data.part_number)
+      showNotification(`New item created: ${data.part_number}`)
+      loadData() // Reload all data
+    })
+    
+    const unsubItemUpdated = pollingManager.subscribeToUpdates('operations:item_updated', (data) => {
+      console.log('🔄 Item updated:', data.part_number)
+      loadItemDetails(data.part_number) // Reload specific item
+    })
+    
+    const unsubItemDeleted = pollingManager.subscribeToUpdates('operations:item_deleted', (data) => {
+      console.log('🗑️ Item deleted:', data.part_number)
+      showNotification(`Item deleted: ${data.part_number}`)
+      loadData() // Reload all data
+    })
+    
+    const unsubGoogleSheets = pollingManager.subscribeToUpdates('operations:google_sheets_import', (data) => {
+      console.log('📊 Google Sheets import:', data.part_number)
+      showNotification(`New item imported: ${data.part_number}`)
+      loadData() // Reload all data
+    })
+    
+    // Store unsubscribe functions
+    pollingSubscriptionsRef.current = [
+      unsubRefresh,
+      unsubItemCreated,
+      unsubItemUpdated,
+      unsubItemDeleted,
+      unsubGoogleSheets
+    ]
+    
+    // Join operations room
+    pollingManager.joinRoom('operations')
+  }
+
+  // ADD: Handle operations refresh events
+  const handleOperationsRefresh = async (event) => {
+    const { type, data } = event
+    
+    switch (type) {
+      case 'item_created':
+      case 'item_deleted':
+      case 'google_sheets_import':
+        // Full reload for these events
+        await loadData()
+        break
+        
+      case 'item_updated':
+      case 'phase_created':
+      case 'phase_updated':
+      case 'phase_status':
+      case 'subphase_completed':
+      case 'employee_assigned':
+        // Reload specific item
+        if (data.part_number) {
+          await loadItemDetails(data.part_number)
+        }
+        break
+        
+      default:
+        console.log('Unknown refresh type:', type)
+    }
+  }
 
   const refreshActiveData = async () => {
     try {
@@ -208,81 +313,80 @@ function OperationsDepartment() {
     }
   }
 
-  const loadData = async () => {
+ const loadData = async (page = 1, limit = 20) => {
   try {
     setLoading(true)
     setError(null)
 
-    console.log('📥 Loading items...')
+    console.log(`📥 Loading items page ${page} with limit ${limit}...`)
 
+    // Load items with pagination
     const [itemsResponse, statsResponse] = await Promise.all([
-      apiService.operations.getItems().catch(err => {
+      apiService.operations.getItemsPaginated(page, limit).catch(err => {
         console.error('Failed to load items:', err)
-        return [] // Return empty array on error
+        return { items: [], pagination: {} }
       }),
       apiService.operations.getStatistics().catch(err => {
         console.error('Failed to load statistics:', err)
-        return null // Return null on error
+        return null
       })
     ])
 
-    // Handle different response formats
-    let itemsArray = []
-    if (Array.isArray(itemsResponse)) {
-      itemsArray = itemsResponse
-    } else if (itemsResponse && typeof itemsResponse === 'object') {
-      const numericKeys = Object.keys(itemsResponse).filter(key => !isNaN(key))
-      if (numericKeys.length > 0) {
-        itemsArray = numericKeys.map(key => itemsResponse[key])
-      } else {
-        itemsArray = itemsResponse.items || itemsResponse.data || []
-      }
+    // Handle paginated response
+    const itemsArray = itemsResponse.items || []
+    const paginationInfo = itemsResponse.pagination || {
+      current_page: 1,
+      per_page: limit,
+      total_items: itemsArray.length,
+      total_pages: 1,
+      has_next: false,
+      has_previous: false
     }
 
-    console.log('✅ Loaded', itemsArray.length, 'items')
+    console.log(`✅ Loaded ${itemsArray.length} items from page ${page}`)
+    console.log(`📊 Pagination:`, paginationInfo)
 
     setItems(itemsArray)
+    setPagination(paginationInfo)
+    setCurrentPage(page)
     setStatistics(statsResponse)
 
   } catch (err) {
     console.error('❌ Failed to load operations data:', err)
     setError(`Failed to load data: ${err.message}`)
-    setItems([]) // Set empty array to prevent undefined errors
+    setItems([])
   } finally {
     setLoading(false)
   }
 }
 
- const handleManualRefresh = async () => {
-  try {
-    setIsRefreshing(true)
-    setError(null)
 
-    console.log('🔄 Manual refresh triggered...')
-
-    // Method 1: Try force cache update (may fail if API has issues)
+  // ✅ SIMPLIFIED handleManualRefresh - just reload data
+  const handleManualRefresh = async () => {
     try {
-      await apiService.operations.forceUpdateItemsCache()
-      console.log('✅ Cache force update successful')
-    } catch (cacheError) {
-      console.warn('⚠️ Cache force update failed, will reload data anyway:', cacheError.message)
-      // Continue to reload data even if cache update fails
+      setIsRefreshing(true)
+      setError(null)
+
+      console.log('🔄 Manual refresh triggered...')
+
+      showNotification('Refreshing data...')
+
+      // Just reload data from network
+      await loadData()
+
+      setLastUpdateCheck(new Date())
+      
+      showNotification('✅ Data refreshed successfully!')
+    } catch (error) {
+      console.error('❌ Failed to refresh:', error)
+      setError(`Failed to refresh: ${error.message}`)
+      showNotification('❌ Failed to refresh data')
+    } finally {
+      setIsRefreshing(false)
     }
-
-    // Method 2: Always reload data from API
-    await loadData()
-
-    setLastUpdateCheck(new Date())
-    showNotification('Data refreshed successfully!')
-  } catch (error) {
-    console.error('❌ Failed to refresh:', error)
-    setError(`Failed to refresh: ${error.message}`)
-  } finally {
-    setIsRefreshing(false)
   }
-}
 
-  const showNotification = (message) => {
+  const showNotification = (message, type = 'info') => {
   console.log('📢 Notification:', message)
 
   // Show browser notification if permitted
@@ -290,119 +394,148 @@ function OperationsDepartment() {
     new Notification('Operations Update', {
       body: message,
       icon: '/icons/icon-192.jpg',
-      tag: 'operations-update'
+      tag: 'operations-update',
+      badge: '/icons/icon-192.jpg'
     })
   }
-
-  // You could also integrate with a toast library here
-  // Example: toast.success(message)
+  
+  // Also show in-app toast (you can integrate with a toast library here)
+  // For now, we'll use a simple console log
+  const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : '📢'
+  console.log(`${emoji} ${message}`)
+  
+  return message // Return for potential chaining
 }
 
   const loadAllItemDetails = async () => {
-    if (items.length === 0) {
-      console.log('[LoadDetails] No items to load')
-      return
+  // Only load details for items that are currently displayed
+  // This prevents loading all items at once
+  const needsDetails = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
+  
+  if (!needsDetails || items.length === 0) {
+    console.log('[LoadDetails] Skipping - not needed or no items')
+    return
+  }
+
+  // Filter items that actually need details loaded
+  const itemsNeedingDetails = items.filter(item =>
+    !item.phases || !Array.isArray(item.phases) ||
+    (item.phase_count > 0 && item.phases.length === 0)
+  )
+
+  if (itemsNeedingDetails.length === 0) {
+    setInitialLoadComplete(true)
+    return
+  }
+
+  try {
+    console.log(`[LoadDetails] Loading details for ${itemsNeedingDetails.length} items`)
+    setLoadingProgress({
+      current: 0,
+      total: itemsNeedingDetails.length,
+      message: 'Starting to load item details...'
+    })
+
+    // Process in smaller batches
+    const batchSize = 3 // Reduced batch size
+    const batches = []
+
+    for (let i = 0; i < itemsNeedingDetails.length; i += batchSize) {
+      batches.push(itemsNeedingDetails.slice(i, i + batchSize))
     }
 
-    try {
-      console.log(`[LoadDetails] Starting to load ${items.length} items with full details`)
+    const allItemsWithDetails = []
+    const failedItems = []
+
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex]
+
+      console.log(`[Batch ${batchIndex + 1}/${batches.length}] Processing ${batch.length} items`)
+
       setLoadingProgress({
-        current: 0,
-        total: items.length,
-        message: 'Starting to load item details...'
+        current: allItemsWithDetails.length,
+        total: itemsNeedingDetails.length,
+        message: `Loading batch ${batchIndex + 1} of ${batches.length}...`
       })
 
-      const batchSize = 5 // Reduced from 10 for more reliability
-      const batches = []
+      const batchResults = await Promise.allSettled(
+        batch.map(item => loadItemWithRetry(item.part_number, 2)) // Reduced retries
+      )
 
-      for (let i = 0; i < items.length; i += batchSize) {
-        batches.push(items.slice(i, i + batchSize))
-      }
+      batchResults.forEach((result, index) => {
+        const item = batch[index]
 
-      const allItemsWithDetails = []
-      const failedItems = []
+        if (result.status === 'fulfilled' && result.value) {
+          allItemsWithDetails.push(result.value)
+          console.log(`[Success] ${item.part_number} loaded`)
+        } else {
+          console.warn(`[Failed] ${item.part_number}:`, result.reason?.message)
 
-      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-        const batch = batches[batchIndex]
+          allItemsWithDetails.push({
+            ...item,
+            _loadError: true,
+            _errorMessage: result.reason?.message || 'Failed to load details'
+          })
 
-        console.log(`[Batch ${batchIndex + 1}/${batches.length}] Processing ${batch.length} items`)
-
-        setLoadingProgress({
-          current: allItemsWithDetails.length,
-          total: items.length,
-          message: `Loading batch ${batchIndex + 1} of ${batches.length}...`
-        })
-
-        const batchResults = await Promise.allSettled(
-          batch.map(item => loadItemWithRetry(item.part_number, 3))
-        )
-
-        batchResults.forEach((result, index) => {
-          const item = batch[index]
-
-          if (result.status === 'fulfilled' && result.value) {
-            allItemsWithDetails.push(result.value)
-            console.log(`[Success] ${item.part_number} loaded`)
-          } else {
-            console.warn(`[Failed] ${item.part_number}:`, result.reason?.message)
-
-            // Keep the basic item data even if details failed to load
-            allItemsWithDetails.push({
-              ...item,
-              _loadError: true,
-              _errorMessage: result.reason?.message || 'Failed to load details'
-            })
-
-            failedItems.push({
-              part_number: item.part_number,
-              error: result.reason?.message
-            })
-          }
-        })
-
-        setLoadingProgress({
-          current: allItemsWithDetails.length,
-          total: items.length,
-          message: `Loaded ${allItemsWithDetails.length} of ${items.length} items...`
-        })
-
-        // Longer delay between batches to avoid overwhelming the server
-        if (batchIndex < batches.length - 1) {
-          console.log('[Batch] Waiting 1s before next batch...')
-          await new Promise(resolve => setTimeout(resolve, 1000))
+          failedItems.push({
+            part_number: item.part_number,
+            error: result.reason?.message
+          })
         }
-      }
+      })
 
-      console.log(`[LoadDetails] Complete: ${allItemsWithDetails.length} items loaded`)
-
-      if (failedItems.length > 0) {
-        console.warn(`[LoadDetails] ${failedItems.length} items failed to load details:`, failedItems)
-
-        // Show a warning to the user
-        setError(`Loaded ${allItemsWithDetails.length - failedItems.length} of ${items.length} items. ${failedItems.length} items have limited details.`)
-      }
-
-      if (isMountedRef.current) {
-        setItems(allItemsWithDetails)
-        setLoadingProgress({
-          current: allItemsWithDetails.length,
-          total: items.length,
-          message: failedItems.length > 0
-            ? `Complete with ${failedItems.length} warnings`
-            : 'Complete! Preparing dashboard...'
+      // Update items incrementally
+      if (isMountedRef.current && allItemsWithDetails.length > 0) {
+        setItems(prevItems => {
+          const updatedItems = [...prevItems]
+          allItemsWithDetails.forEach(detailedItem => {
+            const index = updatedItems.findIndex(i => i.part_number === detailedItem.part_number)
+            if (index !== -1) {
+              updatedItems[index] = detailedItem
+            }
+          })
+          return updatedItems
         })
-
-        // Small delay to show completion message
-        setTimeout(() => {
-          setInitialLoadComplete(true)
-        }, 500)
       }
-    } catch (err) {
-      console.error('[LoadDetails] Critical error:', err)
-      setError('Failed to load item details: ' + err.message)
-      setInitialLoadComplete(true)
+
+      setLoadingProgress({
+        current: allItemsWithDetails.length,
+        total: itemsNeedingDetails.length,
+        message: `Loaded ${allItemsWithDetails.length} of ${itemsNeedingDetails.length} items...`
+      })
+
+      // Wait between batches
+      if (batchIndex < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
     }
+
+    console.log(`[LoadDetails] Complete: ${allItemsWithDetails.length} items loaded`)
+
+    if (failedItems.length > 0) {
+      console.warn(`[LoadDetails] ${failedItems.length} items failed to load details:`, failedItems)
+      setError(`Loaded ${allItemsWithDetails.length - failedItems.length} of ${itemsNeedingDetails.length} items. ${failedItems.length} items have limited details.`)
+    }
+
+    if (isMountedRef.current) {
+      setLoadingProgress({
+        current: allItemsWithDetails.length,
+        total: itemsNeedingDetails.length,
+        message: failedItems.length > 0
+          ? `Complete with ${failedItems.length} warnings`
+          : 'Complete! Preparing dashboard...'
+      })
+
+      setTimeout(() => {
+        setInitialLoadComplete(true)
+      }, 300)
+    }
+  } catch (err) {
+    console.error('[LoadDetails] Critical error:', err)
+    setError('Failed to load item details: ' + err.message)
+    setInitialLoadComplete(true)
   }
+}
 
   const loadItemWithRetry = async (partNumber, maxRetries = 3) => {
     let lastError
@@ -683,6 +816,175 @@ function OperationsDepartment() {
 
   const textPrimaryClass = isDarkMode ? "text-gray-100" : "text-gray-800"
   const textSecondaryClass = isDarkMode ? "text-gray-300" : "text-gray-600"
+
+
+  // ==================== ADD PAGINATION HANDLERS ====================
+
+const handlePageChange = (newPage) => {
+  if (newPage >= 1 && newPage <= pagination.total_pages) {
+    loadData(newPage, itemsPerPage)
+    scrollToTop()
+  }
+}
+
+const handleItemsPerPageChange = (newLimit) => {
+  setItemsPerPage(newLimit)
+  loadData(1, newLimit) // Reset to page 1 when changing items per page
+}
+
+const handleNextPage = () => {
+  if (pagination.has_next) {
+    handlePageChange(currentPage + 1)
+  }
+}
+
+const handlePreviousPage = () => {
+  if (pagination.has_previous) {
+    handlePageChange(currentPage - 1)
+  }
+}
+
+// ==================== ADD PAGINATION COMPONENT ====================
+
+const PaginationControls = () => {
+  const { current_page, total_pages, total_items, has_next, has_previous } = pagination
+
+  if (total_pages <= 1) return null
+
+  const pageNumbers = []
+  const maxVisiblePages = 5
+
+  // Calculate visible page range
+  let startPage = Math.max(1, current_page - Math.floor(maxVisiblePages / 2))
+  let endPage = Math.min(total_pages, startPage + maxVisiblePages - 1)
+
+  if (endPage - startPage + 1 < maxVisiblePages) {
+    startPage = Math.max(1, endPage - maxVisiblePages + 1)
+  }
+
+  for (let i = startPage; i <= endPage; i++) {
+    pageNumbers.push(i)
+  }
+
+  return (
+    <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t ${
+      isDarkMode ? 'border-gray-700' : 'border-gray-300'
+    }`}>
+      {/* Items per page selector */}
+      <div className="flex items-center gap-2">
+        <label className={`text-sm ${textSecondaryClass}`}>
+          Items per page:
+        </label>
+        <select
+          value={itemsPerPage}
+          onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+          className={`px-3 py-1 rounded-lg border transition-colors ${
+            isDarkMode
+              ? 'bg-gray-800 border-gray-700 text-gray-200'
+              : 'bg-white border-gray-300 text-gray-800'
+          }`}
+        >
+          <option value={10}>10</option>
+          <option value={20}>20</option>
+          <option value={50}>50</option>
+          <option value={100}>100</option>
+        </select>
+      </div>
+
+      {/* Page info */}
+      <div className={`text-sm ${textSecondaryClass}`}>
+        Showing {((current_page - 1) * itemsPerPage) + 1} to{' '}
+        {Math.min(current_page * itemsPerPage, total_items)} of {total_items} items
+      </div>
+
+      {/* Pagination buttons */}
+      <div className="flex items-center gap-2">
+        {/* Previous button */}
+        <button
+          onClick={handlePreviousPage}
+          disabled={!has_previous}
+          className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+            has_previous
+              ? isDarkMode
+                ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+              : 'opacity-50 cursor-not-allowed bg-gray-600 text-gray-400'
+          }`}
+        >
+          Previous
+        </button>
+
+        {/* First page */}
+        {startPage > 1 && (
+          <>
+            <button
+              onClick={() => handlePageChange(1)}
+              className={`px-3 py-1 rounded-lg transition-colors ${
+                isDarkMode
+                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+              }`}
+            >
+              1
+            </button>
+            {startPage > 2 && <span className={textSecondaryClass}>...</span>}
+          </>
+        )}
+
+        {/* Page numbers */}
+        {pageNumbers.map((pageNum) => (
+          <button
+            key={pageNum}
+            onClick={() => handlePageChange(pageNum)}
+            className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+              pageNum === current_page
+                ? isDarkMode
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-blue-500 text-white'
+                : isDarkMode
+                ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+            }`}
+          >
+            {pageNum}
+          </button>
+        ))}
+
+        {/* Last page */}
+        {endPage < total_pages && (
+          <>
+            {endPage < total_pages - 1 && <span className={textSecondaryClass}>...</span>}
+            <button
+              onClick={() => handlePageChange(total_pages)}
+              className={`px-3 py-1 rounded-lg transition-colors ${
+                isDarkMode
+                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+              }`}
+            >
+              {total_pages}
+            </button>
+          </>
+        )}
+
+        {/* Next button */}
+        <button
+          onClick={handleNextPage}
+          disabled={!has_next}
+          className={`px-3 py-1 rounded-lg font-medium transition-colors ${
+            has_next
+              ? isDarkMode
+                ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+              : 'opacity-50 cursor-not-allowed bg-gray-600 text-gray-400'
+          }`}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  )
+}
 
   return (
     <div className={`min-h-screen p-8 transition-colors duration-300 ${isDarkMode
