@@ -1,0 +1,32 @@
+# .htaccess - Alternative for GoDaddy
+RewriteEngine On
+RewriteBase /api/
+
+# Set environment variables for CORS
+SetEnvIf Origin "^http(s)?://(.+\.)?(localhost:5173|jjcenggworks\.com)$" CORS_ALLOW_ORIGIN=$0
+
+# CORS Headers using environment variables
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin "*" env=CORS_ALLOW_ORIGIN
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+    Header always set Access-Control-Max-Age "86400"
+</IfModule>
+
+# Handle OPTIONS requests
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ - [R=200,L]
+
+# Prevent access to sensitive files
+<FilesMatch "^(config|\.env|\.git)">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Set UTF-8 encoding
+AddDefaultCharset UTF-8
+
+# Redirect all requests to index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
