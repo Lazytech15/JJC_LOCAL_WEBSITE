@@ -212,10 +212,10 @@ function PurchaseOrderTracker() {
 
   const getStatusColor = (status) => {
     const colors = {
+      draft: "bg-gray-200 text-gray-600 border-gray-300",
       requested: "bg-gray-100 text-gray-800 border-gray-200",
-      ordered: "bg-blue-100 text-blue-800 border-blue-200",
-      in_transit: "bg-yellow-100 text-yellow-800 border-yellow-200",
-      ready_for_pickup: "bg-orange-100 text-orange-800 border-orange-200",
+      approved: "bg-blue-100 text-blue-800 border-blue-200",
+      ordered: "bg-indigo-100 text-indigo-800 border-indigo-200",
       received: "bg-green-100 text-green-800 border-green-200",
       cancelled: "bg-red-100 text-red-800 border-red-200"
     }
@@ -224,10 +224,10 @@ function PurchaseOrderTracker() {
 
   const getStatusText = (status) => {
     const texts = {
+      draft: "Draft",
       requested: "Requested",
+      approved: "Approved",
       ordered: "Ordered",
-      in_transit: "In Transit",
-      ready_for_pickup: "Ready for Pickup",
       received: "Received",
       cancelled: "Cancelled"
     }
@@ -564,6 +564,32 @@ function PurchaseOrderTracker() {
     })
     setShowOrderDetails(true)
   }
+  
+  const handleConvertDraftToRequested = async () => {
+    if (!selectedOrder || selectedOrder.status !== 'draft') {
+      showError('Invalid Action', 'Only draft orders can be converted to requested status')
+      return
+    }
+    
+    try {
+      const payload = {
+        status: 'requested',
+        notes: 'Converted from draft to requested'
+      }
+      
+      const result = await apiService.purchaseOrders.updatePurchaseOrderStatus(selectedOrder.id, payload)
+      
+      if (result && result.success) {
+        success('Converted', 'Draft purchase order has been submitted as requested')
+        fetchPurchaseOrders()
+        setShowOrderDetails(false)
+      } else {
+        showError('Failed', (result && (result.message || result.error)) || 'Failed to convert draft to requested')
+      }
+    } catch (err) {
+      showError('Error', err.message || 'Failed to convert draft to requested')
+    }
+  }
 
   // Open edit modal and prefill form
   const handleOpenEdit = (order) => {
@@ -623,7 +649,7 @@ function PurchaseOrderTracker() {
 
       {/* Status Overview */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {["requested", "ordered", "in_transit", "ready_for_pickup", "received", "cancelled"].map(status => {
+        {["draft", "requested", "approved", "ordered", "received", "cancelled"].map(status => {
           const count = purchaseOrders.filter(order => order.status === status).length
           return (
             <div key={status} className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-lg p-4 border border-white/20 dark:border-gray-700/20">
@@ -834,12 +860,6 @@ function PurchaseOrderTracker() {
                 </div>
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => handleOpenEdit(selectedOrder)}
-                    className="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-black rounded text-xs font-medium transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
                     onClick={() => setShowOrderDetails(false)}
                     className="text-white hover:text-blue-200 transition-colors"
                   >
@@ -861,6 +881,33 @@ function PurchaseOrderTracker() {
                       </svg>
                       Order Information
                     </h4>
+                    
+                    {/* Draft Order Notice */}
+                    {selectedOrder.status === 'draft' && (
+                      <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <svg className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          <div className="flex-1">
+                            <h5 className="font-semibold text-amber-800 dark:text-amber-200 mb-1">Draft Purchase Order</h5>
+                            <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
+                              This is a draft purchase order and has not been officially submitted. It won't affect inventory or appear in official reports until converted to "Requested" status.
+                            </p>
+                            <button
+                              onClick={handleConvertDraftToRequested}
+                              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              Submit as Requested Order
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-1">
                         <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Supplier</label>
@@ -973,9 +1020,8 @@ function PurchaseOrderTracker() {
                           >
                             <option value="">Select new status...</option>
                             <option value="requested">Requested</option>
+                            <option value="approved">Approved</option>
                             <option value="ordered">Ordered</option>
-                            <option value="in_transit">In Transit</option>
-                            <option value="ready_for_pickup">Ready for Pickup</option>
                             <option value="received">Received</option>
                             <option value="cancelled">Cancelled</option>
                           </select>
