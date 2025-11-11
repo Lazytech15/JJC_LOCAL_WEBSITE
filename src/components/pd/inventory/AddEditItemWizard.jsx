@@ -8,40 +8,59 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
   const [inputValue, setInputValue] = useState(value || "")
   const [filteredOptions, setFilteredOptions] = useState(options)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const [typingValue, setTypingValue] = useState("")
+  const [debounceTimer, setDebounceTimer] = useState(null)
+
+  // Utility: rank-and-filter options by input (startsWith > includes)
+  const computeFiltered = (text, opts) => {
+    const term = (text || "").trim().toLowerCase()
+    if (!term) return opts
+
+    const base = opts.filter(opt => opt !== '─────────')
+    const ranked = base
+      .map(opt => {
+        const lower = opt.toLowerCase()
+        const starts = lower.startsWith(term)
+        const contains = !starts && lower.includes(term)
+        const score = starts ? 0 : (contains ? 1 : 2)
+        return { opt, score }
+      })
+      .filter(x => x.score !== 2)
+      .sort((a, b) => a.score - b.score || a.opt.localeCompare(b.opt))
+      .map(x => x.opt)
+
+    // Ensure special option is available when appropriate
+    if ('+ Add New Supplier'.toLowerCase().includes(term) || ranked.length === 0) {
+      ranked.push('+ Add New Supplier')
+    }
+    return ranked
+  }
 
   useEffect(() => {
     setInputValue(value || "")
   }, [value])
 
   useEffect(() => {
-    setFilteredOptions(options)
-  }, [options])
+    // When options change (new suppliers loaded), recompute filtered based on current input
+    setFilteredOptions(prev => computeFiltered(inputValue, options))
+  }, [options, inputValue])
 
   const handleInputChange = (e) => {
     const newValue = e.target.value
     setInputValue(newValue)
-    onChange(newValue)
-
-    // Filter options based on input
-    if (newValue.trim()) {
-      const filtered = options.filter(option =>
-        option.toLowerCase().includes(newValue.toLowerCase()) &&
-        option !== '─────────' // Don't include separator in filtered results
-      )
-      // Always add the special option at the end if it matches or if we're adding custom
-      const finalFiltered = [...filtered]
-      if ('+ Add New Supplier'.toLowerCase().includes(newValue.toLowerCase()) || filtered.length === 0) {
-        finalFiltered.push('+ Add New Supplier')
-      }
-      setFilteredOptions(finalFiltered)
-    } else {
-      setFilteredOptions(options)
-    }
-
+    setTypingValue(newValue)
     setIsOpen(true)
-    // Reset highlight to first valid option
-    const firstValidIndex = options.findIndex(option => option !== '─────────' && option !== '+ Add New Supplier')
-    setHighlightedIndex(firstValidIndex >= 0 ? firstValidIndex : -1)
+
+    // Debounce updating parent and filtering to reduce churn for large lists
+    if (debounceTimer) clearTimeout(debounceTimer)
+    const t = setTimeout(() => {
+      onChange(newValue)
+      const newFiltered = computeFiltered(newValue, options)
+      setFilteredOptions(newFiltered)
+      const firstValidIndex = newFiltered.findIndex(option => option !== '─────────' && option !== '+ Add New Supplier')
+      setHighlightedIndex(firstValidIndex >= 0 ? firstValidIndex : -1)
+    }, 180)
+    setDebounceTimer(t)
   }
 
   const handleOptionSelect = (option) => {
@@ -63,9 +82,9 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
 
   const handleFocus = () => {
     setIsOpen(true)
-    setFilteredOptions(options)
-    // Find first valid option (skip separator)
-    const firstValidIndex = options.findIndex(option => option !== '─────────' && option !== '+ Add New Supplier')
+    setFilteredOptions(computeFiltered(inputValue, options))
+    // Find first valid option (skip separator) in current filtered list
+    const firstValidIndex = (computeFiltered(inputValue, options)).findIndex(option => option !== '─────────' && option !== '+ Add New Supplier')
     setHighlightedIndex(firstValidIndex >= 0 ? firstValidIndex : -1)
   }
 
@@ -348,17 +367,16 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
       // Resolve supplier name: backend items endpoints expect `supplier` as a string.
       if (wizardData.supplier_id === '__custom') {
         payload.supplier = (wizardData.custom_supplier || '').trim()
-        delete payload.supplier_id
       } else if (wizardData.supplier_id) {
         // Find selected supplier in suppliersList and use its label/name
         const found = suppliersList.find(s => s.id === wizardData.supplier_id)
         payload.supplier = found?.label || wizardData.supplier || ''
-        delete payload.supplier_id
       } else {
         payload.supplier = (wizardData.supplier || '').trim()
       }
 
-      // Clean up temporary fields not required by API
+      // Clean up temporary fields not required by API - ALWAYS delete these
+      delete payload.supplier_id
       delete payload.custom_supplier
 
       onSave(payload)

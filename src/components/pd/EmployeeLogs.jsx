@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react'
+import { pollingManager } from "../../utils/api/websocket/polling-manager.jsx"
+import { SOCKET_EVENTS } from "../../utils/api/websocket/constants/events.js"
 import apiService from "../../utils/api/api-service"
 import { getStoredToken } from "../../utils/auth"
 import { ModalPortal } from "./shared"
@@ -140,6 +142,54 @@ function EmployeeLogs() {
     window.addEventListener('employeeLogEdited', handler)
     return () => window.removeEventListener('employeeLogEdited', handler)
   }, [])
+
+  // Real-time: subscribe to Toolbox log creation and refresh Procurement logs
+  useEffect(() => {
+    // Ensure polling is active
+    try { pollingManager.initialize() } catch (e) {}
+
+    // When a new log is created in Toolbox
+    const unsubCreated = pollingManager.subscribeToUpdates(
+      SOCKET_EVENTS.INVENTORY.LOG_CREATED,
+      (data) => {
+        // If on first page, prefer silent refresh to get server-authoritative sort/pagination
+        if (state.currentPage === 1) {
+          fetchEmployeeLogs()
+        } else {
+          // Optimistically prepend if not on first page but keep UX responsive
+          setState(prev => {
+            // Basic duplicate guard
+            if (prev.logs.some(l => String(l.id) === String(data.id))) return prev
+            const newEntry = {
+              id: data.id,
+              username: data.username || 'N/A',
+              details: data.details || data.purpose || 'New activity',
+              log_date: data.log_date,
+              log_time: data.log_time,
+              purpose: data.purpose || '',
+              created_at: new Date().toISOString(),
+            }
+            return { ...prev, logs: [newEntry, ...prev.logs] }
+          })
+        }
+      }
+    )
+
+    // Generic refresh signal emitted by handler layer
+    const unsubRefresh = pollingManager.subscribeToUpdates(
+      'inventory:logs:refresh',
+      () => {
+        if (state.currentPage === 1) {
+          fetchEmployeeLogs()
+        }
+      }
+    )
+
+    return () => {
+      if (typeof unsubCreated === 'function') unsubCreated()
+      if (typeof unsubRefresh === 'function') unsubRefresh()
+    }
+  }, [state.currentPage])
 
   const fetchEmployeeLogs = async () => {
     try {

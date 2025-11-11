@@ -27,6 +27,8 @@ import { BulkOperationsBar, useBulkSelection } from "./bulk-operations"
 import useGlobalBarcodeScanner from "../hooks/use-global-barcode-scanner"
 import BarcodeModal from "./barcode-modal"
 import { useInventorySync } from "../hooks/useInventorySync"
+import { SOCKET_EVENTS } from "../../src/utils/api/websocket/constants/events.js"
+import { pollingManager } from "../../src/utils/api/websocket/polling-manager.jsx"
 
 
 interface DashboardViewProps {
@@ -120,6 +122,9 @@ export function DashboardView({
   // Note: Global barcode scanning is handled by GlobalBarcodeListener component
   // The dashboard listens to 'scanned-barcode' events dispatched by that component
   const [logs, setLogs] = useState<any[]>([])
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false)
+  const [logsError, setLogsError] = useState<string | null>(null)
+  const [hasLoadedLogs, setHasLoadedLogs] = useState(false)
   const [useEnhancedCards] = useState(true)
 
   // Bulk selection state
@@ -128,10 +133,7 @@ export function DashboardView({
     selectAll,
     clearSelection
   } = useBulkSelection()
-  const [isLoadingLogs, setIsLoadingLogs] = useState(false)
-  const [logsError, setLogsError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("api")
-  const [hasLoadedLogs, setHasLoadedLogs] = useState(false)
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? navigator.onLine : true)
   const [isCategoriesCollapsed, setIsCategoriesCollapsed] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
@@ -208,6 +210,69 @@ export function DashboardView({
     }
     return true
   }
+
+  // ================= Employee Logs (Transactions) =================
+  const fetchLogsFromAPI = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setIsLoadingLogs(true)
+      setLogsError(null)
+      // Fetch latest 100 logs
+      const data = await apiService.fetchTransactions({ limit: 100, offset: 0 })
+      if (data && Array.isArray(data.data)) {
+        setLogs(data.data)
+        setHasLoadedLogs(true)
+      }
+    } catch (err: any) {
+      console.error('[Dashboard] Failed to fetch employee logs', err)
+      setLogsError(err?.message || 'Failed to load logs')
+    } finally {
+      setIsLoadingLogs(false)
+    }
+  }, [])
+
+  // Initial load when opening the Logs tab first time
+  useEffect(() => {
+    if (activeTab === 'logs' && !hasLoadedLogs && !isLoadingLogs) {
+      fetchLogsFromAPI()
+    }
+  }, [activeTab, hasLoadedLogs, isLoadingLogs, fetchLogsFromAPI])
+
+  // Real-time subscription for new logs (append or refetch)
+  useEffect(() => {
+    // Ensure polling manager is initialized (handled in useInventorySync) but guard anyway
+    pollingManager.initialize()
+
+    // When a log is created, optimistically insert at top; if structure differs, fallback to refetch
+    const unsub1 = pollingManager.subscribeToUpdates(SOCKET_EVENTS.INVENTORY.LOG_CREATED, (data: any) => {
+      setLogs(prev => {
+        // Avoid duplicates
+        if (prev.some(l => String(l.id) === String(data.id))) return prev
+        const newEntry = {
+          id: data.id,
+          username: data.username || data.user || 'unknown',
+            // details may already be present else build a simple one
+          details: data.details || data.purpose || 'New transaction',
+          log_date: data.log_date || new Date().toISOString().slice(0,10),
+          log_time: data.log_time || new Date().toLocaleTimeString('en-PH', { hour12:false }),
+          purpose: data.purpose || ''
+        }
+        const updated = [newEntry, ...prev]
+        // Keep only last 100
+        return updated.slice(0,100)
+      })
+    })
+
+    // Generic refresh trigger (inventory:logs:refresh)
+    const unsub2 = pollingManager.subscribeToUpdates('inventory:logs:refresh', () => {
+      // Refetch in background (silent)
+      fetchLogsFromAPI(true)
+    })
+
+    return () => {
+      unsub1 && unsub1()
+      unsub2 && unsub2()
+    }
+  }, [fetchLogsFromAPI])
 
   // Online/Offline status tracking
   useEffect(() => {
@@ -523,73 +588,7 @@ export function DashboardView({
     }
   }
 
-  // Logs fetching and export
-  const fetchLogsFromAPI = async () => {
-    try {
-      setIsLoadingLogs(true)
-      setLogsError(null)
-      
-      const resp = await apiService.fetchTransactions()
-
-      // TransactionResponse shape is { data: any[], ... }
-      const fetched = Array.isArray(resp) ? resp : (resp && Array.isArray(resp.data) ? resp.data : [])
-
-      // Normalize fields: Username, details, log_date, log_time
-      const normalized = fetched.map((entry: any) => {
-        // Try common timestamp fields
-        const ts = entry.timestamp || entry.created_at || entry.log_timestamp || entry.datetime || entry.date
-        let logDate = ''
-        let logTime = ''
-        if (ts) {
-          try {
-            const d = new Date(ts)
-            if (!isNaN(d.getTime())) {
-              logDate = d.toLocaleDateString()
-              logTime = d.toLocaleTimeString()
-            }
-          } catch (e) {
-            // fallthrough
-          }
-        }
-
-        // Better details formatting - try to extract meaningful text from JSON
-        let details = entry.details || entry.action || entry.message || 'No details'
-        if (details === 'No details' && entry) {
-          // If it's a POS checkout, format it nicely
-          if (entry.action && entry.action.includes('POS Checkout')) {
-            details = entry.action
-          } else {
-            // Otherwise, show a shortened JSON
-            const jsonStr = JSON.stringify(entry)
-            details = jsonStr.length > 100 ? jsonStr.substring(0, 100) + '...' : jsonStr
-          }
-        }
-
-        return {
-          username: entry.username || entry.user || entry.user_name || entry.employee || 'Unknown',
-          details: details,
-          log_date: logDate,
-          log_time: logTime,
-          raw: entry,
-        }
-      })
-
-      setLogs(normalized)
-      setHasLoadedLogs(true)
-    } catch (error) {
-      console.error('[v0] Failed to fetch logs:', error)
-      setLogsError(String(error))
-      toast({ 
-        title: 'Failed to load logs', 
-        description: String(error), 
-        variant: 'destructive',
-        toastType: 'error',
-        duration: 5000
-      } as any)
-    } finally {
-      setIsLoadingLogs(false)
-    }
-  }
+  // (Legacy duplicate fetchLogsFromAPI removed; unified implementation above with useCallback(silent))
 
   // Auto-load logs when Logs tab is opened
   const handleTabChange = (value: string) => {
@@ -1474,7 +1473,7 @@ export function DashboardView({
                         <p className="text-sm text-muted-foreground">Recent employee activity logs loaded automatically from the API.</p>
                       </div>
                       <div className="flex space-x-2">
-                        <Button onClick={fetchLogsFromAPI} size="sm" disabled={isLoadingLogs} variant="outline">
+                        <Button onClick={() => fetchLogsFromAPI(false)} size="sm" disabled={isLoadingLogs} variant="outline">
                           <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingLogs ? 'animate-spin' : ''}`} />
                           Refresh
                         </Button>
