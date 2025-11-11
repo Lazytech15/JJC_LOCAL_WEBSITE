@@ -143,9 +143,14 @@ function createPurchaseOrder() {
 
     // Store the new priority codes (P0..P4) directly in the DB
     $dbPriority = $priority;
-        $prepared_by = $input['prepared_by'] ?? null;
-        $verified_by = $input['verified_by'] ?? null;
-        $approved_by = $input['approved_by'] ?? null;
+        
+        // Support draft status - defaults to 'requested' if not provided
+        $status = isset($input['status']) ? strtolower(trim($input['status'])) : 'requested';
+        
+        // Normalize empty strings to NULL for optional signature fields
+        $prepared_by = !empty($input['prepared_by']) ? $input['prepared_by'] : null;
+        $verified_by = !empty($input['verified_by']) ? trim($input['verified_by']) : null;
+        $approved_by = !empty($input['approved_by']) ? trim($input['approved_by']) : null;
         $overwrite_existing = $input['overwrite_existing'] ?? false;
         
         // Validate required fields
@@ -174,6 +179,13 @@ function createPurchaseOrder() {
         $validPriorities = ['P0','P1','P2','P3','P4','low', 'normal', 'high', 'urgent'];
         if (!empty($priority) && !in_array($priority, $validPriorities)) {
             sendErrorResponse('Invalid priority. Must be one of: P0,P1,P2,P3,P4 (or legacy: low, normal, high, urgent)', 400);
+            return;
+        }
+        
+        // Validate status
+        $validStatuses = ['draft', 'requested', 'approved', 'ordered', 'received', 'cancelled'];
+        if (!empty($status) && !in_array($status, $validStatuses)) {
+            sendErrorResponse('Invalid status. Must be one of: draft, requested, approved, ordered, received, cancelled', 400);
             return;
         }
         
@@ -300,7 +312,7 @@ function createPurchaseOrder() {
                 $supplier_name,
                 $supplier_address,
                 $attention_person,
-                'requested',
+                $status, // Use the validated status from input (draft or requested)
                 date('Y-m-d'),
                 $po_date,
                 $input['expected_delivery_date'] ?? null,
@@ -412,6 +424,9 @@ function updatePurchaseOrder($id)
 
     // Store the new priority codes (P0..P4) directly
     $dbPriority = $priority;
+    
+        // Support status updates - if provided, validate it
+        $status = isset($input['status']) ? strtolower(trim($input['status'])) : null;
 
         if (empty($supplier_name)) {
             sendErrorResponse('Supplier name is required', 400);
@@ -426,6 +441,13 @@ function updatePurchaseOrder($id)
         $validPriorities = ['P0','P1','P2','P3','P4','low', 'normal', 'high', 'urgent'];
         if (!empty($priority) && !in_array($priority, $validPriorities)) {
             sendErrorResponse('Invalid priority. Must be one of: P0,P1,P2,P3,P4 (or legacy: low, normal, high, urgent)', 400);
+            return;
+        }
+        
+        // Validate status if provided
+        $validStatuses = ['draft', 'requested', 'approved', 'ordered', 'received', 'cancelled'];
+        if (!empty($status) && !in_array($status, $validStatuses)) {
+            sendErrorResponse('Invalid status. Must be one of: draft, requested, approved, ordered, received, cancelled', 400);
             return;
         }
 
@@ -524,7 +546,8 @@ function updatePurchaseOrder($id)
         // Update the purchase_orders header fields (preserve id)
         $now = date('Y-m-d H:i:s');
 
-        $updatePO = $db->prepare("UPDATE purchase_orders SET
+        // Build dynamic UPDATE query to include status if provided
+        $updateFields = "
             supplier = ?,
             supplier_name = ?,
             supplier_address = ?,
@@ -541,10 +564,16 @@ function updatePurchaseOrder($id)
             approved_by = ?,
             last_updated = ?,
             previous_version = ?,
-            overwrite_timestamp = ?
-            WHERE id = ?");
+            overwrite_timestamp = ?";
+        
+        // Add status to update if provided
+        if (!empty($status)) {
+            $updateFields .= ", status = ?";
+        }
+        
+        $updatePO = $db->prepare("UPDATE purchase_orders SET {$updateFields} WHERE id = ?");
 
-        $updatePO->execute([
+        $updateParams = [
             $supplier_name,
             $supplier_name,
             $input['supplier_address'] ?? null,
@@ -556,14 +585,23 @@ function updatePurchaseOrder($id)
             $input['notes'] ?? null,
             $input['terms'] ?? null,
             $dbPriority,
-            $input['prepared_by'] ?? null,
-            $input['verified_by'] ?? null,
-            $input['approved_by'] ?? null,
+            !empty($input['prepared_by']) ? $input['prepared_by'] : null,
+            !empty($input['verified_by']) ? trim($input['verified_by']) : null,
+            !empty($input['approved_by']) ? trim($input['approved_by']) : null,
             $now,
             $backupJson,
-            $now,
-            $poId
-        ]);
+            $now
+        ];
+        
+        // Add status parameter if it was provided
+        if (!empty($status)) {
+            $updateParams[] = $status;
+        }
+        
+        // Add the WHERE clause parameter (id)
+        $updateParams[] = $poId;
+        
+        $updatePO->execute($updateParams);
 
         // Insert new items
         $itemStmt = $db->prepare("INSERT INTO purchase_order_items (
@@ -630,16 +668,23 @@ function updatePurchaseOrderStatus($id)
         $input = getJsonInput();
         $newStatus = isset($input['status']) ? strtolower(trim($input['status'])) : null;
 
-        // Only allow changing status to 'received' via this endpoint for now
-        if ($newStatus !== 'received') {
-            http_response_code(405);
-            echo json_encode(['success' => false, 'error' => 'Only status change to "received" is supported via this endpoint']);
+        if (empty($newStatus)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Status is required']);
+            return;
+        }
+
+        // Validate status
+        $validStatuses = ['draft', 'requested', 'approved', 'ordered', 'received', 'cancelled'];
+        if (!in_array($newStatus, $validStatuses)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid status. Must be one of: ' . implode(', ', $validStatuses)]);
             return;
         }
 
         $db = getConnection();
 
-        // Begin transaction - we'll update the PO status and inventory atomically
+        // Begin transaction - we'll update the PO status and inventory (if receiving)
         $db->beginTransaction();
 
         // Lock the purchase order row
@@ -653,63 +698,71 @@ function updatePurchaseOrderStatus($id)
             return;
         }
 
-        if (isset($po['status']) && strtolower($po['status']) === 'received') {
-            $db->rollBack();
-            sendErrorResponse('Purchase order is already marked as received', 409);
-            return;
-        }
-
-        // Fetch PO items and lock them for update
-        $itemsStmt = $db->prepare("SELECT * FROM purchase_order_items WHERE purchase_order_id = ? FOR UPDATE");
-        $itemsStmt->execute([$id]);
-        $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
-
-        // If no items, treat as error
-        if (!$items || count($items) === 0) {
-            $db->rollBack();
-            sendErrorResponse('Purchase order has no items to receive', 400);
-            return;
-        }
-
-        $now = date('Y-m-d H:i:s');
-
-        // Process each item: increment itemsdb.in_qty and mark PO item as received
-        foreach ($items as $item) {
-            $itemNo = $item['item_no'];
-            $qty = isset($item['quantity']) ? (int)$item['quantity'] : 0;
-
-            if ($qty <= 0) {
-                // skip zero quantities
-                continue;
-            }
-
-            // Lock inventory row
-            $checkStmt = $db->prepare("SELECT item_no, in_qty FROM itemsdb WHERE item_no = ? FOR UPDATE");
-            $checkStmt->execute([$itemNo]);
-            $inv = $checkStmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$inv) {
+        // Special handling for "received" status - update inventory
+        if ($newStatus === 'received') {
+            if (isset($po['status']) && strtolower($po['status']) === 'received') {
                 $db->rollBack();
-                sendErrorResponse("Inventory item {$itemNo} not found", 400);
+                sendErrorResponse('Purchase order is already marked as received', 409);
                 return;
             }
 
-            $currentIn = isset($inv['in_qty']) ? (int)$inv['in_qty'] : 0;
-            $newIn = $currentIn + $qty;
+            // Fetch PO items and lock them for update
+            $itemsStmt = $db->prepare("SELECT * FROM purchase_order_items WHERE purchase_order_id = ? FOR UPDATE");
+            $itemsStmt->execute([$id]);
+            $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Update inventory in_qty and last_po
-            $updateInv = $db->prepare("UPDATE itemsdb SET in_qty = ?, last_po = ? WHERE item_no = ?");
-            $updateInv->execute([$newIn, $id, $itemNo]);
+            // If no items, treat as error
+            if (!$items || count($items) === 0) {
+                $db->rollBack();
+                sendErrorResponse('Purchase order has no items to receive', 400);
+                return;
+            }
 
-            // Update purchase order item status to received
-            $updatePOItem = $db->prepare("UPDATE purchase_order_items SET status = 'received', delivery_method = COALESCE(delivery_method, 'delivery') WHERE purchase_order_id = ? AND item_no = ?");
-            $updatePOItem->execute([$id, $itemNo]);
+            $now = date('Y-m-d H:i:s');
+
+            // Process each item: increment itemsdb.in_qty and mark PO item as received
+            foreach ($items as $item) {
+                $itemNo = $item['item_no'];
+                $qty = isset($item['quantity']) ? (int)$item['quantity'] : 0;
+
+                if ($qty <= 0) {
+                    // skip zero quantities
+                    continue;
+                }
+
+                // Lock inventory row
+                $checkStmt = $db->prepare("SELECT item_no, in_qty FROM itemsdb WHERE item_no = ? FOR UPDATE");
+                $checkStmt->execute([$itemNo]);
+                $inv = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$inv) {
+                    $db->rollBack();
+                    sendErrorResponse("Inventory item {$itemNo} not found", 400);
+                    return;
+                }
+
+                $currentIn = isset($inv['in_qty']) ? (int)$inv['in_qty'] : 0;
+                $newIn = $currentIn + $qty;
+
+                // Update inventory in_qty and last_po
+                $updateInv = $db->prepare("UPDATE itemsdb SET in_qty = ?, last_po = ? WHERE item_no = ?");
+                $updateInv->execute([$newIn, $id, $itemNo]);
+
+                // Update purchase order item status to received
+                $updatePOItem = $db->prepare("UPDATE purchase_order_items SET status = 'received', delivery_method = COALESCE(delivery_method, 'delivery') WHERE purchase_order_id = ? AND item_no = ?");
+                $updatePOItem->execute([$id, $itemNo]);
+            }
+
+            // Update purchase order header: set status and actual_delivery_date / last_updated
+            $actualDeliveryDate = isset($input['actual_delivery_date']) ? $input['actual_delivery_date'] : date('Y-m-d');
+            $updatePO = $db->prepare("UPDATE purchase_orders SET status = 'received', actual_delivery_date = ?, last_updated = ? WHERE id = ?");
+            $updatePO->execute([$actualDeliveryDate, $now, $id]);
+        } else {
+            // For other status changes, just update the status field
+            $now = date('Y-m-d H:i:s');
+            $updatePO = $db->prepare("UPDATE purchase_orders SET status = ?, last_updated = ? WHERE id = ?");
+            $updatePO->execute([$newStatus, $now, $id]);
         }
-
-        // Update purchase order header: set status and actual_delivery_date / last_updated
-        $actualDeliveryDate = isset($input['actual_delivery_date']) ? $input['actual_delivery_date'] : date('Y-m-d');
-        $updatePO = $db->prepare("UPDATE purchase_orders SET status = 'received', actual_delivery_date = ?, last_updated = ? WHERE id = ?");
-        $updatePO->execute([$actualDeliveryDate, $now, $id]);
 
         $db->commit();
 
@@ -722,16 +775,29 @@ function updatePurchaseOrderStatus($id)
         $itemsStmt->execute([$id]);
         $updatedOrder['items'] = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // ✅ Emit real-time event for PO received
+        // ✅ Emit real-time event for PO status change
         $socketEvents = getSocketEvents();
-        $socketEvents->poReceived([
-            'id' => $updatedOrder['id'],
-            'po_number' => $updatedOrder['id'],
-            'received_by' => 'System',
-            'received_date' => $actualDeliveryDate,
-        ]);
+        if ($newStatus === 'received') {
+            $socketEvents->poReceived([
+                'id' => $updatedOrder['id'],
+                'po_number' => $updatedOrder['id'],
+                'received_by' => 'System',
+                'received_date' => $actualDeliveryDate ?? date('Y-m-d'),
+            ]);
+        } else {
+            $socketEvents->poStatusChanged([
+                'id' => $updatedOrder['id'],
+                'po_number' => $updatedOrder['id'],
+                'old_status' => $po['status'],
+                'new_status' => $newStatus,
+            ]);
+        }
 
-        sendSuccessResponse($updatedOrder, 'Purchase order marked as received and inventory updated');
+        $message = $newStatus === 'received' 
+            ? 'Purchase order marked as received and inventory updated'
+            : "Purchase order status updated to {$newStatus}";
+        
+        sendSuccessResponse($updatedOrder, $message);
 
     } catch (Exception $e) {
         if (isset($db) && $db->inTransaction()) {
