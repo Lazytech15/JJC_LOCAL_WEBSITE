@@ -9,6 +9,7 @@ import { ListenerManager } from './managers/listener-manager.js'
 // Register default handlers here so they are active for polling
 import { InventoryEventHandler } from './handlers/inventory-handler.js'
 import { ProcurementEventHandler } from './handlers/procurement-handler.js'
+import { OperationsEventHandler } from './handlers/operations-handler.js'
 
 export class PollingManager {
   constructor() {
@@ -34,20 +35,21 @@ export class PollingManager {
   }
 
   setupEventHandlers() {
-    // Create mock socket interface for handlers
-    const mockSocket = this.createMockSocketInterface()
-    
-    // Import and initialize handlers dynamically
-    this.eventHandlers = [
-      new InventoryEventHandler(this),
-      new ProcurementEventHandler(this),
-    ]
-    
-    // Setup all handlers
-    this.eventHandlers.forEach(handler => {
-      handler.setupHandlers(mockSocket)
-    })
-  }
+  // Create mock socket interface for handlers
+  const mockSocket = this.createMockSocketInterface()
+  
+  // Import and initialize handlers dynamically
+  this.eventHandlers = [
+    new InventoryEventHandler(this),
+    new ProcurementEventHandler(this),
+    new OperationsEventHandler(this), // ADD THIS
+  ]
+  
+  // Setup all handlers
+  this.eventHandlers.forEach(handler => {
+    handler.setupHandlers(mockSocket)
+  })
+}
 
   createMockSocketInterface() {
     const internalHandlers = new Map()
@@ -185,10 +187,17 @@ export class PollingManager {
     console.log(`📌 Joined room: ${room}`)
   }
 
-  joinAllRooms() {
-    const defaultRooms = ['employees', 'departments', 'auth', 'daily-summary', 'attendance']
-    defaultRooms.forEach(room => this.joinRoom(room))
-  }
+joinAllRooms() {
+  const defaultRooms = [
+    'employees', 
+    'departments', 
+    'auth', 
+    'daily-summary', 
+    'attendance',
+    'operations'
+  ]
+  defaultRooms.forEach(room => this.joinRoom(room))
+}
 
   leaveRoom(room) {
     this.rooms.delete(room)

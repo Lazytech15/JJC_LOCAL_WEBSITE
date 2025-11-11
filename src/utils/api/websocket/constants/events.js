@@ -80,6 +80,26 @@ export const SOCKET_EVENTS = {
 
   // Generic data change
   DATA_CHANGED: 'data:changed',
+
+  // Operations events (ADD THIS)
+  OPERATIONS: {
+    ITEM_CREATED: 'operations:item_created',
+    ITEM_UPDATED: 'operations:item_updated',
+    ITEM_DELETED: 'operations:item_deleted',
+    PHASE_CREATED: 'operations:phase_created',
+    PHASE_UPDATED: 'operations:phase_updated',
+    PHASE_DELETED: 'operations:phase_deleted',
+    PHASE_STARTED: 'operations:phase_started',
+    PHASE_STOPPED: 'operations:phase_stopped',
+    PHASE_PAUSED: 'operations:phase_paused',
+    PHASE_RESUMED: 'operations:phase_resumed',
+    SUBPHASE_CREATED: 'operations:subphase_created',
+    SUBPHASE_UPDATED: 'operations:subphase_updated',
+    SUBPHASE_DELETED: 'operations:subphase_deleted',
+    SUBPHASE_COMPLETED: 'operations:subphase_completed',
+    EMPLOYEE_ASSIGNED: 'operations:employee_assigned',
+    GOOGLE_SHEETS_IMPORT: 'operations:google_sheets_import',
+  },
 }
 
 // Room names
@@ -92,6 +112,7 @@ export const SOCKET_ROOMS = {
   INVENTORY: 'inventory',
   PROCUREMENT: 'procurement',
   RECRUITMENT: 'recruitment',
+  OPERATIONS: 'operations',
 }
 
 // Event categories for bulk operations
@@ -102,6 +123,7 @@ export const EVENT_CATEGORIES = {
   DAILY_SUMMARY: Object.values(SOCKET_EVENTS.DAILY_SUMMARY),
   INVENTORY: Object.values(SOCKET_EVENTS.INVENTORY),
   PROCUREMENT: Object.values(SOCKET_EVENTS.PROCUREMENT),
+  OPERATIONS: Object.values(SOCKET_EVENTS.OPERATIONS),
 }
 
 // Helper function to get all event names

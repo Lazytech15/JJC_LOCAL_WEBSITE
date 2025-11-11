@@ -1,6 +1,7 @@
 // ==================== CONFIGURATION ====================
 const WEBHOOK_URL = 'https://jjcenggworks.com/api/operations/google-sheets-import';
-const SHEET_NAME = 'AddItem'; // Name of your sheet tab
+const STATUS_CHECK_URL = 'https://jjcenggworks.com/api/operations/items';
+const SHEET_NAME = 'AddItem';
 
 // Column indices (0-based)
 const COLUMNS = {
@@ -12,37 +13,43 @@ const COLUMNS = {
   MESSAGE: 5           // Column F (auto-filled)
 };
 
+// Status colors
+const STATUS_COLORS = {
+  'SUCCESS': { bg: '#d4edda', fg: '#155724' },      // Light green
+  'ERROR': { bg: '#f8d7da', fg: '#721c24' },        // Light red
+  'PROCESSING': { bg: '#fff3cd', fg: '#856404' },   // Yellow
+  'PENDING': { bg: '#e7e7e7', fg: '#666666' },      // Grey
+  'completed': { bg: '#28a745', fg: '#ffffff' },    // Green - Item completed
+  'in_progress': { bg: '#ffc107', fg: '#000000' },  // Yellow - Item in progress
+  'not_started': { bg: '#6c757d', fg: '#ffffff' },  // Grey - Item not started
+  'paused': { bg: '#fd7e14', fg: '#ffffff' }        // Orange - Item paused
+};
+
 // ==================== MAIN FUNCTIONS ====================
 
 /**
  * Extract base part number from full part number
- * Example: "37256-BATCH-1762738550430-723" -> "37256"
  */
 function extractBasePartNumber(fullPartNumber) {
   const partStr = String(fullPartNumber).trim();
   
-  // If it contains "-BATCH-" or similar patterns, extract the base
   if (partStr.includes('-BATCH-') || partStr.includes('-GS-')) {
     return partStr.split('-')[0];
   }
   
-  // Otherwise return as-is
   return partStr;
 }
 
 function onEditInstallable(e) {
   const sheet = e.source.getActiveSheet();
   
-  // Only process if it's the correct sheet
   if (sheet.getName() !== SHEET_NAME) return;
   
   const row = e.range.getRow();
   const col = e.range.getColumn();
   
-  // Skip header row
   if (row === 1) return;
   
-  // Only trigger when Part Number, Client Name, or Quantity is edited
   if (col >= 1 && col <= 3) {
     processRow(sheet, row);
   }
@@ -87,7 +94,6 @@ function processRow(sheet, row) {
       muteHttpExceptions: true
     };
     
-    // ✅ Send to import endpoint
     const response = UrlFetchApp.fetch(WEBHOOK_URL, options);
     const responseCode = response.getResponseCode();
     const responseText = response.getContentText();
@@ -105,11 +111,12 @@ function processRow(sheet, row) {
       const createdPartNumber = result.data?.part_number || result.part_number || 'OK';
       updateStatus(sheet, row, 'SUCCESS', `Item created: ${createdPartNumber}`);
       
-      // ✅ CRITICAL: Notify cache refresh
-      // Wait a moment for the database transaction to complete
-      Utilities.sleep(1000); // 1 second delay
-      
+      Utilities.sleep(1000);
       notifyFrontendCacheRefresh(createdPartNumber);
+      
+      // ✅ NEW: Check status after creation
+      Utilities.sleep(2000); // Wait 2 seconds for backend to process
+      checkAndUpdateItemStatus(sheet, row, basePartNumber, clientName);
     } else {
       let errorMsg = responseText || `HTTP ${responseCode}`;
       try {
@@ -127,6 +134,242 @@ function processRow(sheet, row) {
   }
 }
 
+// Around line 150-200, UPDATE checkAndUpdateItemStatus to fetch specific item:
+
+function checkAndUpdateItemStatus(sheet, row, basePartNumber, clientName) {
+  try {
+    // Validate parameters
+    if (!sheet || !row || !basePartNumber || !clientName) {
+      Logger.log(`❌ Missing required parameters`);
+      return false;
+    }
+    
+    // ✅ STEP 1: Get list to find exact part_number
+    const listOptions = {
+      method: 'get',
+      muteHttpExceptions: true,
+      headers: { 'Accept': 'application/json' }
+    };
+    
+    const listResponse = UrlFetchApp.fetch(STATUS_CHECK_URL, listOptions);
+    
+    if (listResponse.getResponseCode() !== 200) {
+      Logger.log(`❌ Failed to fetch items list`);
+      return false;
+    }
+    
+    const listResponseData = JSON.parse(listResponse.getContentText());
+    
+    // Parse items list
+    let items;
+    if (listResponseData.success !== undefined && listResponseData.data) {
+      items = listResponseData.data;
+    } else if (Array.isArray(listResponseData)) {
+      items = listResponseData;
+    } else if (typeof listResponseData === 'object' && !Array.isArray(listResponseData)) {
+      const numericKeys = Object.keys(listResponseData).filter(k => !isNaN(k));
+      if (numericKeys.length > 0) {
+        items = numericKeys.map(key => listResponseData[key]);
+      } else {
+        return false;
+      }
+    } else {
+      return false;
+    }
+    
+    // Find matching items
+    const matchingItems = items.filter(item => {
+      if (!item || !item.part_number || !item.client_name) return false;
+      const itemBasePartNumber = extractBasePartNumber(item.part_number);
+      const partMatch = itemBasePartNumber === basePartNumber;
+      const clientMatch = item.client_name.trim().toLowerCase() === clientName.trim().toLowerCase();
+      return partMatch && clientMatch;
+    });
+    
+    if (matchingItems.length === 0) {
+      Logger.log(`⚠️ No matching item found`);
+      return false;
+    }
+    
+    // Get latest item
+    const summaryItem = matchingItems.sort((a, b) => 
+      new Date(b.created_at || 0) - new Date(a.created_at || 0)
+    )[0];
+    
+    // ✅ STEP 2: Fetch specific item with full phase details
+    const detailUrl = `${STATUS_CHECK_URL}?part_number=${encodeURIComponent(summaryItem.part_number)}`;
+    const detailResponse = UrlFetchApp.fetch(detailUrl, listOptions);
+    
+    if (detailResponse.getResponseCode() !== 200) {
+      Logger.log(`❌ Failed to fetch item details`);
+      return false;
+    }
+    
+    const detailResponseData = JSON.parse(detailResponse.getContentText());
+    
+    // Extract item
+    let matchingItem;
+    if (detailResponseData.success && detailResponseData.data) {
+      matchingItem = detailResponseData.data;
+    } else {
+      matchingItem = detailResponseData;
+    }
+    
+    if (!matchingItem || !matchingItem.part_number) {
+      Logger.log(`❌ Invalid item data`);
+      return false;
+    }
+    
+    Logger.log(`✅ Got item with phases: ${matchingItem.part_number}`);
+    
+    const itemStatus = matchingItem.status || 'not_started';
+    let displayStatus = '';
+    let statusColor = STATUS_COLORS[itemStatus] || STATUS_COLORS['not_started'];
+    
+    // ✅ SIMPLIFIED: If ANY phase has pause_time with a value, item is PAUSED
+    let isPaused = false;
+    if (matchingItem.phases && Array.isArray(matchingItem.phases)) {
+      isPaused = matchingItem.phases.some(phase => {
+        const hasPauseTime = phase.pause_time && 
+                            phase.pause_time !== null && 
+                            phase.pause_time !== '' &&
+                            phase.pause_time !== 'null';
+        
+        if (hasPauseTime) {
+          Logger.log(`🔍 Phase "${phase.name}" has pause_time: "${phase.pause_time}" - PAUSED`);
+        }
+        
+        return hasPauseTime;
+      });
+    }
+    
+    Logger.log(`⏸️  Overall item paused status: ${isPaused}`);
+    
+    // Priority: Check PAUSED first
+    if (isPaused) {
+      displayStatus = 'PAUSED';
+      statusColor = STATUS_COLORS['paused'];
+    } else {
+      switch (itemStatus) {
+        case 'completed':
+          displayStatus = 'COMPLETED';
+          statusColor = STATUS_COLORS['completed'];
+          break;
+        case 'in_progress':
+          displayStatus = 'IN PROGRESS';
+          statusColor = STATUS_COLORS['in_progress'];
+          break;
+        case 'not_started':
+          displayStatus = 'NOT STARTED';
+          statusColor = STATUS_COLORS['not_started'];
+          break;
+        default:
+          displayStatus = itemStatus.toUpperCase();
+      }
+    }
+    
+    Logger.log(`📊 Status: ${displayStatus}`);
+    
+    // Update row
+    const rowRange = sheet.getRange(row, 1, 1, 6);
+    rowRange.setBackground(statusColor.bg);
+    rowRange.setFontColor(statusColor.fg);
+    
+    const statusCell = sheet.getRange(row, COLUMNS.STATUS + 1);
+    statusCell.setValue(displayStatus);
+    
+    let message = `Item: ${matchingItem.part_number}`;
+    if (matchingItem.overall_progress) {
+      message += ` | Progress: ${Math.round(matchingItem.overall_progress)}%`;
+    }
+    
+    sheet.getRange(row, COLUMNS.MESSAGE + 1).setValue(message);
+    
+    Logger.log(`✅ Updated row ${row} with status: ${displayStatus}`);
+    return true;
+    
+  } catch (error) {
+    Logger.log(`❌ Error: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * ✅ FIXED: Sync all rows with backend status
+ * This can be triggered manually or on a schedule
+ */
+function syncAllItemStatuses() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    
+    if (!sheet) {
+      Logger.log(`❌ Sheet "${SHEET_NAME}" not found`);
+      return;
+    }
+    
+    const lastRow = sheet.getLastRow();
+    
+    if (lastRow <= 1) {
+      Logger.log('ℹ️ No items to sync');
+      return;
+    }
+    
+    let syncedCount = 0;
+    let failedCount = 0;
+    
+    Logger.log(`🔄 Starting sync for ${lastRow - 1} rows...`);
+    
+    for (let row = 2; row <= lastRow; row++) {
+      try {
+        const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
+        const clientName = sheet.getRange(row, COLUMNS.CLIENT_NAME + 1).getValue();
+        const status = sheet.getRange(row, COLUMNS.STATUS + 1).getValue();
+        
+        // Skip empty rows
+        if (!partNumber || !clientName) {
+          continue;
+        }
+        
+        // Only sync rows that have been successfully created
+        // Allow syncing of SUCCESS, COMPLETED, IN PROGRESS, NOT STARTED, PAUSED statuses
+        const syncableStatuses = ['ADDED!', 'COMPLETED', 'IN PROGRESS', 'NOT STARTED', 'PAUSED'];
+        
+        if (partNumber && clientName && syncableStatuses.includes(status)) {
+          const basePartNumber = extractBasePartNumber(partNumber);
+          Logger.log(`Syncing row ${row}: ${basePartNumber} - ${clientName}`);
+          
+          const success = checkAndUpdateItemStatus(sheet, row, basePartNumber, clientName);
+          
+          if (success) {
+            syncedCount++;
+          } else {
+            failedCount++;
+          }
+          
+          Utilities.sleep(500); // Wait between requests
+        }
+      } catch (rowError) {
+        Logger.log(`❌ Error syncing row ${row}: ${rowError.message}`);
+        failedCount++;
+      }
+    }
+    
+    Logger.log(`✅ Sync complete: ${syncedCount} synced, ${failedCount} failed`);
+    
+    // Only show alert if running manually (not from trigger)
+    try {
+      SpreadsheetApp.getUi().alert(`✅ Sync complete!\n\nSynced: ${syncedCount}\nFailed: ${failedCount}`);
+    } catch (e) {
+      // Running from trigger, no UI available
+      Logger.log('ℹ️ Running from trigger - no UI alert');
+    }
+    
+  } catch (error) {
+    Logger.log(`❌ Fatal error in syncAllItemStatuses: ${error.message}`);
+    Logger.log(`Stack trace: ${error.stack}`);
+    throw error;
+  }
+}
 
 /**
  * Update status columns
@@ -134,65 +377,50 @@ function processRow(sheet, row) {
 function updateStatus(sheet, row, status, message) {
   const timestamp = new Date().toLocaleString();
   
-  // Status column
   const statusCell = sheet.getRange(row, COLUMNS.STATUS + 1);
   statusCell.setValue(status);
   
-  // Color code the status
-  switch (status) {
-    case 'SUCCESS':
-      statusCell.setBackground('#d4edda').setFontColor('#155724');
-      break;
-    case 'ERROR':
-      statusCell.setBackground('#f8d7da').setFontColor('#721c24');
-      break;
-    case 'PROCESSING':
-      statusCell.setBackground('#fff3cd').setFontColor('#856404');
-      break;
-    case 'PENDING':
-      statusCell.setBackground('#e7e7e7').setFontColor('#666666');
-      break;
+  const color = STATUS_COLORS[status];
+  if (color) {
+    statusCell.setBackground(color.bg).setFontColor(color.fg);
   }
   
-  // Timestamp column
   sheet.getRange(row, COLUMNS.TIMESTAMP + 1).setValue(timestamp);
-  
-  // Message column
   sheet.getRange(row, COLUMNS.MESSAGE + 1).setValue(message);
 }
 
 /**
- * Initialize sheet with headers (run this once)
+ * Enhanced sheet setup with better formatting
  */
 function setupSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
   
-  // Create sheet if it doesn't exist
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
   }
   
-  // Set up headers
-  const headers = ['Part Number', 'Client Name', 'Quantity', 'Status', 'Timestamp', 'Message'];
+  // Set headers with Actions column
+  const headers = ['Part Number', 'Client Name', 'Quantity', 'Status', 'Timestamp', 'Message', 'Actions'];
   const headerRange = sheet.getRange(1, 1, 1, headers.length);
   headerRange.setValues([headers]);
   headerRange.setFontWeight('bold');
   headerRange.setBackground('#4285f4');
   headerRange.setFontColor('#ffffff');
+  headerRange.setHorizontalAlignment('center');
   
   // Set column widths
-  sheet.setColumnWidth(1, 150); // Part Number
-  sheet.setColumnWidth(2, 150); // Client Name
-  sheet.setColumnWidth(3, 100); // Quantity
-  sheet.setColumnWidth(4, 120); // Status
-  sheet.setColumnWidth(5, 180); // Timestamp
-  sheet.setColumnWidth(6, 300); // Message
+  sheet.setColumnWidth(1, 150);  // Part Number
+  sheet.setColumnWidth(2, 150);  // Client Name
+  sheet.setColumnWidth(3, 100);  // Quantity
+  sheet.setColumnWidth(4, 120);  // Status
+  sheet.setColumnWidth(5, 180);  // Timestamp
+  sheet.setColumnWidth(6, 300);  // Message
+  sheet.setColumnWidth(7, 100);  // Actions
   
-  // Freeze header row
   sheet.setFrozenRows(1);
   
-  // Add data validation for quantity (numbers only)
+  // Add data validation for quantity
   const qtyColumn = sheet.getRange(2, COLUMNS.QUANTITY + 1, 1000);
   const qtyValidation = SpreadsheetApp.newDataValidation()
     .requireNumberGreaterThan(0)
@@ -201,23 +429,31 @@ function setupSheet() {
     .build();
   qtyColumn.setDataValidation(qtyValidation);
   
-  // Add instructions in a note
+  // Add instructions
   const instructionText = 
-    'HOW TO USE:\n' +
-    '1. Enter Part Number (e.g., 37256 or full: 37256-BATCH-123-456)\n' +
+    '📝 HOW TO USE:\n\n' +
+    '1. Enter Part Number (e.g., 37256)\n' +
     '2. Enter Client Name\n' +
     '3. Enter Quantity\n' +
-    '4. System will auto-process when you complete the row\n\n' +
-    'The system will find an existing template for the part number\n' +
-    'and create a new batch with a unique identifier.';
+    '4. System will auto-process\n' +
+    '5. Click 🔄 Refresh button to sync status\n\n' +
+    '💡 TIP: Use "Item Import" menu for bulk operations\n\n' +
+    '🎨 STATUS COLORS:\n' +
+    '🟢 Green = Completed\n' +
+    '🟡 Yellow = In Progress\n' +
+    '⚪ Grey = Not Started\n' +
+    '🟠 Orange = Paused';
   
   sheet.getRange('A1').setNote(instructionText);
   
-  SpreadsheetApp.getUi().alert('Sheet setup complete! You can now start entering items.');
+  SpreadsheetApp.getUi().alert(
+    '✅ Sheet Setup Complete!\n\n' +
+    'Next step: Click "Item Import" menu → "Add Features" → "Add Refresh Buttons"'
+  );
 }
 
 /**
- * Process all pending rows (manual trigger)
+ * Process all pending rows
  */
 function processAllPendingRows() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
@@ -229,11 +465,10 @@ function processAllPendingRows() {
     const status = sheet.getRange(row, COLUMNS.STATUS + 1).getValue();
     const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
     
-    // Process if status is empty, PENDING, or ERROR and has a part number
     if (partNumber && (!status || status === 'PENDING' || status === 'ERROR')) {
       processRow(sheet, row);
       processedCount++;
-      Utilities.sleep(500); // Wait 500ms between requests
+      Utilities.sleep(500);
     }
   }
   
@@ -241,7 +476,7 @@ function processAllPendingRows() {
 }
 
 /**
- * Clear all status columns (useful for retry)
+ * Clear all status columns
  */
 function clearAllStatuses() {
   const ui = SpreadsheetApp.getUi();
@@ -254,25 +489,46 @@ function clearAllStatuses() {
     const lastRow = sheet.getLastRow();
     
     if (lastRow > 1) {
+      const range = sheet.getRange(2, 1, lastRow - 1, 6);
+      range.setBackground(null);
+      range.setFontColor(null);
+      
       sheet.getRange(2, COLUMNS.STATUS + 1, lastRow - 1, 3).clearContent();
-      sheet.getRange(2, COLUMNS.STATUS + 1, lastRow - 1, 1).setBackground(null);
       ui.alert('Status columns cleared');
     }
   }
 }
 
 /**
- * Create custom menu
+ * Enhanced custom menu with more options
  */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('Item Import')
-    .addItem('Setup Sheet', 'setupSheet')
+  ui.createMenu('📋 Item Import')
+    .addItem('🔧 Setup Sheet', 'setupSheet')
     .addSeparator()
-    .addItem('Process All Pending', 'processAllPendingRows')
-    .addItem('Clear All Statuses', 'clearAllStatuses')
+    .addSubMenu(ui.createMenu('➕ Add Features')
+      .addItem('Add Refresh Buttons', 'addButtonsToSheet'))
     .addSeparator()
-    .addItem('Test Connection', 'testConnection')
+    .addSubMenu(ui.createMenu('🔄 Sync Operations')
+      .addItem('Refresh All Rows', 'bulkRefreshAllRows')
+      .addItem('Refresh Selected Row', 'testSingleRowSync')
+      .addItem('Process All Pending', 'processAllPendingRows')
+      .addItem('Enable Auto-Sync (5 min)', 'createAutoSyncTrigger')
+      .addItem('Disable Auto-Sync', 'removeAutoSyncTrigger'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('✏️ Row Actions')
+      .addItem('Show Action Menu', 'showRowActionMenu')
+      .addItem('Clear Row Status', 'clearSelectedRowStatus')
+      .addItem('Delete Row', 'deleteSelectedRow'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('🗑️ Cleanup')
+      .addItem('Clear All Statuses', 'clearAllStatuses'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('🧪 Testing')
+      .addItem('Test Connection', 'testConnection')
+      .addItem('Test API Response', 'testAPIResponse')
+      .addItem('🆕 Test Phase Data Structure', 'testPhaseDataStructure'))
     .addToUi();
 }
 
@@ -287,22 +543,128 @@ function testConnection() {
     });
     
     if (response.getResponseCode() === 200) {
-      SpreadsheetApp.getUi().alert('Connection successful!');
+      SpreadsheetApp.getUi().alert('✅ Connection successful!');
     } else {
-      SpreadsheetApp.getUi().alert('Connection failed: ' + response.getResponseCode());
+      SpreadsheetApp.getUi().alert('❌ Connection failed: ' + response.getResponseCode());
     }
   } catch (error) {
-    SpreadsheetApp.getUi().alert('Connection error: ' + error.message);
+    SpreadsheetApp.getUi().alert('❌ Connection error: ' + error.message);
   }
 }
 
 /**
- * ✅ NEW: Notify frontend to refresh cache
+ * ✅ NEW: Test API response format
+ * This helps debug what structure the API returns
+ */
+function testAPIResponse() {
+  try {
+    Logger.log('=== Testing API Response Format ===');
+    
+    const options = {
+      method: 'get',
+      muteHttpExceptions: true,
+      headers: {
+        'Accept': 'application/json'
+      }
+    };
+    
+    Logger.log(`Fetching from: ${STATUS_CHECK_URL}`);
+    const response = UrlFetchApp.fetch(STATUS_CHECK_URL, options);
+    
+    Logger.log(`Response Code: ${response.getResponseCode()}`);
+    
+    const responseText = response.getContentText();
+    Logger.log(`Response Length: ${responseText.length} characters`);
+    Logger.log(`First 1000 chars: ${responseText.substring(0, 1000)}`);
+    
+    if (response.getResponseCode() === 200) {
+      const data = JSON.parse(responseText);
+      Logger.log(`Response Type: ${typeof data}`);
+      Logger.log(`Is Array: ${Array.isArray(data)}`);
+      
+      if (typeof data === 'object') {
+        Logger.log(`Object Keys: ${Object.keys(data).join(', ')}`);
+        
+        // Check common wrapper properties
+        if (data.success !== undefined) {
+          Logger.log(`Has 'success' property: ${data.success}`);
+        }
+        if (data.data !== undefined) {
+          Logger.log(`Has 'data' property: ${Array.isArray(data.data) ? 'Array' : typeof data.data}`);
+        }
+        if (data.items !== undefined) {
+          Logger.log(`Has 'items' property: ${Array.isArray(data.items) ? 'Array' : typeof data.items}`);
+        }
+      }
+      
+      SpreadsheetApp.getUi().alert(
+        '✅ API Response received!\n\n' +
+        'Check View > Executions for detailed logs.\n\n' +
+        `Response Type: ${typeof data}\n` +
+        `Is Array: ${Array.isArray(data)}`
+      );
+    } else {
+      SpreadsheetApp.getUi().alert(`❌ API Error: ${response.getResponseCode()}\n\n${responseText.substring(0, 200)}`);
+    }
+    
+  } catch (error) {
+    Logger.log(`❌ Error testing API: ${error.message}`);
+    Logger.log(`Stack: ${error.stack}`);
+    SpreadsheetApp.getUi().alert(`❌ Error: ${error.message}\n\nCheck View > Executions for details`);
+  }
+}
+
+/**
+ * ✅ NEW: Test syncing for currently selected row
+ * Select a row and run this to test if sync works
+ */
+function testSingleRowSync() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const activeRange = sheet.getActiveRange();
+  const row = activeRange.getRow();
+  
+  if (row <= 1) {
+    SpreadsheetApp.getUi().alert('⚠️ Please select a data row (not header)');
+    return;
+  }
+  
+  const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
+  const clientName = sheet.getRange(row, COLUMNS.CLIENT_NAME + 1).getValue();
+  
+  if (!partNumber || !clientName) {
+    SpreadsheetApp.getUi().alert('⚠️ Selected row has no Part Number or Client Name');
+    return;
+  }
+  
+  const basePartNumber = extractBasePartNumber(partNumber);
+  
+  Logger.log(`=== Testing Single Row Sync ===`);
+  Logger.log(`Row: ${row}`);
+  Logger.log(`Part Number: ${partNumber}`);
+  Logger.log(`Base Part Number: ${basePartNumber}`);
+  Logger.log(`Client Name: ${clientName}`);
+  
+  const success = checkAndUpdateItemStatus(sheet, row, basePartNumber, clientName);
+  
+  if (success) {
+    SpreadsheetApp.getUi().alert('✅ Sync successful! Check the row for updated status.');
+  } else {
+    SpreadsheetApp.getUi().alert(
+      '❌ Sync failed.\n\n' +
+      'Check View > Executions for detailed logs.\n\n' +
+      'Common issues:\n' +
+      '- No matching item found in backend\n' +
+      '- Part number or client name mismatch\n' +
+      '- API response format issue'
+    );
+  }
+}
+
+/**
+ * Notify frontend to refresh cache
  */
 function notifyFrontendCacheRefresh(partNumber) {
   try {
-    // Simple ping to trigger cache check
-    // The frontend polling will pick up the new item
     const pingUrl = 'https://jjcenggworks.com/api/operations/items?check=new&t=' + Date.now();
     
     const options = {
@@ -322,7 +684,453 @@ function notifyFrontendCacheRefresh(partNumber) {
       Logger.log(`⚠️ Cache refresh ping returned: ${response.getResponseCode()}`);
     }
   } catch (error) {
-    // Don't fail the import if ping fails
     Logger.log(`⚠️ Cache refresh ping error: ${error.message}`);
+  }
+}
+
+/**
+ * ✅ FIXED: Create time-based trigger for automatic status sync
+ * Run this once to set up automatic syncing every 5 minutes
+ */
+function createAutoSyncTrigger() {
+  try {
+    // Delete existing triggers first
+    const triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach(trigger => {
+      if (trigger.getHandlerFunction() === 'syncAllItemStatuses') {
+        ScriptApp.deleteTrigger(trigger);
+      }
+    });
+    
+    // Create new trigger - runs every 5 minutes
+    ScriptApp.newTrigger('syncAllItemStatuses')
+      .timeBased()
+      .everyMinutes(5)
+      .create();
+    
+    Logger.log('✅ Auto-sync trigger created');
+    
+    try {
+      SpreadsheetApp.getUi().alert('✅ Auto-sync enabled!\n\nStatus will sync every 5 minutes.\n\nCheck View > Executions to monitor syncs.');
+    } catch (e) {
+      // No UI available
+      Logger.log('ℹ️ No UI available for alert');
+    }
+  } catch (error) {
+    Logger.log(`❌ Error creating trigger: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * ✅ NEW: Remove auto-sync trigger
+ */
+function removeAutoSyncTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  let removed = 0;
+  
+  triggers.forEach(trigger => {
+    if (trigger.getHandlerFunction() === 'syncAllItemStatuses') {
+      ScriptApp.deleteTrigger(trigger);
+      removed++;
+    }
+  });
+  
+  SpreadsheetApp.getUi().alert(`✅ Removed ${removed} auto-sync trigger(s)`);
+}
+
+/**
+ * Add buttons to each row
+ */
+function addButtonsToSheet() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const lastRow = sheet.getLastRow();
+  
+  if (lastRow <= 1) {
+    SpreadsheetApp.getUi().alert('No data rows to add buttons to');
+    return;
+  }
+  
+  // Add "Actions" header in column G
+  sheet.getRange(1, 7).setValue('Actions');
+  
+  for (let row = 2; row <= lastRow; row++) {
+    const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
+    if (!partNumber) continue;
+    
+    // Add refresh button
+    const buttonCell = sheet.getRange(row, 7);
+    buttonCell.setValue('🔄 Refresh');
+    buttonCell.setBackground('#4285f4');
+    buttonCell.setFontColor('#ffffff');
+    buttonCell.setHorizontalAlignment('center');
+  }
+  
+  SpreadsheetApp.getUi().alert('✅ Buttons added! Click any "🔄 Refresh" button to sync that row.');
+}
+
+/**
+ * Handle button clicks
+ */
+function onEdit(e) {
+  if (!e) return;
+  
+  const sheet = e.source.getActiveSheet();
+  if (sheet.getName() !== SHEET_NAME) return;
+  
+  const row = e.range.getRow();
+  const col = e.range.getColumn();
+  
+  // Skip header row
+  if (row === 1) return;
+  
+  // Check if it's the Actions column (column 7)
+  if (col === 7) {
+    const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
+    const clientName = sheet.getRange(row, COLUMNS.CLIENT_NAME + 1).getValue();
+    
+    if (!partNumber || !clientName) {
+      SpreadsheetApp.getUi().alert('⚠️ This row has no Part Number or Client Name');
+      return;
+    }
+    
+    const basePartNumber = extractBasePartNumber(partNumber);
+    
+    // Show loading state
+    e.range.setValue('⏳ Syncing...');
+    e.range.setBackground('#fff3cd');
+    
+    // Sync the row
+    const success = checkAndUpdateItemStatus(sheet, row, basePartNumber, clientName);
+    
+    // Reset button
+    e.range.setValue('🔄 Refresh');
+    e.range.setBackground('#4285f4');
+    
+    if (success) {
+      SpreadsheetApp.getActiveSpreadsheet().toast('✅ Row synced successfully!', 'Success', 3);
+    } else {
+      SpreadsheetApp.getActiveSpreadsheet().toast('❌ Sync failed. Check logs.', 'Error', 3);
+    }
+  }
+  
+  // Handle data changes in columns A, B, C (existing functionality)
+  if (col >= 1 && col <= 3) {
+    processRow(sheet, row);
+  }
+}
+
+/**
+ * Bulk refresh all rows with a confirmation
+ */
+function bulkRefreshAllRows() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    'Refresh All Rows',
+    'This will sync all rows with the server. Continue?',
+    ui.ButtonSet.YES_NO
+  );
+  
+  if (response === ui.Button.YES) {
+    syncAllItemStatuses();
+  }
+}
+
+/**
+ * Show action menu for selected row
+ */
+function showRowActionMenu() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const activeRange = sheet.getActiveRange();
+  const row = activeRange.getRow();
+  
+  if (row <= 1) {
+    SpreadsheetApp.getUi().alert('⚠️ Please select a data row (not header)');
+    return;
+  }
+  
+  const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
+  const clientName = sheet.getRange(row, COLUMNS.CLIENT_NAME + 1).getValue();
+  const status = sheet.getRange(row, COLUMNS.STATUS + 1).getValue();
+  
+  if (!partNumber || !clientName) {
+    SpreadsheetApp.getUi().alert('⚠️ This row has no Part Number or Client Name');
+    return;
+  }
+  
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    `Actions for Row ${row}`,
+    `Part: ${partNumber}\nClient: ${clientName}\nStatus: ${status}\n\nWhat would you like to do?`,
+    ui.ButtonSet.OK_CANCEL
+  );
+  
+  if (response === ui.Button.OK) {
+    // Show submenu
+    const actionResponse = ui.alert(
+      'Choose Action',
+      '1. Refresh Status\n2. Clear Row Data\n3. Delete Row\n\nEnter number (1-3):',
+      ui.ButtonSet.OK_CANCEL
+    );
+    
+    if (actionResponse === ui.Button.OK) {
+      // You can implement specific actions here
+      SpreadsheetApp.getUi().alert('Action menu coming soon!');
+    }
+  }
+}
+
+/**
+ * Clear status for selected row
+ */
+function clearSelectedRowStatus() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const activeRange = sheet.getActiveRange();
+  const row = activeRange.getRow();
+  
+  if (row <= 1) {
+    SpreadsheetApp.getUi().alert('⚠️ Please select a data row (not header)');
+    return;
+  }
+  
+  // Clear status columns
+  sheet.getRange(row, COLUMNS.STATUS + 1, 1, 3).clearContent();
+  sheet.getRange(row, 1, 1, 6).setBackground(null).setFontColor(null);
+  
+  SpreadsheetApp.getUi().alert('✅ Row status cleared');
+}
+
+/**
+ * Delete selected row
+ */
+function deleteSelectedRow() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const activeRange = sheet.getActiveRange();
+  const row = activeRange.getRow();
+  
+  if (row <= 1) {
+    SpreadsheetApp.getUi().alert('⚠️ Please select a data row (not header)');
+    return;
+  }
+  
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    'Delete Row',
+    `Are you sure you want to delete row ${row}?`,
+    ui.ButtonSet.YES_NO
+  );
+  
+  if (response === ui.Button.YES) {
+    sheet.deleteRow(row);
+    SpreadsheetApp.getUi().alert('✅ Row deleted');
+  }
+}
+
+// REPLACE the testPhaseDataStructure function with this corrected version:
+
+// Around line 700-750, REPLACE the testPhaseDataStructure function's fetch logic:
+
+/**
+ * ✅ FIXED: Diagnostic function to check phase data structure
+ */
+function testPhaseDataStructure() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert(`❌ Sheet "${SHEET_NAME}" not found`);
+      return;
+    }
+    
+    const activeRange = sheet.getActiveRange();
+    const row = activeRange.getRow();
+    
+    if (row <= 1) {
+      SpreadsheetApp.getUi().alert('⚠️ Please select a data row (not header)');
+      return;
+    }
+    
+    const partNumber = sheet.getRange(row, COLUMNS.PART_NUMBER + 1).getValue();
+    const clientName = sheet.getRange(row, COLUMNS.CLIENT_NAME + 1).getValue();
+    
+    if (!partNumber || !clientName) {
+      SpreadsheetApp.getUi().alert('⚠️ Selected row has no Part Number or Client Name');
+      return;
+    }
+    
+    const basePartNumber = extractBasePartNumber(partNumber);
+    
+    Logger.log('=== PHASE DATA STRUCTURE TEST ===');
+    Logger.log(`Row: ${row}`);
+    Logger.log(`Part Number: ${partNumber}`);
+    Logger.log(`Base Part Number: ${basePartNumber}`);
+    Logger.log(`Client Name: ${clientName}`);
+    
+    // ✅ STEP 1: First, get list of all items to find the exact part_number
+    Logger.log(`\n📋 Step 1: Fetching items list...`);
+    const listOptions = {
+      method: 'get',
+      muteHttpExceptions: true,
+      headers: { 'Accept': 'application/json' }
+    };
+    
+    Logger.log(`Fetching from: ${STATUS_CHECK_URL}`);
+    const listResponse = UrlFetchApp.fetch(STATUS_CHECK_URL, listOptions);
+    
+    if (listResponse.getResponseCode() !== 200) {
+      Logger.log(`❌ Failed to fetch: ${listResponse.getResponseCode()}`);
+      SpreadsheetApp.getUi().alert(`❌ API Error: ${listResponse.getResponseCode()}`);
+      return;
+    }
+    
+    const listResponseText = listResponse.getContentText();
+    const listResponseData = JSON.parse(listResponseText);
+    
+    // Handle different response formats
+    let items;
+    if (listResponseData.success !== undefined && listResponseData.data) {
+      items = listResponseData.data;
+    } else if (Array.isArray(listResponseData)) {
+      items = listResponseData;
+    } else if (listResponseData.items && Array.isArray(listResponseData.items)) {
+      items = listResponseData.items;
+    } else if (typeof listResponseData === 'object' && !Array.isArray(listResponseData)) {
+      const numericKeys = Object.keys(listResponseData).filter(k => !isNaN(k));
+      if (numericKeys.length > 0) {
+        items = numericKeys.map(key => listResponseData[key]);
+      }
+    }
+    
+    if (!items || !Array.isArray(items)) {
+      Logger.log(`❌ Could not parse items from response`);
+      SpreadsheetApp.getUi().alert('❌ Invalid response format');
+      return;
+    }
+    
+    Logger.log(`✅ Found ${items.length} total items`);
+    
+    // Find matching items
+    const matchingItems = items.filter(item => {
+      if (!item || !item.part_number || !item.client_name) return false;
+      
+      const itemBasePartNumber = extractBasePartNumber(item.part_number);
+      const partMatch = itemBasePartNumber === basePartNumber;
+      const clientMatch = item.client_name.trim().toLowerCase() === clientName.trim().toLowerCase();
+      
+      return partMatch && clientMatch;
+    });
+    
+    Logger.log(`✅ Found ${matchingItems.length} matching items`);
+    
+    if (matchingItems.length === 0) {
+      Logger.log(`⚠️ No matching item found`);
+      SpreadsheetApp.getUi().alert('⚠️ No matching item found in backend');
+      return;
+    }
+    
+    // Sort by created_at descending (latest first)
+    const summaryItem = matchingItems.sort((a, b) => 
+      new Date(b.created_at || 0) - new Date(a.created_at || 0)
+    )[0];
+    
+    Logger.log(`✅ Found latest item: ${summaryItem.part_number}`);
+    
+    // ✅ STEP 2: Fetch the SPECIFIC item with full phase details
+    Logger.log(`\n📋 Step 2: Fetching full item details with phases...`);
+    const detailUrl = `${STATUS_CHECK_URL}?part_number=${encodeURIComponent(summaryItem.part_number)}`;
+    Logger.log(`Fetching from: ${detailUrl}`);
+    
+    const detailOptions = {
+      method: 'get',
+      muteHttpExceptions: true,
+      headers: { 'Accept': 'application/json' }
+    };
+    
+    const detailResponse = UrlFetchApp.fetch(detailUrl, detailOptions);
+    
+    if (detailResponse.getResponseCode() !== 200) {
+      Logger.log(`❌ Failed to fetch item details: ${detailResponse.getResponseCode()}`);
+      SpreadsheetApp.getUi().alert(`❌ API Error: ${detailResponse.getResponseCode()}`);
+      return;
+    }
+    
+    const detailResponseText = detailResponse.getContentText();
+    Logger.log(`Response length: ${detailResponseText.length} chars`);
+    Logger.log(`First 500 chars: ${detailResponseText.substring(0, 500)}`);
+    
+    const detailResponseData = JSON.parse(detailResponseText);
+    
+    // Extract the item from response
+    let matchingItem;
+    if (detailResponseData.success && detailResponseData.data) {
+      matchingItem = detailResponseData.data;
+    } else if (detailResponseData.part_number) {
+      matchingItem = detailResponseData;
+    } else {
+      matchingItem = detailResponseData;
+    }
+    
+    Logger.log(`\n📦 Testing Item: ${matchingItem.part_number}`);
+    Logger.log(`Client: ${matchingItem.client_name}`);
+    Logger.log(`Status: ${matchingItem.status}`);
+    
+    if (!matchingItem.phases || !Array.isArray(matchingItem.phases)) {
+      Logger.log(`⚠️ Item has no phases`);
+      Logger.log(`Response data keys: ${Object.keys(matchingItem).join(', ')}`);
+      SpreadsheetApp.getUi().alert('⚠️ Item has no phases');
+      return;
+    }
+    
+    Logger.log(`\n✅ Item has ${matchingItem.phases.length} phases\n`);
+    
+    matchingItem.phases.forEach((phase, idx) => {
+      Logger.log(`${'='.repeat(50)}`);
+      Logger.log(`Phase ${idx + 1}: "${phase.name}"`);
+      Logger.log(`${'='.repeat(50)}`);
+      Logger.log(`  start_time: "${phase.start_time}"`);
+      Logger.log(`  pause_time: "${phase.pause_time}"`);
+      Logger.log(`  end_time: "${phase.end_time}"`);
+      Logger.log(`  paused_duration: ${phase.paused_duration || 0}`);
+      
+      Logger.log(`\n  🔍 Simplified Pause Detection:`);
+      Logger.log(`    pause_time value: "${phase.pause_time}"`);
+      Logger.log(`    pause_time type: ${typeof phase.pause_time}`);
+      
+      // ✅ SIMPLIFIED: Just check if pause_time has a truthy value
+      const hasPauseTime = phase.pause_time && 
+                          phase.pause_time !== null && 
+                          phase.pause_time !== '' &&
+                          phase.pause_time !== 'null';
+      
+      Logger.log(`\n  📊 Result:`);
+      Logger.log(`    ➜ HAS PAUSE TIME: ${hasPauseTime}`);
+      Logger.log(`    ➜ IS PAUSED: ${hasPauseTime ? 'YES ⏸️' : 'NO ▶️'}`);
+      Logger.log('');
+    });
+    
+    // Check overall pause status with simplified logic
+    const isPaused = matchingItem.phases.some(phase => {
+      return phase.pause_time && 
+             phase.pause_time !== null && 
+             phase.pause_time !== '' &&
+             phase.pause_time !== 'null';
+    });
+    
+    Logger.log(`\n${'='.repeat(50)}`);
+    Logger.log(`⏸️  OVERALL ITEM PAUSE STATUS: ${isPaused ? 'PAUSED' : 'NOT PAUSED'}`);
+    Logger.log(`${'='.repeat(50)}`);
+    
+    SpreadsheetApp.getUi().alert(
+      `✅ Test Complete!\n\n` +
+      `Item: ${matchingItem.part_number}\n` +
+      `Phases: ${matchingItem.phases.length}\n` +
+      `Paused: ${isPaused ? 'YES' : 'NO'}\n\n` +
+      `Check View > Executions for detailed logs`
+    );
+    
+  } catch (error) {
+    Logger.log(`❌ Error in testPhaseDataStructure: ${error.message}`);
+    Logger.log(`Stack trace: ${error.stack}`);
+    SpreadsheetApp.getUi().alert(`❌ Error: ${error.message}\n\nCheck View > Executions for details`);
   }
 }

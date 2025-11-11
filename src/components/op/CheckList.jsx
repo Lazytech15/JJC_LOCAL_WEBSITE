@@ -55,6 +55,7 @@ function Checklist({
   const [filterPriority, setFilterPriority] = useState("")
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState("name-asc")
+  const [filterStatus, setFilterStatus] = useState("")
   const [transferModalOpen, setTransferModalOpen] = useState(false)
   const [selectedSubphase, setSelectedSubphase] = useState(null)
   const [selectedItem, setSelectedItem] = useState(null)
@@ -84,6 +85,11 @@ function Checklist({
   const [selectedSubphaseForEdit, setSelectedSubphaseForEdit] = useState(null)
   const [selectedItemsForBulk, setSelectedItemsForBulk] = useState([])
   const [itemCheckboxes, setItemCheckboxes] = useState({})
+
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(20)
+  const [totalPages, setTotalPages] = useState(1)
+
 
   // Optimistic update helpers - update local state without full reload
   const updateItemInState = (partNumber, updates) => {
@@ -129,23 +135,23 @@ function Checklist({
   }
 
   // Auto-stop item when it reaches 100%
-useEffect(() => {
-  items.forEach((item) => {
-    // ADD SAFETY CHECK HERE
-    if (!item || !item.phases) return;
-    
-    if (item.phases) {
-      item.phases.forEach((phase) => {
-        const phaseProgress = calculatePhaseProgress(phase)
-        // Auto-stop phase when all subphases are complete
-        if (phaseProgress === 100 && phase.start_time && !phase.end_time && !phase.pause_time) {
-          // Use silent completion (no reload) and auto-start next phase
-          handleStopPhase(item.part_number, phase.id)
-        }
-      })
-    }
-  })
-}, [items])
+  useEffect(() => {
+    items.forEach((item) => {
+      // ADD SAFETY CHECK HERE
+      if (!item || !item.phases) return;
+
+      if (item.phases) {
+        item.phases.forEach((phase) => {
+          const phaseProgress = calculatePhaseProgress(phase)
+          // Auto-stop phase when all subphases are complete
+          if (phaseProgress === 100 && phase.start_time && !phase.end_time && !phase.pause_time) {
+            // Use silent completion (no reload) and auto-start next phase
+            handleStopPhase(item.part_number, phase.id)
+          }
+        })
+      }
+    })
+  }, [items])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -194,19 +200,19 @@ useEffect(() => {
     })
   }, [items])
 
- // Load items for selected client
-useEffect(() => {
-  if (newClient.trim() && transferModalOpen) {
-    const basePartNumber = getBasePartNumber(selectedItem?.part_number);
-    const filtered = items.filter((item) => {
-      const itemBasePartNumber = getBasePartNumber(item.part_number);
-      return item.client_name === newClient.trim() && itemBasePartNumber === basePartNumber;
-    });
-    setClientItems(filtered)
-  } else {
-    setClientItems([])
-  }
-}, [newClient, items, selectedItem, transferModalOpen])
+  // Load items for selected client
+  useEffect(() => {
+    if (newClient.trim() && transferModalOpen) {
+      const basePartNumber = getBasePartNumber(selectedItem?.part_number);
+      const filtered = items.filter((item) => {
+        const itemBasePartNumber = getBasePartNumber(item.part_number);
+        return item.client_name === newClient.trim() && itemBasePartNumber === basePartNumber;
+      });
+      setClientItems(filtered)
+    } else {
+      setClientItems([])
+    }
+  }, [newClient, items, selectedItem, transferModalOpen])
 
   // Filter clients for dropdown
   useEffect(() => {
@@ -650,44 +656,71 @@ useEffect(() => {
     }
   }
 
-// Filter items based on search and filters
-const filteredItems = items.filter((item) => {
-  // Safety check for item structure - ADD part_number check here
-  if (!item || !item.part_number) return false  // ← Changed from just "if (!item)"
+  const filteredItems = items.filter((item) => {
+    if (!item || !item.part_number) return false
 
-  const matchesSearch =
-    !searchTerm ||
-    item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.part_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch =
+      !searchTerm ||
+      item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.part_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
 
-  const matchesClient = !filterClient || item.client_name === filterClient
-  const matchesPriority = !filterPriority || item.priority === filterPriority
+    const matchesClient = !filterClient || item.client_name === filterClient
+    const matchesPriority = !filterPriority || item.priority === filterPriority
 
-  return matchesSearch && matchesClient && matchesPriority
-})
+    const matchesStatus = !filterStatus || (() => {
+      const progress = calculateItemProgress(item)
+      if (filterStatus === "completed") return progress === 100
+      if (filterStatus === "in-progress") return progress > 0 && progress < 100
+      if (filterStatus === "not-started") return progress === 0
+      return true
+    })()
 
-  // Separate completed and in-progress items with safety checks
-  const completedItems = filteredItems.filter((item) => {
-    try {
-      return calculateItemProgress(item) === 100
-    } catch (err) {
-      console.warn('Error calculating progress for item:', item?.part_number, err)
-      return false
-    }
-  })
-  const inProgressItems = filteredItems.filter((item) => {
-    try {
-      return calculateItemProgress(item) < 100
-    } catch (err) {
-      console.warn('Error calculating progress for item:', item?.part_number, err)
-      return true // Include items with errors in "in progress"
-    }
+    return matchesSearch && matchesClient && matchesPriority && matchesStatus
   })
 
-  // Sort in-progress items
+  // Calculate total pages
+  useEffect(() => {
+    const total = Math.ceil(filteredItems.length / itemsPerPage)
+    setTotalPages(total)
+
+    // Reset to page 1 if current page exceeds total pages
+    if (currentPage > total && total > 0) {
+      setCurrentPage(1)
+    }
+  }, [filteredItems.length, itemsPerPage, currentPage])
+
+  // Get paginated items
+  const getPaginatedItems = (itemsList) => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return itemsList.slice(startIndex, endIndex)
+  }
+
+  // Separate completed and in-progress with pagination
+  const completedItems = getPaginatedItems(
+    filteredItems.filter((item) => {
+      try {
+        return calculateItemProgress(item) === 100
+      } catch (err) {
+        console.warn('Error calculating progress for item:', item?.part_number, err)
+        return false
+      }
+    })
+  )
+
+  const inProgressItems = getPaginatedItems(
+    filteredItems.filter((item) => {
+      try {
+        return calculateItemProgress(item) < 100
+      } catch (err) {
+        console.warn('Error calculating progress for item:', item?.part_number, err)
+        return true
+      }
+    })
+  )
+  // Sort in-progress items (keep existing sorting logic)
   const sortedInProgressItems = [...inProgressItems].sort((a, b) => {
-    // Apply custom sort if selected
     if (sortBy === "name-asc") {
       return (a.name || "").localeCompare(b.name || "")
     }
@@ -701,19 +734,34 @@ const filteredItems = items.filter((item) => {
       return new Date(a.created_at || 0) - new Date(b.created_at || 0)
     }
 
-    // Default: sort by priority
     const priorityOrder = { High: 0, Medium: 1, Low: 2 }
     const aPriority = a.priority || "Medium"
     const bPriority = b.priority || "Medium"
     return priorityOrder[aPriority] - priorityOrder[bPriority]
   })
 
+  // Pagination handlers
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  const handlePreviousPage = () => {
+    handlePageChange(currentPage - 1)
+  }
+
+  const handleNextPage = () => {
+    handlePageChange(currentPage + 1)
+  }
+
   // Get unique clients for filter
   const uniqueClients = [...new Set(
-  items
-    .filter(item => item && item.client_name)
-    .map((item) => item.client_name)
-)]
+    items
+      .filter(item => item && item.client_name)
+      .map((item) => item.client_name)
+  )]
 
   // Helper function to check if previous subphase is completed
   const isPreviousSubphaseCompleted = (item, phase, currentSubphaseIndex) => {
@@ -899,12 +947,12 @@ const filteredItems = items.filter((item) => {
   }
 
   // Helper function to extract base part number (remove batch suffix)
-const getBasePartNumber = (partNumber) => {
-  if (!partNumber) return '';
-  // Extract only the numeric part before "-BATCH-"
-  const match = partNumber.match(/^(\d+)/);
-  return match ? match[1] : partNumber;
-};
+  const getBasePartNumber = (partNumber) => {
+    if (!partNumber) return '';
+    // Extract only the numeric part before "-BATCH-"
+    const match = partNumber.match(/^(\d+)/);
+    return match ? match[1] : partNumber;
+  };
 
   // Edit Component
   // Edit Item Handler - OPTIMISTIC UPDATE
@@ -1279,11 +1327,14 @@ const getBasePartNumber = (partNumber) => {
   const getCheckedItemsCount = () => {
     return Object.values(itemCheckboxes).filter(Boolean).length
   }
+
   return (
     <div>
-      <h2 className={`text-2xl font-bold mb-6 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-        Progress Checklist
-      </h2>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <h2 className={`text-2xl font-bold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+          Progress Checklist
+        </h2>
+      </div>
 
       {/* Search and Filter Bar */}
       <div
@@ -1298,7 +1349,10 @@ const getBasePartNumber = (partNumber) => {
               type="text"
               placeholder="Search by name, part number, or client..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value)
+                setCurrentPage(1) // ADD THIS LINE
+              }}
               className={`w-full pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all ${isDarkMode
                 ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                 : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
@@ -1313,13 +1367,15 @@ const getBasePartNumber = (partNumber) => {
           >
             <Filter size={18} />
             <span className="hidden sm:inline">Filters</span>
-            {(filterClient || filterPriority || sortBy) && `(${[filterClient, filterPriority, sortBy].filter(Boolean).length})`}
+            {(filterClient || filterPriority || filterStatus || sortBy) &&
+              `(${[filterClient, filterPriority, filterStatus, sortBy].filter(Boolean).length})`
+            }
           </button>
         </div>
 
         {/* Filter Options */}
         {showFilters && (
-          <div className="mt-3 pt-3 border-t border-gray-300/20 dark:border-gray-700/20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="mt-3 pt-3 border-t border-gray-300/20 dark:border-gray-700/20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Filter by Client
@@ -1360,33 +1416,56 @@ const getBasePartNumber = (partNumber) => {
               </select>
             </div>
 
+            {/* NEW: Status Filter */}
             <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Sort by
-                  </label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all ${isDarkMode
-                        ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                        : "bg-white/50 border border-gray-300/30 text-gray-800"
-                      }`}
-                  >
-                    <option value="">Default</option>
-                    <option value="name-asc">Name (A-Z)</option>
-                    <option value="name-desc">Name (Z-A)</option>
-                    <option value="date-newest">Date Added (Newest)</option>
-                    <option value="date-oldest">Date Added (Oldest)</option>
-                  </select>
-                </div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Filter by Status
+              </label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all ${isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800"
+                  }`}
+              >
+                <option value="">All Statuses</option>
+                <option value="not-started">Not Started</option>
+                <option value="in-progress">In Progress</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
 
-            {(filterClient || filterPriority || sortBy) && (
-              <div className="sm:col-span-2 lg:col-span-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Sort by
+              </label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all ${isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800"
+                  }`}
+              >
+                <option value="">Default</option>
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+                <option value="date-newest">Date Added (Newest)</option>
+                <option value="date-oldest">Date Added (Oldest)</option>
+              </select>
+            </div>
+
+            {/* UPDATE: Clear filters to include status */}
+            {(filterClient || filterPriority || filterStatus || sortBy) && (
+              <div className="sm:col-span-2 lg:col-span-4">
                 <button
                   onClick={() => {
                     setFilterClient("")
                     setFilterPriority("")
+                    setFilterStatus("")
                     setSortBy("")
+                    setCurrentPage(1)
                   }}
                   className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                 >
@@ -2885,6 +2964,117 @@ const getBasePartNumber = (partNumber) => {
           }}
           onSave={handleBulkEdit}
         />
+      )}
+
+      {/* Pagination Controls */}
+      {filteredItems.length > 0 && totalPages > 1 && (
+        <div className={`backdrop-blur-md rounded-lg p-4 mt-6 border transition-all shadow-sm ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+          }`}>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Page Info */}
+            <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredItems.length)} of {filteredItems.length} items
+            </div>
+
+            {/* Pagination Buttons */}
+            <div className="flex items-center gap-2">
+              {/* First Page */}
+              <button
+                onClick={() => handlePageChange(1)}
+                disabled={currentPage === 1}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors ${currentPage === 1
+                    ? "opacity-50 cursor-not-allowed"
+                    : isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                      : "bg-white/50 hover:bg-white/70 text-gray-700"
+                  }`}
+              >
+                ««
+              </button>
+
+              {/* Previous */}
+              <button
+                onClick={handlePreviousPage}
+                disabled={currentPage === 1}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors ${currentPage === 1
+                    ? "opacity-50 cursor-not-allowed"
+                    : isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                      : "bg-white/50 hover:bg-white/70 text-gray-700"
+                  }`}
+              >
+                « Previous
+              </button>
+
+              {/* Page Numbers */}
+              <div className="flex gap-1">
+                {(() => {
+                  const pages = []
+                  const showPages = 5 // Number of page buttons to show
+                  let startPage = Math.max(1, currentPage - Math.floor(showPages / 2))
+                  let endPage = Math.min(totalPages, startPage + showPages - 1)
+
+                  if (endPage - startPage < showPages - 1) {
+                    startPage = Math.max(1, endPage - showPages + 1)
+                  }
+
+                  for (let i = startPage; i <= endPage; i++) {
+                    pages.push(
+                      <button
+                        key={i}
+                        onClick={() => handlePageChange(i)}
+                        className={`px-3 py-2 rounded-lg font-medium transition-colors ${currentPage === i
+                            ? isDarkMode
+                              ? "bg-slate-600 text-white"
+                              : "bg-slate-600 text-white"
+                            : isDarkMode
+                              ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                              : "bg-white/50 hover:bg-white/70 text-gray-700"
+                          }`}
+                      >
+                        {i}
+                      </button>
+                    )
+                  }
+                  return pages
+                })()}
+              </div>
+
+              {/* Next */}
+              <button
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors ${currentPage === totalPages
+                    ? "opacity-50 cursor-not-allowed"
+                    : isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                      : "bg-white/50 hover:bg-white/70 text-gray-700"
+                  }`}
+              >
+                Next »
+              </button>
+
+              {/* Last Page */}
+              <button
+                onClick={() => handlePageChange(totalPages)}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors ${currentPage === totalPages
+                    ? "opacity-50 cursor-not-allowed"
+                    : isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                      : "bg-white/50 hover:bg-white/70 text-gray-700"
+                  }`}
+              >
+                »»
+              </button>
+            </div>
+
+            {/* Items per page selector (optional) */}
+            <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Page {currentPage} of {totalPages}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
