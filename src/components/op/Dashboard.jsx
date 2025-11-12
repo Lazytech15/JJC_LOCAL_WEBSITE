@@ -157,13 +157,15 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
   const textSecondaryClass = isDarkMode ? "text-gray-300" : "text-gray-600";
 
   // Calculate statistics from statistics API
-  const stats = statistics?.overall || {
-    total_items: 0,
-    completed_items: 0,
-    in_progress_items: 0,
-    not_started_items: 0,
-    avg_progress: 0
-  };
+const stats = statistics?.overall || {
+  total_items: 0,
+  completed_items: 0,
+  in_progress_items: 0,
+  not_started_items: 0,
+  avg_progress: 0
+};
+
+const overallProgress = Math.round(parseFloat(stats.avg_progress) || 0);
 
   if (loading) {
     return (
@@ -352,16 +354,44 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
           </div>
         </div>
         <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-3 sm:p-5 rounded-lg shadow-md text-white col-span-2 sm:col-span-1">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xs sm:text-sm font-medium opacity-90">Overall Progress</h3>
-              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">
-                {Math.round(parseFloat(stats.avg_progress) || 0)}%
-              </p>
-            </div>
-            <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 opacity-80" />
-          </div>
-        </div>
+  <div className="flex items-center justify-between">
+    <div>
+      <h3 className="text-xs sm:text-sm font-medium opacity-90">Overall Progress</h3>
+      <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">
+        {overallProgress}%
+      </p>
+    </div>
+    <div className="relative w-16 h-16 sm:w-20 sm:h-20">
+      <svg className="transform -rotate-90 w-full h-full" viewBox="0 0 80 80">
+        {/* Background circle */}
+        <circle
+          cx="40"
+          cy="40"
+          r="32"
+          stroke="rgba(255, 255, 255, 0.2)"
+          strokeWidth="8"
+          fill="none"
+        />
+        {/* Progress circle */}
+        <circle
+          cx="40"
+          cy="40"
+          r="32"
+          stroke="white"
+          strokeWidth="8"
+          fill="none"
+          strokeDasharray={`${2 * Math.PI * 32}`}
+          strokeDashoffset={`${2 * Math.PI * 32 * (1 - overallProgress / 100)}`}
+          strokeLinecap="round"
+          className="transition-all duration-1000 ease-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-xs sm:text-sm font-bold">{overallProgress}%</span>
+      </div>
+    </div>
+  </div>
+</div>
       </div>
 
       {/* Items Progress List */}
@@ -425,36 +455,69 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
                         )}
                       </div>
                       <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
-                            progress === 100 ? 'bg-green-500 text-white' :
-                            progress > 0 ? 'bg-yellow-500 text-white' :
-                            'bg-gray-500 text-white'
-                          }`}>
-                            {progress}%
-                          </span>
-                          {isSelected ? (
-                            <ChevronUp className={`w-4 h-4 sm:w-5 sm:h-5 ${
-                              isDarkMode ? "text-blue-400" : "text-blue-500"
-                            }`} />
-                          ) : (
-                            <ChevronDown className={`w-4 h-4 sm:w-5 sm:h-5 ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`} />
-                          )}
-                        </div>
-                        {item.priority && (
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            item.priority === 'High'
-                              ? isDarkMode ? 'bg-red-500/20 text-red-300' : 'bg-red-500/20 text-red-700'
-                              : item.priority === 'Medium'
-                                ? isDarkMode ? 'bg-yellow-500/20 text-yellow-300' : 'bg-yellow-500/20 text-yellow-700'
-                                : isDarkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-500/20 text-blue-700'
-                          }`}>
-                            {item.priority}
-                          </span>
-                        )}
-                      </div>
+  <div className="flex items-center gap-2">
+    {/* Circular Progress Indicator */}
+    <div className="relative w-12 h-12 sm:w-14 sm:h-14">
+      <svg className="transform -rotate-90 w-full h-full" viewBox="0 0 48 48">
+        {/* Background circle */}
+        <circle
+          cx="24"
+          cy="24"
+          r="20"
+          stroke={isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"}
+          strokeWidth="4"
+          fill="none"
+        />
+        {/* Progress circle */}
+        <circle
+          cx="24"
+          cy="24"
+          r="20"
+          stroke={
+            progress === 100 ? '#22c55e' :
+            progress > 0 ? '#eab308' :
+            '#6b7280'
+          }
+          strokeWidth="4"
+          fill="none"
+          strokeDasharray={`${2 * Math.PI * 20}`}
+          strokeDashoffset={`${2 * Math.PI * 20 * (1 - progress / 100)}`}
+          strokeLinecap="round"
+          className="transition-all duration-500 ease-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className={`text-xs font-bold ${
+          progress === 100 ? 'text-green-500' :
+          progress > 0 ? 'text-yellow-500' :
+          'text-gray-500'
+        }`}>
+          {progress}%
+        </span>
+      </div>
+    </div>
+    {isSelected ? (
+      <ChevronUp className={`w-4 h-4 sm:w-5 sm:h-5 ${
+        isDarkMode ? "text-blue-400" : "text-blue-500"
+      }`} />
+    ) : (
+      <ChevronDown className={`w-4 h-4 sm:w-5 sm:h-5 ${
+        isDarkMode ? "text-gray-400" : "text-gray-500"
+      }`} />
+    )}
+  </div>
+  {item.priority && (
+    <span className={`px-2 py-1 rounded text-xs font-medium ${
+      item.priority === 'High'
+        ? isDarkMode ? 'bg-red-500/20 text-red-300' : 'bg-red-500/20 text-red-700'
+        : item.priority === 'Medium'
+          ? isDarkMode ? 'bg-yellow-500/20 text-yellow-300' : 'bg-yellow-500/20 text-yellow-700'
+          : isDarkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-500/20 text-blue-700'
+    }`}>
+      {item.priority}
+    </span>
+  )}
+</div>
                     </div>
                     <div className={`w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
                       <div
