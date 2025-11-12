@@ -723,7 +723,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     setCurrentStep(prev => prev - 1)
   }
 
-  const handleSubmit = async (overwriteExisting = false) => {
+  const handleSubmit = async (overwriteExisting = false, saveAsDraft = false) => {
     try {
       setLoading(true)
       setError(null)
@@ -745,6 +745,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         verified_by: formData.verified_by,
         approved_by: formData.approved_by,
         notes: formData.notes,
+        // Add status field - 'draft' if saveAsDraft, otherwise 'requested'
+        status: saveAsDraft ? 'draft' : 'requested',
         // Tax and discount information
         apply_tax: formData.apply_tax,
         tax_type: formData.tax_type,
@@ -777,7 +779,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         if (editingOrder) {
           onSuccess(`Purchase Order ${editingOrder.id} updated successfully!`)
         } else {
-          onSuccess(`Purchase Order ${formData.po_number} created successfully!`)
+          const statusText = saveAsDraft ? 'saved as draft' : 'created'
+          onSuccess(`Purchase Order ${formData.po_number} ${statusText} successfully!`)
         }
         handleClose()
       } else {
@@ -1618,7 +1621,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
                       <div className="col-span-2">
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                          Prepared By * (Multiple people allowed)
+                          Prepared By (Multiple people allowed)
                         </label>
                         <div className="space-y-2">
                           {formData.prepared_by.map((person, index) => (
@@ -1634,7 +1637,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                 className="flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
                                   bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
                                   focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                                placeholder={`Person ${index + 1} name`}
+                                placeholder={`Person ${index + 1} name (optional)`}
                               />
                               {formData.prepared_by.length > 1 && (
                                 <button
@@ -1664,7 +1667,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                          Verified By *
+                          Verified By
                         </label>
                         <input
                           type="text"
@@ -1673,13 +1676,13 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
                             bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
                             focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                          placeholder="Name of person verifying"
+                          placeholder="Name of person verifying (optional)"
                         />
                       </div>
 
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                          Approved By *
+                          Approved By
                         </label>
                         <input
                           type="text"
@@ -1688,7 +1691,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
                             bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
                             focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                          placeholder="Name of person approving"
+                          placeholder="Name of person approving (optional)"
                         />
                       </div>
                     </div>
@@ -1859,26 +1862,42 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                         <div>
                           <div className="text-sm text-gray-700 mb-1">Prepared by:</div>
                           <div className="space-y-2">
-                            {formData.prepared_by.filter(p => p.trim()).map((person, idx) => (
-                              <div key={idx}>
-                                <div className="font-semibold text-gray-900">{person}</div>
-                                <div className="border-t border-gray-400 mt-6"></div>
-                                <div className="text-xs text-gray-600 text-center mt-1">Signature</div>
-                              </div>
-                            ))}
+                            {formData.prepared_by.filter(p => p.trim()).length > 0 ? (
+                              formData.prepared_by.filter(p => p.trim()).map((person, idx) => (
+                                <div key={idx}>
+                                  <div className="font-semibold text-gray-900">{person}</div>
+                                  <div className="border-t border-gray-400 mt-6"></div>
+                                  <div className="text-xs text-gray-600 text-center mt-1">Signature</div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-gray-500 italic">Not specified</div>
+                            )}
                           </div>
                         </div>
                         <div>
                           <div className="text-sm text-gray-700 mb-1">Verified by:</div>
-                          <div className="font-semibold text-gray-900">{formData.verified_by}</div>
-                          <div className="border-t border-gray-400 mt-8"></div>
-                          <div className="text-xs text-gray-600 text-center mt-1">Signature</div>
+                          {formData.verified_by ? (
+                            <>
+                              <div className="font-semibold text-gray-900">{formData.verified_by}</div>
+                              <div className="border-t border-gray-400 mt-8"></div>
+                              <div className="text-xs text-gray-600 text-center mt-1">Signature</div>
+                            </>
+                          ) : (
+                            <div className="text-gray-500 italic">Not specified</div>
+                          )}
                         </div>
                         <div>
                           <div className="text-sm text-gray-700 mb-1">Approved by:</div>
-                          <div className="font-semibold text-gray-900">{formData.approved_by}</div>
-                          <div className="border-t border-gray-400 mt-8"></div>
-                          <div className="text-xs text-gray-600 text-center mt-1">Signature</div>
+                          {formData.approved_by ? (
+                            <>
+                              <div className="font-semibold text-gray-900">{formData.approved_by}</div>
+                              <div className="border-t border-gray-400 mt-8"></div>
+                              <div className="text-xs text-gray-600 text-center mt-1">Signature</div>
+                            </>
+                          ) : (
+                            <div className="text-gray-500 italic">Not specified</div>
+                          )}
                         </div>
                       </div>
 
@@ -1915,7 +1934,26 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                         ← Edit Details
                       </button>
                       <button
-                        onClick={() => handleSubmit(false)}
+                        onClick={() => handleSubmit(false, true)}
+                        disabled={loading}
+                        className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                      >
+                        {loading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                            </svg>
+                            Save as Draft
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleSubmit(false, false)}
                         disabled={loading}
                         className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                       >
