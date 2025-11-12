@@ -19,14 +19,6 @@ import {
   Trash2,
 } from "lucide-react"
 import { useAuth } from "../../contexts/AuthContext"
-import {
-  EditItemModal,
-  EditPhaseModal,
-  EditSubphaseModal,
-  AddPhaseModal,
-  AddSubphaseModal,
-  BulkEditModal
-} from "./EditItems"
 import { pollingManager } from "../../utils/api/websocket/polling-manager.jsx"
 
 function Checklist({
@@ -47,12 +39,22 @@ function Checklist({
   apiService,
   formatTime,
   loadData,
+    // ADD THESE NEW PROPS:
+  setShowEditItemModal,
+  setShowEditPhaseModal,
+  setShowEditSubphaseModal,
+  setShowAddPhaseModal,
+  setShowAddSubphaseModal,
+  setShowBulkEditModal,
+  setSelectedItemForEdit,
+  setSelectedPhaseForEdit,
+  setSelectedSubphaseForEdit,
+  setSelectedItemsForBulk,
+  clients,
 }) {
   const { isDarkMode } = useAuth()
   const pollingSubscriptionsRef = useRef([])
   const isMountedRef = useRef(true)
-
-  const [clients, setClients] = useState([])
   const [searchTerm, setSearchTerm] = useState("")
   const [filterClient, setFilterClient] = useState("")
   const [filterPriority, setFilterPriority] = useState("")
@@ -75,18 +77,6 @@ function Checklist({
   const [selectedTargetPhase, setSelectedTargetPhase] = useState(null)
   const [selectedTargetSubphase, setSelectedTargetSubphase] = useState(null)
   const [, forceUpdate] = useState(0)
-
-  const [showEditItemModal, setShowEditItemModal] = useState(false)
-  const [showEditPhaseModal, setShowEditPhaseModal] = useState(false)
-  const [showEditSubphaseModal, setShowEditSubphaseModal] = useState(false)
-  const [showAddPhaseModal, setShowAddPhaseModal] = useState(false)
-  const [showAddSubphaseModal, setShowAddSubphaseModal] = useState(false)
-  const [showBulkEditModal, setShowBulkEditModal] = useState(false)
-
-  const [selectedItemForEdit, setSelectedItemForEdit] = useState(null)
-  const [selectedPhaseForEdit, setSelectedPhaseForEdit] = useState(null)
-  const [selectedSubphaseForEdit, setSelectedSubphaseForEdit] = useState(null)
-  const [selectedItemsForBulk, setSelectedItemsForBulk] = useState([])
   const [itemCheckboxes, setItemCheckboxes] = useState({})
 
     const [currentPage, setCurrentPage] = useState(1)
@@ -268,21 +258,6 @@ function Checklist({
 
     return () => clearInterval(interval)
   }, [items])
-
-  // Load clients on mount
-  useEffect(() => {
-    loadClients()
-  }, [])
-
-  const loadClients = async () => {
-    try {
-      const clientList = await apiService.operations.getClients()
-      setClients(Array.isArray(clientList) ? clientList : [])
-    } catch (error) {
-      console.error("Error loading clients:", error)
-      setClients([])
-    }
-  }
 
   // Auto-stop item when it reaches 100%
   useEffect(() => {
@@ -1133,367 +1108,6 @@ const handlePageChange = (newPage) => {
     const match = partNumber.match(/^(\d+)/);
     return match ? match[1] : partNumber;
   };
-
-  // Edit Component
-  // Edit Item Handler - OPTIMISTIC UPDATE
-  const handleEditItem = async (itemData) => {
-    try {
-      // Optimistically update the UI immediately
-      setItems(prevItems =>
-        prevItems.map(item =>
-          item.part_number === selectedItemForEdit.part_number
-            ? { ...item, ...itemData }
-            : item
-        )
-      )
-
-      // Close modal immediately
-      setShowEditItemModal(false)
-      setSelectedItemForEdit(null)
-
-      // API call in background
-      await apiService.operations.updateItem(selectedItemForEdit.part_number, itemData)
-
-    } catch (error) {
-      console.error("Error updating item:", error)
-      alert("Failed to update item: " + error.message)
-      // Reload only on error to fix state
-      await loadData()
-    }
-  }
-
-  // Edit Phase Handler - OPTIMISTIC UPDATE
-  const handleEditPhase = async (phaseData) => {
-    try {
-      // Optimistically update the UI immediately
-      setItems(prevItems =>
-        prevItems.map(item => {
-          if (item.phases) {
-            return {
-              ...item,
-              phases: item.phases.map(phase =>
-                phase.id === selectedPhaseForEdit.id
-                  ? { ...phase, ...phaseData }
-                  : phase
-              )
-            }
-          }
-          return item
-        })
-      )
-
-      // Close modal immediately
-      setShowEditPhaseModal(false)
-      setSelectedPhaseForEdit(null)
-
-      // API call in background
-      await apiService.operations.updatePhase(selectedPhaseForEdit.id, phaseData)
-
-    } catch (error) {
-      console.error("Error updating phase:", error)
-      alert("Failed to update phase: " + error.message)
-      await loadData()
-    }
-  }
-
-  // Delete Phase Handler - OPTIMISTIC UPDATE
-  const handleDeletePhase = async () => {
-    try {
-      const phaseId = selectedPhaseForEdit.id
-
-      // Optimistically remove from UI immediately
-      setItems(prevItems =>
-        prevItems.map(item => {
-          if (item.phases) {
-            return {
-              ...item,
-              phases: item.phases.filter(phase => phase.id !== phaseId)
-            }
-          }
-          return item
-        })
-      )
-
-      // Close modal immediately
-      setShowEditPhaseModal(false)
-      setSelectedPhaseForEdit(null)
-
-      // API call in background
-      await apiService.operations.deletePhase(phaseId)
-
-    } catch (error) {
-      console.error("Error deleting phase:", error)
-      alert("Failed to delete phase: " + error.message)
-      await loadData()
-    }
-  }
-
-  // Edit Subphase Handler - OPTIMISTIC UPDATE
-  const handleEditSubphase = async (subphaseData) => {
-    try {
-      // Optimistically update the UI immediately
-      setItems(prevItems =>
-        prevItems.map(item => {
-          if (item.phases) {
-            return {
-              ...item,
-              phases: item.phases.map(phase => {
-                if (phase.subphases) {
-                  return {
-                    ...phase,
-                    subphases: phase.subphases.map(subphase =>
-                      subphase.id === selectedSubphaseForEdit.id
-                        ? { ...subphase, ...subphaseData }
-                        : subphase
-                    )
-                  }
-                }
-                return phase
-              })
-            }
-          }
-          return item
-        })
-      )
-
-      // Close modal immediately
-      setShowEditSubphaseModal(false)
-      setSelectedSubphaseForEdit(null)
-
-      // API call in background
-      await apiService.operations.updateSubphase(selectedSubphaseForEdit.id, subphaseData)
-
-    } catch (error) {
-      console.error("Error updating subphase:", error)
-      alert("Failed to update subphase: " + error.message)
-      await loadData()
-    }
-  }
-
-  // Delete Subphase Handler - OPTIMISTIC UPDATE
-  const handleDeleteSubphase = async () => {
-    try {
-      const subphaseId = selectedSubphaseForEdit.id
-
-      // Optimistically remove from UI immediately
-      setItems(prevItems =>
-        prevItems.map(item => {
-          if (item.phases) {
-            return {
-              ...item,
-              phases: item.phases.map(phase => {
-                if (phase.subphases) {
-                  return {
-                    ...phase,
-                    subphases: phase.subphases.filter(subphase => subphase.id !== subphaseId)
-                  }
-                }
-                return phase
-              })
-            }
-          }
-          return item
-        })
-      )
-
-      // Close modal immediately
-      setShowEditSubphaseModal(false)
-      setSelectedSubphaseForEdit(null)
-
-      // API call in background
-      await apiService.operations.deleteSubphase(subphaseId)
-
-    } catch (error) {
-      console.error("Error deleting subphase:", error)
-      alert("Failed to delete subphase: " + error.message)
-      await loadData()
-    }
-  }
-
-  // Add Phase Handler - OPTIMISTIC UPDATE
-  const handleAddPhase = async (phaseData) => {
-    try {
-      const partNumber = selectedItemForEdit.part_number
-
-      // Create temporary phase with fake ID
-      const tempPhase = {
-        id: Date.now(), // Temporary ID
-        name: phaseData.name,
-        phase_order: phaseData.phase_order,
-        subphases: []
-      }
-
-      // Optimistically add to UI immediately
-      setItems(prevItems =>
-        prevItems.map(item =>
-          item.part_number === partNumber
-            ? {
-              ...item,
-              phases: [...(item.phases || []), tempPhase]
-            }
-            : item
-        )
-      )
-
-      // Close modal immediately
-      setShowAddPhaseModal(false)
-      setSelectedItemForEdit(null)
-
-      // API call in background
-      const response = await apiService.operations.createPhase({
-        part_number: partNumber,
-        name: phaseData.name,
-        phase_order: phaseData.phase_order
-      })
-
-      // Update with real ID from server
-      if (response && response.id) {
-        setItems(prevItems =>
-          prevItems.map(item =>
-            item.part_number === partNumber
-              ? {
-                ...item,
-                phases: item.phases.map(phase =>
-                  phase.id === tempPhase.id ? { ...phase, id: response.id } : phase
-                )
-              }
-              : item
-          )
-        )
-      }
-
-    } catch (error) {
-      console.error("Error adding phase:", error)
-      alert("Failed to add phase: " + error.message)
-      await loadData()
-    }
-  }
-
-  // Add Subphase Handler - OPTIMISTIC UPDATE
-  const handleAddSubphase = async (subphaseData) => {
-    try {
-      const partNumber = selectedItemForEdit.part_number
-      const phaseId = selectedPhaseForEdit.id
-
-      // Create temporary subphase with fake ID
-      const tempSubphase = {
-        id: Date.now(), // Temporary ID
-        name: subphaseData.name,
-        expected_duration: parseFloat(subphaseData.expected_duration) || 0,
-        expected_quantity: parseInt(subphaseData.expected_quantity) || 0,
-        subphase_order: parseInt(subphaseData.subphase_order) || 0,
-        completed: 0,
-        current_completed_quantity: 0
-      }
-
-      // Optimistically add to UI immediately
-      setItems(prevItems =>
-        prevItems.map(item =>
-          item.part_number === partNumber
-            ? {
-              ...item,
-              phases: item.phases.map(phase =>
-                phase.id === phaseId
-                  ? {
-                    ...phase,
-                    subphases: [...(phase.subphases || []), tempSubphase]
-                  }
-                  : phase
-              )
-            }
-            : item
-        )
-      )
-
-      // Close modal immediately
-      setShowAddSubphaseModal(false)
-      setSelectedPhaseForEdit(null)
-      setSelectedItemForEdit(null)
-
-      // API call in background
-      const response = await apiService.operations.createSubphase({
-        part_number: partNumber,
-        phase_id: phaseId,
-        name: subphaseData.name,
-        expected_duration: parseFloat(subphaseData.expected_duration) || 0,
-        expected_quantity: parseInt(subphaseData.expected_quantity) || 0,
-        subphase_order: parseInt(subphaseData.subphase_order) || 0
-      })
-
-      // Update with real ID from server
-      if (response && response.id) {
-        setItems(prevItems =>
-          prevItems.map(item =>
-            item.part_number === partNumber
-              ? {
-                ...item,
-                phases: item.phases.map(phase =>
-                  phase.id === phaseId
-                    ? {
-                      ...phase,
-                      subphases: phase.subphases.map(subphase =>
-                        subphase.id === tempSubphase.id
-                          ? { ...subphase, id: response.id }
-                          : subphase
-                      )
-                    }
-                    : phase
-                )
-              }
-              : item
-          )
-        )
-      }
-
-    } catch (error) {
-      console.error("Error adding subphase:", error)
-      alert("Failed to add subphase: " + error.message)
-      await loadData()
-    }
-  }
-
-  // Bulk Edit Handler - OPTIMISTIC UPDATE
-  const handleBulkEdit = async (updates) => {
-    try {
-      const itemsToUpdate = Object.keys(itemCheckboxes)
-        .filter(partNumber => itemCheckboxes[partNumber])
-        .map(partNumber => items.find(item => item.part_number === partNumber))
-        .filter(Boolean)
-
-      // Optimistically update all items immediately
-      setItems(prevItems =>
-        prevItems.map(item => {
-          if (itemCheckboxes[item.part_number]) {
-            const updateData = { ...updates }
-            // If updating remarks, append to existing
-            if (updates.remarks && item.remarks) {
-              updateData.remarks = `${item.remarks}\n${updates.remarks}`
-            }
-            return { ...item, ...updateData }
-          }
-          return item
-        })
-      )
-
-      // Close modal and clear checkboxes immediately
-      setShowBulkEditModal(false)
-      setItemCheckboxes({})
-
-      // API calls in background
-      for (const item of itemsToUpdate) {
-        const updateData = { ...updates }
-        if (updates.remarks && item.remarks) {
-          updateData.remarks = `${item.remarks}\n${updates.remarks}`
-        }
-        await apiService.operations.updateItem(item.part_number, updateData)
-      }
-
-    } catch (error) {
-      console.error("Error in bulk edit:", error)
-      alert("Failed to update items: " + error.message)
-      await loadData()
-    }
-  }
 
   // Toggle Item Checkbox
   const toggleItemCheckbox = (partNumber) => {
@@ -3068,95 +2682,6 @@ const handlePageChange = (newPage) => {
   </p>
 ) : null}
         </p>
-      )}
-
-
-      {/* Edit Item Modal */}
-      {showEditItemModal && selectedItemForEdit && (
-        <EditItemModal
-          item={selectedItemForEdit}
-          clients={clients}
-          isDarkMode={isDarkMode}
-          onClose={() => {
-            setShowEditItemModal(false)
-            setSelectedItemForEdit(null)
-          }}
-          onSave={handleEditItem}
-        />
-      )}
-
-      {/* Edit Phase Modal */}
-      {showEditPhaseModal && selectedPhaseForEdit && (
-        <EditPhaseModal
-          phase={selectedPhaseForEdit}
-          isDarkMode={isDarkMode}
-          onClose={() => {
-            setShowEditPhaseModal(false)
-            setSelectedPhaseForEdit(null)
-          }}
-          onSave={handleEditPhase}
-          onDelete={handleDeletePhase}
-        />
-      )}
-
-      {/* Edit Subphase Modal */}
-      {showEditSubphaseModal && selectedSubphaseForEdit && selectedItemForEdit && (
-        <EditSubphaseModal
-          subphase={selectedSubphaseForEdit}
-          batchQty={selectedItemForEdit.qty}
-          isDarkMode={isDarkMode}
-          onClose={() => {
-            setShowEditSubphaseModal(false)
-            setSelectedSubphaseForEdit(null)
-            setSelectedPhaseForEdit(null)
-            setSelectedItemForEdit(null)
-          }}
-          onSave={handleEditSubphase}
-          onDelete={handleDeleteSubphase}
-        />
-      )}
-
-      {/* Add Phase Modal */}
-      {showAddPhaseModal && selectedItemForEdit && (
-        <AddPhaseModal
-          item={selectedItemForEdit}
-          isDarkMode={isDarkMode}
-          onClose={() => {
-            setShowAddPhaseModal(false)
-            setSelectedItemForEdit(null)
-          }}
-          onSave={handleAddPhase}
-        />
-      )}
-
-      {/* Add Subphase Modal */}
-      {showAddSubphaseModal && selectedPhaseForEdit && selectedItemForEdit && (
-        <AddSubphaseModal
-          item={selectedItemForEdit}
-          phase={selectedPhaseForEdit}
-          batchQty={selectedItemForEdit.qty}
-          isDarkMode={isDarkMode}
-          onClose={() => {
-            setShowAddSubphaseModal(false)
-            setSelectedPhaseForEdit(null)
-            setSelectedItemForEdit(null)
-          }}
-          onSave={handleAddSubphase}
-        />
-      )}
-
-      {/* Bulk Edit Modal */}
-      {showBulkEditModal && selectedItemsForBulk.length > 0 && (
-        <BulkEditModal
-          selectedItems={selectedItemsForBulk}
-          clients={clients}
-          isDarkMode={isDarkMode}
-          onClose={() => {
-            setShowBulkEditModal(false)
-            setSelectedItemsForBulk([])
-          }}
-          onSave={handleBulkEdit}
-        />
       )}
 
       {/* Pagination Controls */}
