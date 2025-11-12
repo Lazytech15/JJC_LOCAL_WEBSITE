@@ -870,7 +870,7 @@ function createMaterialBarChart(sheet, dataRange, title, col, row) {
       bold: true,
       color: ZINC_THEME.zinc800
     })
-    .setOption('width', 400)
+    .setOption('width', 480)
     .setOption('height', 250)
     .setOption('backgroundColor', ZINC_THEME.zinc50)
     .setOption('colors', [ZINC_THEME.zinc700])

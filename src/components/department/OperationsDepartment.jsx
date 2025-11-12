@@ -38,15 +38,15 @@ function OperationsDepartment() {
   const pollIntervalRef = useRef(null)
 
   // WebSocket Polling for new items added via Google Sheets
-   const pollingSubscriptionsRef = useRef([])
+  const pollingSubscriptionsRef = useRef([])
 
-   const [pagination, setPagination] = useState({
-  current_page: 1,
-  per_page: 20,
-  total_items: 0,
-  total_pages: 0,
-  has_next: false,
-  has_previous: false
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    per_page: 20,
+    total_items: 0,
+    total_pages: 0,
+    has_next: false,
+    has_previous: false
   })
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(20)
@@ -182,10 +182,10 @@ function OperationsDepartment() {
 
   useEffect(() => {
     loadData()
-    
+
     // Setup polling subscriptions
     setupPollingListeners()
-    
+
     return () => {
       // Cleanup polling subscriptions
       pollingSubscriptionsRef.current.forEach(unsubscribe => unsubscribe())
@@ -194,47 +194,47 @@ function OperationsDepartment() {
   }, [])
 
   useEffect(() => {
-  if ('Notification' in window && Notification.permission === 'default') {
-    // Request permission silently
-    Notification.requestPermission().then(permission => {
-      console.log('Notification permission:', permission)
-    })
-  }
-}, [])
+    if ('Notification' in window && Notification.permission === 'default') {
+      // Request permission silently
+      Notification.requestPermission().then(permission => {
+        console.log('Notification permission:', permission)
+      })
+    }
+  }, [])
 
   const setupPollingListeners = () => {
     console.log('📡 Setting up Operations polling listeners...')
-    
+
     // Subscribe to all operations refresh events
     const unsubRefresh = pollingManager.subscribeToUpdates('operations:refresh', (event) => {
       console.log('🔄 Operations refresh event:', event.type)
       handleOperationsRefresh(event)
     })
-    
+
     // Subscribe to specific item events
     const unsubItemCreated = pollingManager.subscribeToUpdates('operations:item_created', (data) => {
       console.log('✨ New item created:', data.part_number)
       showNotification(`New item created: ${data.part_number}`)
       loadData() // Reload all data
     })
-    
+
     const unsubItemUpdated = pollingManager.subscribeToUpdates('operations:item_updated', (data) => {
       console.log('🔄 Item updated:', data.part_number)
       loadItemDetails(data.part_number) // Reload specific item
     })
-    
+
     const unsubItemDeleted = pollingManager.subscribeToUpdates('operations:item_deleted', (data) => {
       console.log('🗑️ Item deleted:', data.part_number)
       showNotification(`Item deleted: ${data.part_number}`)
       loadData() // Reload all data
     })
-    
+
     const unsubGoogleSheets = pollingManager.subscribeToUpdates('operations:google_sheets_import', (data) => {
       console.log('📊 Google Sheets import:', data.part_number)
       showNotification(`New item imported: ${data.part_number}`)
       loadData() // Reload all data
     })
-    
+
     // Store unsubscribe functions
     pollingSubscriptionsRef.current = [
       unsubRefresh,
@@ -243,7 +243,7 @@ function OperationsDepartment() {
       unsubItemDeleted,
       unsubGoogleSheets
     ]
-    
+
     // Join operations room
     pollingManager.joinRoom('operations')
   }
@@ -251,7 +251,7 @@ function OperationsDepartment() {
   // ADD: Handle operations refresh events
   const handleOperationsRefresh = async (event) => {
     const { type, data } = event
-    
+
     switch (type) {
       case 'item_created':
       case 'item_deleted':
@@ -259,7 +259,7 @@ function OperationsDepartment() {
         // Full reload for these events
         await loadData()
         break
-        
+
       case 'item_updated':
       case 'phase_created':
       case 'phase_updated':
@@ -271,7 +271,7 @@ function OperationsDepartment() {
           await loadItemDetails(data.part_number)
         }
         break
-        
+
       default:
         console.log('Unknown refresh type:', type)
     }
@@ -313,52 +313,52 @@ function OperationsDepartment() {
     }
   }
 
- const loadData = async (page = 1, limit = 20) => {
-  try {
-    setLoading(true)
-    setError(null)
+  const loadData = async (page = 1, limit = 20) => {
+    try {
+      setLoading(true)
+      setError(null)
 
-    console.log(`📥 Loading items page ${page} with limit ${limit}...`)
+      console.log(`📥 Loading items page ${page} with limit ${limit}...`)
 
-    // Load items with pagination
-    const [itemsResponse, statsResponse] = await Promise.all([
-      apiService.operations.getItemsPaginated(page, limit).catch(err => {
-        console.error('Failed to load items:', err)
-        return { items: [], pagination: {} }
-      }),
-      apiService.operations.getStatistics().catch(err => {
-        console.error('Failed to load statistics:', err)
-        return null
-      })
-    ])
+      // Load items with pagination
+      const [itemsResponse, statsResponse] = await Promise.all([
+        apiService.operations.getItemsPaginated(page, limit).catch(err => {
+          console.error('Failed to load items:', err)
+          return { items: [], pagination: {} }
+        }),
+        apiService.operations.getStatistics().catch(err => {
+          console.error('Failed to load statistics:', err)
+          return null
+        })
+      ])
 
-    // Handle paginated response
-    const itemsArray = itemsResponse.items || []
-    const paginationInfo = itemsResponse.pagination || {
-      current_page: 1,
-      per_page: limit,
-      total_items: itemsArray.length,
-      total_pages: 1,
-      has_next: false,
-      has_previous: false
+      // Handle paginated response
+      const itemsArray = itemsResponse.items || []
+      const paginationInfo = itemsResponse.pagination || {
+        current_page: 1,
+        per_page: limit,
+        total_items: itemsArray.length,
+        total_pages: 1,
+        has_next: false,
+        has_previous: false
+      }
+
+      console.log(`✅ Loaded ${itemsArray.length} items from page ${page}`)
+      console.log(`📊 Pagination:`, paginationInfo)
+
+      setItems(itemsArray)
+      setPagination(paginationInfo)
+      setCurrentPage(page)
+      setStatistics(statsResponse)
+
+    } catch (err) {
+      console.error('❌ Failed to load operations data:', err)
+      setError(`Failed to load data: ${err.message}`)
+      setItems([])
+    } finally {
+      setLoading(false)
     }
-
-    console.log(`✅ Loaded ${itemsArray.length} items from page ${page}`)
-    console.log(`📊 Pagination:`, paginationInfo)
-
-    setItems(itemsArray)
-    setPagination(paginationInfo)
-    setCurrentPage(page)
-    setStatistics(statsResponse)
-
-  } catch (err) {
-    console.error('❌ Failed to load operations data:', err)
-    setError(`Failed to load data: ${err.message}`)
-    setItems([])
-  } finally {
-    setLoading(false)
   }
-}
 
 
   // ✅ SIMPLIFIED handleManualRefresh - just reload data
@@ -375,7 +375,7 @@ function OperationsDepartment() {
       await loadData()
 
       setLastUpdateCheck(new Date())
-      
+
       showNotification('✅ Data refreshed successfully!')
     } catch (error) {
       console.error('❌ Failed to refresh:', error)
@@ -387,155 +387,155 @@ function OperationsDepartment() {
   }
 
   const showNotification = (message, type = 'info') => {
-  console.log('📢 Notification:', message)
+    console.log('📢 Notification:', message)
 
-  // Show browser notification if permitted
-  if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification('Operations Update', {
-      body: message,
-      icon: '/icons/icon-192.jpg',
-      tag: 'operations-update',
-      badge: '/icons/icon-192.jpg'
-    })
+    // Show browser notification if permitted
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('Operations Update', {
+        body: message,
+        icon: '/icons/icon-192.jpg',
+        tag: 'operations-update',
+        badge: '/icons/icon-192.jpg'
+      })
+    }
+
+    // Also show in-app toast (you can integrate with a toast library here)
+    // For now, we'll use a simple console log
+    const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : '📢'
+    console.log(`${emoji} ${message}`)
+
+    return message // Return for potential chaining
   }
-  
-  // Also show in-app toast (you can integrate with a toast library here)
-  // For now, we'll use a simple console log
-  const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : '📢'
-  console.log(`${emoji} ${message}`)
-  
-  return message // Return for potential chaining
-}
 
   const loadAllItemDetails = async () => {
-  // Only load details for items that are currently displayed
-  // This prevents loading all items at once
-  const needsDetails = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
-  
-  if (!needsDetails || items.length === 0) {
-    console.log('[LoadDetails] Skipping - not needed or no items')
-    return
-  }
+    // Only load details for items that are currently displayed
+    // This prevents loading all items at once
+    const needsDetails = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
 
-  // Filter items that actually need details loaded
-  const itemsNeedingDetails = items.filter(item =>
-    !item.phases || !Array.isArray(item.phases) ||
-    (item.phase_count > 0 && item.phases.length === 0)
-  )
-
-  if (itemsNeedingDetails.length === 0) {
-    setInitialLoadComplete(true)
-    return
-  }
-
-  try {
-    console.log(`[LoadDetails] Loading details for ${itemsNeedingDetails.length} items`)
-    setLoadingProgress({
-      current: 0,
-      total: itemsNeedingDetails.length,
-      message: 'Starting to load item details...'
-    })
-
-    // Process in smaller batches
-    const batchSize = 3 // Reduced batch size
-    const batches = []
-
-    for (let i = 0; i < itemsNeedingDetails.length; i += batchSize) {
-      batches.push(itemsNeedingDetails.slice(i, i + batchSize))
+    if (!needsDetails || items.length === 0) {
+      console.log('[LoadDetails] Skipping - not needed or no items')
+      return
     }
 
-    const allItemsWithDetails = []
-    const failedItems = []
+    // Filter items that actually need details loaded
+    const itemsNeedingDetails = items.filter(item =>
+      !item.phases || !Array.isArray(item.phases) ||
+      (item.phase_count > 0 && item.phases.length === 0)
+    )
 
-    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-      const batch = batches[batchIndex]
+    if (itemsNeedingDetails.length === 0) {
+      setInitialLoadComplete(true)
+      return
+    }
 
-      console.log(`[Batch ${batchIndex + 1}/${batches.length}] Processing ${batch.length} items`)
-
+    try {
+      console.log(`[LoadDetails] Loading details for ${itemsNeedingDetails.length} items`)
       setLoadingProgress({
-        current: allItemsWithDetails.length,
+        current: 0,
         total: itemsNeedingDetails.length,
-        message: `Loading batch ${batchIndex + 1} of ${batches.length}...`
+        message: 'Starting to load item details...'
       })
 
-      const batchResults = await Promise.allSettled(
-        batch.map(item => loadItemWithRetry(item.part_number, 2)) // Reduced retries
-      )
+      // Process in smaller batches
+      const batchSize = 3 // Reduced batch size
+      const batches = []
 
-      batchResults.forEach((result, index) => {
-        const item = batch[index]
+      for (let i = 0; i < itemsNeedingDetails.length; i += batchSize) {
+        batches.push(itemsNeedingDetails.slice(i, i + batchSize))
+      }
 
-        if (result.status === 'fulfilled' && result.value) {
-          allItemsWithDetails.push(result.value)
-          console.log(`[Success] ${item.part_number} loaded`)
-        } else {
-          console.warn(`[Failed] ${item.part_number}:`, result.reason?.message)
+      const allItemsWithDetails = []
+      const failedItems = []
 
-          allItemsWithDetails.push({
-            ...item,
-            _loadError: true,
-            _errorMessage: result.reason?.message || 'Failed to load details'
-          })
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex]
 
-          failedItems.push({
-            part_number: item.part_number,
-            error: result.reason?.message
+        console.log(`[Batch ${batchIndex + 1}/${batches.length}] Processing ${batch.length} items`)
+
+        setLoadingProgress({
+          current: allItemsWithDetails.length,
+          total: itemsNeedingDetails.length,
+          message: `Loading batch ${batchIndex + 1} of ${batches.length}...`
+        })
+
+        const batchResults = await Promise.allSettled(
+          batch.map(item => loadItemWithRetry(item.part_number, 2)) // Reduced retries
+        )
+
+        batchResults.forEach((result, index) => {
+          const item = batch[index]
+
+          if (result.status === 'fulfilled' && result.value) {
+            allItemsWithDetails.push(result.value)
+            console.log(`[Success] ${item.part_number} loaded`)
+          } else {
+            console.warn(`[Failed] ${item.part_number}:`, result.reason?.message)
+
+            allItemsWithDetails.push({
+              ...item,
+              _loadError: true,
+              _errorMessage: result.reason?.message || 'Failed to load details'
+            })
+
+            failedItems.push({
+              part_number: item.part_number,
+              error: result.reason?.message
+            })
+          }
+        })
+
+        // Update items incrementally
+        if (isMountedRef.current && allItemsWithDetails.length > 0) {
+          setItems(prevItems => {
+            const updatedItems = [...prevItems]
+            allItemsWithDetails.forEach(detailedItem => {
+              const index = updatedItems.findIndex(i => i.part_number === detailedItem.part_number)
+              if (index !== -1) {
+                updatedItems[index] = detailedItem
+              }
+            })
+            return updatedItems
           })
         }
-      })
 
-      // Update items incrementally
-      if (isMountedRef.current && allItemsWithDetails.length > 0) {
-        setItems(prevItems => {
-          const updatedItems = [...prevItems]
-          allItemsWithDetails.forEach(detailedItem => {
-            const index = updatedItems.findIndex(i => i.part_number === detailedItem.part_number)
-            if (index !== -1) {
-              updatedItems[index] = detailedItem
-            }
-          })
-          return updatedItems
+        setLoadingProgress({
+          current: allItemsWithDetails.length,
+          total: itemsNeedingDetails.length,
+          message: `Loaded ${allItemsWithDetails.length} of ${itemsNeedingDetails.length} items...`
         })
+
+        // Wait between batches
+        if (batchIndex < batches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
       }
 
-      setLoadingProgress({
-        current: allItemsWithDetails.length,
-        total: itemsNeedingDetails.length,
-        message: `Loaded ${allItemsWithDetails.length} of ${itemsNeedingDetails.length} items...`
-      })
+      console.log(`[LoadDetails] Complete: ${allItemsWithDetails.length} items loaded`)
 
-      // Wait between batches
-      if (batchIndex < batches.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500))
+      if (failedItems.length > 0) {
+        console.warn(`[LoadDetails] ${failedItems.length} items failed to load details:`, failedItems)
+        setError(`Loaded ${allItemsWithDetails.length - failedItems.length} of ${itemsNeedingDetails.length} items. ${failedItems.length} items have limited details.`)
       }
+
+      if (isMountedRef.current) {
+        setLoadingProgress({
+          current: allItemsWithDetails.length,
+          total: itemsNeedingDetails.length,
+          message: failedItems.length > 0
+            ? `Complete with ${failedItems.length} warnings`
+            : 'Complete! Preparing dashboard...'
+        })
+
+        setTimeout(() => {
+          setInitialLoadComplete(true)
+        }, 300)
+      }
+    } catch (err) {
+      console.error('[LoadDetails] Critical error:', err)
+      setError('Failed to load item details: ' + err.message)
+      setInitialLoadComplete(true)
     }
-
-    console.log(`[LoadDetails] Complete: ${allItemsWithDetails.length} items loaded`)
-
-    if (failedItems.length > 0) {
-      console.warn(`[LoadDetails] ${failedItems.length} items failed to load details:`, failedItems)
-      setError(`Loaded ${allItemsWithDetails.length - failedItems.length} of ${itemsNeedingDetails.length} items. ${failedItems.length} items have limited details.`)
-    }
-
-    if (isMountedRef.current) {
-      setLoadingProgress({
-        current: allItemsWithDetails.length,
-        total: itemsNeedingDetails.length,
-        message: failedItems.length > 0
-          ? `Complete with ${failedItems.length} warnings`
-          : 'Complete! Preparing dashboard...'
-      })
-
-      setTimeout(() => {
-        setInitialLoadComplete(true)
-      }, 300)
-    }
-  } catch (err) {
-    console.error('[LoadDetails] Critical error:', err)
-    setError('Failed to load item details: ' + err.message)
-    setInitialLoadComplete(true)
   }
-}
 
   const loadItemWithRetry = async (partNumber, maxRetries = 3) => {
     let lastError
@@ -759,6 +759,12 @@ function OperationsDepartment() {
   }
 
   const calculateItemProgress = (item) => {
+    // First check if API already provided overall_progress
+    if (item && item.overall_progress !== undefined && item.overall_progress !== null) {
+      return Math.round(parseFloat(item.overall_progress))
+    }
+
+    // Fallback: calculate from phases if available
     if (!item || !Array.isArray(item.phases) || item.phases.length === 0) return 0
 
     const totalProgress = item.phases.reduce((sum, phase) => sum + calculatePhaseProgress(phase), 0)
@@ -820,171 +826,164 @@ function OperationsDepartment() {
 
   // ==================== ADD PAGINATION HANDLERS ====================
 
-const handlePageChange = (newPage) => {
-  if (newPage >= 1 && newPage <= pagination.total_pages) {
-    loadData(newPage, itemsPerPage)
-    scrollToTop()
-  }
-}
-
-const handleItemsPerPageChange = (newLimit) => {
-  setItemsPerPage(newLimit)
-  loadData(1, newLimit) // Reset to page 1 when changing items per page
-}
-
-const handleNextPage = () => {
-  if (pagination.has_next) {
-    handlePageChange(currentPage + 1)
-  }
-}
-
-const handlePreviousPage = () => {
-  if (pagination.has_previous) {
-    handlePageChange(currentPage - 1)
-  }
-}
-
-// ==================== ADD PAGINATION COMPONENT ====================
-
-const PaginationControls = () => {
-  const { current_page, total_pages, total_items, has_next, has_previous } = pagination
-
-  if (total_pages <= 1) return null
-
-  const pageNumbers = []
-  const maxVisiblePages = 5
-
-  // Calculate visible page range
-  let startPage = Math.max(1, current_page - Math.floor(maxVisiblePages / 2))
-  let endPage = Math.min(total_pages, startPage + maxVisiblePages - 1)
-
-  if (endPage - startPage + 1 < maxVisiblePages) {
-    startPage = Math.max(1, endPage - maxVisiblePages + 1)
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.total_pages) {
+      loadData(newPage, itemsPerPage)
+      scrollToTop()
+    }
   }
 
-  for (let i = startPage; i <= endPage; i++) {
-    pageNumbers.push(i)
+  const handleItemsPerPageChange = (newLimit) => {
+    setItemsPerPage(newLimit)
+    loadData(1, newLimit) // Reset to page 1 when changing items per page
   }
 
-  return (
-    <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t ${
-      isDarkMode ? 'border-gray-700' : 'border-gray-300'
-    }`}>
-      {/* Items per page selector */}
-      <div className="flex items-center gap-2">
-        <label className={`text-sm ${textSecondaryClass}`}>
-          Items per page:
-        </label>
-        <select
-          value={itemsPerPage}
-          onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-          className={`px-3 py-1 rounded-lg border transition-colors ${
-            isDarkMode
-              ? 'bg-gray-800 border-gray-700 text-gray-200'
-              : 'bg-white border-gray-300 text-gray-800'
-          }`}
-        >
-          <option value={10}>10</option>
-          <option value={20}>20</option>
-          <option value={50}>50</option>
-          <option value={100}>100</option>
-        </select>
-      </div>
+  const handleNextPage = () => {
+    if (pagination.has_next) {
+      handlePageChange(currentPage + 1)
+    }
+  }
 
-      {/* Page info */}
-      <div className={`text-sm ${textSecondaryClass}`}>
-        Showing {((current_page - 1) * itemsPerPage) + 1} to{' '}
-        {Math.min(current_page * itemsPerPage, total_items)} of {total_items} items
-      </div>
+  const handlePreviousPage = () => {
+    if (pagination.has_previous) {
+      handlePageChange(currentPage - 1)
+    }
+  }
 
-      {/* Pagination buttons */}
-      <div className="flex items-center gap-2">
-        {/* Previous button */}
-        <button
-          onClick={handlePreviousPage}
-          disabled={!has_previous}
-          className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-            has_previous
-              ? isDarkMode
-                ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-              : 'opacity-50 cursor-not-allowed bg-gray-600 text-gray-400'
-          }`}
-        >
-          Previous
-        </button>
+  // ==================== ADD PAGINATION COMPONENT ====================
 
-        {/* First page */}
-        {startPage > 1 && (
-          <>
-            <button
-              onClick={() => handlePageChange(1)}
-              className={`px-3 py-1 rounded-lg transition-colors ${
-                isDarkMode
-                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-                  : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+  const PaginationControls = () => {
+    const { current_page, total_pages, total_items, has_next, has_previous } = pagination
+
+    if (total_pages <= 1) return null
+
+    const pageNumbers = []
+    const maxVisiblePages = 5
+
+    // Calculate visible page range
+    let startPage = Math.max(1, current_page - Math.floor(maxVisiblePages / 2))
+    let endPage = Math.min(total_pages, startPage + maxVisiblePages - 1)
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1)
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(i)
+    }
+
+    return (
+      <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-300'
+        }`}>
+        {/* Items per page selector */}
+        <div className="flex items-center gap-2">
+          <label className={`text-sm ${textSecondaryClass}`}>
+            Items per page:
+          </label>
+          <select
+            value={itemsPerPage}
+            onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+            className={`px-3 py-1 rounded-lg border transition-colors ${isDarkMode
+                ? 'bg-gray-800 border-gray-700 text-gray-200'
+                : 'bg-white border-gray-300 text-gray-800'
               }`}
-            >
-              1
-            </button>
-            {startPage > 2 && <span className={textSecondaryClass}>...</span>}
-          </>
-        )}
-
-        {/* Page numbers */}
-        {pageNumbers.map((pageNum) => (
-          <button
-            key={pageNum}
-            onClick={() => handlePageChange(pageNum)}
-            className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-              pageNum === current_page
-                ? isDarkMode
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-blue-500 text-white'
-                : isDarkMode
-                ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-            }`}
           >
-            {pageNum}
-          </button>
-        ))}
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </select>
+        </div>
 
-        {/* Last page */}
-        {endPage < total_pages && (
-          <>
-            {endPage < total_pages - 1 && <span className={textSecondaryClass}>...</span>}
-            <button
-              onClick={() => handlePageChange(total_pages)}
-              className={`px-3 py-1 rounded-lg transition-colors ${
-                isDarkMode
+        {/* Page info */}
+        <div className={`text-sm ${textSecondaryClass}`}>
+          Showing {((current_page - 1) * itemsPerPage) + 1} to{' '}
+          {Math.min(current_page * itemsPerPage, total_items)} of {total_items} items
+        </div>
+
+        {/* Pagination buttons */}
+        <div className="flex items-center gap-2">
+          {/* Previous button */}
+          <button
+            onClick={handlePreviousPage}
+            disabled={!has_previous}
+            className={`px-3 py-1 rounded-lg font-medium transition-colors ${has_previous
+                ? isDarkMode
                   ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
                   : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                : 'opacity-50 cursor-not-allowed bg-gray-600 text-gray-400'
               }`}
-            >
-              {total_pages}
-            </button>
-          </>
-        )}
+          >
+            Previous
+          </button>
 
-        {/* Next button */}
-        <button
-          onClick={handleNextPage}
-          disabled={!has_next}
-          className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-            has_next
-              ? isDarkMode
-                ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-              : 'opacity-50 cursor-not-allowed bg-gray-600 text-gray-400'
-          }`}
-        >
-          Next
-        </button>
+          {/* First page */}
+          {startPage > 1 && (
+            <>
+              <button
+                onClick={() => handlePageChange(1)}
+                className={`px-3 py-1 rounded-lg transition-colors ${isDarkMode
+                    ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                  }`}
+              >
+                1
+              </button>
+              {startPage > 2 && <span className={textSecondaryClass}>...</span>}
+            </>
+          )}
+
+          {/* Page numbers */}
+          {pageNumbers.map((pageNum) => (
+            <button
+              key={pageNum}
+              onClick={() => handlePageChange(pageNum)}
+              className={`px-3 py-1 rounded-lg font-medium transition-colors ${pageNum === current_page
+                  ? isDarkMode
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-blue-500 text-white'
+                  : isDarkMode
+                    ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                }`}
+            >
+              {pageNum}
+            </button>
+          ))}
+
+          {/* Last page */}
+          {endPage < total_pages && (
+            <>
+              {endPage < total_pages - 1 && <span className={textSecondaryClass}>...</span>}
+              <button
+                onClick={() => handlePageChange(total_pages)}
+                className={`px-3 py-1 rounded-lg transition-colors ${isDarkMode
+                    ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                  }`}
+              >
+                {total_pages}
+              </button>
+            </>
+          )}
+
+          {/* Next button */}
+          <button
+            onClick={handleNextPage}
+            disabled={!has_next}
+            className={`px-3 py-1 rounded-lg font-medium transition-colors ${has_next
+                ? isDarkMode
+                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                : 'opacity-50 cursor-not-allowed bg-gray-600 text-gray-400'
+              }`}
+          >
+            Next
+          </button>
+        </div>
       </div>
-    </div>
-  )
-}
+    )
+  }
 
   return (
     <div className={`min-h-screen p-8 transition-colors duration-300 ${isDarkMode
@@ -1009,8 +1008,8 @@ const PaginationControls = () => {
                 onClick={handleManualRefresh}
                 disabled={isRefreshing || loading}
                 className={`p-2 rounded-lg backdrop-blur-sm border transition-all duration-300 ${isDarkMode
-                    ? "bg-gray-800/60 border-gray-700/50 hover:bg-gray-800/80 text-cyan-400"
-                    : "bg-white/20 border-white/30 hover:bg-white/30 text-blue-700"
+                  ? "bg-gray-800/60 border-gray-700/50 hover:bg-gray-800/80 text-cyan-400"
+                  : "bg-white/20 border-white/30 hover:bg-white/30 text-blue-700"
                   } ${(isRefreshing || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}
                 aria-label="Refresh data"
                 title={lastUpdateCheck ? `Last checked: ${lastUpdateCheck.toLocaleTimeString()}` : 'Refresh data'}
@@ -1021,8 +1020,8 @@ const PaginationControls = () => {
               <button
                 onClick={toggleDarkMode}
                 className={`p-2 rounded-lg backdrop-blur-sm border transition-all duration-300 ${isDarkMode
-                    ? "bg-gray-800/60 border-gray-700/50 hover:bg-gray-800/80 text-yellow-400"
-                    : "bg-white/20 border-white/30 hover:bg-white/30 text-gray-700"
+                  ? "bg-gray-800/60 border-gray-700/50 hover:bg-gray-800/80 text-yellow-400"
+                  : "bg-white/20 border-white/30 hover:bg-white/30 text-gray-700"
                   }`}
                 aria-label="Toggle dark mode"
               >
@@ -1032,8 +1031,8 @@ const PaginationControls = () => {
               <button
                 onClick={logout}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${isDarkMode
-                    ? "bg-slate-700 hover:bg-slate-600 text-white"
-                    : "bg-slate-600 hover:bg-slate-700 text-white"
+                  ? "bg-slate-700 hover:bg-slate-600 text-white"
+                  : "bg-slate-600 hover:bg-slate-700 text-white"
                   }`}
               >
                 <span className="hidden sm:inline">Logout</span>
