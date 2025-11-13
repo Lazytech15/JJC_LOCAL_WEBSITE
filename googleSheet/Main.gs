@@ -35,6 +35,12 @@ function onOpen() {
       .addItem('📈 View Statistics', 'showStatistics')
       .addItem('📥 Export PDF Report', 'exportDashboardPDF'))
     .addSeparator()
+    .addSubMenu(ui.createMenu('📋 Item Tracking')  // ⭐ NEW MENU
+      .addItem('🔄 Refresh Tracking View', 'refreshTrackingView')
+      .addItem('📍 View Tracking Sheet', 'viewTrackingSheet')
+      .addItem('⚡ Enable Auto-Refresh (1 min)', 'createTrackingAutoRefresh')
+      .addItem('🛑 Disable Auto-Refresh', 'removeTrackingAutoRefresh'))
+    .addSeparator()
     .addSubMenu(ui.createMenu('🔄 Sync Operations')
       .addItem('Refresh All Rows', 'bulkRefreshAllRows')
       .addItem('Refresh Selected Row', 'testSingleRowSync')
@@ -313,6 +319,90 @@ function testSingleRowSync() {
   }
 }
 
+/**
+ * Refresh tracking view
+ */
+function refreshTrackingView() {
+  try {
+    UIFunctions.updateTrackingSheet();
+    SpreadsheetApp.getUi().alert('✅ Tracking view refreshed successfully!');
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('❌ Error refreshing tracking view: ' + error.message);
+    Logger.log('Error refreshing tracking: ' + error.message);
+  }
+}
+
+/**
+ * View tracking sheet
+ */
+function viewTrackingSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let trackingSheet = ss.getSheetByName(CoreFunctions.TRACKING_SHEET);
+  
+  if (!trackingSheet) {
+    SpreadsheetApp.getUi().alert('Tracking sheet not found. Please run Setup Sheets first.');
+    return;
+  }
+  
+  ss.setActiveSheet(trackingSheet);
+  UIFunctions.updateTrackingSheet();
+  SpreadsheetApp.getUi().alert('📋 Viewing detailed item tracking with real-time data.');
+}
+
+/**
+ * Create auto-refresh trigger for tracking
+ */
+function createTrackingAutoRefresh() {
+  try {
+    const triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach(trigger => {
+      if (trigger.getHandlerFunction() === 'autoRefreshTracking') {
+        ScriptApp.deleteTrigger(trigger);
+      }
+    });
+    
+    ScriptApp.newTrigger('autoRefreshTracking')
+      .timeBased()
+      .everyMinutes(1)
+      .create();
+    
+    Logger.log('✅ Tracking auto-refresh trigger created');
+    SpreadsheetApp.getUi().alert('✅ Auto-refresh enabled!\n\nTracking view will update every 1 minute.');
+  } catch (error) {
+    Logger.log(`❌ Error creating trigger: ${error.message}`);
+    SpreadsheetApp.getUi().alert('❌ Error: ' + error.message);
+  }
+}
+
+/**
+ * Remove auto-refresh trigger for tracking
+ */
+function removeTrackingAutoRefresh() {
+  const triggers = ScriptApp.getProjectTriggers();
+  let removed = 0;
+  
+  triggers.forEach(trigger => {
+    if (trigger.getHandlerFunction() === 'autoRefreshTracking') {
+      ScriptApp.deleteTrigger(trigger);
+      removed++;
+    }
+  });
+  
+  SpreadsheetApp.getUi().alert(`✅ Removed ${removed} tracking auto-refresh trigger(s)`);
+}
+
+/**
+ * Auto-refresh tracking (called by trigger)
+ */
+function autoRefreshTracking() {
+  try {
+    UIFunctions.updateTrackingSheet();
+    Logger.log('✅ Tracking auto-refreshed at ' + new Date().toLocaleString());
+  } catch (error) {
+    Logger.log('❌ Error in auto-refresh: ' + error.message);
+  }
+}
+
 // ==================== TRIGGER MANAGEMENT ====================
 
 /**
@@ -465,5 +555,114 @@ function testPhaseDataStructure() {
   } catch (error) {
     Logger.log(`❌ Error in testPhaseDataStructure: ${error.message}`);
     SpreadsheetApp.getUi().alert(`❌ Error: ${error.message}`);
+  }
+}
+
+/**
+ * Test tracking data fetch
+ * Run this from the menu to diagnose issues
+ */
+function testTrackingDataFetch() {
+  try {
+    Logger.log('=== TRACKING DATA FETCH TEST ===\n');
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const addItemSheet = ss.getSheetByName(CoreFunctions.SHEET_NAME);
+    
+    if (!addItemSheet) {
+      SpreadsheetApp.getUi().alert('❌ AddItem sheet not found!');
+      return;
+    }
+    
+    const lastRow = addItemSheet.getLastRow();
+    Logger.log(`📋 AddItem sheet has ${lastRow - 1} items`);
+    
+    if (lastRow <= 1) {
+      SpreadsheetApp.getUi().alert('⚠️ No items in AddItem sheet. Add some items first!');
+      return;
+    }
+    
+    // Get first item as test
+    const testRow = addItemSheet.getRange(2, 1, 1, 7).getValues()[0];
+    const partNumber = String(testRow[0]).trim();
+    
+    Logger.log(`\n🔍 Testing with part number: ${partNumber}`);
+    
+    // Test API call
+    Logger.log('\n📡 Calling API...');
+    const detailData = ApiService.getItemDetails(partNumber);
+    
+    if (!detailData) {
+      Logger.log('❌ API returned null');
+      SpreadsheetApp.getUi().alert(
+        '❌ API Test Failed\n\n' +
+        `Part Number: ${partNumber}\n` +
+        'API returned no data.\n\n' +
+        'Check:\n' +
+        '1. Is the item synced? (Run "Refresh Selected Row")\n' +
+        '2. Check View > Executions for API errors'
+      );
+      return;
+    }
+    
+    Logger.log('✅ API returned data');
+    Logger.log(`Response type: ${typeof detailData}`);
+    Logger.log(`Response keys: ${Object.keys(detailData).join(', ')}`);
+    
+    // Parse item
+    const item = ApiService.parseItemFromResponse(detailData);
+    
+    if (!item || !item.part_number) {
+      Logger.log('❌ Failed to parse item from response');
+      SpreadsheetApp.getUi().alert(
+        '❌ Parse Error\n\n' +
+        'API returned data but parsing failed.\n' +
+        'Check View > Executions for details.'
+      );
+      return;
+    }
+    
+    Logger.log(`✅ Item parsed: ${item.part_number}`);
+    Logger.log(`   Name: ${item.name}`);
+    Logger.log(`   Status: ${item.status}`);
+    Logger.log(`   Progress: ${item.overall_progress}%`);
+    Logger.log(`   Phases: ${item.phases?.length || 0}`);
+    
+    // Check phases
+    if (item.phases && item.phases.length > 0) {
+      Logger.log('\n📁 Phases:');
+      item.phases.forEach((phase, i) => {
+        Logger.log(`   ${i + 1}. ${phase.name} (${phase.subphases?.length || 0} subphases)`);
+        if (phase.subphases && phase.subphases.length > 0) {
+          phase.subphases.forEach((sub, j) => {
+            Logger.log(`      ${j + 1}. ${sub.name} - ${sub.completed ? 'Complete' : 'Pending'}`);
+          });
+        }
+      });
+    } else {
+      Logger.log('\n⚠️ No phases found');
+    }
+    
+    // Show success message
+    SpreadsheetApp.getUi().alert(
+      '✅ Tracking Data Test Successful!\n\n' +
+      `Part Number: ${item.part_number}\n` +
+      `Name: ${item.name}\n` +
+      `Status: ${item.status}\n` +
+      `Progress: ${Math.round(item.overall_progress || 0)}%\n` +
+      `Phases: ${item.phases?.length || 0}\n\n` +
+      'Check View > Executions for detailed logs.\n\n' +
+      'You can now run "Refresh Tracking View"'
+    );
+    
+  } catch (error) {
+    Logger.log(`❌ Test error: ${error.message}`);
+    Logger.log(`Stack: ${error.stack}`);
+    
+    SpreadsheetApp.getUi().alert(
+      '❌ Test Failed\n\n' +
+      `Error: ${error.message}\n\n` +
+      'Check View > Executions for full error details.'
+    );
   }
 }

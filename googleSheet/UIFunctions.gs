@@ -2,7 +2,6 @@
 // Dashboard, history, and UI setup
 
 const UIFunctions = {
-  // Zinc Theme Colors
   ZINC_THEME: {
     zinc50: '#fafafa',
     zinc100: '#f4f4f5',
@@ -25,59 +24,61 @@ const UIFunctions = {
   },
   
   /**
-   * Setup all sheets
-   */
-  setupSheet() {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    
-    // Setup AddItem sheet
-    let addItemSheet = ss.getSheetByName(CoreFunctions.SHEET_NAME);
-    if (!addItemSheet) {
-      addItemSheet = ss.insertSheet(CoreFunctions.SHEET_NAME);
-    }
-    
-    const headers = ['Part Number', 'Item Name', 'Client Name', 'Quantity', 'Status', 'Timestamp', 'Message'];
-    const headerRange = addItemSheet.getRange(1, 1, 1, headers.length);
-    headerRange.setValues([headers]);
-    headerRange.setFontWeight('bold');
-    headerRange.setBackground(this.ZINC_THEME.zinc900);
-    headerRange.setFontColor('#ffffff');
-    headerRange.setHorizontalAlignment('center');
-    headerRange.setFontSize(11);
-    
-    addItemSheet.setColumnWidth(1, 180);
-    addItemSheet.setColumnWidth(2, 200);
-    addItemSheet.setColumnWidth(3, 180);
-    addItemSheet.setColumnWidth(4, 100);
-    addItemSheet.setColumnWidth(5, 130);
-    addItemSheet.setColumnWidth(6, 180);
-    addItemSheet.setColumnWidth(7, 350);
-    
-    addItemSheet.setFrozenRows(1);
-    
-    const qtyColumn = addItemSheet.getRange(2, CoreFunctions.COLUMNS.QUANTITY + 1, 1000);
-    const qtyValidation = SpreadsheetApp.newDataValidation()
-      .requireNumberGreaterThan(0)
-      .setAllowInvalid(false)
-      .setHelpText('Enter a positive number')
-      .build();
-    qtyColumn.setDataValidation(qtyValidation);
-    
-    this.setupDashboardSheet(ss);
-    this.setupHistorySheet(ss);
-    
-    SpreadsheetApp.getUi().alert(
-      '✅ Material Design Dashboard Setup Complete!\n\n' +
-      '🎨 Zinc theme with modern design\n' +
-      '📊 Bar charts instead of pie charts\n' +
-      '📝 Fixed chart positioning\n' +
-      '📈 No overlapping on new items\n\n' +
-      'Navigate between sheets:\n' +
-      '• AddItem - Create new items\n' +
-      '• Dashboard - View statistics\n' +
-      '• ItemHistory - Track changes'
-    );
-  },
+ * Setup all sheets
+ */
+setupSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // Setup AddItem sheet
+  let addItemSheet = ss.getSheetByName(CoreFunctions.SHEET_NAME);
+  if (!addItemSheet) {
+    addItemSheet = ss.insertSheet(CoreFunctions.SHEET_NAME);
+  }
+  
+  const headers = ['Part Number', 'Item Name', 'Client Name', 'Quantity', 'Status', 'Timestamp', 'Message'];
+  const headerRange = addItemSheet.getRange(1, 1, 1, headers.length);
+  headerRange.setValues([headers]);
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground(this.ZINC_THEME.zinc900);
+  headerRange.setFontColor('#ffffff');
+  headerRange.setHorizontalAlignment('center');
+  headerRange.setFontSize(11);
+  
+  addItemSheet.setColumnWidth(1, 180);
+  addItemSheet.setColumnWidth(2, 200);
+  addItemSheet.setColumnWidth(3, 180);
+  addItemSheet.setColumnWidth(4, 100);
+  addItemSheet.setColumnWidth(5, 130);
+  addItemSheet.setColumnWidth(6, 180);
+  addItemSheet.setColumnWidth(7, 350);
+  
+  addItemSheet.setFrozenRows(1);
+  
+  const qtyColumn = addItemSheet.getRange(2, CoreFunctions.COLUMNS.QUANTITY + 1, 1000);
+  const qtyValidation = SpreadsheetApp.newDataValidation()
+    .requireNumberGreaterThan(0)
+    .setAllowInvalid(false)
+    .setHelpText('Enter a positive number')
+    .build();
+  qtyColumn.setDataValidation(qtyValidation);
+  
+  this.setupDashboardSheet(ss);
+  this.setupHistorySheet(ss);
+  this.setupTrackingSheet(ss);  // ⭐ ADD THIS LINE HERE ⭐
+  
+  SpreadsheetApp.getUi().alert(
+    '✅ Material Design Dashboard Setup Complete!\n\n' +
+    '🎨 Zinc theme with modern design\n' +
+    '📊 Bar charts instead of pie charts\n' +
+    '📝 Fixed chart positioning\n' +
+    '📈 No overlapping on new items\n\n' +
+    'Navigate between sheets:\n' +
+    '• AddItem - Create new items\n' +
+    '• Dashboard - View statistics\n' +
+    '• ItemTracking - Detailed tracking\n' +
+    '• ItemHistory - Track changes'
+  );
+},
   
   /**
    * Setup Dashboard sheet
@@ -157,7 +158,7 @@ const UIFunctions = {
     activityHeaderRow.setValues([activityHeaders]);
     activityHeaderRow.setFontWeight('bold');
     activityHeaderRow.setBackground(this.ZINC_THEME.zinc200);
-    activityHeaderRow.setFontColor(this.ZINC_THEME.zinc800);
+    activityHeaderRow.setFontColor(this.ZINC_THEME.zinc600);
     activityHeaderRow.setHorizontalAlignment('center');
     activityHeaderRow.setFontSize(10);
     
@@ -195,7 +196,7 @@ const UIFunctions = {
     headerRange.setValue(title);
     headerRange.setFontSize(13);
     headerRange.setFontWeight('bold');
-    headerRange.setBackground(this.ZINC_THEME.zinc800);
+    headerRange.setBackground(this.ZINC_THEME.zinc600);
     headerRange.setFontColor('#ffffff');
     headerRange.setHorizontalAlignment('center');
     headerRange.setVerticalAlignment('middle');
@@ -438,7 +439,7 @@ const UIFunctions = {
       .setOption('titleTextStyle', { 
         fontSize: 12, 
         bold: true,
-        color: this.ZINC_THEME.zinc800
+        color: this.ZINC_THEME.zinc600
       })
       .setOption('width', 480)
       .setOption('height', 250)
@@ -462,7 +463,7 @@ const UIFunctions = {
         alwaysOutside: true,
         textStyle: {
           fontSize: 10,
-          color: this.ZINC_THEME.zinc800,
+          color: this.ZINC_THEME.zinc600,
           bold: true
         }
       })
@@ -550,7 +551,9 @@ const UIFunctions = {
     
     if (progress > 0) {
       const progressCell = historySheet.getRange(lastRow, 8);
-      progressCell.setNumberFormat('0"%"');
+      
+      // Set value as string with % symbol to avoid format issues
+      progressCell.setValue(progress + '%');
       
       if (progress === 100) {
         progressCell.setBackground(this.ZINC_THEME.successLight);
@@ -560,5 +563,631 @@ const UIFunctions = {
         progressCell.setFontColor(this.ZINC_THEME.warning);
       }
     }
+  },
+
+/**
+ * Setup tracking sheet for detailed item/phase/subphase view
+ */
+setupTrackingSheet(ss) {
+  let trackingSheet = ss.getSheetByName(CoreFunctions.TRACKING_SHEET);
+  
+  if (trackingSheet) {
+    ss.deleteSheet(trackingSheet);
   }
+  
+  trackingSheet = ss.insertSheet(CoreFunctions.TRACKING_SHEET, 1);
+  
+  trackingSheet.setColumnWidth(1, 40);   // Indent column
+trackingSheet.setColumnWidth(2, 120);  // Type
+trackingSheet.setColumnWidth(3, 130);  // Part Number
+trackingSheet.setColumnWidth(4, 320);  // Name (wider for full text)
+trackingSheet.setColumnWidth(5, 180);  // Client
+trackingSheet.setColumnWidth(6, 110);  // Priority
+trackingSheet.setColumnWidth(7, 140);  // Status
+trackingSheet.setColumnWidth(8, 110);  // Progress
+trackingSheet.setColumnWidth(9, 140);  // Duration
+trackingSheet.setColumnWidth(10, 180); // Employee
+trackingSheet.setColumnWidth(11, 180); // Start Time
+trackingSheet.setColumnWidth(12, 180); // Pause Status
+trackingSheet.setColumnWidth(13, 180); // End Time
+
+// Set Roboto Mono font for entire sheet
+trackingSheet.getDataRange().setFontFamily('Roboto Mono');
+  
+  // Main Header
+  const headerRange = trackingSheet.getRange('A1:M3');
+  headerRange.merge();
+  headerRange.setValue('📋 DETAILED ITEM TRACKING');
+  headerRange.setFontSize(28);
+  headerRange.setFontWeight('bold');
+  headerRange.setHorizontalAlignment('center');
+  headerRange.setVerticalAlignment('middle');
+  headerRange.setBackground(this.ZINC_THEME.zinc900);
+  headerRange.setFontColor('#ffffff');
+  
+  // Subtitle
+  const subtitleRange = trackingSheet.getRange('A4:M4');
+  subtitleRange.merge();
+  subtitleRange.setValue('Real-time tracking of items, phases, sub-phases, durations, and employee assignments');
+  subtitleRange.setFontSize(12);
+  subtitleRange.setFontStyle('italic');
+  subtitleRange.setHorizontalAlignment('center');
+  subtitleRange.setBackground(this.ZINC_THEME.zinc100);
+  subtitleRange.setFontColor(this.ZINC_THEME.zinc600);
+  
+  // Last Updated
+  const updateRange = trackingSheet.getRange('A5:M5');
+  updateRange.merge();
+  updateRange.setValue(`Last Updated: ${new Date().toLocaleString()}`);
+  updateRange.setFontSize(10);
+  updateRange.setHorizontalAlignment('center');
+  updateRange.setBackground('#ffffff');
+  updateRange.setFontColor(this.ZINC_THEME.zinc500);
+  
+  // Column Headers
+  const headers = ['', 'Type', 'Part Number', 'Name', 'Client', 'Priority', 'Status', 'Progress', 'Duration', 'Assigned Employee', 'Start Time', 'Pause Status', 'End Time'];
+  const headerRow = trackingSheet.getRange(7, 1, 1, 13);
+headerRow.setValues([headers]);
+headerRow.setFontWeight('bold');
+headerRow.setBackground(this.ZINC_THEME.zinc600);
+headerRow.setFontColor('#ffffff');
+headerRow.setHorizontalAlignment('center');  // Already there
+headerRow.setVerticalAlignment('middle');    // Add this line
+headerRow.setFontSize(11);
+headerRow.setWrap(true);
+headerRow.setFontFamily('Roboto Mono');      // Add this line
+  
+  trackingSheet.setFrozenRows(7);
+  
+  // Footer
+  const footerRange = trackingSheet.getRange('A8:M8');
+  footerRange.merge();
+  footerRange.setValue('Use "Refresh Tracking" menu to update with latest data');
+  footerRange.setFontSize(9);
+  footerRange.setHorizontalAlignment('center');
+  footerRange.setBackground(this.ZINC_THEME.zinc100);
+  footerRange.setFontColor(this.ZINC_THEME.zinc600);
+  footerRange.setFontStyle('italic');
+},
+
+
+
+/**
+ * Extract short part number (remove -GS-timestamp-id suffix)
+ */
+extractShortPartNumber(fullPartNumber) {
+  if (!fullPartNumber) return 'N/A';
+  const partStr = String(fullPartNumber).trim();
+  // Remove -GS-timestamp-id pattern (e.g., 17358-GS-1763044590-317 -> 17358)
+  return partStr.split('-')[0];
+},
+
+/**
+ * ✅ UPDATED: Update tracking sheet with items from AddItem sheet only
+ */
+updateTrackingSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const trackingSheet = ss.getSheetByName(CoreFunctions.TRACKING_SHEET);
+  const addItemSheet = ss.getSheetByName(CoreFunctions.SHEET_NAME);
+  
+  if (!trackingSheet) {
+    Logger.log('❌ Tracking sheet not found');
+    return;
+  }
+  
+  // Update timestamp
+  trackingSheet.getRange('A5:M5').setValue(`Last Updated: ${new Date().toLocaleString()}`);
+  
+  // Clear existing data (keep headers)
+  const lastRow = trackingSheet.getLastRow();
+  if (lastRow > 8) {
+    trackingSheet.getRange(9, 1, lastRow - 8, 13).clearContent();
+    trackingSheet.getRange(9, 1, lastRow - 8, 13).setBackground(null);
+    trackingSheet.getRange(9, 1, lastRow - 8, 13).setFontColor(null);
+    trackingSheet.getRange(9, 1, lastRow - 8, 13).setFontWeight('normal');
+    trackingSheet.getRange(9, 1, lastRow - 8, 13).setFontStyle('normal');
+  }
+  
+  // Get part numbers from AddItem sheet
+  if (!addItemSheet) {
+    Logger.log('❌ AddItem sheet not found');
+    return;
+  }
+  
+  const addItemLastRow = addItemSheet.getLastRow();
+  if (addItemLastRow <= 1) {
+    Logger.log('ℹ️ No items in AddItem sheet');
+    trackingSheet.getRange(9, 1, 1, 13).merge();
+    trackingSheet.getRange(9, 1).setValue('No items found. Add items via the AddItem sheet.');
+    trackingSheet.getRange(9, 1).setHorizontalAlignment('center');
+    trackingSheet.getRange(9, 1).setBackground(this.ZINC_THEME.zinc100);
+    trackingSheet.getRange(9, 1).setFontColor(this.ZINC_THEME.zinc600);
+    trackingSheet.getRange(9, 1).setFontStyle('italic');
+    return;
+  }
+  
+  // Get part numbers from AddItem sheet (column A, starting from row 2)
+  const addItemData = addItemSheet.getRange(2, 1, addItemLastRow - 1, 1).getValues();
+  const addItemPartNumbers = addItemData
+    .map(row => row[0])
+    .filter(pn => pn && String(pn).trim() !== '')
+    .map(pn => CoreFunctions.extractBasePartNumber(String(pn).trim()));
+  
+  Logger.log(`📋 Found ${addItemPartNumbers.length} part numbers in AddItem sheet`);
+  
+  if (addItemPartNumbers.length === 0) {
+    Logger.log('ℹ️ No valid part numbers in AddItem sheet');
+    trackingSheet.getRange(9, 1, 1, 13).merge();
+    trackingSheet.getRange(9, 1).setValue('No valid part numbers found in AddItem sheet.');
+    trackingSheet.getRange(9, 1).setHorizontalAlignment('center');
+    trackingSheet.getRange(9, 1).setBackground(this.ZINC_THEME.warningLight);
+    trackingSheet.getRange(9, 1).setFontColor(this.ZINC_THEME.warning);
+    trackingSheet.getRange(9, 1).setFontStyle('italic');
+    return;
+  }
+  
+  Logger.log(`🔄 Fetching items from API...`);
+  
+  const trackingData = [];
+  let itemsProcessed = 0;
+  let itemsWithDetails = 0;
+
+  // Process each part number from AddItem
+  addItemPartNumbers.forEach((basePartNumber, index) => {
+    itemsProcessed++;
+    Logger.log(`\n📦 [${itemsProcessed}/${addItemPartNumbers.length}] Processing: ${basePartNumber}`);
+    
+    try {
+      // Search for items with this base part number
+      const searchData = ApiService.searchItems(basePartNumber);
+      
+      if (!searchData) {
+        Logger.log(`   ⚠️ No search results for ${basePartNumber}`);
+        this.addBasicItemRow(trackingData, basePartNumber, 'N/A', 'N/A', 'Not Found', 'N/A');
+        return;
+      }
+      
+      const items = ApiService.parseItemsFromResponse(searchData);
+      
+      if (!items || items.length === 0) {
+        Logger.log(`   ⚠️ No items found for ${basePartNumber}`);
+        this.addBasicItemRow(trackingData, basePartNumber, 'N/A', 'N/A', 'Not Found', 'N/A');
+        return;
+      }
+      
+      // Filter items that match the base part number
+      const matchingItems = items.filter(item => {
+        const itemBase = CoreFunctions.extractBasePartNumber(item.part_number);
+        return itemBase === basePartNumber;
+      });
+      
+      if (matchingItems.length === 0) {
+        Logger.log(`   ⚠️ No matching items for ${basePartNumber}`);
+        this.addBasicItemRow(trackingData, basePartNumber, 'N/A', 'N/A', 'Not Found', 'N/A');
+        return;
+      }
+      
+      // Get most recent item
+      const summaryItem = matchingItems.sort((a, b) => 
+        new Date(b.created_at || 0) - new Date(a.created_at || 0)
+      )[0];
+      
+      Logger.log(`   ✅ Found item: ${summaryItem.part_number}`);
+      
+      // Get detailed item data
+      const detailData = ApiService.getItemDetails(summaryItem.part_number);
+      
+      if (detailData) {
+        const item = ApiService.parseItemFromResponse(detailData);
+        
+        if (item && item.part_number) {
+          itemsWithDetails++;
+          Logger.log(`   ✅ Got item details with ${item.phases?.length || 0} phases`);
+          
+          // Extract priority from item data
+          const priority = item.priority || 'Medium';
+          
+          // Add item row
+          trackingData.push([
+            '', // Indent
+            '📦 ITEM',
+            this.extractShortPartNumber(item.part_number),
+            item.name || 'N/A',
+            item.client_name || 'N/A',
+            priority,
+            this.formatStatus(item.status),
+            Math.round(item.overall_progress || 0) + '%',
+            '', // Duration
+            '', // Employee
+            '', // Start time
+            '', // Pause status
+            item.completed_at ? new Date(item.completed_at).toLocaleString() : ''
+          ]);
+          
+          // Add phases
+          if (item.phases && Array.isArray(item.phases) && item.phases.length > 0) {
+            Logger.log(`   📁 Processing ${item.phases.length} phases...`);
+            
+            item.phases.forEach((phase, phaseIndex) => {
+              const duration = this.calculatePhaseDuration(phase);
+              const pauseStatus = this.getPauseStatus(phase);
+              
+              Logger.log(`      Phase ${phaseIndex + 1}: ${phase.name}`);
+              
+              trackingData.push([
+                '  ', // Indent
+                '  📁 Phase',
+                '',
+                phase.name,
+                '',
+                '',
+                '', // Phases don't have individual status
+                Math.round(phase.progress || 0) + '%',
+                duration,
+                '', // Phases don't have direct employee assignment
+                phase.start_time ? new Date(phase.start_time).toLocaleString() : '',
+                pauseStatus,
+                phase.end_time ? new Date(phase.end_time).toLocaleString() : ''
+              ]);
+              
+              // Add subphases
+              if (phase.subphases && Array.isArray(phase.subphases) && phase.subphases.length > 0) {
+                Logger.log(`      ✓ Processing ${phase.subphases.length} subphases...`);
+                
+                phase.subphases.forEach((subphase) => {
+                  const subDuration = this.formatDuration(subphase.time_duration || 0);
+                  const employeeInfo = subphase.employee_name || 
+                                      (subphase.employee_barcode ? `ID: ${subphase.employee_barcode}` : 'Not assigned');
+                  
+                  let subphaseName = subphase.name;
+                  if (subphase.expected_quantity > 0) {
+                    subphaseName += ` (${subphase.current_completed_quantity || 0}/${subphase.expected_quantity})`;
+                  }
+                  
+                  trackingData.push([
+                    '    ', // Indent
+                    '    ✓ Subphase',
+                    '',
+                    subphaseName,
+                    '',
+                    '',
+                    subphase.completed ? '✅ Complete' : '⏳ Pending',
+                    '', // Subphases don't have progress percentage
+                    subDuration,
+                    employeeInfo,
+                    '', // Subphases use phase timing
+                    '',
+                    subphase.completed_at ? new Date(subphase.completed_at).toLocaleString() : ''
+                  ]);
+                });
+              }
+            });
+          }
+          
+          // Add spacing row
+          trackingData.push(['', '', '', '', '', '', '', '', '', '', '', '', '']);
+          
+        } else {
+          Logger.log(`   ⚠️ Invalid item data structure`);
+          this.addBasicItemRow(trackingData, basePartNumber, summaryItem.name, summaryItem.client_name, summaryItem.status, summaryItem.priority);
+        }
+      } else {
+        Logger.log(`   ⚠️ No detail data returned from API`);
+        this.addBasicItemRow(trackingData, basePartNumber, summaryItem.name, summaryItem.client_name, summaryItem.status, summaryItem.priority);
+      }
+    } catch (error) {
+      Logger.log(`   ❌ Error fetching details: ${error.message}`);
+      this.addBasicItemRow(trackingData, basePartNumber, 'N/A', 'N/A', 'Error', 'N/A');
+    }
+  });
+  
+  Logger.log(`\n📊 Summary: Processed ${itemsProcessed} items, ${itemsWithDetails} with full details`);
+
+  // Write all data at once
+  if (trackingData.length > 0) {
+    Logger.log(`✍️ Writing ${trackingData.length} rows to sheet...`);
+    
+    const dataRange = trackingSheet.getRange(9, 1, trackingData.length, 13);
+    dataRange.setValues(trackingData);
+
+    if (trackingData.length > 0) {
+  Logger.log(`✍️ Writing ${trackingData.length} rows to sheet...`);
+  
+  const dataRange = trackingSheet.getRange(9, 1, trackingData.length, 13);
+  dataRange.setValues(trackingData);
+  dataRange.setHorizontalAlignment('center');  // Add this line
+  dataRange.setVerticalAlignment('middle');    // Add this line
+  dataRange.setFontFamily('Roboto Mono');      // Add this line
+    
+    // Apply formatting
+    for (let i = 0; i < trackingData.length; i++) {
+      const rowNum = 9 + i;
+      const rowData = trackingData[i];
+      const rowRange = trackingSheet.getRange(rowNum, 1, 1, 13);
+      
+      // Empty spacing rows
+      if (!rowData[1]) {
+        rowRange.setBackground(this.ZINC_THEME.zinc100);
+        continue;
+      }
+      
+      // Item rows
+      if (rowData[1].includes('ITEM')) {
+        rowRange.setBackground(this.ZINC_THEME.zinc600);
+        rowRange.setFontColor('#ffffff');
+        rowRange.setFontWeight('bold');
+        rowRange.setFontSize(11);
+        
+        // Color code priority
+        const priorityCell = trackingSheet.getRange(rowNum, 6);
+        const priority = rowData[5];
+        if (priority === 'High') {
+          priorityCell.setBackground(this.ZINC_THEME.danger);
+        } else if (priority === 'Medium') {
+          priorityCell.setBackground(this.ZINC_THEME.warning);
+        } else if (priority === 'Low') {
+          priorityCell.setBackground(this.ZINC_THEME.success);
+        }
+      }
+      // Phase rows
+      else if (rowData[1].includes('Phase')) {
+        rowRange.setBackground(this.ZINC_THEME.zinc200);
+        rowRange.setFontColor(this.ZINC_THEME.zinc600);
+        rowRange.setFontWeight('bold');
+        rowRange.setFontSize(10);
+      }
+      // Subphase rows
+      else if (rowData[1].includes('Subphase')) {
+        rowRange.setBackground('#ffffff');
+        rowRange.setFontColor(this.ZINC_THEME.zinc700);
+        rowRange.setFontSize(9);
+        
+        // Color code status
+        if (rowData[6] && rowData[6].includes('Complete')) {
+          trackingSheet.getRange(rowNum, 7).setBackground(this.ZINC_THEME.successLight);
+          trackingSheet.getRange(rowNum, 7).setFontColor(this.ZINC_THEME.success);
+          trackingSheet.getRange(rowNum, 7).setFontWeight('bold');
+        } else if (rowData[6] && rowData[6].includes('Pending')) {
+          trackingSheet.getRange(rowNum, 7).setBackground(this.ZINC_THEME.warningLight);
+          trackingSheet.getRange(rowNum, 7).setFontColor(this.ZINC_THEME.warning);
+        }
+      }
+
+      
+      
+      // Pause status formatting
+      if (rowData[11] && rowData[11].includes('PAUSED')) {
+        trackingSheet.getRange(rowNum, 12).setBackground(this.ZINC_THEME.dangerLight);
+        trackingSheet.getRange(rowNum, 12).setFontColor(this.ZINC_THEME.danger);
+        trackingSheet.getRange(rowNum, 12).setFontWeight('bold');
+      }
+    }
+    
+    Logger.log('✅ Tracking sheet updated successfully');
+  } else {
+    Logger.log('⚠️ No tracking data to display');
+    
+    trackingSheet.getRange(9, 1, 1, 13).merge();
+    trackingSheet.getRange(9, 1).setValue('No tracking data available. Items may not have been synced yet.');
+    trackingSheet.getRange(9, 1).setHorizontalAlignment('center');
+    trackingSheet.getRange(9, 1).setBackground(this.ZINC_THEME.warningLight);
+    trackingSheet.getRange(9, 1).setFontColor(this.ZINC_THEME.warning);
+    trackingSheet.getRange(9, 1).setFontStyle('italic');
+  }
+  }
+},
+
+/**
+ * ✅ NEW: Fetch ALL items from API using pagination
+ */
+ fetchAllItemsFromAPI() {
+  try {
+    const allItems = [];
+    let currentPage = 1;
+    let hasMorePages = true;
+    const maxPages = 100; // Safety limit
+    
+    Logger.log('📡 Starting paginated fetch from API...');
+    
+    while (hasMorePages && currentPage <= maxPages) {
+      Logger.log(`   Fetching page ${currentPage}...`);
+      
+      // Fetch page with large limit
+      const response = ApiService.getAllItems();
+      
+      if (!response) {
+        Logger.log(`   ⚠️ No response from API on page ${currentPage}`);
+        break;
+      }
+      
+      // Parse response
+      const items = ApiService.parseItemsFromResponse(response);
+      
+      if (!items || items.length === 0) {
+        Logger.log(`   ℹ️ No more items on page ${currentPage}`);
+        break;
+      }
+      
+      Logger.log(`   ✅ Got ${items.length} items from page ${currentPage}`);
+      allItems.push(...items);
+      
+      // Check if there are more pages
+      // Since the API returns all items in one call, we only need one iteration
+      hasMorePages = false;
+      currentPage++;
+      
+      // Small delay to avoid rate limiting
+      if (hasMorePages) {
+        Utilities.sleep(500);
+      }
+    }
+    
+    Logger.log(`✅ Total items fetched: ${allItems.length}`);
+    return allItems;
+    
+  } catch (error) {
+    Logger.log(`❌ Error fetching items from API: ${error.message}`);
+    return [];
+  }
+},
+
+/**
+ * Helper function to add basic item row when API fails
+ */
+addBasicItemRow(trackingData, partNumber, itemName, clientName, status, priority) {
+  trackingData.push([
+    '',
+    '📦 ITEM',
+    this.extractShortPartNumber(partNumber),
+    itemName || 'N/A',
+    clientName || 'N/A',
+    priority || 'Medium',
+    this.formatStatus(status),
+    '', // No progress data
+    'API data unavailable',
+    '',
+    '',
+    '',
+    ''
+  ]);
+  
+  // Add spacing row
+  trackingData.push(['', '', '', '', '', '', '', '', '', '', '', '', '']);
+},
+
+/**
+ * Calculate phase duration including pause time
+ */
+calculatePhaseDuration(phase) {
+  if (!phase.start_time) {
+    return 'Not started';
+  }
+  
+  const startTime = new Date(phase.start_time);
+  const now = new Date();
+  
+  let endTime;
+  if (phase.end_time) {
+    endTime = new Date(phase.end_time);
+  } else {
+    endTime = now;
+  }
+  
+  // Calculate total elapsed time in seconds
+  let totalSeconds = Math.floor((endTime - startTime) / 1000);
+  
+  // Subtract paused duration if exists
+  const pausedDuration = parseInt(phase.paused_duration || 0);
+  totalSeconds = Math.max(0, totalSeconds - pausedDuration);
+  
+  return this.formatDuration(totalSeconds);
+},
+
+/**
+ * Get pause status for a phase
+ */
+getPauseStatus(phase) {
+  if (phase.pause_time && !phase.end_time) {
+    const pauseStart = new Date(phase.pause_time);
+    const now = new Date();
+    const pausedSeconds = Math.floor((now - pauseStart) / 1000);
+    return `⏸️ PAUSED (${this.formatDuration(pausedSeconds)})`;
+  }
+  
+  if (phase.paused_duration && parseInt(phase.paused_duration) > 0) {
+    return `Total paused: ${this.formatDuration(parseInt(phase.paused_duration))}`;
+  }
+  
+  return phase.end_time ? 'Completed' : 'Active';
+},
+
+/**
+ * Format duration from seconds to readable format
+ */
+formatDuration(seconds) {
+  if (!seconds || seconds === 0) return '0m';
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${secs}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${secs}s`;
+  } else {
+    return `${secs}s`;
+  }
+},
+
+/**
+ * Format status for display
+ */
+formatStatus(status) {
+  if (!status) return 'N/A';
+  
+  const statusUpper = String(status).toUpperCase();
+  
+  if (statusUpper.includes('COMPLETED')) return '✅ COMPLETED';
+  if (statusUpper.includes('PROGRESS')) return '🔄 IN PROGRESS';
+  if (statusUpper.includes('PAUSED')) return '⏸️ PAUSED';
+  if (statusUpper.includes('NOT STARTED')) return '⏹️ NOT STARTED';
+  
+  return status;
+},
+
+/**
+ * Get pause status for a phase
+ */
+getPauseStatus(phase) {
+  if (phase.pause_time && !phase.end_time) {
+    const pauseStart = new Date(phase.pause_time);
+    const now = new Date();
+    const pausedSeconds = Math.floor((now - pauseStart) / 1000);
+    return `⏸️ PAUSED (${this.formatDuration(pausedSeconds)})`;
+  }
+  
+  if (phase.paused_duration && parseInt(phase.paused_duration) > 0) {
+    return `Total paused: ${this.formatDuration(parseInt(phase.paused_duration))}`;
+  }
+  
+  return phase.end_time ? 'Completed' : 'Active';
+},
+
+
+
+/**
+ * Format duration from seconds to readable format
+ */
+formatDuration(seconds) {
+  if (!seconds || seconds === 0) return '0m';
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${secs}s`;
+  } else {
+    return `${secs}s`;
+  }
+},
+
+/**
+ * Format status for display
+ */
+formatStatus(status) {
+  if (!status) return 'N/A';
+  
+  const statusUpper = String(status).toUpperCase();
+  
+  if (statusUpper.includes('COMPLETED')) return '✅ COMPLETED';
+  if (statusUpper.includes('PROGRESS')) return '🔄 IN PROGRESS';
+  if (statusUpper.includes('PAUSED')) return '⏸️ PAUSED';
+  if (statusUpper.includes('NOT STARTED')) return '⏹️ NOT STARTED';
+  
+  return status;
+},
 };
