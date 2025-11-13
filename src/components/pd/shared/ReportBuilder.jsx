@@ -5,9 +5,9 @@
 
 import React, { useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import apiService from '../../utils/api/api-service'
+import apiService from '../../../utils/api/api-service'
 import jsPDF from 'jspdf'
-import 'jspdf-autotable'
+import autoTable from 'jspdf-autotable'
 
 export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
   const [reportConfig, setReportConfig] = useState({
@@ -93,7 +93,7 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
         log.item_no || '-'
       ])
 
-      doc.autoTable({
+      autoTable(doc, {
         startY: yPosition,
         head: [['Date', 'Time', 'User', 'Activity', 'Item']],
         body: tableData,
@@ -218,16 +218,56 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
    * Send report via email (API call)
    */
   const sendReportEmail = async () => {
-    // TODO: Implement API endpoint for email delivery
-    console.log('Sending report to:', reportConfig.emailTo)
+    try {
+      const reportData = await apiService.employeeLogs.generateReport({
+        filters: {
+          date_from: reportConfig.dateFrom,
+          date_to: reportConfig.dateTo
+        }
+      })
+
+      await apiService.employeeLogs.emailReport({
+        recipients: reportConfig.emailTo.split(',').map(e => e.trim()),
+        subject: reportConfig.title,
+        message: `Please find attached the ${reportConfig.title} for the period ${reportConfig.dateFrom || 'All'} to ${reportConfig.dateTo || 'Present'}.`,
+        report_data: reportData
+      })
+
+      console.log('✅ Report email sent successfully to:', reportConfig.emailTo)
+    } catch (error) {
+      console.error('❌ Failed to send report email:', error)
+      throw new Error('Failed to send email: ' + error.message)
+    }
   }
 
   /**
    * Save report schedule (API call)
    */
   const saveSchedule = async () => {
-    // TODO: Implement API endpoint for saving schedules
-    console.log('Saving schedule:', reportConfig.schedule)
+    try {
+      const scheduleData = {
+        name: reportConfig.title,
+        filters: {
+          date_from: reportConfig.dateFrom,
+          date_to: reportConfig.dateTo
+        },
+        schedule: {
+          frequency: reportConfig.schedule,
+          time: '08:00',
+          day: reportConfig.schedule === 'weekly' ? 'monday' : undefined,
+          day_of_month: reportConfig.schedule === 'monthly' ? 1 : undefined
+        },
+        recipients: reportConfig.emailTo.split(',').map(e => e.trim()),
+        format: reportConfig.format,
+        enabled: true
+      }
+
+      const result = await apiService.employeeLogs.scheduleReport(scheduleData)
+      console.log('✅ Report schedule saved successfully:', result)
+    } catch (error) {
+      console.error('❌ Failed to save report schedule:', error)
+      throw new Error('Failed to save schedule: ' + error.message)
+    }
   }
 
   if (!isOpen) return null
@@ -362,7 +402,6 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
                 >
                   <option value="pdf">PDF Document</option>
                   <option value="csv">CSV Spreadsheet</option>
-                  <option value="excel">Excel Workbook (Coming Soon)</option>
                 </select>
               </div>
 
@@ -376,9 +415,9 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
                   className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                 >
                   <option value="none">One-time Report</option>
-                  <option value="daily">Daily (Coming Soon)</option>
-                  <option value="weekly">Weekly (Coming Soon)</option>
-                  <option value="monthly">Monthly (Coming Soon)</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
                 </select>
               </div>
 
@@ -390,11 +429,11 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
                   type="email"
                   value={reportConfig.emailTo}
                   onChange={(e) => updateConfig('emailTo', e.target.value)}
-                  placeholder="email@example.com"
+                  placeholder="email@example.com, user2@example.com"
                   className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                 />
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Leave empty to only download. Email delivery coming soon.
+                  Separate multiple emails with commas. Leave empty to only download.
                 </p>
               </div>
             </div>

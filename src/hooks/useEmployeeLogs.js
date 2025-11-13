@@ -372,7 +372,7 @@ export const useLogNotifications = (options = {}) => {
     enableToast = true,
     enableBadge = true,
     enableSound = true,
-    soundUrl = '/notification.mp3',
+    soundUrl = '/sounds/notification.mp3',
     criticalKeywords = ['urgent', 'critical', 'emergency', 'error']
   } = options
 
