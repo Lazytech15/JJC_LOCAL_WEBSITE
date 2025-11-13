@@ -2,10 +2,10 @@
 // Business logic and data processing
 
 const CoreFunctions = {
-  // Sheet and column configuration
   SHEET_NAME: 'AddItem',
   DASHBOARD_SHEET: 'Dashboard',
   HISTORY_SHEET: 'ItemHistory',
+  TRACKING_SHEET: 'ItemTracking',  // ⭐ NEW
   
   COLUMNS: {
     PART_NUMBER: 0,
