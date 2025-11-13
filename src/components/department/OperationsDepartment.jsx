@@ -7,6 +7,14 @@ import Checklist from "../op/CheckList.jsx"
 import Reports from "../op/Report.jsx"
 import ItemComparison from "../op/ItemComparison.jsx"
 import { pollingManager } from "../../utils/api/websocket/polling-manager.jsx"
+import {
+  EditItemModal,
+  EditPhaseModal,
+  EditSubphaseModal,
+  AddPhaseModal,
+  AddSubphaseModal,
+  BulkEditModal
+} from "../op/EditItems.jsx"
 const GearLoadingSpinner = lazy(() => import("../../../public/LoadingGear.jsx"))
 import { Menu, X, ArrowUp, RefreshCw } from 'lucide-react'
 
@@ -51,52 +59,104 @@ function OperationsDepartment() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(20)
 
+  const [showEditItemModal, setShowEditItemModal] = useState(false)
+  const [showEditPhaseModal, setShowEditPhaseModal] = useState(false)
+  const [showEditSubphaseModal, setShowEditSubphaseModal] = useState(false)
+  const [showAddPhaseModal, setShowAddPhaseModal] = useState(false)
+  const [showAddSubphaseModal, setShowAddSubphaseModal] = useState(false)
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false)
+
+  const [selectedItemForEdit, setSelectedItemForEdit] = useState(null)
+  const [selectedPhaseForEdit, setSelectedPhaseForEdit] = useState(null)
+  const [selectedSubphaseForEdit, setSelectedSubphaseForEdit] = useState(null)
+  const [selectedItemsForBulk, setSelectedItemsForBulk] = useState([])
+  const [clients, setClients] = useState([])
+
   useEffect(() => {
-    const needsPolling = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
+  const needsPolling = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
 
-    if (!needsPolling) {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current)
-        pollIntervalRef.current = null
-      }
-      return
+  if (!needsPolling) {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+      console.log('⏸️ Polling stopped - not on relevant tab')
     }
+    return
+  }
 
-    // Check for updates every 30 seconds
+  // ✅ FIXED: Simplified polling that just checks item count
+  const startPolling = () => {
     pollIntervalRef.current = setInterval(async () => {
       try {
         console.log('🔄 Polling for new items...')
 
         const currentCount = items.length
+        const currentPage = pagination.current_page || 1
 
-        // Just fetch fresh data
-        const freshItems = await apiService.operations.checkForUpdates()
+        // Fetch fresh data from the current page
+        const freshResponse = await apiService.operations.getItemsPaginated(
+          currentPage,
+          pagination.per_page || 20,
+          { _t: Date.now() } // Cache buster
+        )
 
-        if (Array.isArray(freshItems) && freshItems.length > currentCount) {
-          const newCount = freshItems.length - currentCount
-          console.log(`✅ Found ${newCount} new item(s)!`)
+        if (freshResponse && freshResponse.items) {
+          const freshCount = freshResponse.pagination.total_items || freshResponse.items.length
 
-          showNotification(`${newCount} new item(s) added from Google Sheets!`)
+          // Check if total items increased
+          if (freshCount > pagination.total_items) {
+            const newCount = freshCount - pagination.total_items
+            console.log(`✅ Found ${newCount} new item(s)!`)
 
-          // Reload all data
-          await loadData()
-        } else {
-          console.log('✅ No new items')
+            showNotification(`${newCount} new item(s) added!`, 'success')
+
+            // Reload all data to get the new items
+            await loadData(currentPage, pagination.per_page)
+          } else {
+            console.log('✅ No new items detected')
+          }
         }
 
         setLastUpdateCheck(new Date())
       } catch (error) {
         console.warn('⚠️ Polling check failed:', error.message)
+        // Don't show error to user, just log it
       }
-    }, 30000)
+    }, 30000) // Poll every 30 seconds
+  }
 
-    return () => {
+  // ✅ Only poll when tab is visible
+  const handleVisibilityChange = () => {
+    if (document.hidden) {
+      console.log('⏸️ Tab hidden - stopping polling')
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current)
         pollIntervalRef.current = null
       }
+    } else {
+      console.log('▶️ Tab visible - starting polling')
+      if (!pollIntervalRef.current) {
+        startPolling()
+      }
     }
-  }, [activeTab, items.length])
+  }
+
+  // Start polling if tab is visible
+  if (!document.hidden) {
+    startPolling()
+  }
+
+  // Listen for visibility changes
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+
+  return () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }
+}, [activeTab, pagination.current_page, pagination.per_page, pagination.total_items])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -180,18 +240,29 @@ function OperationsDepartment() {
     }
   }, [activeTab, items])
 
-  useEffect(() => {
-    loadData()
+  const loadClients = async () => {
+  try {
+    const clientList = await apiService.operations.getClients()
+    setClients(Array.isArray(clientList) ? clientList : [])
+  } catch (error) {
+    console.error("Error loading clients:", error)
+    setClients([])
+  }
+}
 
-    // Setup polling subscriptions
-    setupPollingListeners()
+useEffect(() => {
+  loadData()
+  loadClients() // ADD THIS LINE
 
-    return () => {
-      // Cleanup polling subscriptions
-      pollingSubscriptionsRef.current.forEach(unsubscribe => unsubscribe())
-      pollingSubscriptionsRef.current = []
-    }
-  }, [])
+  // Setup polling subscriptions
+  setupPollingListeners()
+
+  return () => {
+    // Cleanup polling subscriptions
+    pollingSubscriptionsRef.current.forEach(unsubscribe => unsubscribe())
+    pollingSubscriptionsRef.current = []
+  }
+}, [])
 
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
@@ -361,51 +432,55 @@ function OperationsDepartment() {
   }
 
 
-  // ✅ SIMPLIFIED handleManualRefresh - just reload data
   const handleManualRefresh = async () => {
-    try {
-      setIsRefreshing(true)
-      setError(null)
+  try {
+    setIsRefreshing(true)
+    setError(null)
 
-      console.log('🔄 Manual refresh triggered...')
+    console.log('🔄 Manual refresh triggered...')
 
-      showNotification('Refreshing data...')
+    showNotification('Refreshing data...', 'info')
 
-      // Just reload data from network
-      await loadData()
+    // Reload data from current page with cache buster
+    await loadData(pagination.current_page || 1, pagination.per_page || 20)
 
-      setLastUpdateCheck(new Date())
+    setLastUpdateCheck(new Date())
 
-      showNotification('✅ Data refreshed successfully!')
-    } catch (error) {
-      console.error('❌ Failed to refresh:', error)
-      setError(`Failed to refresh: ${error.message}`)
-      showNotification('❌ Failed to refresh data')
-    } finally {
-      setIsRefreshing(false)
-    }
+    showNotification('✅ Data refreshed successfully!', 'success')
+  } catch (error) {
+    console.error('❌ Failed to refresh:', error)
+    setError(`Failed to refresh: ${error.message}`)
+    showNotification('❌ Failed to refresh data', 'error')
+  } finally {
+    setIsRefreshing(false)
   }
+}
 
   const showNotification = (message, type = 'info') => {
-    console.log('📢 Notification:', message)
+  console.log('📢 Notification:', message)
 
-    // Show browser notification if permitted
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('Operations Update', {
-        body: message,
-        icon: '/icons/icon-192.jpg',
-        tag: 'operations-update',
-        badge: '/icons/icon-192.jpg'
-      })
-    }
-
-    // Also show in-app toast (you can integrate with a toast library here)
-    // For now, we'll use a simple console log
-    const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : '📢'
-    console.log(`${emoji} ${message}`)
-
-    return message // Return for potential chaining
+  // Show browser notification if permitted
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('Operations Update', {
+      body: message,
+      icon: '/icons/icon-192.jpg',
+      tag: 'operations-update',
+      badge: '/icons/icon-192.jpg'
+    })
   }
+
+  // Visual feedback emoji
+  const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : '📢'
+  console.log(`${emoji} ${message}`)
+
+  // ✅ OPTIONAL: If you have a toast library, use it here
+  // Example with react-hot-toast:
+  // if (type === 'success') toast.success(message)
+  // else if (type === 'error') toast.error(message)
+  // else toast(message)
+
+  return message
+}
 
   const loadAllItemDetails = async () => {
     // Only load details for items that are currently displayed
@@ -823,167 +898,297 @@ function OperationsDepartment() {
   const textPrimaryClass = isDarkMode ? "text-gray-100" : "text-gray-800"
   const textSecondaryClass = isDarkMode ? "text-gray-300" : "text-gray-600"
 
-
-  // ==================== ADD PAGINATION HANDLERS ====================
-
-  const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= pagination.total_pages) {
-      loadData(newPage, itemsPerPage)
-      scrollToTop()
-    }
-  }
-
-  const handleItemsPerPageChange = (newLimit) => {
-    setItemsPerPage(newLimit)
-    loadData(1, newLimit) // Reset to page 1 when changing items per page
-  }
-
-  const handleNextPage = () => {
-    if (pagination.has_next) {
-      handlePageChange(currentPage + 1)
-    }
-  }
-
-  const handlePreviousPage = () => {
-    if (pagination.has_previous) {
-      handlePageChange(currentPage - 1)
-    }
-  }
-
-  // ==================== ADD PAGINATION COMPONENT ====================
-
-  const PaginationControls = () => {
-    const { current_page, total_pages, total_items, has_next, has_previous } = pagination
-
-    if (total_pages <= 1) return null
-
-    const pageNumbers = []
-    const maxVisiblePages = 5
-
-    // Calculate visible page range
-    let startPage = Math.max(1, current_page - Math.floor(maxVisiblePages / 2))
-    let endPage = Math.min(total_pages, startPage + maxVisiblePages - 1)
-
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      startPage = Math.max(1, endPage - maxVisiblePages + 1)
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i)
-    }
-
-    return (
-      <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-300'
-        }`}>
-        {/* Items per page selector */}
-        <div className="flex items-center gap-2">
-          <label className={`text-sm ${textSecondaryClass}`}>
-            Items per page:
-          </label>
-          <select
-            value={itemsPerPage}
-            onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-            className={`px-3 py-1 rounded-lg border transition-colors ${isDarkMode
-                ? 'bg-gray-800 border-gray-700 text-gray-200'
-                : 'bg-white border-gray-300 text-gray-800'
-              }`}
-          >
-            <option value={10}>10</option>
-            <option value={20}>20</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </select>
-        </div>
-
-        {/* Page info */}
-        <div className={`text-sm ${textSecondaryClass}`}>
-          Showing {((current_page - 1) * itemsPerPage) + 1} to{' '}
-          {Math.min(current_page * itemsPerPage, total_items)} of {total_items} items
-        </div>
-
-        {/* Pagination buttons */}
-        <div className="flex items-center gap-2">
-          {/* Previous button */}
-          <button
-            onClick={handlePreviousPage}
-            disabled={!has_previous}
-            className={`px-3 py-1 rounded-lg font-medium transition-colors ${has_previous
-                ? isDarkMode
-                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-                  : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                : 'opacity-50 cursor-not-allowed bg-gray-600 text-gray-400'
-              }`}
-          >
-            Previous
-          </button>
-
-          {/* First page */}
-          {startPage > 1 && (
-            <>
-              <button
-                onClick={() => handlePageChange(1)}
-                className={`px-3 py-1 rounded-lg transition-colors ${isDarkMode
-                    ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                  }`}
-              >
-                1
-              </button>
-              {startPage > 2 && <span className={textSecondaryClass}>...</span>}
-            </>
-          )}
-
-          {/* Page numbers */}
-          {pageNumbers.map((pageNum) => (
-            <button
-              key={pageNum}
-              onClick={() => handlePageChange(pageNum)}
-              className={`px-3 py-1 rounded-lg font-medium transition-colors ${pageNum === current_page
-                  ? isDarkMode
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-blue-500 text-white'
-                  : isDarkMode
-                    ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                }`}
-            >
-              {pageNum}
-            </button>
-          ))}
-
-          {/* Last page */}
-          {endPage < total_pages && (
-            <>
-              {endPage < total_pages - 1 && <span className={textSecondaryClass}>...</span>}
-              <button
-                onClick={() => handlePageChange(total_pages)}
-                className={`px-3 py-1 rounded-lg transition-colors ${isDarkMode
-                    ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                  }`}
-              >
-                {total_pages}
-              </button>
-            </>
-          )}
-
-          {/* Next button */}
-          <button
-            onClick={handleNextPage}
-            disabled={!has_next}
-            className={`px-3 py-1 rounded-lg font-medium transition-colors ${has_next
-                ? isDarkMode
-                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-                  : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                : 'opacity-50 cursor-not-allowed bg-gray-600 text-gray-400'
-              }`}
-          >
-            Next
-          </button>
-        </div>
-      </div>
+// Edit Item Handler
+const handleEditItem = async (itemData) => {
+  try {
+    setItems(prevItems =>
+      prevItems.map(item =>
+        item.part_number === selectedItemForEdit.part_number
+          ? { ...item, ...itemData }
+          : item
+      )
     )
+    setShowEditItemModal(false)
+    setSelectedItemForEdit(null)
+    await apiService.operations.updateItem(selectedItemForEdit.part_number, itemData)
+  } catch (error) {
+    console.error("Error updating item:", error)
+    alert("Failed to update item: " + error.message)
+    await loadData()
   }
+}
+
+// Edit Phase Handler
+const handleEditPhase = async (phaseData) => {
+  try {
+    setItems(prevItems =>
+      prevItems.map(item => {
+        if (item.phases) {
+          return {
+            ...item,
+            phases: item.phases.map(phase =>
+              phase.id === selectedPhaseForEdit.id
+                ? { ...phase, ...phaseData }
+                : phase
+            )
+          }
+        }
+        return item
+      })
+    )
+    setShowEditPhaseModal(false)
+    setSelectedPhaseForEdit(null)
+    await apiService.operations.updatePhase(selectedPhaseForEdit.id, phaseData)
+  } catch (error) {
+    console.error("Error updating phase:", error)
+    alert("Failed to update phase: " + error.message)
+    await loadData()
+  }
+}
+
+// Delete Phase Handler
+const handleDeletePhase = async () => {
+  try {
+    const phaseId = selectedPhaseForEdit.id
+    setItems(prevItems =>
+      prevItems.map(item => {
+        if (item.phases) {
+          return {
+            ...item,
+            phases: item.phases.filter(phase => phase.id !== phaseId)
+          }
+        }
+        return item
+      })
+    )
+    setShowEditPhaseModal(false)
+    setSelectedPhaseForEdit(null)
+    await apiService.operations.deletePhase(phaseId)
+  } catch (error) {
+    console.error("Error deleting phase:", error)
+    alert("Failed to delete phase: " + error.message)
+    await loadData()
+  }
+}
+
+// Edit Subphase Handler
+const handleEditSubphase = async (subphaseData) => {
+  try {
+    setItems(prevItems =>
+      prevItems.map(item => {
+        if (item.phases) {
+          return {
+            ...item,
+            phases: item.phases.map(phase => {
+              if (phase.subphases) {
+                return {
+                  ...phase,
+                  subphases: phase.subphases.map(subphase =>
+                    subphase.id === selectedSubphaseForEdit.id
+                      ? { ...subphase, ...subphaseData }
+                      : subphase
+                  )
+                }
+              }
+              return phase
+            })
+          }
+        }
+        return item
+      })
+    )
+    setShowEditSubphaseModal(false)
+    setSelectedSubphaseForEdit(null)
+    await apiService.operations.updateSubphase(selectedSubphaseForEdit.id, subphaseData)
+  } catch (error) {
+    console.error("Error updating subphase:", error)
+    alert("Failed to update subphase: " + error.message)
+    await loadData()
+  }
+}
+
+// Delete Subphase Handler
+const handleDeleteSubphase = async () => {
+  try {
+    const subphaseId = selectedSubphaseForEdit.id
+    setItems(prevItems =>
+      prevItems.map(item => {
+        if (item.phases) {
+          return {
+            ...item,
+            phases: item.phases.map(phase => {
+              if (phase.subphases) {
+                return {
+                  ...phase,
+                  subphases: phase.subphases.filter(subphase => subphase.id !== subphaseId)
+                }
+              }
+              return phase
+            })
+          }
+        }
+        return item
+      })
+    )
+    setShowEditSubphaseModal(false)
+    setSelectedSubphaseForEdit(null)
+    await apiService.operations.deleteSubphase(subphaseId)
+  } catch (error) {
+    console.error("Error deleting subphase:", error)
+    alert("Failed to delete subphase: " + error.message)
+    await loadData()
+  }
+}
+
+// Add Phase Handler
+const handleAddPhase = async (phaseData) => {
+  try {
+    const partNumber = selectedItemForEdit.part_number
+    const tempPhase = {
+      id: Date.now(),
+      name: phaseData.name,
+      phase_order: phaseData.phase_order,
+      subphases: []
+    }
+    setItems(prevItems =>
+      prevItems.map(item =>
+        item.part_number === partNumber
+          ? { ...item, phases: [...(item.phases || []), tempPhase] }
+          : item
+      )
+    )
+    setShowAddPhaseModal(false)
+    setSelectedItemForEdit(null)
+    const response = await apiService.operations.createPhase({
+      part_number: partNumber,
+      name: phaseData.name,
+      phase_order: phaseData.phase_order
+    })
+    if (response && response.id) {
+      setItems(prevItems =>
+        prevItems.map(item =>
+          item.part_number === partNumber
+            ? {
+              ...item,
+              phases: item.phases.map(phase =>
+                phase.id === tempPhase.id ? { ...phase, id: response.id } : phase
+              )
+            }
+            : item
+        )
+      )
+    }
+  } catch (error) {
+    console.error("Error adding phase:", error)
+    alert("Failed to add phase: " + error.message)
+    await loadData()
+  }
+}
+
+// Add Subphase Handler
+const handleAddSubphase = async (subphaseData) => {
+  try {
+    const partNumber = selectedItemForEdit.part_number
+    const phaseId = selectedPhaseForEdit.id
+    const tempSubphase = {
+      id: Date.now(),
+      name: subphaseData.name,
+      expected_duration: parseFloat(subphaseData.expected_duration) || 0,
+      expected_quantity: parseInt(subphaseData.expected_quantity) || 0,
+      subphase_order: parseInt(subphaseData.subphase_order) || 0,
+      completed: 0,
+      current_completed_quantity: 0
+    }
+    setItems(prevItems =>
+      prevItems.map(item =>
+        item.part_number === partNumber
+          ? {
+            ...item,
+            phases: item.phases.map(phase =>
+              phase.id === phaseId
+                ? { ...phase, subphases: [...(phase.subphases || []), tempSubphase] }
+                : phase
+            )
+          }
+          : item
+      )
+    )
+    setShowAddSubphaseModal(false)
+    setSelectedPhaseForEdit(null)
+    setSelectedItemForEdit(null)
+    const response = await apiService.operations.createSubphase({
+      part_number: partNumber,
+      phase_id: phaseId,
+      name: subphaseData.name,
+      expected_duration: parseFloat(subphaseData.expected_duration) || 0,
+      expected_quantity: parseInt(subphaseData.expected_quantity) || 0,
+      subphase_order: parseInt(subphaseData.subphase_order) || 0
+    })
+    if (response && response.id) {
+      setItems(prevItems =>
+        prevItems.map(item =>
+          item.part_number === partNumber
+            ? {
+              ...item,
+              phases: item.phases.map(phase =>
+                phase.id === phaseId
+                  ? {
+                    ...phase,
+                    subphases: phase.subphases.map(subphase =>
+                      subphase.id === tempSubphase.id
+                        ? { ...subphase, id: response.id }
+                        : subphase
+                    )
+                  }
+                  : phase
+              )
+            }
+            : item
+        )
+      )
+    }
+  } catch (error) {
+    console.error("Error adding subphase:", error)
+    alert("Failed to add subphase: " + error.message)
+    await loadData()
+  }
+}
+
+// Bulk Edit Handler
+const handleBulkEdit = async (updates, itemCheckboxes) => {
+  try {
+    const itemsToUpdate = Object.keys(itemCheckboxes)
+      .filter(partNumber => itemCheckboxes[partNumber])
+      .map(partNumber => items.find(item => item.part_number === partNumber))
+      .filter(Boolean)
+
+    setItems(prevItems =>
+      prevItems.map(item => {
+        if (itemCheckboxes[item.part_number]) {
+          const updateData = { ...updates }
+          if (updates.remarks && item.remarks) {
+            updateData.remarks = `${item.remarks}\n${updates.remarks}`
+          }
+          return { ...item, ...updateData }
+        }
+        return item
+      })
+    )
+    setShowBulkEditModal(false)
+
+    for (const item of itemsToUpdate) {
+      const updateData = { ...updates }
+      if (updates.remarks && item.remarks) {
+        updateData.remarks = `${item.remarks}\n${updates.remarks}`
+      }
+      await apiService.operations.updateItem(item.part_number, updateData)
+    }
+  } catch (error) {
+    console.error("Error in bulk edit:", error)
+    alert("Failed to update items: " + error.message)
+    await loadData()
+  }
+}
 
   return (
     <div className={`min-h-screen p-8 transition-colors duration-300 ${isDarkMode
@@ -1295,6 +1500,7 @@ function OperationsDepartment() {
                   calculateItemProgress={calculateItemProgress}
                   loading={loading}
                   apiService={apiService}
+                  formatTime={formatTime}
                 />
               )}
 
@@ -1308,31 +1514,43 @@ function OperationsDepartment() {
               )}
 
               {activeTab === "checklist" && (
-                <Checklist
-                  items={items}
-                  setItems={setItems}
-                  formatTime={formatTime}
-                  formatActionDuration={formatActionDuration}
-                  expandedItems={expandedItems}
-                  expandedPhases={expandedPhases}
-                  scanningFor={scanningFor}
-                  barcodeInput={barcodeInput}
-                  setBarcodeInput={setBarcodeInput}
-                  calculateItemProgress={calculateItemProgress}
-                  calculatePhaseProgress={calculatePhaseProgress}
-                  toggleItemExpansion={toggleItemExpansion}
-                  togglePhaseExpansion={togglePhaseExpansion}
-                  toggleSubPhase={toggleSubPhase}
-                  updateActualHours={updateActualHours}
-                  handleBarcodeScan={handleBarcodeScan}
-                  submitBarcode={submitBarcode}
-                  setScanningFor={setScanningFor}
-                  deleteItem={deleteItem}
-                  apiService={apiService}
-                  loadData={loadData}
-                  isDarkMode={isDarkMode}
-                />
-              )}
+  <Checklist
+    items={items}
+    setItems={setItems}
+    formatTime={formatTime}
+    formatActionDuration={formatActionDuration}
+    expandedItems={expandedItems}
+    expandedPhases={expandedPhases}
+    scanningFor={scanningFor}
+    barcodeInput={barcodeInput}
+    setBarcodeInput={setBarcodeInput}
+    calculateItemProgress={calculateItemProgress}
+    calculatePhaseProgress={calculatePhaseProgress}
+    toggleItemExpansion={toggleItemExpansion}
+    togglePhaseExpansion={togglePhaseExpansion}
+    toggleSubPhase={toggleSubPhase}
+    updateActualHours={updateActualHours}
+    handleBarcodeScan={handleBarcodeScan}
+    submitBarcode={submitBarcode}
+    setScanningFor={setScanningFor}
+    deleteItem={deleteItem}
+    apiService={apiService}
+    loadData={loadData}
+    isDarkMode={isDarkMode}
+    // ADD THESE NEW PROPS:
+    setShowEditItemModal={setShowEditItemModal}
+    setShowEditPhaseModal={setShowEditPhaseModal}
+    setShowEditSubphaseModal={setShowEditSubphaseModal}
+    setShowAddPhaseModal={setShowAddPhaseModal}
+    setShowAddSubphaseModal={setShowAddSubphaseModal}
+    setShowBulkEditModal={setShowBulkEditModal}
+    setSelectedItemForEdit={setSelectedItemForEdit}
+    setSelectedPhaseForEdit={setSelectedPhaseForEdit}
+    setSelectedSubphaseForEdit={setSelectedSubphaseForEdit}
+    setSelectedItemsForBulk={setSelectedItemsForBulk}
+    clients={clients}
+  />
+)}
 
               {activeTab === "comparison" && (
                 <ItemComparison
@@ -1370,6 +1588,96 @@ function OperationsDepartment() {
         >
           <ArrowUp className="w-6 h-6" />
         </button>
+      )}
+
+      {/* ADD ALL THESE MODALS HERE: */}
+      
+      {/* Edit Item Modal */}
+      {showEditItemModal && selectedItemForEdit && (
+        <EditItemModal
+          item={selectedItemForEdit}
+          clients={clients}
+          isDarkMode={isDarkMode}
+          onClose={() => {
+            setShowEditItemModal(false)
+            setSelectedItemForEdit(null)
+          }}
+          onSave={handleEditItem}
+        />
+      )}
+
+      {/* Edit Phase Modal */}
+      {showEditPhaseModal && selectedPhaseForEdit && (
+        <EditPhaseModal
+          phase={selectedPhaseForEdit}
+          isDarkMode={isDarkMode}
+          onClose={() => {
+            setShowEditPhaseModal(false)
+            setSelectedPhaseForEdit(null)
+          }}
+          onSave={handleEditPhase}
+          onDelete={handleDeletePhase}
+        />
+      )}
+
+      {/* Edit Subphase Modal */}
+      {showEditSubphaseModal && selectedSubphaseForEdit && selectedItemForEdit && (
+        <EditSubphaseModal
+          subphase={selectedSubphaseForEdit}
+          batchQty={selectedItemForEdit.qty}
+          isDarkMode={isDarkMode}
+          onClose={() => {
+            setShowEditSubphaseModal(false)
+            setSelectedSubphaseForEdit(null)
+            setSelectedPhaseForEdit(null)
+            setSelectedItemForEdit(null)
+          }}
+          onSave={handleEditSubphase}
+          onDelete={handleDeleteSubphase}
+        />
+      )}
+
+      {/* Add Phase Modal */}
+      {showAddPhaseModal && selectedItemForEdit && (
+        <AddPhaseModal
+          item={selectedItemForEdit}
+          isDarkMode={isDarkMode}
+          onClose={() => {
+            setShowAddPhaseModal(false)
+            setSelectedItemForEdit(null)
+          }}
+          onSave={handleAddPhase}
+        />
+      )}
+
+      {/* Add Subphase Modal */}
+      {showAddSubphaseModal && selectedPhaseForEdit && selectedItemForEdit && (
+        <AddSubphaseModal
+          item={selectedItemForEdit}
+          phase={selectedPhaseForEdit}
+          batchQty={selectedItemForEdit.qty}
+          isDarkMode={isDarkMode}
+          onClose={() => {
+            setShowAddSubphaseModal(false)
+            setSelectedPhaseForEdit(null)
+            setSelectedItemForEdit(null)
+          }}
+          onSave={handleAddSubphase}
+        />
+      )}
+
+      {/* Bulk Edit Modal */}
+      {showBulkEditModal && selectedItemsForBulk.length > 0 && (
+        <BulkEditModal
+          selectedItems={selectedItemsForBulk}
+          clients={clients}
+          isDarkMode={isDarkMode}
+          onClose={() => {
+            setShowBulkEditModal(false)
+            setSelectedItemsForBulk([])
+          }}
+          onSave={handleBulkEdit}
+        />
       )}
     </div>
   )
