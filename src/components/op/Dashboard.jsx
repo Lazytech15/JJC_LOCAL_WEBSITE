@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, Calendar, Package, CheckCircle, Clock, Users, Activity, TrendingUp, AlertCircle } from 'lucide-react';
 
-function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMode }) {
+function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMode, formatTime}) {
   const [selectedItem, setSelectedItem] = useState(null);
   const [itemDetails, setItemDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -548,6 +548,7 @@ const overallProgress = Math.round(parseFloat(stats.avg_progress) || 0);
                       loadingDetails={loadingDetails}
                       onClose={closePanel}
                       isDarkMode={isDarkMode}
+                      formatTime={formatTime}
                     />
                   )}
                 </div>
@@ -574,7 +575,7 @@ const overallProgress = Math.round(parseFloat(stats.avg_progress) || 0);
 }
 
 // Item Details Slide Panel Component
-function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isDarkMode }) {
+function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isDarkMode, formatTime }) {
   const [expandedPhases, setExpandedPhases] = useState({});
 
   const togglePhase = (phaseId) => {
@@ -935,7 +936,7 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                                 const minutes = Math.floor(subphase.time_duration / 60);
                                 const seconds = subphase.time_duration % 60;
                                 const actualMinutes = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-                                const expectedMinutes = subphase.expected_duration ? (parseFloat(subphase.expected_duration) * 60).toFixed(0) : '0';
+                                const expectedMinutes = subphase.expected_duration;
 
                                 return (
                                   <div key={subphase.id} className={`p-2 rounded border ${isCompleted
@@ -982,12 +983,12 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                                                   <span className="font-medium">{actualMinutes}</span>
                                                   {expectedMinutes !== '0' && (
                                                     <span className={isDarkMode ? "text-gray-500" : "text-gray-500"}>
-                                                      {' '}(exp: {expectedMinutes}m)
+                                                      {' '}(exp: {formatTime(expectedMinutes)})
                                                     </span>
                                                   )}
                                                 </>
                                               ) : (
-                                                <>Expected: {expectedMinutes}m</>
+                                                <>Expected: {formatTime(expectedMinutes)}</>
                                               )}
                                             </span>
                                           </div>

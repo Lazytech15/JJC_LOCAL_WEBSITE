@@ -1511,26 +1511,32 @@ async batchImportFromGoogleSheets(items) {
 }
 
   /**
-   * ✅ SIMPLIFIED: Just fetch fresh data from network
-   */
-  async checkForUpdates() {
-    try {
-      console.log('🔍 Checking for updates...')
-      
-      const response = await this.request('/api/operations/items', {
-        cache: 'no-cache',
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
-        }
-      })
-      
+ * Get fresh data with cache busting
+ * @param {Object} filters - Optional filters
+ * @returns {Promise<Array>} Fresh items
+ */
+async getFreshData(filters = {}) {
+  try {
+    console.log('🔄 Fetching fresh data...')
+    
+    const response = await this.getItems({
+      ...filters,
+      _t: Date.now() // Cache buster
+    })
+    
+    // Handle both paginated and non-paginated responses
+    if (response && response.items) {
+      return response.items
+    } else if (Array.isArray(response)) {
       return response
-    } catch (error) {
-      console.error('❌ Failed to check for updates:', error)
-      throw error
     }
+    
+    return []
+  } catch (error) {
+    console.error('❌ Failed to fetch fresh data:', error)
+    throw error
   }
+}
 
 /**
  * Get items imported from Google Sheets

@@ -73,51 +73,90 @@ function OperationsDepartment() {
   const [clients, setClients] = useState([])
 
   useEffect(() => {
-    const needsPolling = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
+  const needsPolling = activeTab === "dashboard" || activeTab === "reports" || activeTab === "checklist"
 
-    if (!needsPolling) {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current)
-        pollIntervalRef.current = null
-      }
-      return
+  if (!needsPolling) {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+      console.log('⏸️ Polling stopped - not on relevant tab')
     }
+    return
+  }
 
-    // Check for updates every 30 seconds
+  // ✅ FIXED: Simplified polling that just checks item count
+  const startPolling = () => {
     pollIntervalRef.current = setInterval(async () => {
       try {
         console.log('🔄 Polling for new items...')
 
         const currentCount = items.length
+        const currentPage = pagination.current_page || 1
 
-        // Just fetch fresh data
-        const freshItems = await apiService.operations.checkForUpdates()
+        // Fetch fresh data from the current page
+        const freshResponse = await apiService.operations.getItemsPaginated(
+          currentPage,
+          pagination.per_page || 20,
+          { _t: Date.now() } // Cache buster
+        )
 
-        if (Array.isArray(freshItems) && freshItems.length > currentCount) {
-          const newCount = freshItems.length - currentCount
-          console.log(`✅ Found ${newCount} new item(s)!`)
+        if (freshResponse && freshResponse.items) {
+          const freshCount = freshResponse.pagination.total_items || freshResponse.items.length
 
-          showNotification(`${newCount} new item(s) added from Google Sheets!`)
+          // Check if total items increased
+          if (freshCount > pagination.total_items) {
+            const newCount = freshCount - pagination.total_items
+            console.log(`✅ Found ${newCount} new item(s)!`)
 
-          // Reload all data
-          await loadData()
-        } else {
-          console.log('✅ No new items')
+            showNotification(`${newCount} new item(s) added!`, 'success')
+
+            // Reload all data to get the new items
+            await loadData(currentPage, pagination.per_page)
+          } else {
+            console.log('✅ No new items detected')
+          }
         }
 
         setLastUpdateCheck(new Date())
       } catch (error) {
         console.warn('⚠️ Polling check failed:', error.message)
+        // Don't show error to user, just log it
       }
-    }, 30000)
+    }, 30000) // Poll every 30 seconds
+  }
 
-    return () => {
+  // ✅ Only poll when tab is visible
+  const handleVisibilityChange = () => {
+    if (document.hidden) {
+      console.log('⏸️ Tab hidden - stopping polling')
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current)
         pollIntervalRef.current = null
       }
+    } else {
+      console.log('▶️ Tab visible - starting polling')
+      if (!pollIntervalRef.current) {
+        startPolling()
+      }
     }
-  }, [activeTab, items.length])
+  }
+
+  // Start polling if tab is visible
+  if (!document.hidden) {
+    startPolling()
+  }
+
+  // Listen for visibility changes
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+
+  return () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }
+}, [activeTab, pagination.current_page, pagination.per_page, pagination.total_items])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -393,51 +432,55 @@ useEffect(() => {
   }
 
 
-  // ✅ SIMPLIFIED handleManualRefresh - just reload data
   const handleManualRefresh = async () => {
-    try {
-      setIsRefreshing(true)
-      setError(null)
+  try {
+    setIsRefreshing(true)
+    setError(null)
 
-      console.log('🔄 Manual refresh triggered...')
+    console.log('🔄 Manual refresh triggered...')
 
-      showNotification('Refreshing data...')
+    showNotification('Refreshing data...', 'info')
 
-      // Just reload data from network
-      await loadData()
+    // Reload data from current page with cache buster
+    await loadData(pagination.current_page || 1, pagination.per_page || 20)
 
-      setLastUpdateCheck(new Date())
+    setLastUpdateCheck(new Date())
 
-      showNotification('✅ Data refreshed successfully!')
-    } catch (error) {
-      console.error('❌ Failed to refresh:', error)
-      setError(`Failed to refresh: ${error.message}`)
-      showNotification('❌ Failed to refresh data')
-    } finally {
-      setIsRefreshing(false)
-    }
+    showNotification('✅ Data refreshed successfully!', 'success')
+  } catch (error) {
+    console.error('❌ Failed to refresh:', error)
+    setError(`Failed to refresh: ${error.message}`)
+    showNotification('❌ Failed to refresh data', 'error')
+  } finally {
+    setIsRefreshing(false)
   }
+}
 
   const showNotification = (message, type = 'info') => {
-    console.log('📢 Notification:', message)
+  console.log('📢 Notification:', message)
 
-    // Show browser notification if permitted
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('Operations Update', {
-        body: message,
-        icon: '/icons/icon-192.jpg',
-        tag: 'operations-update',
-        badge: '/icons/icon-192.jpg'
-      })
-    }
-
-    // Also show in-app toast (you can integrate with a toast library here)
-    // For now, we'll use a simple console log
-    const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : '📢'
-    console.log(`${emoji} ${message}`)
-
-    return message // Return for potential chaining
+  // Show browser notification if permitted
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('Operations Update', {
+      body: message,
+      icon: '/icons/icon-192.jpg',
+      tag: 'operations-update',
+      badge: '/icons/icon-192.jpg'
+    })
   }
+
+  // Visual feedback emoji
+  const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : '📢'
+  console.log(`${emoji} ${message}`)
+
+  // ✅ OPTIONAL: If you have a toast library, use it here
+  // Example with react-hot-toast:
+  // if (type === 'success') toast.success(message)
+  // else if (type === 'error') toast.error(message)
+  // else toast(message)
+
+  return message
+}
 
   const loadAllItemDetails = async () => {
     // Only load details for items that are currently displayed
@@ -1457,6 +1500,7 @@ const handleBulkEdit = async (updates, itemCheckboxes) => {
                   calculateItemProgress={calculateItemProgress}
                   loading={loading}
                   apiService={apiService}
+                  formatTime={formatTime}
                 />
               )}
 
