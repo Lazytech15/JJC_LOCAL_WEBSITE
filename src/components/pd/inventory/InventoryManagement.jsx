@@ -418,8 +418,8 @@ function InventoryManagement() {
           }
           .barcode-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 15px;
           }
           .barcode-item {
             border: 2px dashed #000;
