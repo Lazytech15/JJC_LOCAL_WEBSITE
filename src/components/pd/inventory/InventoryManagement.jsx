@@ -403,54 +403,48 @@ function InventoryManagement() {
         <title>CODE-128 ITM Format Barcodes</title>
         <style>
           @page {
-            size: A4;
-            margin: 0.5in;
+            size: A4 landscape;
+            margin: 0.3in;
           }
           body {
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             background: white;
           }
           .header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
           }
           .barcode-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 10px;
           }
           .barcode-item {
             border: 2px dashed #000;
-            padding: 20px;
+            padding: 4px;
             text-align: center;
             break-inside: avoid;
             background: white;
-            margin-bottom: 10px;
+            margin-bottom: 2px;
           }
           .barcode-svg {
-            margin: 15px 0;
+            margin: 2px 0;
             background: white;
           }
           .item-name {
-            font-size: 16px;
+            font-size: 11px;
             font-weight: bold;
-            margin: 8px 0;
+            margin: 2px 0;
             word-wrap: break-word;
+            line-height: 1.2;
           }
           .item-details {
-            font-size: 12px;
+            font-size: 9px;
             color: #333;
-            margin: 4px 0;
-          }
-          .item-id {
-            font-size: 14px;
-            font-weight: bold;
-            margin: 8px 0;
-            background: #f0f0f0;
-            padding: 4px 8px;
-            border-radius: 4px;
+            margin: 1px 0;
+            line-height: 1.2;
           }
           .instructions {
             background: #fffacd;
@@ -463,9 +457,16 @@ function InventoryManagement() {
             .no-print { display: none; }
             .barcode-item { 
               page-break-inside: avoid; 
-              margin-bottom: 5px;
+              margin-bottom: 2px;
+              padding: 3px;
             }
-            body { background: white !important; }
+            body { 
+              background: white !important;
+              padding: 10px;
+            }
+            .barcode-grid {
+              gap: 6px;
+            }
           }
         </style>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
@@ -504,11 +505,8 @@ function InventoryManagement() {
         htmlContent += `
         <div class="barcode-item">
           <svg id="barcode-${index}" class="barcode-svg"></svg>
-          <div class="item-id">ID: ${barcodeId}</div>
           <div class="item-name">${item.item_name}</div>
-          <div class="item-details"><strong>Brand:</strong> ${item.brand || 'No Brand'}</div>
-          <div class="item-details"><strong>Location:</strong> ${item.location || 'No Location'}</div>
-          <div class="item-details"><strong>Balance:</strong> ${item.balance || 0}</div>
+          <div class="item-details"><strong>ROP:</strong> ${item.min_stock || 0}</div>
         </div>
       `
       })
@@ -530,16 +528,16 @@ function InventoryManagement() {
               try {
                 JsBarcode("#barcode-${index}", "${barcodeId}", {
                   format: "CODE128",
-                  width: 3,
-                  height: 80,
+                  width: 1.5,
+                  height: 30,
                   displayValue: true,
-                  fontSize: 16,
-                  margin: 10,
+                  fontSize: 10,
+                  margin: 2,
                   background: "#ffffff",
                   lineColor: "#000000",
                   textAlign: "center",
                   textPosition: "bottom",
-                  textMargin: 8
+                  textMargin: 2
                 });
               } catch(e) {
                 console.error("Error generating barcode for ${barcodeId}:", e);
