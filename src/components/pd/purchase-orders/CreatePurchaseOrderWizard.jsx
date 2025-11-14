@@ -61,7 +61,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     prepared_by: [''], // Changed to array for multiple people, initialize with one empty string
     verified_by: "",
     approved_by: "",
-    notes: ""
+    notes: "",
+    attached_images: [] // Array of base64 image data
   })
 
   // Helper to safely format currency numbers
@@ -279,6 +280,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
           verified_by: po.verified_by || prev.verified_by,
           approved_by: po.approved_by || prev.approved_by,
           notes: po.notes || prev.notes,
+          attached_images: po.attached_images ? (typeof po.attached_images === 'string' ? JSON.parse(po.attached_images) : po.attached_images) : [],
           // preserve priority when editing if present (support legacy values too)
           priority: po.priority || po.priority_level || prev.priority
         }))
@@ -678,8 +680,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     }
     
     if (currentStep === 4) {
-      if (!formData.prepared_by || !formData.verified_by || !formData.approved_by) {
-        setError("Please fill in all signature fields")
+      if (!formData.prepared_by) {
+        setError("Please fill in the 'Prepared By' field")
         return
       }
     }
@@ -745,6 +747,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         verified_by: formData.verified_by,
         approved_by: formData.approved_by,
         notes: formData.notes,
+        attached_images: JSON.stringify(formData.attached_images), // Serialize images array
         // Add status field - 'draft' if saveAsDraft, otherwise 'requested'
         status: saveAsDraft ? 'draft' : 'requested',
         // Tax and discount information
@@ -820,7 +823,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       prepared_by: [''],
       verified_by: "",
       approved_by: "",
-      notes: ""
+      notes: "",
+      attached_images: []
     })
     setPoNumberStatus({ checking: false, exists: false, message: "" })
     setError(null)
@@ -1637,7 +1641,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                 className="flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
                                   bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
                                   focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                                placeholder={`Person ${index + 1} name (optional)`}
+                                placeholder={`Person ${index + 1} name`}
                               />
                               {formData.prepared_by.length > 1 && (
                                 <button
@@ -1676,7 +1680,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
                             bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
                             focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                          placeholder="Name of person verifying (optional)"
+                          placeholder="Name of person verifying"
                         />
                       </div>
 
@@ -1691,7 +1695,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
                             bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
                             focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                          placeholder="Name of person approving (optional)"
+                            placeholder="Name of person approving"
                         />
                       </div>
                     </div>
@@ -1717,6 +1721,75 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           <span className="absolute top-1 right-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">Autofilled</span>
                         )}
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        Attach Images (Drawings, Photos, etc.)
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files || [])
+                          const imagePromises = files.map(file => {
+                            return new Promise((resolve, reject) => {
+                              const reader = new FileReader()
+                              reader.onload = (event) => resolve({
+                                data: event.target.result,
+                                name: file.name,
+                                type: file.type
+                              })
+                              reader.onerror = reject
+                              reader.readAsDataURL(file)
+                            })
+                          })
+                          try {
+                            const newImages = await Promise.all(imagePromises)
+                            setFormData(prev => ({
+                              ...prev,
+                              attached_images: [...prev.attached_images, ...newImages]
+                            }))
+                          } catch (err) {
+                            console.error('Error loading images:', err)
+                          }
+                        }}
+                        className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                          bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                          focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all
+                          file:mr-4 file:py-2 file:px-4 file:rounded file:border-0
+                          file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700
+                          hover:file:bg-blue-100 cursor-pointer"
+                      />
+                      
+                      {/* Image Previews */}
+                      {formData.attached_images.length > 0 && (
+                        <div className="mt-4 grid grid-cols-2 gap-4">
+                          {formData.attached_images.map((img, idx) => (
+                            <div key={idx} className="relative border-2 border-gray-300 dark:border-gray-600 rounded-lg p-2">
+                              <img
+                                src={img.data}
+                                alt={img.name}
+                                className="w-full h-32 object-contain rounded"
+                              />
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">{img.name}</p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    attached_images: prev.attached_images.filter((_, i) => i !== idx)
+                                  }))
+                                }}
+                                className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-colors"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1907,6 +1980,27 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           <div className="text-sm font-semibold text-gray-800">Notes:</div>
                           <div className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">
                             {formData.notes}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Attached Images */}
+                      {formData.attached_images && formData.attached_images.length > 0 && (
+                        <div className="mt-6 pt-4 border-t border-gray-300">
+                          <div className="text-sm font-semibold text-gray-800 mb-3">Attached Images:</div>
+                          <div className="grid grid-cols-2 gap-4">
+                            {formData.attached_images.map((img, idx) => (
+                              <div key={idx} className="border border-gray-300 rounded p-2">
+                                <img
+                                  src={img.data}
+                                  alt={img.name || `Attachment ${idx + 1}`}
+                                  className="w-full h-32 object-contain rounded"
+                                />
+                                <p className="text-xs text-gray-600 mt-1 text-center truncate">
+                                  {img.name || `Image ${idx + 1}`}
+                                </p>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
