@@ -423,34 +423,26 @@ function InventoryManagement() {
           }
           .barcode-item {
             border: 2px dashed #000;
-            padding: 20px;
+            padding: 10px;
             text-align: center;
             break-inside: avoid;
             background: white;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
           }
           .barcode-svg {
-            margin: 15px 0;
+            margin: 8px 0;
             background: white;
           }
           .item-name {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
-            margin: 8px 0;
+            margin: 6px 0;
             word-wrap: break-word;
           }
           .item-details {
-            font-size: 12px;
+            font-size: 11px;
             color: #333;
-            margin: 4px 0;
-          }
-          .item-id {
-            font-size: 14px;
-            font-weight: bold;
-            margin: 8px 0;
-            background: #f0f0f0;
-            padding: 4px 8px;
-            border-radius: 4px;
+            margin: 3px 0;
           }
           .instructions {
             background: #fffacd;
@@ -504,11 +496,8 @@ function InventoryManagement() {
         htmlContent += `
         <div class="barcode-item">
           <svg id="barcode-${index}" class="barcode-svg"></svg>
-          <div class="item-id">ID: ${barcodeId}</div>
           <div class="item-name">${item.item_name}</div>
-          <div class="item-details"><strong>Brand:</strong> ${item.brand || 'No Brand'}</div>
-          <div class="item-details"><strong>Location:</strong> ${item.location || 'No Location'}</div>
-          <div class="item-details"><strong>Balance:</strong> ${item.balance || 0}</div>
+          <div class="item-details"><strong>ROP:</strong> ${item.min_stock || 0}</div>
         </div>
       `
       })
@@ -530,16 +519,16 @@ function InventoryManagement() {
               try {
                 JsBarcode("#barcode-${index}", "${barcodeId}", {
                   format: "CODE128",
-                  width: 3,
-                  height: 80,
+                  width: 2,
+                  height: 60,
                   displayValue: true,
-                  fontSize: 16,
-                  margin: 10,
+                  fontSize: 14,
+                  margin: 5,
                   background: "#ffffff",
                   lineColor: "#000000",
                   textAlign: "center",
                   textPosition: "bottom",
-                  textMargin: 8
+                  textMargin: 5
                 });
               } catch(e) {
                 console.error("Error generating barcode for ${barcodeId}:", e);
