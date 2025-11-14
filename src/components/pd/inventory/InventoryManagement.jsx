@@ -403,46 +403,46 @@ function InventoryManagement() {
         <title>CODE-128 ITM Format Barcodes</title>
         <style>
           @page {
-            size: A4;
-            margin: 0.5in;
+            size: A4 landscape;
+            margin: 0.3in;
           }
           body {
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             background: white;
           }
           .header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
           }
           .barcode-grid {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr 1fr;
-            gap: 15px;
+            gap: 10px;
           }
           .barcode-item {
             border: 2px dashed #000;
-            padding: 10px;
+            padding: 6px;
             text-align: center;
             break-inside: avoid;
             background: white;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
           }
           .barcode-svg {
-            margin: 8px 0;
+            margin: 4px 0;
             background: white;
           }
           .item-name {
-            font-size: 14px;
+            font-size: 12px;
             font-weight: bold;
-            margin: 6px 0;
+            margin: 4px 0;
             word-wrap: break-word;
           }
           .item-details {
-            font-size: 11px;
+            font-size: 10px;
             color: #333;
-            margin: 3px 0;
+            margin: 2px 0;
           }
           .instructions {
             background: #fffacd;
@@ -455,9 +455,15 @@ function InventoryManagement() {
             .no-print { display: none; }
             .barcode-item { 
               page-break-inside: avoid; 
-              margin-bottom: 5px;
+              margin-bottom: 3px;
             }
-            body { background: white !important; }
+            body { 
+              background: white !important;
+              padding: 10px;
+            }
+            .barcode-grid {
+              gap: 8px;
+            }
           }
         </style>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
@@ -519,16 +525,16 @@ function InventoryManagement() {
               try {
                 JsBarcode("#barcode-${index}", "${barcodeId}", {
                   format: "CODE128",
-                  width: 2,
-                  height: 60,
+                  width: 1.5,
+                  height: 40,
                   displayValue: true,
-                  fontSize: 14,
-                  margin: 5,
+                  fontSize: 12,
+                  margin: 3,
                   background: "#ffffff",
                   lineColor: "#000000",
                   textAlign: "center",
                   textPosition: "bottom",
-                  textMargin: 5
+                  textMargin: 3
                 });
               } catch(e) {
                 console.error("Error generating barcode for ${barcodeId}:", e);
