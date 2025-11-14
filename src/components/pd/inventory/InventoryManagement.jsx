@@ -423,26 +423,28 @@ function InventoryManagement() {
           }
           .barcode-item {
             border: 2px dashed #000;
-            padding: 6px;
+            padding: 4px;
             text-align: center;
             break-inside: avoid;
             background: white;
-            margin-bottom: 3px;
+            margin-bottom: 2px;
           }
           .barcode-svg {
-            margin: 4px 0;
+            margin: 2px 0;
             background: white;
           }
           .item-name {
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
-            margin: 4px 0;
+            margin: 2px 0;
             word-wrap: break-word;
+            line-height: 1.2;
           }
           .item-details {
-            font-size: 10px;
+            font-size: 9px;
             color: #333;
-            margin: 2px 0;
+            margin: 1px 0;
+            line-height: 1.2;
           }
           .instructions {
             background: #fffacd;
@@ -455,14 +457,15 @@ function InventoryManagement() {
             .no-print { display: none; }
             .barcode-item { 
               page-break-inside: avoid; 
-              margin-bottom: 3px;
+              margin-bottom: 2px;
+              padding: 3px;
             }
             body { 
               background: white !important;
               padding: 10px;
             }
             .barcode-grid {
-              gap: 8px;
+              gap: 6px;
             }
           }
         </style>
@@ -526,15 +529,15 @@ function InventoryManagement() {
                 JsBarcode("#barcode-${index}", "${barcodeId}", {
                   format: "CODE128",
                   width: 1.5,
-                  height: 40,
+                  height: 30,
                   displayValue: true,
-                  fontSize: 12,
-                  margin: 3,
+                  fontSize: 10,
+                  margin: 2,
                   background: "#ffffff",
                   lineColor: "#000000",
                   textAlign: "center",
                   textPosition: "bottom",
-                  textMargin: 3
+                  textMargin: 2
                 });
               } catch(e) {
                 console.error("Error generating barcode for ${barcodeId}:", e);
