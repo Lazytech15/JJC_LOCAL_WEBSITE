@@ -594,7 +594,7 @@ export const exportPurchaseOrderToPDF = (poData) => {
     // NOTES SECTION
     // ============================================================================
     
-    if (poData.notes && poData.notes.trim()) {
+    if ((poData.notes && poData.notes.trim()) || (poData.attached_images && poData.attached_images.length > 0)) {
       const footerY = pageHeight - margin - 5
       const availableNotesHeight = footerY - yPos - 8
       
@@ -609,16 +609,89 @@ export const exportPurchaseOrderToPDF = (poData) => {
         doc.setLineWidth(LINE_WEIGHTS.grid)
         doc.line(margin + 1, yPos + 6.5, pageWidth - rightMargin - 1, yPos + 6.5)
         
-        doc.setFont("helvetica", "normal")
-        doc.setFontSize(FONT_SIZES.body)
+        let contentY = yPos + 10
         
-        const lineHeight = 4
-        const availableLines = Math.floor((availableNotesHeight - 10) / lineHeight)
+        // Display text notes if present
+        if (poData.notes && poData.notes.trim()) {
+          doc.setFont("helvetica", "normal")
+          doc.setFontSize(FONT_SIZES.body)
+          
+          const lineHeight = 4
+          const notesLines = doc.splitTextToSize(poData.notes, pageWidth - margin - rightMargin - 8)
+          
+          doc.text(notesLines, margin + 4, contentY)
+          contentY += notesLines.length * lineHeight + 4
+        }
         
-        const notesLines = doc.splitTextToSize(poData.notes, pageWidth - margin - rightMargin - 8)
-        const displayLines = notesLines.slice(0, availableLines)
-        
-        doc.text(displayLines, margin + 4, yPos + 10)
+        // Display attached images if present
+        const images = poData.attached_images
+        if (images && images.length > 0) {
+          // Parse if it's a JSON string
+          const imageArray = typeof images === 'string' ? JSON.parse(images) : images
+          
+          const availableWidth = pageWidth - margin - rightMargin - 8
+          const imageSpacing = 4
+          const imagesPerRow = Math.min(imageArray.length, 2)
+          const imageWidth = (availableWidth - (imageSpacing * (imagesPerRow - 1))) / imagesPerRow
+          
+          let imgX = margin + 4
+          let imgY = contentY
+          
+          imageArray.forEach((img, idx) => {
+            // Check if we need to wrap to next row
+            if (idx > 0 && idx % imagesPerRow === 0) {
+              imgX = margin + 4
+            }
+            
+            try {
+              // Add image (img.data is the base64 data URL)
+              const imgData = img.data || img
+              
+              // Get image format from data URL
+              let format = 'JPEG'
+              if (imgData.includes('image/png')) format = 'PNG'
+              else if (imgData.includes('image/jpeg') || imgData.includes('image/jpg')) format = 'JPEG'
+              
+              // Calculate proper height maintaining aspect ratio
+              // Create a temporary image to get dimensions
+              const tempImg = new Image()
+              tempImg.src = imgData
+              
+              // Calculate scaled dimensions to fit within the box while maintaining aspect ratio
+              const maxImageHeight = 50
+              const aspectRatio = tempImg.width / tempImg.height
+              let finalWidth = imageWidth
+              let finalHeight = imageWidth / aspectRatio
+              
+              // If height exceeds max, scale down based on height
+              if (finalHeight > maxImageHeight) {
+                finalHeight = maxImageHeight
+                finalWidth = maxImageHeight * aspectRatio
+              }
+              
+              // Center the image within its allocated space
+              const xOffset = (imageWidth - finalWidth) / 2
+              
+              // Check if there's enough space
+              const requiredSpace = finalHeight + 3
+              if (imgY + requiredSpace <= yPos + availableNotesHeight - 3) {
+                doc.addImage(imgData, format, imgX + xOffset, imgY, finalWidth, finalHeight)
+                
+                // Move to next position
+                if (idx < imageArray.length - 1 && (idx + 1) % imagesPerRow === 0) {
+                  imgY += maxImageHeight + imageSpacing
+                }
+              }
+            } catch (err) {
+              console.warn("Error adding image to PDF:", err)
+            }
+            
+            // Move X position for next image in row
+            if ((idx + 1) % imagesPerRow !== 0) {
+              imgX += imageWidth + imageSpacing
+            }
+          })
+        }
       }
     }
   }
