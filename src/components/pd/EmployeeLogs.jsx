@@ -6,6 +6,7 @@ import { getStoredToken } from "../../utils/auth"
 import { ModalPortal } from "./shared"
 import { EmployeeLogsSkeleton } from "../skeletons/ProcurementSkeletons"
 import { useAuth } from "../../contexts/AuthContext"
+import { ReportBuilder } from "./shared/ReportBuilder"
 
 function EmployeeLogs() {
   const [state, setState] = useState({
@@ -27,11 +28,12 @@ function EmployeeLogs() {
     associatedItems: [],
     profileMap: {}, // uid -> url or null
     logProfileMap: {}, // logId -> url or null
-    detailsLoading: false
+    detailsLoading: false,
+    showReportBuilder: false
   })
 
   const logsPerPage = 10
-  const { logs, loading, initialLoading, error, searchTerm, dateFilter, currentPage, totalLogs, filters, visibleCount, selectedLogs, showFilters, showDetailedView, selectedLog, employeeDetails, associatedItems, detailsLoading } = state
+  const { logs, loading, initialLoading, error, searchTerm, dateFilter, currentPage, totalLogs, filters, visibleCount, selectedLogs, showFilters, showDetailedView, selectedLog, employeeDetails, associatedItems, detailsLoading, showReportBuilder } = state
   const [isEditWizardOpen, setIsEditWizardOpen] = useState(false)
   const [editTargetLog, setEditTargetLog] = useState(null)
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' })
@@ -866,6 +868,15 @@ function EmployeeLogs() {
               >
                 Export CSV
               </button>
+              <button 
+                onClick={() => setState(prev => ({ ...prev, showReportBuilder: true }))}
+                className="px-4 py-2.5 bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Generate Report</span>
+              </button>
               {/* Checkout quantity editing is available via "Edit Checkout Items" button in detailed view */}
             </div>
           </div>
@@ -1380,6 +1391,13 @@ function EmployeeLogs() {
           <span className="font-medium">{toast.message}</span>
         </div>
       )}
+
+      {/* Report Builder */}
+      <ReportBuilder
+        isOpen={showReportBuilder}
+        onClose={() => setState(prev => ({ ...prev, showReportBuilder: false }))}
+        logs={logs}
+      />
 
     </div>
   )

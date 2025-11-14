@@ -129,4 +129,42 @@ export class EmployeeLogsService extends BaseAPIService {
       body: JSON.stringify(updateData),
     })
   }
+
+  // POST /api/employee-logs/generate-report - Generate report with filters
+  async generateReport(reportData) {
+    return this.request("/api/employee-logs/generate-report", {
+      method: "POST",
+      body: JSON.stringify(reportData),
+    })
+  }
+
+  // POST /api/employee-logs/email-report - Send report via email
+  async emailReport(emailData) {
+    return this.request("/api/employee-logs/email-report", {
+      method: "POST",
+      body: JSON.stringify(emailData),
+    })
+  }
+
+  // POST /api/employee-logs/schedule-report - Schedule recurring report
+  async scheduleReport(scheduleData) {
+    return this.request("/api/employee-logs/schedule-report", {
+      method: "POST",
+      body: JSON.stringify(scheduleData),
+    })
+  }
+
+  // GET /api/employee-logs/statistics - Get enhanced statistics
+  async getStatistics(params = {}) {
+    const queryParams = new URLSearchParams(params).toString()
+    return this.request(`/api/employee-logs/statistics?${queryParams}`)
+  }
+
+  // POST /api/employee-logs/bulk-operations - Enhanced bulk operations
+  async bulkOperations(operationData) {
+    return this.request("/api/employee-logs/bulk-operations", {
+      method: "POST",
+      body: JSON.stringify(operationData),
+    })
+  }
 }
