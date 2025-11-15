@@ -630,17 +630,22 @@ export const exportPurchaseOrderToPDF = (poData) => {
           const imageArray = typeof images === 'string' ? JSON.parse(images) : images
           
           const availableWidth = pageWidth - margin - rightMargin - 8
+          const availableImageHeight = availableNotesHeight - (contentY - yPos) - 3
           const imageSpacing = 4
           const imagesPerRow = Math.min(imageArray.length, 2)
-          const imageWidth = (availableWidth - (imageSpacing * (imagesPerRow - 1))) / imagesPerRow
+          const maxImageWidth = (availableWidth - (imageSpacing * (imagesPerRow - 1))) / imagesPerRow
+          const maxImageHeight = Math.min(availableImageHeight - 10, 80) // Allow taller images
           
           let imgX = margin + 4
           let imgY = contentY
+          let currentRowHeight = 0
           
           imageArray.forEach((img, idx) => {
             // Check if we need to wrap to next row
             if (idx > 0 && idx % imagesPerRow === 0) {
               imgX = margin + 4
+              imgY += currentRowHeight + imageSpacing
+              currentRowHeight = 0
             }
             
             try {
@@ -652,35 +657,36 @@ export const exportPurchaseOrderToPDF = (poData) => {
               if (imgData.includes('image/png')) format = 'PNG'
               else if (imgData.includes('image/jpeg') || imgData.includes('image/jpg')) format = 'JPEG'
               
-              // Calculate proper height maintaining aspect ratio
-              // Create a temporary image to get dimensions
-              const tempImg = new Image()
-              tempImg.src = imgData
+              // Get actual image properties using jsPDF's internal method
+              const imgProps = doc.getImageProperties(imgData)
+              const aspectRatio = imgProps.width / imgProps.height
               
-              // Calculate scaled dimensions to fit within the box while maintaining aspect ratio
-              const maxImageHeight = 50
-              const aspectRatio = tempImg.width / tempImg.height
-              let finalWidth = imageWidth
-              let finalHeight = imageWidth / aspectRatio
+              // Calculate scaled dimensions to fit within constraints while maintaining aspect ratio
+              let finalWidth = maxImageWidth
+              let finalHeight = finalWidth / aspectRatio
               
               // If height exceeds max, scale down based on height
               if (finalHeight > maxImageHeight) {
                 finalHeight = maxImageHeight
-                finalWidth = maxImageHeight * aspectRatio
+                finalWidth = finalHeight * aspectRatio
+              }
+              
+              // If width still exceeds max (for very wide images), scale down further
+              if (finalWidth > maxImageWidth) {
+                finalWidth = maxImageWidth
+                finalHeight = finalWidth / aspectRatio
               }
               
               // Center the image within its allocated space
-              const xOffset = (imageWidth - finalWidth) / 2
+              const xOffset = (maxImageWidth - finalWidth) / 2
               
               // Check if there's enough space
-              const requiredSpace = finalHeight + 3
-              if (imgY + requiredSpace <= yPos + availableNotesHeight - 3) {
+              const requiredSpace = imgY + finalHeight - yPos
+              if (requiredSpace <= availableNotesHeight - 3) {
                 doc.addImage(imgData, format, imgX + xOffset, imgY, finalWidth, finalHeight)
                 
-                // Move to next position
-                if (idx < imageArray.length - 1 && (idx + 1) % imagesPerRow === 0) {
-                  imgY += maxImageHeight + imageSpacing
-                }
+                // Track the tallest image in current row
+                currentRowHeight = Math.max(currentRowHeight, finalHeight)
               }
             } catch (err) {
               console.warn("Error adding image to PDF:", err)
@@ -688,7 +694,7 @@ export const exportPurchaseOrderToPDF = (poData) => {
             
             // Move X position for next image in row
             if ((idx + 1) % imagesPerRow !== 0) {
-              imgX += imageWidth + imageSpacing
+              imgX += maxImageWidth + imageSpacing
             }
           })
         }
