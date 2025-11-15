@@ -467,10 +467,7 @@ export default function EmployeeDashboard() {
 
         {activeTab === "announcements" && (
           <Announcements
-            announcements={announcements}
-            setAnnouncements={setAnnouncements}
             isDarkMode={isDarkMode}
-            announcementService={announcements.current}
           />
         )}
 

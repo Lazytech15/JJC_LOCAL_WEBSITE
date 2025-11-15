@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, Badge, Button } from "../../ui/UiComponents"
-import { Loader2, AlertCircle, Check } from "lucide-react"
+import { Loader2, AlertCircle, Check, ChevronDown, ChevronUp } from "lucide-react"
 import apiService from "../../../utils/api/api-service"
 import { getStoredToken, verifyToken } from "../../../utils/auth"
 
@@ -10,6 +10,7 @@ export default function Announcements({ isDarkMode }) {
   const [error, setError] = useState(null)
   const [employeeId, setEmployeeId] = useState(null)
   const [markingAsRead, setMarkingAsRead] = useState(null)
+  const [expandedIds, setExpandedIds] = useState(new Set())
 
   useEffect(() => {
     const fetchAnnouncementsData = async () => {
@@ -86,6 +87,22 @@ export default function Announcements({ isDarkMode }) {
     }
   }
 
+  const toggleExpand = (announcementId, isRead) => {
+    setExpandedIds((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(announcementId)) {
+        newSet.delete(announcementId)
+      } else {
+        newSet.add(announcementId)
+        // Auto-mark as read when expanded
+        if (!isRead) {
+          handleMarkAsRead(announcementId)
+        }
+      }
+      return newSet
+    })
+  }
+
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
       case "high":
@@ -147,72 +164,103 @@ export default function Announcements({ isDarkMode }) {
         </div>
       ) : (
         <div className="space-y-3 sm:space-y-4">
-          {announcements.map((announcement) => (
-            <Card key={announcement.id}>
-              <CardContent className="p-4 sm:p-6">
-                <div className="space-y-3">
-                  {/* Title and Badges Row */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-2">
-                        <p className={`font-semibold text-base sm:text-lg break-words ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                          {announcement.title}
-                        </p>
-                        {!announcement.read && (
-                          <Badge variant="destructive" className="flex-shrink-0 text-xs">
-                            New
+          {announcements.map((announcement) => {
+            const isExpanded = expandedIds.has(announcement.id)
+            return (
+              <Card key={announcement.id} className="overflow-hidden">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="space-y-3">
+                    {/* Title and Badges Row */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                          <p className={`font-semibold text-base sm:text-lg break-words ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                            {announcement.title}
+                          </p>
+                          {!announcement.read && (
+                            <Badge variant="destructive" className="flex-shrink-0 text-xs">
+                              New
+                            </Badge>
+                          )}
+                        </div>
+                        {announcement.priority && announcement.priority !== "normal" && (
+                          <Badge className={`text-xs flex-shrink-0 ${getPriorityColor(announcement.priority)} text-white`}>
+                            {announcement.priority}
                           </Badge>
                         )}
                       </div>
-                      {announcement.priority && announcement.priority !== "normal" && (
-                        <Badge className={`text-xs flex-shrink-0 ${getPriorityColor(announcement.priority)} text-white`}>
-                          {announcement.priority}
-                        </Badge>
+                      {!announcement.read && (
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 bg-red-500`}></div>
                       )}
                     </div>
-                    {!announcement.read && (
-                      <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${isDarkMode ? "bg-red-500" : "bg-red-500"}`}></div>
+
+                    {/* Description Preview or Full */}
+                    {announcement.description && (
+                      <div className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                        <p className={isExpanded ? "whitespace-pre-wrap" : "line-clamp-2"}>
+                          {announcement.description}
+                        </p>
+                      </div>
                     )}
-                  </div>
 
-                  {/* Description */}
-                  {announcement.description && (
-                    <p className={`text-sm line-clamp-2 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                      {announcement.description}
-                    </p>
-                  )}
-
-                  {/* Footer with Time and Button */}
-                  <div className="flex items-center justify-between gap-3 pt-2">
-                    <p className={`text-xs ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>
-                      {announcement.time}
-                    </p>
-                    {!announcement.read && (
-                      <Button
-                        variant={isDarkMode ? "secondary" : "outline"}
-                        size="sm"
-                        onClick={() => handleMarkAsRead(announcement.id)}
-                        disabled={markingAsRead === announcement.id}
-                        className="flex-shrink-0"
-                      >
-                        {markingAsRead === announcement.id ? (
-                          <>
-                            <Loader2 className="w-3 h-3 sm:mr-1.5 animate-spin" />
-                            <span className="hidden sm:inline">Marking...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Check className="w-3 h-3 sm:mr-1.5" />
-                            <span className="hidden sm:inline">Mark as Seen</span>
-                          </>
+                    {/* Footer with Time and Buttons */}
+                    <div className="flex items-center justify-between gap-3 pt-2 flex-wrap">
+                      <p className={`text-xs ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>
+                        {announcement.time}
+                      </p>
+                      
+                      <div className="flex items-center gap-2">
+                        {/* Expand/Collapse Button */}
+                        {announcement.description && announcement.description.length > 100 && (
+                          <Button
+                            variant={isDarkMode ? "ghost" : "ghost"}
+                            size="sm"
+                            onClick={() => toggleExpand(announcement.id, announcement.read)}
+                            className="flex-shrink-0"
+                          >
+                            {isExpanded ? (
+                              <>
+                                <ChevronUp className="w-3 h-3 sm:mr-1.5" />
+                                <span className="hidden sm:inline">Show Less</span>
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="w-3 h-3 sm:mr-1.5" />
+                                <span className="hidden sm:inline">Read More</span>
+                              </>
+                            )}
+                          </Button>
                         )}
-                      </Button>
-                    )}
+
+                        {/* Mark as Read Button */}
+                        {!announcement.read && (
+                          <Button
+                            variant={isDarkMode ? "secondary" : "outline"}
+                            size="sm"
+                            onClick={() => handleMarkAsRead(announcement.id)}
+                            disabled={markingAsRead === announcement.id}
+                            className="flex-shrink-0"
+                          >
+                            {markingAsRead === announcement.id ? (
+                              <>
+                                <Loader2 className="w-3 h-3 sm:mr-1.5 animate-spin" />
+                                <span className="hidden sm:inline">Marking...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Check className="w-3 h-3 sm:mr-1.5" />
+                                <span className="hidden sm:inline">Mark as Seen</span>
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       )}
     </div>

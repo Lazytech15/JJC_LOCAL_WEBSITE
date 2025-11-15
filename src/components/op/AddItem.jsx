@@ -27,6 +27,20 @@ function AddItems({ items, submitting, apiService }) {
   const { isDarkMode, user } = useAuth()
   const [showImportModal, setShowImportModal] = useState(false)
 
+  const [isTemplateSelected, setIsTemplateSelected] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchPagination, setSearchPagination] = useState({
+    current_page: 1,
+    per_page: 10,
+    total_items: 0,
+    total_pages: 0,
+    has_next: false,
+    has_previous: false
+  })
+
+  const [itemNameHasFocus, setItemNameHasFocus] = useState(false)
+  const searchTimeoutRef = useRef(null)
+
 
   // Load existing clients on mount
   useEffect(() => {
@@ -65,22 +79,72 @@ function AddItems({ items, submitting, apiService }) {
     }
 
     document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
+    return () => {
+  document.removeEventListener("mousedown", handleClickOutside)
+  if (searchTimeoutRef.current) {
+    clearTimeout(searchTimeoutRef.current)
+  }
+}
   }, [])
 
-  // Filter items based on item name search only
   useEffect(() => {
-    const searchTerm = itemName.trim().toLowerCase()
+  if (searchTimeoutRef.current) {
+    clearTimeout(searchTimeoutRef.current)
+  }
 
-    if (searchTerm.length >= 2) {
-      const matches = items.filter((item) => item.name?.toLowerCase().includes(searchTerm))
-      setFilteredItems(matches)
-      setShowTemplateDropdown(matches.length > 0)
-    } else {
+  if (isTemplateSelected) {
+    setIsTemplateSelected(false)
+    return
+  }
+
+  // Don't search if input doesn't have focus
+  if (!itemNameHasFocus) {
+    return
+  }
+
+  const searchTerm = itemName.trim().toLowerCase()
+
+  if (searchTerm.length >= 2) {
+    searchTimeoutRef.current = setTimeout(() => {
+      searchItemsFromAPI(searchTerm)
+    }, 500) // Increased delay to 500ms
+  } else {
+    setFilteredItems([])
+    setShowTemplateDropdown(false)
+  }
+
+  return () => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+  }
+}, [itemName, itemNameHasFocus, isTemplateSelected])
+
+  const searchItemsFromAPI = async (searchTerm, page = 1) => {
+    setIsSearching(true)
+    try {
+      const response = await apiService.operations.getItemsPaginated(page, 10, {
+        search: searchTerm
+      })
+
+      setFilteredItems(response.items || [])
+      setSearchPagination(response.pagination || {
+        current_page: page,
+        per_page: 10,
+        total_items: 0,
+        total_pages: 0,
+        has_next: false,
+        has_previous: false
+      })
+      setShowTemplateDropdown((response.items || []).length > 0)
+    } catch (error) {
+      console.error("Error searching items:", error)
       setFilteredItems([])
       setShowTemplateDropdown(false)
+    } finally {
+      setIsSearching(false)
     }
-  }, [itemName, items])
+  }
 
   // Filter clients based on input
   useEffect(() => {
@@ -118,6 +182,8 @@ function AddItems({ items, submitting, apiService }) {
     setLoadingTemplate(true)
     setShowTemplateDropdown(false)
     setSelectedTemplateId(item.id)
+    setItemNameHasFocus(false) 
+    setIsTemplateSelected(true) 
 
     try {
       const fullItem = await apiService.operations.getItem(item.part_number)
@@ -480,60 +546,129 @@ function AddItems({ items, submitting, apiService }) {
             </label>
             <div className="relative">
               <input
-                type="text"
-                placeholder="Enter item name or search existing to use as template..."
-                value={itemName}
-                onChange={(e) => setItemName(e.target.value)}
-                disabled={submitting}
+  type="text"
+  placeholder="Enter item name or search existing to use as template..."
+  value={itemName}
+  onChange={(e) => setItemName(e.target.value)}
+  onFocus={() => setItemNameHasFocus(true)}
+  onBlur={() => {
+    // Delay to allow click on dropdown item
+    setTimeout(() => setItemNameHasFocus(false), 200)
+  }}
+  disabled={submitting}
                 className={`w-full px-4 py-2 pr-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                    : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
                   }`}
               />
-              <Search size={18} className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`} />
+              {isSearching ? (
+                <div className={`absolute right-3 top-1/2 transform -translate-y-1/2 animate-spin rounded-full h-4 w-4 border-b-2 ${isDarkMode ? "border-blue-400" : "border-blue-600"
+                  }`}></div>
+              ) : (
+                <Search size={18} className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? "text-gray-400" : "text-gray-500"
+                  }`} />
+              )}
             </div>
 
             {showTemplateDropdown && filteredItems.length > 0 && (
               <div
-                className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-60 overflow-y-auto border ${isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"
+                className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg border ${isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"
                   }`}
               >
+                {/* Header with count and loading indicator */}
                 <div
-                  className={`p-2 border-b ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-gray-100 border-gray-300"}`}
+                  className={`p-2 border-b ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-gray-100 border-gray-300"
+                    }`}
                 >
-                  <p className={`text-xs font-medium ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
-                    Select a template to copy ({filteredItems.length} found)
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className={`text-xs font-medium ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                      {isSearching ? "Searching..." : `Select a template (${searchPagination.total_items} found)`}
+                    </p>
+                    {isSearching && (
+                      <div className={`animate-spin rounded-full h-3 w-3 border-b-2 ${isDarkMode ? "border-blue-400" : "border-blue-600"
+                        }`}></div>
+                    )}
+                  </div>
                 </div>
-                {filteredItems.map((item) => {
-                  const itemKey = item.part_number || item.id
-                  return (
-                    <button
-                      key={itemKey}
-                      onClick={() => loadTemplateFromItem(item)}
-                      className={`w-full text-left px-4 py-3 border-b last:border-b-0 transition-colors ${isDarkMode
-                        ? "hover:bg-gray-700 border-gray-700 text-gray-100"
-                        : "hover:bg-gray-50 border-gray-200 text-gray-800"
-                        }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <p className={`font-medium ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>{item.name}</p>
-                          <p className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>Part #: {item.part_number}</p>
-                          {item.client_name && (
-                            <p className={`text-xs mt-1 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>Client: {item.client_name}</p>
-                          )}
+
+                {/* Results list */}
+                <div className="max-h-60 overflow-y-auto">
+                  {filteredItems.map((item) => {
+                    const itemKey = item.part_number || item.id
+                    return (
+                      <button
+                        key={itemKey}
+                        onClick={() => loadTemplateFromItem(item)}
+                        disabled={loadingTemplate}
+                        className={`w-full text-left px-4 py-3 border-b last:border-b-0 transition-colors disabled:opacity-50 ${isDarkMode
+                            ? "hover:bg-gray-700 border-gray-700 text-gray-100"
+                            : "hover:bg-gray-50 border-gray-200 text-gray-800"
+                          }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <p className={`font-medium ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+                              {item.name}
+                            </p>
+                            <p className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                              Part #: {item.part_number}
+                            </p>
+                            {item.client_name && (
+                              <p className={`text-xs mt-1 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
+                                Client: {item.client_name}
+                              </p>
+                            )}
+                          </div>
+                          <div className={`flex items-center gap-2 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                            <span className={`px-2 py-1 rounded ${isDarkMode ? "bg-blue-500/20 text-blue-300" : "bg-blue-500/20 text-blue-700"
+                              }`}>
+                              {item.phases?.length || item.phase_count || 0} phases
+                            </span>
+                            <Copy size={14} />
+                          </div>
                         </div>
-                        <div className={`flex items-center gap-2 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                          <span className={`px-2 py-1 rounded ${isDarkMode ? "bg-blue-500/20 text-blue-300" : "bg-blue-500/20 text-blue-700"}`}>
-                            {item.phases?.length || item.phase_count || 0} phases
-                          </span>
-                          <Copy size={14} />
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Pagination controls */}
+                {searchPagination.total_pages > 1 && (
+                  <div className={`p-2 border-t ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-gray-100 border-gray-300"
+                    }`}>
+                    <div className="flex items-center justify-between text-xs">
+                      <button
+                        onClick={() => searchItemsFromAPI(itemName.trim().toLowerCase(), searchPagination.current_page - 1)}
+                        disabled={!searchPagination.has_previous || isSearching}
+                        className={`px-2 py-1 rounded transition-colors ${searchPagination.has_previous && !isSearching
+                            ? isDarkMode
+                              ? "bg-gray-600 hover:bg-gray-500 text-gray-200"
+                              : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                            : "opacity-50 cursor-not-allowed text-gray-500"
+                          }`}
+                      >
+                        Previous
+                      </button>
+
+                      <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+                        Page {searchPagination.current_page} of {searchPagination.total_pages}
+                      </span>
+
+                      <button
+                        onClick={() => searchItemsFromAPI(itemName.trim().toLowerCase(), searchPagination.current_page + 1)}
+                        disabled={!searchPagination.has_next || isSearching}
+                        className={`px-2 py-1 rounded transition-colors ${searchPagination.has_next && !isSearching
+                            ? isDarkMode
+                              ? "bg-gray-600 hover:bg-gray-500 text-gray-200"
+                              : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                            : "opacity-50 cursor-not-allowed text-gray-500"
+                          }`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
