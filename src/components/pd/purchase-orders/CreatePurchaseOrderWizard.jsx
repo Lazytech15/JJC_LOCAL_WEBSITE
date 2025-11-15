@@ -88,6 +88,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   })
   const [showOverwriteModal, setShowOverwriteModal] = useState(false)
   const [existingPO, setExistingPO] = useState(null)
+  const [showImagePreview, setShowImagePreview] = useState(false)
 
   // Initialize data when modal opens
   useEffect(() => {
@@ -1765,29 +1766,44 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       
                       {/* Image Previews */}
                       {formData.attached_images.length > 0 && (
-                        <div className="mt-4 grid grid-cols-2 gap-4">
-                          {formData.attached_images.map((img, idx) => (
-                            <div key={idx} className="relative border-2 border-gray-300 dark:border-gray-600 rounded-lg p-2">
-                              <img
-                                src={img.data}
-                                alt={img.name}
-                                className="w-full h-32 object-contain rounded"
-                              />
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">{img.name}</p>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    attached_images: prev.attached_images.filter((_, i) => i !== idx)
-                                  }))
-                                }}
-                                className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-colors"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
+                        <div className="mt-4 space-y-3">
+                          {/* Preview Button */}
+                          <button
+                            type="button"
+                            onClick={() => setShowImagePreview(true)}
+                            className="w-full px-4 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center justify-center gap-2 border-2 border-blue-200 dark:border-blue-700"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            Preview How Images Will Appear in PDF
+                          </button>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            {formData.attached_images.map((img, idx) => (
+                              <div key={idx} className="relative border-2 border-gray-300 dark:border-gray-600 rounded-lg p-2">
+                                <img
+                                  src={img.data}
+                                  alt={img.name}
+                                  className="w-full h-32 object-contain rounded"
+                                />
+                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">{img.name}</p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      attached_images: prev.attached_images.filter((_, i) => i !== idx)
+                                    }))
+                                  }}
+                                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-colors"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2148,6 +2164,109 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Image Preview Modal */}
+        {showImagePreview && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-100 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-linear-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-750">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    PDF Image Preview
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    This shows how your images will appear in the Notes section of the PDF
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowImagePreview(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Preview Content */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="bg-white border-2 border-gray-300 rounded-lg p-4">
+                  {/* Simulated PDF Notes Container */}
+                  <div className="border-2 border-gray-400 rounded p-4 min-h-[500px]">
+                    <div className="flex items-center gap-2 mb-4 pb-2 border-b-2 border-gray-400">
+                      <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      <span className="font-bold text-gray-900 text-sm">NOTES:</span>
+                    </div>
+                    
+                    {/* Notes Text */}
+                    {formData.notes && formData.notes.trim() && (
+                      <div className="mb-6 text-sm text-gray-800 whitespace-pre-wrap">
+                        {formData.notes}
+                      </div>
+                    )}
+                    
+                    {/* Images in PDF Layout - 2 per row */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {formData.attached_images.map((img, idx) => (
+                        <div key={idx} className="border border-gray-300 rounded p-3 bg-gray-50">
+                          <div className="relative w-full bg-white rounded" style={{ minHeight: '200px', maxHeight: '280px' }}>
+                            <img
+                              src={img.data}
+                              alt={img.name || `Image ${idx + 1}`}
+                              className="w-full h-full object-contain rounded"
+                              style={{ maxHeight: '280px' }}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-600 mt-2 text-center truncate font-medium">
+                            {img.name || `Image ${idx + 1}`}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Info Box */}
+                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded">
+                    <div className="flex items-start gap-2">
+                      <svg className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div className="text-sm text-blue-800 dark:text-blue-300">
+                        <p className="font-semibold mb-1">PDF Layout Information:</p>
+                        <ul className="list-disc list-inside space-y-1 text-xs">
+                          <li>Images are displayed in a 2-column grid layout</li>
+                          <li>Each image maintains its original aspect ratio</li>
+                          <li>Images are scaled to fit properly within the notes container</li>
+                          <li>Maximum height: ~80mm to ensure proper page layout</li>
+                          <li>All {formData.attached_images.length} image{formData.attached_images.length !== 1 ? 's' : ''} will appear in the PDF</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750 flex items-center justify-between">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  {formData.attached_images.length} image{formData.attached_images.length !== 1 ? 's' : ''} attached
+                </div>
+                <button
+                  onClick={() => setShowImagePreview(false)}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Close Preview
+                </button>
+              </div>
             </div>
           </div>
         )}
