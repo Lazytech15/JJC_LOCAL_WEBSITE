@@ -1,8 +1,12 @@
-import { Clock, Calendar, TrendingUp, AlertCircle, CheckCircle2, XCircle } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../ui/UiComponents"
+import { useState } from "react"
+import { Clock, Calendar, TrendingUp, AlertCircle, CheckCircle2, XCircle, ChevronDown, ChevronUp } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button } from "../../ui/UiComponents"
 import { Badge } from "../../ui/UiComponents"
 
 export default function TimeAttendance({ dailySummaries, isDarkMode }) {
+  const [showAll, setShowAll] = useState(false)
+  const INITIAL_DISPLAY_COUNT = 10
+
   const calculateStats = () => {
     if (!dailySummaries || dailySummaries.length === 0) {
       return {
@@ -62,6 +66,9 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
     }
     return <Badge className="bg-emerald-500 text-white">Complete</Badge>
   }
+
+  const displayedRecords = showAll ? dailySummaries : dailySummaries.slice(0, INITIAL_DISPLAY_COUNT)
+  const hasMoreRecords = dailySummaries.length > INITIAL_DISPLAY_COUNT
 
   return (
     <div className="space-y-6">
@@ -159,10 +166,19 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
 
       <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
         <CardHeader>
-          <CardTitle className={isDarkMode ? "text-white" : "text-zinc-900"}>Attendance History</CardTitle>
-          <CardDescription className={isDarkMode ? "text-zinc-400" : "text-zinc-600"}>
-            Your recent clock-in and clock-out records
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className={isDarkMode ? "text-white" : "text-zinc-900"}>Attendance History</CardTitle>
+              <CardDescription className={isDarkMode ? "text-zinc-400" : "text-zinc-600"}>
+                Your recent clock-in and clock-out records
+              </CardDescription>
+            </div>
+            {hasMoreRecords && (
+              <span className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                Showing {showAll ? dailySummaries.length : INITIAL_DISPLAY_COUNT} of {dailySummaries.length}
+              </span>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {!dailySummaries || dailySummaries.length === 0 ? (
@@ -171,76 +187,173 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
               <p className={`text-lg ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>No attendance records found</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className={`border-b ${isDarkMode ? "border-zinc-800" : "border-zinc-200"}`}>
-                    <th
-                      className={`text-left py-3 px-4 text-sm font-semibold ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
-                    >
-                      Date
-                    </th>
-                    <th
-                      className={`text-left py-3 px-4 text-sm font-semibold ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
-                    >
-                      Morning
-                    </th>
-                    <th
-                      className={`text-left py-3 px-4 text-sm font-semibold ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
-                    >
-                      Afternoon
-                    </th>
-                    <th
-                      className={`text-left py-3 px-4 text-sm font-semibold ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
-                    >
-                      Evening
-                    </th>
-                    <th
-                      className={`text-right py-3 px-4 text-sm font-semibold ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
-                    >
-                      Total Hours
-                    </th>
-                    <th
-                      className={`text-right py-3 px-4 text-sm font-semibold ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
-                    >
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dailySummaries.slice(0, 10).map((day, index) => (
-                    <tr
-                      key={day.id || index}
-                      className={`border-b transition-colors ${
-                        isDarkMode ? "border-zinc-800 hover:bg-zinc-800/50" : "border-zinc-200 hover:bg-zinc-50"
-                      }`}
-                    >
-                      <td className={`py-4 px-4 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                        <div className="font-medium">{formatDate(day.date)}</div>
-                      </td>
-                      <td className={`py-4 px-4 text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                        <div>{formatTime(day.morning_in)}</div>
-                        <div>{formatTime(day.morning_out)}</div>
-                      </td>
-                      <td className={`py-4 px-4 text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                        <div>{formatTime(day.afternoon_in)}</div>
-                        <div>{formatTime(day.afternoon_out)}</div>
-                      </td>
-                      <td className={`py-4 px-4 text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                        <div>{formatTime(day.evening_in)}</div>
-                        <div>{formatTime(day.evening_out)}</div>
-                      </td>
-                      <td
-                        className={`py-4 px-4 text-right font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className={`border-b ${isDarkMode ? "border-zinc-800" : "border-zinc-200"}`}>
+                      <th
+                        className={`text-left py-3 px-4 text-sm font-semibold ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
                       >
-                        {(parseFloat(day.total_hours) || 0).toFixed(1)}h
-                      </td>
-                      <td className="py-4 px-4 text-right">{getStatusBadge(day)}</td>
+                        Date
+                      </th>
+                      <th
+                        className={`text-left py-3 px-4 text-sm font-semibold ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
+                      >
+                        Morning
+                      </th>
+                      <th
+                        className={`text-left py-3 px-4 text-sm font-semibold ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
+                      >
+                        Afternoon
+                      </th>
+                      <th
+                        className={`text-left py-3 px-4 text-sm font-semibold ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
+                      >
+                        Evening
+                      </th>
+                      <th
+                        className={`text-right py-3 px-4 text-sm font-semibold ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
+                      >
+                        Total Hours
+                      </th>
+                      <th
+                        className={`text-right py-3 px-4 text-sm font-semibold ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
+                      >
+                        Status
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {displayedRecords.map((day, index) => (
+                      <tr
+                        key={day.id || index}
+                        className={`border-b transition-colors ${
+                          isDarkMode ? "border-zinc-800 hover:bg-zinc-800/50" : "border-zinc-200 hover:bg-zinc-50"
+                        }`}
+                      >
+                        <td className={`py-4 px-4 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                          <div className="font-medium">{formatDate(day.date)}</div>
+                        </td>
+                        <td className={`py-4 px-4 text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                          <div>{formatTime(day.morning_in)}</div>
+                          <div>{formatTime(day.morning_out)}</div>
+                        </td>
+                        <td className={`py-4 px-4 text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                          <div>{formatTime(day.afternoon_in)}</div>
+                          <div>{formatTime(day.afternoon_out)}</div>
+                        </td>
+                        <td className={`py-4 px-4 text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                          <div>{formatTime(day.evening_in)}</div>
+                          <div>{formatTime(day.evening_out)}</div>
+                        </td>
+                        <td
+                          className={`py-4 px-4 text-right font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}
+                        >
+                          {(parseFloat(day.total_hours) || 0).toFixed(1)}h
+                        </td>
+                        <td className="py-4 px-4 text-right">{getStatusBadge(day)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="lg:hidden space-y-4">
+                {displayedRecords.map((day, index) => (
+                  <div
+                    key={day.id || index}
+                    className={`p-4 rounded-xl border ${
+                      isDarkMode ? "bg-zinc-800/50 border-zinc-800" : "bg-zinc-50 border-zinc-200"
+                    }`}
+                  >
+                    {/* Header with Date and Status */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className={`font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                        {formatDate(day.date)}
+                      </div>
+                      {getStatusBadge(day)}
+                    </div>
+
+                    {/* Time Sessions */}
+                    <div className="space-y-2">
+                      {/* Morning */}
+                      {(day.morning_in || day.morning_out) && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className={`font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                            Morning
+                          </span>
+                          <span className={isDarkMode ? "text-zinc-300" : "text-zinc-700"}>
+                            {formatTime(day.morning_in)} - {formatTime(day.morning_out)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Afternoon */}
+                      {(day.afternoon_in || day.afternoon_out) && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className={`font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                            Afternoon
+                          </span>
+                          <span className={isDarkMode ? "text-zinc-300" : "text-zinc-700"}>
+                            {formatTime(day.afternoon_in)} - {formatTime(day.afternoon_out)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Evening */}
+                      {(day.evening_in || day.evening_out) && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className={`font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                            Evening
+                          </span>
+                          <span className={isDarkMode ? "text-zinc-300" : "text-zinc-700"}>
+                            {formatTime(day.evening_in)} - {formatTime(day.evening_out)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Total Hours */}
+                    <div className={`mt-3 pt-3 border-t flex items-center justify-between ${
+                      isDarkMode ? "border-zinc-700" : "border-zinc-200"
+                    }`}>
+                      <span className={`text-sm font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                        Total Hours
+                      </span>
+                      <span className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                        {(parseFloat(day.total_hours) || 0).toFixed(1)}h
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Show More/Less Button */}
+              {hasMoreRecords && (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    variant={isDarkMode ? "secondary" : "outline"}
+                    onClick={() => setShowAll(!showAll)}
+                    className="min-w-[200px]"
+                  >
+                    {showAll ? (
+                      <>
+                        <ChevronUp className="w-4 h-4 mr-2" />
+                        Show Less
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-4 h-4 mr-2" />
+                        Show All ({dailySummaries.length - INITIAL_DISPLAY_COUNT} more)
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
