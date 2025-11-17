@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { Trash2, Plus, Copy, Search, User, Flag, Package, AlertTriangle, Sheet } from "lucide-react"
+import { Trash2, Plus, Copy, Search, User, Flag, Package, AlertTriangle, Sheet, Clock, CheckCircle  } from "lucide-react"
 import { useAuth } from "../../contexts/AuthContext"
 import ExcelImportModal from "./ImportExcelItem"
 
@@ -41,6 +41,9 @@ function AddItems({ items, submitting, apiService }) {
   const [itemNameHasFocus, setItemNameHasFocus] = useState(false)
   const searchTimeoutRef = useRef(null)
 
+  const [expectedCompletionHours, setExpectedCompletionHours] = useState("")
+  const [distributeDuration, setDistributeDuration] = useState(false)
+
 
   // Load existing clients on mount
   useEffect(() => {
@@ -80,45 +83,45 @@ function AddItems({ items, submitting, apiService }) {
 
     document.addEventListener("mousedown", handleClickOutside)
     return () => {
-  document.removeEventListener("mousedown", handleClickOutside)
-  if (searchTimeoutRef.current) {
-    clearTimeout(searchTimeoutRef.current)
-  }
-}
+      document.removeEventListener("mousedown", handleClickOutside)
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
   }, [])
 
   useEffect(() => {
-  if (searchTimeoutRef.current) {
-    clearTimeout(searchTimeoutRef.current)
-  }
-
-  if (isTemplateSelected) {
-    setIsTemplateSelected(false)
-    return
-  }
-
-  // Don't search if input doesn't have focus
-  if (!itemNameHasFocus) {
-    return
-  }
-
-  const searchTerm = itemName.trim().toLowerCase()
-
-  if (searchTerm.length >= 2) {
-    searchTimeoutRef.current = setTimeout(() => {
-      searchItemsFromAPI(searchTerm)
-    }, 500) // Increased delay to 500ms
-  } else {
-    setFilteredItems([])
-    setShowTemplateDropdown(false)
-  }
-
-  return () => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current)
     }
-  }
-}, [itemName, itemNameHasFocus, isTemplateSelected])
+
+    if (isTemplateSelected) {
+      setIsTemplateSelected(false)
+      return
+    }
+
+    // Don't search if input doesn't have focus
+    if (!itemNameHasFocus) {
+      return
+    }
+
+    const searchTerm = itemName.trim().toLowerCase()
+
+    if (searchTerm.length >= 2) {
+      searchTimeoutRef.current = setTimeout(() => {
+        searchItemsFromAPI(searchTerm)
+      }, 500) // Increased delay to 500ms
+    } else {
+      setFilteredItems([])
+      setShowTemplateDropdown(false)
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [itemName, itemNameHasFocus, isTemplateSelected])
 
   const searchItemsFromAPI = async (searchTerm, page = 1) => {
     setIsSearching(true)
@@ -182,8 +185,8 @@ function AddItems({ items, submitting, apiService }) {
     setLoadingTemplate(true)
     setShowTemplateDropdown(false)
     setSelectedTemplateId(item.id)
-    setItemNameHasFocus(false) 
-    setIsTemplateSelected(true) 
+    setItemNameHasFocus(false)
+    setIsTemplateSelected(true)
 
     try {
       const fullItem = await apiService.operations.getItem(item.part_number)
@@ -193,6 +196,26 @@ function AddItems({ items, submitting, apiService }) {
       setClientName(fullItem.client_name || "")
       setPriority(fullItem.priority || "Medium")
       setQty(fullItem.qty || 1)
+
+      setExpectedCompletionHours(fullItem.expected_completion_hours || "")
+
+      // Load phases with expected_hours
+      if (fullItem.phases && fullItem.phases.length > 0) {
+        const loadedPhases = fullItem.phases.map((phase) => ({
+          id: Date.now() + Math.random(),
+          name: phase.name || "",
+          expected_hours: phase.expected_hours || "",
+          subphases:
+            phase.subphases?.map((sub) => ({
+              id: Date.now() + Math.random(),
+              name: sub.name || "",
+              // CONVERT SECONDS BACK TO MINUTES FOR DISPLAY
+              expectedDuration: sub.expected_duration ? (sub.expected_duration / 60).toString() : "",
+              expectedQuantity: sub.expected_quantity || "",
+            })) || [],
+        }))
+        setPhases(loadedPhases)
+      }
 
       // Load phases and subphases with expected_quantity
       if (fullItem.phases && fullItem.phases.length > 0) {
@@ -229,10 +252,34 @@ function AddItems({ items, submitting, apiService }) {
     ])
   }
 
-  const updatePhase = (phaseId, field, value) => {
-    setPhases(phases.map((phase) => (phase.id === phaseId ? { ...phase, [field]: value } : phase)))
+const updatePhase = (phaseId, field, value) => {
+  // ✅ Validate phase expected_hours against item expected_completion_hours
+  if (field === 'expected_hours' && expectedCompletionHours) {
+    const newHours = Number.parseFloat(value) || 0
+    const itemHours = Number.parseFloat(expectedCompletionHours)
+    
+    // Calculate total from other phases (excluding current one)
+    const otherPhasesTotal = phases
+      .filter(p => p.id !== phaseId)
+      .reduce((sum, p) => sum + (Number.parseFloat(p.expected_hours) || 0), 0)
+    
+    const totalIfUpdated = otherPhasesTotal + newHours
+    
+    if (totalIfUpdated > itemHours) {
+      const remainingHours = itemHours - otherPhasesTotal
+      alert(
+        `Cannot exceed item expected completion time!\n\n` +
+        `Item Expected: ${itemHours} hours\n` +
+        `Other Phases Total: ${otherPhasesTotal.toFixed(2)} hours\n` +
+        `Remaining: ${remainingHours.toFixed(2)} hours\n\n` +
+        `You can allocate up to ${remainingHours.toFixed(2)} hours for this phase.`
+      )
+      return // ✅ Don't update if it would exceed
+    }
   }
-
+  
+  setPhases(phases.map((phase) => (phase.id === phaseId ? { ...phase, [field]: value } : phase)))
+}
   const removePhase = (phaseId) => {
     setPhases(phases.filter((phase) => phase.id !== phaseId))
   }
@@ -286,6 +333,37 @@ function AddItems({ items, submitting, apiService }) {
                   if (totalIfUpdated > batchQty) {
                     alert(`Cannot exceed batch quantity of ${batchQty}. Current total would be ${totalIfUpdated}.`)
                     return sub
+                  }
+                }
+
+                // NEW: If updating expectedDuration, validate against phase expected_hours
+                if (field === "expectedDuration") {
+                  const newMinutes = Number.parseFloat(value) || 0
+
+                  // Check if phase has expected_hours set
+                  if (phase.expected_hours) {
+                    // Calculate total minutes from other subphases (excluding current one)
+                    let otherSubphasesDuration = 0
+                    phase.subphases.forEach((s) => {
+                      if (s.id !== subphaseId) {
+                        otherSubphasesDuration += Number.parseFloat(s.expectedDuration) || 0
+                      }
+                    })
+
+                    const totalDurationIfUpdated = otherSubphasesDuration + newMinutes
+                    const phaseMinutes = hoursToMinutes(phase.expected_hours)
+
+                    if (totalDurationIfUpdated > phaseMinutes) {
+                      const remainingMinutes = phaseMinutes - otherSubphasesDuration
+                      alert(
+                        `Cannot exceed phase allocation!\n\n` +
+                        `Phase "${phase.name}" has ${phase.expected_hours} hours (${phaseMinutes.toFixed(0)} minutes).\n` +
+                        `Current total: ${otherSubphasesDuration.toFixed(0)} minutes\n` +
+                        `Remaining: ${remainingMinutes.toFixed(0)} minutes\n\n` +
+                        `You can allocate up to ${remainingMinutes.toFixed(1)} minutes for this subphase.`
+                      )
+                      return sub
+                    }
                   }
                 }
 
@@ -345,7 +423,27 @@ function AddItems({ items, submitting, apiService }) {
       return
     }
 
+    // NEW: Validate phase duration allocations
+    for (const phase of validPhases) {
+      if (phase.expected_hours) {
+        const phaseStats = getPhaseRemainingDuration(phase)
+
+        if (phaseStats.isOverAllocated) {
+          alert(
+            `Phase "${phase.name}" duration over-allocated!\n\n` +
+            `Phase allocation: ${phase.expected_hours} hours (${phaseStats.totalMinutes.toFixed(0)} minutes)\n` +
+            `Subphases total: ${phaseStats.allocatedMinutes.toFixed(0)} minutes\n` +
+            `Over by: ${Math.abs(phaseStats.remainingMinutes).toFixed(0)} minutes\n\n` +
+            `Please adjust subphase durations.`
+          )
+          return
+        }
+      }
+    }
+
     const uniquePartNumber = `${partNumber.trim()}-${batchNumber.trim()}`
+    const totalExpectedHours = getTotalAllocatedExpectedHours()
+    const itemExpectedHours = Number.parseFloat(expectedCompletionHours) || null
 
     const itemData = {
       part_number: uniquePartNumber,
@@ -354,15 +452,18 @@ function AddItems({ items, submitting, apiService }) {
       priority: priority,
       qty: Number.parseInt(qty) || 1,
       total_qty: totalQty,
+      expected_completion_hours: itemExpectedHours,
       performed_by_uid: user?.uid || null,
       performed_by_name: user?.name || null,
       phases: validPhases.map((phase) => ({
         name: phase.name.trim(),
+        expected_hours: Number.parseFloat(phase.expected_hours) || null,
         subphases: phase.subphases
           .filter((sub) => sub.name.trim())
           .map((sub) => ({
             name: sub.name.trim(),
-            expected_duration: Number.parseFloat(sub.expectedDuration) || 0,
+            // CONVERT MINUTES TO SECONDS FOR STORAGE
+            expected_duration: (Number.parseFloat(sub.expectedDuration) || 0) * 60,
             expected_quantity: Number.parseInt(sub.expectedQuantity) || 0,
           })),
       })),
@@ -394,6 +495,8 @@ function AddItems({ items, submitting, apiService }) {
       setItemName("")
       setClientName("")
       setPriority("Medium")
+      setExpectedCompletionHours("")
+      setDistributeDuration(false)
       setQty(1)
       setPhases([])
       setBatchNumber("")
@@ -402,6 +505,98 @@ function AddItems({ items, submitting, apiService }) {
       setShowClientDropdown(false)
     }
   }
+
+  const getTotalAllocatedExpectedHours = () => {
+    let total = 0
+    phases.forEach((phase) => {
+      if (phase.expected_hours) {
+        total += Number.parseFloat(phase.expected_hours) || 0
+      } else {
+        // Sum subphase expected durations if phase doesn't have expected_hours
+        phase.subphases.forEach((sub) => {
+          total += Number.parseFloat(sub.expectedDuration) || 0
+        })
+      }
+    })
+    return total
+  }
+
+  const handleDistributeDuration = () => {
+    const totalHours = Number.parseFloat(expectedCompletionHours) || 0
+    if (totalHours <= 0 || phases.length === 0) {
+      alert("Please enter a valid expected completion time and add at least one phase")
+      return
+    }
+
+    // Distribute hours equally across phases
+    const hoursPerPhase = totalHours / phases.length
+
+    const updatedPhases = phases.map((phase) => ({
+      ...phase,
+      expected_hours: hoursPerPhase.toFixed(2)
+    }))
+
+    setPhases(updatedPhases)
+    alert(`Distributed ${totalHours} hours equally: ${hoursPerPhase.toFixed(2)} hours per phase`)
+  }
+
+  // Calculate total allocated subphase duration for a specific phase (in minutes)
+  const getTotalSubphaseDurationForPhase = (phase) => {
+    let total = 0
+    phase.subphases.forEach((sub) => {
+      const minutes = Number.parseFloat(sub.expectedDuration) || 0
+      total += minutes
+    })
+    return total
+  }
+
+  // Convert hours to minutes
+  const hoursToMinutes = (hours) => {
+    return Number.parseFloat(hours) * 60
+  }
+
+  // Convert minutes to hours for display
+  const minutesToHours = (minutes) => {
+    return (Number.parseFloat(minutes) / 60).toFixed(2)
+  }
+
+  // Check if phase has remaining duration available
+  const getPhaseRemainingDuration = (phase) => {
+    if (!phase.expected_hours) return null
+
+    const phaseMinutes = hoursToMinutes(phase.expected_hours)
+    const allocatedMinutes = getTotalSubphaseDurationForPhase(phase)
+    const remaining = phaseMinutes - allocatedMinutes
+
+    return {
+      totalMinutes: phaseMinutes,
+      allocatedMinutes: allocatedMinutes,
+      remainingMinutes: remaining,
+      remainingHours: minutesToHours(remaining),
+      isOverAllocated: remaining < 0
+    }
+  }
+
+  const getTotalPhaseHours = () => {
+  return phases.reduce((sum, phase) => {
+    return sum + (Number.parseFloat(phase.expected_hours) || 0)
+  }, 0)
+}
+
+const getItemRemainingHours = () => {
+  if (!expectedCompletionHours) return null
+  
+  const itemHours = Number.parseFloat(expectedCompletionHours)
+  const allocatedHours = getTotalPhaseHours()
+  const remaining = itemHours - allocatedHours
+  
+  return {
+    itemHours: itemHours,
+    allocatedHours: allocatedHours,
+    remainingHours: remaining,
+    isOverAllocated: remaining < 0
+  }
+}
 
   const getPriorityColor = (priorityValue) => {
     switch (priorityValue) {
@@ -444,20 +639,6 @@ function AddItems({ items, submitting, apiService }) {
           Import from Excel
         </button>
       </div>
-
-      {/* {items.length > 0 && (
-        <div
-          className={`rounded-lg p-4 border transition-all ${
-            isDarkMode ? "bg-blue-500/10 border-blue-500/30" : "bg-blue-500/10 border-blue-500/20"
-          }`}
-        >
-          <p className={`text-sm flex items-center gap-2 ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
-            <Copy size={16} />
-            <strong>Tip:</strong> Start typing an item name to use an existing item as a template. Each new item will
-            have a unique batch number.
-          </p>
-        </div>
-      )} */}
 
       {/* Item Basic Info */}
       <div
@@ -536,6 +717,173 @@ function AddItems({ items, submitting, apiService }) {
             )}
           </div>
 
+          <div>
+            <label
+              className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
+            >
+              <Clock size={16} />
+              Expected Completion Time (Hours)
+              <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                (Optional - Total hours to complete this item)
+              </span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                placeholder="e.g., 24 hours or 1 day"
+                value={expectedCompletionHours}
+                onChange={(e) => setExpectedCompletionHours(e.target.value)}
+                disabled={submitting}
+                className={`flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                  }`}
+              />
+              {expectedCompletionHours && phases.length > 0 && (
+                <button
+                  onClick={handleDistributeDuration}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50"
+                  title="Distribute hours equally across all phases"
+                >
+                  Distribute
+                </button>
+              )}
+            </div>
+            {expectedCompletionHours && (
+              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                Total expected: <span className="font-bold">{expectedCompletionHours} hours</span>
+                {phases.length > 0 && (
+                  <> • Average per phase: <span className="font-bold">
+                    {(Number.parseFloat(expectedCompletionHours) / phases.length).toFixed(2)} hours
+                  </span></>
+                )}
+              </p>
+            )}
+          </div>
+
+          {expectedCompletionHours && phases.length > 0 && (
+  <div
+    className={`mt-4 p-4 rounded-lg border-2 ${
+      (() => {
+        const stats = getItemRemainingHours()
+        return stats?.isOverAllocated
+          ? isDarkMode
+            ? "bg-red-500/10 border-red-500/30"
+            : "bg-red-500/10 border-red-500/30"
+          : isDarkMode
+          ? "bg-purple-500/10 border-purple-500/30"
+          : "bg-purple-500/10 border-purple-500/30"
+      })()
+    }`}
+  >
+    <h4
+      className={`text-sm font-semibold mb-3 flex items-center gap-2 ${
+        isDarkMode ? "text-gray-200" : "text-gray-700"
+      }`}
+    >
+      <Clock size={16} />
+      Item Duration Allocation
+    </h4>
+
+    {(() => {
+      const stats = getItemRemainingHours()
+      if (!stats) return null
+
+      return (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+            <div className="flex justify-between items-center">
+              <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+                Item Expected:
+              </span>
+              <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
+                {stats.itemHours} hours
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+                Phases Allocated:
+              </span>
+              <span
+                className={`font-bold ${
+                  stats.isOverAllocated
+                    ? isDarkMode
+                      ? "text-red-300"
+                      : "text-red-700"
+                    : isDarkMode
+                    ? "text-blue-300"
+                    : "text-blue-700"
+                }`}
+              >
+                {stats.allocatedHours.toFixed(2)} hours
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+                Remaining:
+              </span>
+              <span
+                className={`font-bold ${
+                  stats.isOverAllocated
+                    ? isDarkMode
+                      ? "text-red-300"
+                      : "text-red-700"
+                    : isDarkMode
+                    ? "text-green-300"
+                    : "text-green-700"
+                }`}
+              >
+                {stats.remainingHours.toFixed(2)} hours
+              </span>
+            </div>
+          </div>
+
+          <div className={`mt-3 w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
+            <div
+              className={`h-2 rounded-full transition-all duration-300 ${
+                stats.isOverAllocated ? "bg-red-500" : "bg-purple-500"
+              }`}
+              style={{
+                width: `${Math.min(100, (stats.allocatedHours / stats.itemHours) * 100)}%`,
+              }}
+            ></div>
+          </div>
+
+          {stats.isOverAllocated && (
+            <div
+              className={`flex items-center gap-2 mt-3 ${
+                isDarkMode ? "text-red-300" : "text-red-700"
+              }`}
+            >
+              <AlertTriangle size={16} />
+              <span className="text-xs font-medium">
+                Over-allocated by {Math.abs(stats.remainingHours).toFixed(2)} hours!
+              </span>
+            </div>
+          )}
+
+          {!stats.isOverAllocated && stats.remainingHours === 0 && (
+            <div
+              className={`flex items-center gap-2 mt-3 ${
+                isDarkMode ? "text-green-300" : "text-green-700"
+              }`}
+            >
+              <CheckCircle size={16} />
+              <span className="text-xs font-medium">Fully allocated</span>
+            </div>
+          )}
+        </>
+      )
+    })()}
+  </div>
+)}
+
           {/* Item Name with Template Search */}
           <div className="relative" ref={dropdownRef}>
             <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
@@ -546,19 +894,19 @@ function AddItems({ items, submitting, apiService }) {
             </label>
             <div className="relative">
               <input
-  type="text"
-  placeholder="Enter item name or search existing to use as template..."
-  value={itemName}
-  onChange={(e) => setItemName(e.target.value)}
-  onFocus={() => setItemNameHasFocus(true)}
-  onBlur={() => {
-    // Delay to allow click on dropdown item
-    setTimeout(() => setItemNameHasFocus(false), 200)
-  }}
-  disabled={submitting}
+                type="text"
+                placeholder="Enter item name or search existing to use as template..."
+                value={itemName}
+                onChange={(e) => setItemName(e.target.value)}
+                onFocus={() => setItemNameHasFocus(true)}
+                onBlur={() => {
+                  // Delay to allow click on dropdown item
+                  setTimeout(() => setItemNameHasFocus(false), 200)
+                }}
+                disabled={submitting}
                 className={`w-full px-4 py-2 pr-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                    : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
                   }`}
               />
               {isSearching ? (
@@ -601,8 +949,8 @@ function AddItems({ items, submitting, apiService }) {
                         onClick={() => loadTemplateFromItem(item)}
                         disabled={loadingTemplate}
                         className={`w-full text-left px-4 py-3 border-b last:border-b-0 transition-colors disabled:opacity-50 ${isDarkMode
-                            ? "hover:bg-gray-700 border-gray-700 text-gray-100"
-                            : "hover:bg-gray-50 border-gray-200 text-gray-800"
+                          ? "hover:bg-gray-700 border-gray-700 text-gray-100"
+                          : "hover:bg-gray-50 border-gray-200 text-gray-800"
                           }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -641,10 +989,10 @@ function AddItems({ items, submitting, apiService }) {
                         onClick={() => searchItemsFromAPI(itemName.trim().toLowerCase(), searchPagination.current_page - 1)}
                         disabled={!searchPagination.has_previous || isSearching}
                         className={`px-2 py-1 rounded transition-colors ${searchPagination.has_previous && !isSearching
-                            ? isDarkMode
-                              ? "bg-gray-600 hover:bg-gray-500 text-gray-200"
-                              : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                            : "opacity-50 cursor-not-allowed text-gray-500"
+                          ? isDarkMode
+                            ? "bg-gray-600 hover:bg-gray-500 text-gray-200"
+                            : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                          : "opacity-50 cursor-not-allowed text-gray-500"
                           }`}
                       >
                         Previous
@@ -658,10 +1006,10 @@ function AddItems({ items, submitting, apiService }) {
                         onClick={() => searchItemsFromAPI(itemName.trim().toLowerCase(), searchPagination.current_page + 1)}
                         disabled={!searchPagination.has_next || isSearching}
                         className={`px-2 py-1 rounded transition-colors ${searchPagination.has_next && !isSearching
-                            ? isDarkMode
-                              ? "bg-gray-600 hover:bg-gray-500 text-gray-200"
-                              : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                            : "opacity-50 cursor-not-allowed text-gray-500"
+                          ? isDarkMode
+                            ? "bg-gray-600 hover:bg-gray-500 text-gray-200"
+                            : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                          : "opacity-50 cursor-not-allowed text-gray-500"
                           }`}
                       >
                         Next
@@ -841,6 +1189,49 @@ function AddItems({ items, submitting, apiService }) {
               </p>
             </div>
           )}
+
+          {(expectedCompletionHours || phases.some(p => p.expected_hours || p.subphases.some(s => s.expectedDuration))) && (
+            <div
+              className={`mt-4 p-4 rounded-lg border-2 ${isDarkMode ? "bg-purple-500/10 border-purple-500/30" : "bg-purple-500/10 border-purple-500/30"
+                }`}
+            >
+              <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"
+                }`}>
+                <Clock size={16} />
+                Expected Duration Summary
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                {expectedCompletionHours && (
+                  <div className="flex justify-between items-center">
+                    <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+                      Item Expected Completion:
+                    </span>
+                    <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
+                      {expectedCompletionHours} hours
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center">
+                  <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+                    Total Allocated (from phases/subphases):
+                  </span>
+                  <span className={`font-bold ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
+                    {getTotalAllocatedExpectedHours().toFixed(2)} hours
+                  </span>
+                </div>
+              </div>
+
+              <div className={`mt-3 pt-3 border-t ${isDarkMode ? "border-gray-600/30" : "border-gray-300/30"}`}>
+                <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                  <strong>Note:</strong> Expected hours help track performance. Actual duration will be tracked
+                  automatically as work progresses, allowing you to compare and improve estimates over time.
+                </p>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
 
@@ -888,12 +1279,75 @@ function AddItems({ items, submitting, apiService }) {
                         }`}
                     />
                   </div>
+
+                  {/* ADD THIS NEW INPUT */}
+                  <div className="w-40">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      placeholder="Expected hrs"
+                      value={phase.expected_hours || ""}
+                      onChange={(e) => updatePhase(phase.id, "expected_hours", e.target.value)}
+                      disabled={submitting}
+                      className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 transition-all ${isDarkMode
+                        ? "bg-gray-800/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                        : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                        }`}
+                      title="Expected hours for this phase"
+                    />
+                    {phase.expected_hours && (
+                      <div className={`mt-2 p-2 rounded text-xs ${getPhaseRemainingDuration(phase)?.isOverAllocated
+                        ? isDarkMode ? "bg-red-500/10 border border-red-500/30 text-red-300" : "bg-red-500/10 border border-red-500/30 text-red-700"
+                        : isDarkMode ? "bg-purple-500/10 border border-purple-500/30 text-purple-300" : "bg-purple-500/10 border border-purple-500/30 text-purple-700"
+                        }`}>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">Phase Duration Allocation:</span>
+                          <span className="font-bold">
+                            {getTotalSubphaseDurationForPhase(phase).toFixed(0)} / {hoursToMinutes(phase.expected_hours).toFixed(0)} minutes
+                          </span>
+                        </div>
+                        {(() => {
+                          const stats = getPhaseRemainingDuration(phase)
+                          return (
+                            <>
+                              <div className={`mt-1 w-full rounded-full h-1.5 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
+                                <div
+                                  className={`h-1.5 rounded-full transition-all duration-300 ${stats.isOverAllocated ? "bg-red-500" : "bg-purple-500"
+                                    }`}
+                                  style={{
+                                    width: `${Math.min(100, (stats.allocatedMinutes / stats.totalMinutes * 100))}%`,
+                                  }}
+                                ></div>
+                              </div>
+                              {stats.isOverAllocated ? (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <AlertTriangle size={12} />
+                                  <span className="font-medium">
+                                    Over-allocated by {Math.abs(stats.remainingMinutes).toFixed(0)} minutes ({Math.abs(stats.remainingHours)}h)
+                                  </span>
+                                </div>
+                              ) : stats.remainingMinutes > 0 ? (
+                                <div className="mt-1">
+                                  Remaining: {stats.remainingMinutes.toFixed(0)} minutes ({stats.remainingHours}h)
+                                </div>
+                              ) : (
+                                <div className="mt-1 flex items-center gap-1">
+                                  <CheckCircle size={12} />
+                                  <span>Fully allocated</span>
+                                </div>
+                              )}
+                            </>
+                          )
+                        })()}
+                      </div>
+                    )}
+                  </div>
+
                   <button
                     onClick={() => removePhase(phase.id)}
                     disabled={submitting}
-                    className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${isDarkMode
-                      ? "text-red-400 hover:bg-red-500/20"
-                      : "text-red-500 hover:bg-red-500/10"
+                    className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${isDarkMode ? "text-red-400 hover:bg-red-500/20" : "text-red-500 hover:bg-red-500/10"
                       }`}
                     title="Remove phase"
                   >
@@ -957,21 +1411,117 @@ function AddItems({ items, submitting, apiService }) {
                             </button>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <input
-                              type="number"
-                              step="1"
-                              min="0"
-                              placeholder="Duration (minutes)"
-                              value={subphase.expectedDuration}
-                              onChange={(e) =>
-                                updateSubphase(phase.id, subphase.id, "expectedDuration", e.target.value)
-                              }
-                              disabled={submitting}
-                              className={`px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                                ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                                : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                                }`}
-                            />
+                            {/* Duration Input - Minutes with Conversion Display */}
+                            <div>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="1"
+                                  min="0"
+                                  placeholder="Duration (minutes)"
+                                  value={subphase.expectedDuration}
+                                  onChange={(e) => {
+                                    const newMinutes = e.target.value
+                                    updateSubphase(phase.id, subphase.id, "expectedDuration", newMinutes)
+                                  }}
+                                  disabled={submitting}
+                                  className={`w-full px-3 py-1.5 pr-12 text-sm rounded focus:outline-none focus:ring-2 ${(() => {
+                                    // Check if this would exceed phase allocation
+                                    if (phase.expected_hours && subphase.expectedDuration) {
+                                      const currentMinutes = Number.parseFloat(subphase.expectedDuration) || 0
+                                      const otherSubphasesDuration = phase.subphases
+                                        .filter(s => s.id !== subphase.id)
+                                        .reduce((sum, s) => sum + (Number.parseFloat(s.expectedDuration) || 0), 0)
+                                      const totalWithThis = otherSubphasesDuration + currentMinutes
+                                      const phaseMinutes = hoursToMinutes(phase.expected_hours)
+
+                                      if (totalWithThis > phaseMinutes) {
+                                        return isDarkMode
+                                          ? "bg-red-500/20 border border-red-500/50 text-red-300 focus:ring-red-500"
+                                          : "bg-red-500/20 border border-red-500/50 text-red-700 focus:ring-red-500"
+                                      }
+                                    }
+                                    return isDarkMode
+                                      ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400 focus:ring-blue-500"
+                                      : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500 focus:ring-blue-500"
+                                  })()
+                                    } disabled:opacity-50 transition-all`}
+                                />
+                                <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"
+                                  }`}>
+                                  min
+                                </span>
+                              </div>
+                              {/* Show hours conversion */}
+                              {subphase.expectedDuration && Number.parseFloat(subphase.expectedDuration) > 0 && (
+                                <p className={`text-xs mt-0.5 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                                  ≈ {minutesToHours(subphase.expectedDuration)} hours
+                                  {phase.expected_hours && (
+                                    <>
+                                      {" "}• {((Number.parseFloat(subphase.expectedDuration) / hoursToMinutes(phase.expected_hours)) * 100).toFixed(0)}% of phase
+                                    </>
+                                  )}
+                                </p>
+                              )}
+                              {/* Show warning if exceeds phase allocation */}
+                              {phase.expected_hours && subphase.expectedDuration && (() => {
+                                const currentMinutes = Number.parseFloat(subphase.expectedDuration) || 0
+                                const otherSubphasesDuration = phase.subphases
+                                  .filter(s => s.id !== subphase.id)
+                                  .reduce((sum, s) => sum + (Number.parseFloat(s.expectedDuration) || 0), 0)
+                                const totalWithThis = otherSubphasesDuration + currentMinutes
+                                const phaseMinutes = hoursToMinutes(phase.expected_hours)
+
+                                if (totalWithThis > phaseMinutes) {
+                                  return (
+                                    <p className={`text-xs mt-0.5 flex items-center gap-1 font-medium ${isDarkMode ? "text-red-300" : "text-red-700"
+                                      }`}>
+                                      <AlertTriangle size={10} />
+                                      Exceeds phase allocation by {(totalWithThis - phaseMinutes).toFixed(0)} min
+                                    </p>
+                                  )
+                                }
+                                return null
+                              })()}
+                            </div>
+
+                            {phase.expected_hours && !subphase.expectedDuration && (
+                              <div className="flex gap-1 flex-wrap mt-1">
+                                <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                                  Quick:
+                                </span>
+                                {[15, 30, 45, 60, 90, 120].map((minutes) => {
+                                  const phaseMinutes = hoursToMinutes(phase.expected_hours)
+                                  const otherSubphasesDuration = phase.subphases
+                                    .filter(s => s.id !== subphase.id)
+                                    .reduce((sum, s) => sum + (Number.parseFloat(s.expectedDuration) || 0), 0)
+                                  const wouldExceed = (otherSubphasesDuration + minutes) > phaseMinutes
+
+                                  return (
+                                    <button
+                                      key={minutes}
+                                      onClick={() => {
+                                        if (!wouldExceed) {
+                                          updateSubphase(phase.id, subphase.id, "expectedDuration", minutes.toString())
+                                        }
+                                      }}
+                                      disabled={wouldExceed || submitting}
+                                      className={`px-2 py-0.5 text-xs rounded transition-colors ${wouldExceed
+                                          ? "opacity-40 cursor-not-allowed line-through"
+                                          : isDarkMode
+                                            ? "bg-purple-500/20 hover:bg-purple-500/30 text-purple-300"
+                                            : "bg-purple-500/20 hover:bg-purple-500/30 text-purple-700"
+                                        }`}
+                                      title={wouldExceed ? "Would exceed phase allocation" : `Set ${minutes} minutes (${minutesToHours(minutes)}h)`}
+                                    >
+                                      {minutes}m
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            )}
+
+                            {/* Quantity Input - Keep as is */}
                             <input
                               type="number"
                               min="0"

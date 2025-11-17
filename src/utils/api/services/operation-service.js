@@ -1685,4 +1685,196 @@ async getGoogleSheetsImportSummary() {
   
   return summary;
 }
+
+/**
+ * Get duration variance statistics
+ * @param {Object} filters - Optional filters (status, priority, client_name)
+ * @returns {Promise} Statistics on expected vs actual durations
+ */
+async getDurationVarianceStats(filters = {}) {
+  try {
+    const items = await this.getItems(filters);
+    
+    const stats = {
+      total_items_with_estimates: 0,
+      completed_with_actual: 0,
+      over_estimate: 0,
+      under_estimate: 0,
+      on_target: 0,
+      avg_variance_hours: 0,
+      total_expected_hours: 0,
+      total_actual_hours: 0,
+      items: []
+    };
+    
+    let varianceSum = 0;
+    
+    items.forEach(item => {
+      if (item.expected_completion_hours) {
+        stats.total_items_with_estimates++;
+        stats.total_expected_hours += parseFloat(item.expected_completion_hours);
+        
+        if (item.actual_completion_hours) {
+          stats.completed_with_actual++;
+          stats.total_actual_hours += parseFloat(item.actual_completion_hours);
+          
+          const variance = item.actual_completion_hours - item.expected_completion_hours;
+          varianceSum += variance;
+          
+          if (variance > 0.5) {
+            stats.over_estimate++;
+          } else if (variance < -0.5) {
+            stats.under_estimate++;
+          } else {
+            stats.on_target++;
+          }
+          
+          stats.items.push({
+            part_number: item.part_number,
+            name: item.name,
+            expected_hours: item.expected_completion_hours,
+            actual_hours: item.actual_completion_hours,
+            variance: variance,
+            variance_percentage: ((variance / item.expected_completion_hours) * 100).toFixed(1)
+          });
+        }
+      }
+    });
+    
+    if (stats.completed_with_actual > 0) {
+      stats.avg_variance_hours = (varianceSum / stats.completed_with_actual).toFixed(2);
+      stats.avg_variance_percentage = ((stats.avg_variance_hours / (stats.total_expected_hours / stats.completed_with_actual)) * 100).toFixed(1);
+    }
+    
+    // Sort items by variance (worst first)
+    stats.items.sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance));
+    
+    return stats;
+  } catch (error) {
+    console.error('Error getting duration variance stats:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get items that exceeded expected duration
+ * @param {number} varianceThreshold - Minimum hours over estimate (default: 1)
+ * @returns {Promise} Items that took longer than expected
+ */
+async getOverEstimatedItems(varianceThreshold = 1) {
+  try {
+    const items = await this.getAllItems();
+    
+    return items.filter(item => 
+      item.expected_completion_hours &&
+      item.actual_completion_hours &&
+      (item.actual_completion_hours - item.expected_completion_hours) >= varianceThreshold
+    ).map(item => ({
+      ...item,
+      variance: item.actual_completion_hours - item.expected_completion_hours,
+      variance_percentage: (((item.actual_completion_hours - item.expected_completion_hours) / item.expected_completion_hours) * 100).toFixed(1)
+    })).sort((a, b) => b.variance - a.variance);
+  } catch (error) {
+    console.error('Error getting over-estimated items:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get items that completed faster than expected
+ * @param {number} varianceThreshold - Minimum hours under estimate (default: 1)
+ * @returns {Promise} Items that took less time than expected
+ */
+async getUnderEstimatedItems(varianceThreshold = 1) {
+  try {
+    const items = await this.getAllItems();
+    
+    return items.filter(item => 
+      item.expected_completion_hours &&
+      item.actual_completion_hours &&
+      (item.expected_completion_hours - item.actual_completion_hours) >= varianceThreshold
+    ).map(item => ({
+      ...item,
+      variance: item.expected_completion_hours - item.actual_completion_hours,
+      variance_percentage: (((item.expected_completion_hours - item.actual_completion_hours) / item.expected_completion_hours) * 100).toFixed(1)
+    })).sort((a, b) => b.variance - a.variance);
+  } catch (error) {
+    console.error('Error getting under-estimated items:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get average completion time by client
+ * @returns {Promise} Client-wise duration statistics
+ */
+async getClientDurationStats() {
+  try {
+    const items = await this.getAllItems();
+    const clientStats = {};
+    
+    items.forEach(item => {
+      if (item.client_name && item.expected_completion_hours && item.actual_completion_hours) {
+        if (!clientStats[item.client_name]) {
+          clientStats[item.client_name] = {
+            client_name: item.client_name,
+            total_items: 0,
+            total_expected: 0,
+            total_actual: 0,
+            avg_variance: 0,
+            items: []
+          };
+        }
+        
+        clientStats[item.client_name].total_items++;
+        clientStats[item.client_name].total_expected += parseFloat(item.expected_completion_hours);
+        clientStats[item.client_name].total_actual += parseFloat(item.actual_completion_hours);
+        clientStats[item.client_name].items.push({
+          part_number: item.part_number,
+          name: item.name,
+          expected: item.expected_completion_hours,
+          actual: item.actual_completion_hours
+        });
+      }
+    });
+    
+    // Calculate averages and variances
+    Object.keys(clientStats).forEach(client => {
+      const stats = clientStats[client];
+      stats.avg_expected = (stats.total_expected / stats.total_items).toFixed(2);
+      stats.avg_actual = (stats.total_actual / stats.total_items).toFixed(2);
+      stats.avg_variance = (stats.avg_actual - stats.avg_expected).toFixed(2);
+      stats.avg_variance_percentage = ((stats.avg_variance / stats.avg_expected) * 100).toFixed(1);
+    });
+    
+    return Object.values(clientStats).sort((a, b) => b.total_items - a.total_items);
+  } catch (error) {
+    console.error('Error getting client duration stats:', error);
+    throw error;
+  }
+}
+
+/**
+ * Export duration variance report
+ * @param {Object} filters - Optional filters
+ * @returns {Promise} CSV-ready data with variance analysis
+ */
+async exportDurationVarianceReport(filters = {}) {
+  try {
+    const stats = await this.getDurationVarianceStats(filters);
+    
+    return stats.items.map(item => ({
+      part_number: item.part_number,
+      name: item.name,
+      expected_hours: item.expected_hours,
+      actual_hours: item.actual_hours,
+      variance_hours: item.variance,
+      variance_percentage: item.variance_percentage + '%',
+      status: item.variance > 0 ? 'Over Estimate' : item.variance < 0 ? 'Under Estimate' : 'On Target'
+    }));
+  } catch (error) {
+    console.error('Error exporting duration variance report:', error);
+    throw error;
+  }
+}
 }

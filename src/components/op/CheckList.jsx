@@ -39,7 +39,7 @@ function Checklist({
   apiService,
   formatTime,
   loadData,
-    // ADD THESE NEW PROPS:
+  // ADD THESE NEW PROPS:
   setShowEditItemModal,
   setShowEditPhaseModal,
   setShowEditSubphaseModal,
@@ -79,7 +79,7 @@ function Checklist({
   const [, forceUpdate] = useState(0)
   const [itemCheckboxes, setItemCheckboxes] = useState({})
 
-    const [currentPage, setCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(20)
   const [totalPages, setTotalPages] = useState(1)
   const [isFiltering, setIsFiltering] = useState(false)
@@ -807,79 +807,79 @@ function Checklist({
   }
 
   const applyFilters = async (page = 1) => {
-  setIsFiltering(true)
-  try {
-    // Build filter params
-    const params = {
-      page,
-      limit: itemsPerPage
-    }
-
-    // Map dashboard filters to API filters - FIX status mapping
-    if (filterStatus && filterStatus !== 'all') {
-      if (filterStatus === 'completed') {
-        params.status = 'completed'
-      } else if (filterStatus === 'in-progress') {
-        params.status = 'in_progress'
-      } else if (filterStatus === 'not-started') {
-        params.status = 'not_started'
+    setIsFiltering(true)
+    try {
+      // Build filter params
+      const params = {
+        page,
+        limit: itemsPerPage
       }
+
+      // Map dashboard filters to API filters - FIX status mapping
+      if (filterStatus && filterStatus !== 'all') {
+        if (filterStatus === 'completed') {
+          params.status = 'completed'
+        } else if (filterStatus === 'in-progress') {
+          params.status = 'in_progress'
+        } else if (filterStatus === 'not-started') {
+          params.status = 'not_started'
+        }
+      }
+
+      if (filterPriority && filterPriority !== 'all') {
+        params.priority = filterPriority
+      }
+
+      if (filterClient && filterClient !== 'all') {
+        params.client_name = filterClient
+      }
+
+      if (searchTerm && searchTerm.trim()) {
+        params.search = searchTerm.trim()
+      }
+
+      const response = await apiService.operations.getItemsPaginated(page, itemsPerPage, params)
+
+      setItems(response.items || [])
+      setPagination(response.pagination || {
+        current_page: page,
+        per_page: itemsPerPage,
+        total_items: 0,
+        total_pages: 0,
+        has_next: false,
+        has_previous: false
+      })
+    } catch (error) {
+      console.error('Failed to apply filters:', error)
+      setItems([])
+    } finally {
+      setIsFiltering(false)
     }
-
-    if (filterPriority && filterPriority !== 'all') {
-      params.priority = filterPriority
-    }
-
-    if (filterClient && filterClient !== 'all') {
-      params.client_name = filterClient
-    }
-
-    if (searchTerm && searchTerm.trim()) {
-      params.search = searchTerm.trim()
-    }
-
-    const response = await apiService.operations.getItemsPaginated(page, itemsPerPage, params)
-
-    setItems(response.items || [])
-    setPagination(response.pagination || {
-      current_page: page,
-      per_page: itemsPerPage,
-      total_items: 0,
-      total_pages: 0,
-      has_next: false,
-      has_previous: false
-    })
-  } catch (error) {
-    console.error('Failed to apply filters:', error)
-    setItems([])
-  } finally {
-    setIsFiltering(false)
   }
-}
 
   useEffect(() => {
     applyFilters(1) // Reset to page 1 when filters change
   }, [filterStatus, filterPriority, filterClient, searchTerm])
 
   const completedItems = items.filter((item) => {
-  if (!item) return false
-  try {
-    return calculateItemProgress(item) === 100
-  } catch (err) {
-    console.warn('Error calculating progress for item:', item?.part_number, err)
-    return false
-  }
-})
+    if (!item) return false
+    try {
+      return calculateItemProgress(item) === 100
+    } catch (err) {
+      console.warn('Error calculating progress for item:', item?.part_number, err)
+      return false
+    }
+  })
 
-const inProgressItems = items.filter((item) => {
-  if (!item) return false
-  try {
-    return calculateItemProgress(item) < 100
-  } catch (err) {
-    console.warn('Error calculating progress for item:', item?.part_number, err)
-    return true
-  }
-})
+  const inProgressItems = items.filter((item) => {
+    if (!item) return false
+    try {
+      return calculateItemProgress(item) < 100
+    } catch (err) {
+      console.warn('Error calculating progress for item:', item?.part_number, err)
+      return true
+    }
+  })
 
   // Sort in-progress items (keep existing sorting logic)
   const sortedInProgressItems = [...inProgressItems].sort((a, b) => {
@@ -892,13 +892,13 @@ const inProgressItems = items.filter((item) => {
     return priorityOrder[a.priority || "Medium"] - priorityOrder[b.priority || "Medium"]
   })
 
-const handlePageChange = (newPage) => {
-  if (newPage >= 1 && newPage <= pagination.total_pages) {
-    setCurrentPage(newPage) // ADD THIS LINE
-    applyFilters(newPage)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.total_pages) {
+      setCurrentPage(newPage) // ADD THIS LINE
+      applyFilters(newPage)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
   }
-}
   const handlePreviousPage = () => {
     if (pagination.has_previous) {
       handlePageChange(currentPage - 1)
@@ -1931,46 +1931,76 @@ const handlePageChange = (newPage) => {
                                     </div>
 
                                     {/* Phase Duration Tracker */}
-                                    <div
-                                      className={`rounded-lg p-3 ${isDarkMode ? "bg-slate-500/20" : "bg-slate-500/10"}`}
-                                    >
+                                    <div className={`rounded-lg p-3 ${isDarkMode ? "bg-slate-500/20" : "bg-slate-500/10"}`}>
                                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
-                                        <span
-                                          className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-                                            }`}
-                                        >
+                                        <span className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                                          }`}>
                                           <Calendar size={16} />
                                           Phase Duration
+                                          {phase.expected_hours && (
+                                            <span className={`text-xs px-2 py-0.5 rounded ${isDarkMode ? "bg-purple-500/20 text-purple-300" : "bg-purple-500/20 text-purple-700"
+                                              }`}>
+                                              Expected: {Number.parseFloat(phase.expected_hours).toFixed(1)}h
+                                            </span>
+                                          )}
                                         </span>
                                         <div className="flex items-center gap-2">
                                           <Clock size={16} className="text-slate-600 dark:text-slate-400" />
-                                          <span
-                                            className={`text-lg font-mono font-bold ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                              }`}
-                                          >
+                                          <span className={`text-lg font-mono font-bold ${isDarkMode ? "text-gray-200" : "text-gray-800"
+                                            }`}>
                                             {formatTime(getPhaseElapsedTime(phase))}
                                           </span>
+                                          {/* Show variance indicator if phase is complete and has expected hours */}
+                                          {phase.end_time && phase.expected_hours && phase.actual_hours && (
+                                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${phase.actual_hours > phase.expected_hours
+                                                ? "bg-red-500/20 text-red-700 dark:text-red-300"
+                                                : "bg-green-500/20 text-green-700 dark:text-green-300"
+                                              }`}>
+                                              {phase.actual_hours > phase.expected_hours ? "+" : ""}
+                                              {(phase.actual_hours - phase.expected_hours).toFixed(1)}h
+                                            </span>
+                                          )}
                                         </div>
                                       </div>
 
+                                      {/* Show progress bar for expected vs actual if expected hours set */}
+                                      {phase.expected_hours && phase.start_time && !phase.end_time && (
+                                        <div className="mb-2">
+                                          <div className="flex justify-between text-xs mb-1">
+                                            <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
+                                              Progress vs Expected
+                                            </span>
+                                            <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
+                                              {((getPhaseElapsedTime(phase) / 3600) / phase.expected_hours * 100).toFixed(0)}%
+                                            </span>
+                                          </div>
+                                          <div className={`w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
+                                            <div
+                                              className={`h-2 rounded-full transition-all duration-300 ${(getPhaseElapsedTime(phase) / 3600) > phase.expected_hours
+                                                  ? "bg-red-500"
+                                                  : "bg-purple-500"
+                                                }`}
+                                              style={{
+                                                width: `${Math.min(100, ((getPhaseElapsedTime(phase) / 3600) / phase.expected_hours * 100))}%`,
+                                              }}
+                                            ></div>
+                                          </div>
+                                          <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                                            {(getPhaseElapsedTime(phase) / 3600).toFixed(2)}h of {phase.expected_hours}h expected
+                                          </p>
+                                        </div>
+                                      )}
+
                                       <div className="flex justify-between items-center text-xs mb-3">
                                         <div>
-                                          <span className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""}`}>
-                                            Start:{" "}
-                                          </span>
-                                          <span
-                                            className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}
-                                          >
+                                          <span className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""}`}>Start: </span>
+                                          <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
                                             {formatDateTime(phase.start_time)}
                                           </span>
                                         </div>
                                         <div>
-                                          <span className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""}`}>
-                                            End:{" "}
-                                          </span>
-                                          <span
-                                            className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}
-                                          >
+                                          <span className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""}`}>End: </span>
+                                          <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
                                             {phase.end_time
                                               ? formatDateTime(phase.end_time)
                                               : phase.pause_time
@@ -2656,6 +2686,51 @@ const handlePageChange = (newPage) => {
                                         ))}
                                       </div>
                                     )}
+
+                                    {item.expected_completion_hours && item.actual_completion_hours && (
+                                      <div className={`mt-3 p-3 rounded-lg border ${isDarkMode ? "bg-purple-500/10 border-purple-500/30" : "bg-purple-500/10 border-purple-500/30"
+                                        }`}>
+                                        <div className="flex items-center justify-between mb-2">
+                                          <span className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? "text-purple-300" : "text-purple-700"
+                                            }`}>
+                                            <Clock size={14} />
+                                            Duration Analysis
+                                          </span>
+                                          <span className={`text-xs px-2 py-1 rounded font-bold ${item.actual_completion_hours > item.expected_completion_hours
+                                              ? "bg-red-500/20 text-red-700 dark:text-red-300"
+                                              : "bg-green-500/20 text-green-700 dark:text-green-300"
+                                            }`}>
+                                            {item.actual_completion_hours > item.expected_completion_hours ? "Over" : "Under"} by{" "}
+                                            {Math.abs(item.actual_completion_hours - item.expected_completion_hours).toFixed(1)}h
+                                          </span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-xs">
+                                          <div>
+                                            <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Expected: </span>
+                                            <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
+                                              {Number.parseFloat(item.expected_completion_hours).toFixed(1)}h
+                                            </span>
+                                          </div>
+                                          <div>
+                                            <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Actual: </span>
+                                            <span className={`font-bold ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
+                                              {Number.parseFloat(item.actual_completion_hours).toFixed(1)}h
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className={`mt-2 w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
+                                          <div
+                                            className={`h-2 rounded-full ${item.actual_completion_hours > item.expected_completion_hours
+                                                ? "bg-red-500"
+                                                : "bg-green-500"
+                                              }`}
+                                            style={{
+                                              width: `${Math.min(100, (item.actual_completion_hours / item.expected_completion_hours * 100))}%`,
+                                            }}
+                                          ></div>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               )
@@ -2675,127 +2750,121 @@ const handlePageChange = (newPage) => {
       ) : (
         <p className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
           {!isFiltering && items.length === 0 ? (
-  <p className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-    {searchTerm || filterClient || filterPriority || filterStatus
-      ? "No items match your search or filters."
-      : 'No items yet. Go to "Add Items" to create your first item.'}
-  </p>
-) : null}
+            <p className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+              {searchTerm || filterClient || filterPriority || filterStatus
+                ? "No items match your search or filters."
+                : 'No items yet. Go to "Add Items" to create your first item.'}
+            </p>
+          ) : null}
         </p>
       )}
 
       {/* Pagination Controls */}
-{!isFiltering && pagination.total_pages > 1 && (
-  <div className={`backdrop-blur-md rounded-lg p-4 mt-6 border transition-all shadow-sm ${
-    isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-  }`}>
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-      {/* Page Info */}
-      <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-        Showing {((pagination.current_page - 1) * pagination.per_page) + 1} - {Math.min(pagination.current_page * pagination.per_page, pagination.total_items)} of {pagination.total_items} items
-      </div>
-      
-      {/* Pagination Buttons */}
-      <div className="flex items-center gap-2">
-        {/* First Page */}
-        <button
-          onClick={() => handlePageChange(1)}
-          disabled={!pagination.has_previous}
-          className={`px-3 py-2 rounded-lg font-medium transition-colors ${
-            pagination.has_previous
-              ? isDarkMode
-                ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                : "bg-white/50 hover:bg-white/70 text-gray-700"
-              : "opacity-50 cursor-not-allowed"
-          }`}
-        >
-          ««
-        </button>
+      {!isFiltering && pagination.total_pages > 1 && (
+        <div className={`backdrop-blur-md rounded-lg p-4 mt-6 border transition-all shadow-sm ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+          }`}>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Page Info */}
+            <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Showing {((pagination.current_page - 1) * pagination.per_page) + 1} - {Math.min(pagination.current_page * pagination.per_page, pagination.total_items)} of {pagination.total_items} items
+            </div>
 
-        {/* Previous */}
-        <button
-          onClick={handlePreviousPage}
-          disabled={!pagination.has_previous}
-          className={`px-3 py-2 rounded-lg font-medium transition-colors ${
-            pagination.has_previous
-              ? isDarkMode
-                ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                : "bg-white/50 hover:bg-white/70 text-gray-700"
-              : "opacity-50 cursor-not-allowed"
-          }`}
-        >
-          « Previous
-        </button>
-
-        {/* Page Numbers */}
-        <div className="flex gap-1">
-          {(() => {
-            const pages = []
-            const showPages = 5
-            let startPage = Math.max(1, pagination.current_page - Math.floor(showPages / 2))
-            let endPage = Math.min(pagination.total_pages, startPage + showPages - 1)
-
-            if (endPage - startPage < showPages - 1) {
-              startPage = Math.max(1, endPage - showPages + 1)
-            }
-
-            for (let i = startPage; i <= endPage; i++) {
-              pages.push(
-                <button
-                  key={i}
-                  onClick={() => handlePageChange(i)}
-                  className={`px-3 py-2 rounded-lg font-medium transition-colors ${
-                    pagination.current_page === i
-                      ? isDarkMode ? "bg-slate-600 text-white" : "bg-slate-600 text-white"
-                      : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-200" : "bg-white/50 hover:bg-white/70 text-gray-700"
+            {/* Pagination Buttons */}
+            <div className="flex items-center gap-2">
+              {/* First Page */}
+              <button
+                onClick={() => handlePageChange(1)}
+                disabled={!pagination.has_previous}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors ${pagination.has_previous
+                    ? isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                      : "bg-white/50 hover:bg-white/70 text-gray-700"
+                    : "opacity-50 cursor-not-allowed"
                   }`}
-                >
-                  {i}
-                </button>
-              )
-            }
-            return pages
-          })()}
+              >
+                ««
+              </button>
+
+              {/* Previous */}
+              <button
+                onClick={handlePreviousPage}
+                disabled={!pagination.has_previous}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors ${pagination.has_previous
+                    ? isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                      : "bg-white/50 hover:bg-white/70 text-gray-700"
+                    : "opacity-50 cursor-not-allowed"
+                  }`}
+              >
+                « Previous
+              </button>
+
+              {/* Page Numbers */}
+              <div className="flex gap-1">
+                {(() => {
+                  const pages = []
+                  const showPages = 5
+                  let startPage = Math.max(1, pagination.current_page - Math.floor(showPages / 2))
+                  let endPage = Math.min(pagination.total_pages, startPage + showPages - 1)
+
+                  if (endPage - startPage < showPages - 1) {
+                    startPage = Math.max(1, endPage - showPages + 1)
+                  }
+
+                  for (let i = startPage; i <= endPage; i++) {
+                    pages.push(
+                      <button
+                        key={i}
+                        onClick={() => handlePageChange(i)}
+                        className={`px-3 py-2 rounded-lg font-medium transition-colors ${pagination.current_page === i
+                            ? isDarkMode ? "bg-slate-600 text-white" : "bg-slate-600 text-white"
+                            : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-200" : "bg-white/50 hover:bg-white/70 text-gray-700"
+                          }`}
+                      >
+                        {i}
+                      </button>
+                    )
+                  }
+                  return pages
+                })()}
+              </div>
+
+              {/* Next */}
+              <button
+                onClick={handleNextPage}
+                disabled={!pagination.has_next}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors ${pagination.has_next
+                    ? isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                      : "bg-white/50 hover:bg-white/70 text-gray-700"
+                    : "opacity-50 cursor-not-allowed"
+                  }`}
+              >
+                Next »
+              </button>
+
+              {/* Last Page */}
+              <button
+                onClick={() => handlePageChange(pagination.total_pages)}
+                disabled={!pagination.has_next}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors ${pagination.has_next
+                    ? isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                      : "bg-white/50 hover:bg-white/70 text-gray-700"
+                    : "opacity-50 cursor-not-allowed"
+                  }`}
+              >
+                »»
+              </button>
+            </div>
+
+            {/* Items per page selector */}
+            <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Page {pagination.current_page} of {pagination.total_pages}
+            </div>
+          </div>
         </div>
-
-        {/* Next */}
-        <button
-          onClick={handleNextPage}
-          disabled={!pagination.has_next}
-          className={`px-3 py-2 rounded-lg font-medium transition-colors ${
-            pagination.has_next
-              ? isDarkMode
-                ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                : "bg-white/50 hover:bg-white/70 text-gray-700"
-              : "opacity-50 cursor-not-allowed"
-          }`}
-        >
-          Next »
-        </button>
-
-        {/* Last Page */}
-        <button
-          onClick={() => handlePageChange(pagination.total_pages)}
-          disabled={!pagination.has_next}
-          className={`px-3 py-2 rounded-lg font-medium transition-colors ${
-            pagination.has_next
-              ? isDarkMode
-                ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                : "bg-white/50 hover:bg-white/70 text-gray-700"
-              : "opacity-50 cursor-not-allowed"
-          }`}
-        >
-          »»
-        </button>
-      </div>
-
-      {/* Items per page selector */}
-      <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-        Page {pagination.current_page} of {pagination.total_pages}
-      </div>
-    </div>
-  </div>
-)}
+      )}
     </div>
   )
 }
