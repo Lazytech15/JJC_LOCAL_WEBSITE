@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { Search, Home, Briefcase, X, Zap } from "lucide-react"
+import { Search, Home, Briefcase, X, Zap, Menu } from "lucide-react"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Badge } from "./ui/badge"
@@ -17,6 +17,7 @@ interface HeaderProps {
 export function Header({ cartItemCount, currentView, onViewChange, onSearch }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   // Real search suggestions based on product data
   const [products, setProducts] = useState<Array<{id: string, name: string, brand: string, itemType: string}>>([])
@@ -99,7 +100,7 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b-2 border-slate-700 shadow-2xl">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b-2 border-slate-700 shadow-2xl touch-manipulation">
       {/* Industrial accent line */}
       <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-blue-500/50 to-transparent"></div>
       
@@ -133,8 +134,20 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
           </div>
         </div>
 
+        {/* Mobile actions */}
+        <div className="absolute right-4 top-3 sm:hidden flex items-center gap-2">
+          <button
+            aria-label="Toggle menu"
+            onClick={() => setIsMobileMenuOpen(o => !o)}
+            className={`h-10 w-10 inline-flex items-center justify-center rounded-xl bg-slate-800/60 border border-slate-600 hover:bg-slate-700/70 active:scale-95 transition ${isMobileMenuOpen ? 'ring-2 ring-blue-500/40' : ''}`}
+          >
+            {isMobileMenuOpen ? <X className="w-5 h-5 text-slate-200" /> : <Menu className="w-5 h-5 text-slate-200" />}
+          </button>
+          <ThemeToggle />
+        </div>
+
         {/* Search Bar */}
-        <div className="flex-1 max-w-full sm:max-w-3xl sm:mx-10 mx-0 relative order-2 sm:order-none">
+        <div className="flex-1 max-w-full sm:max-w-3xl sm:mx-10 mx-0 relative order-2 sm:order-none mt-12 sm:mt-0">
           <div className="relative">
             <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-600 dark:text-slate-400">
               <Search className="w-5 h-5" />
@@ -235,11 +248,39 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
             </Button>
           </div>
           
-          <div className="sm:hidden">
-            <ThemeToggle />
-          </div>
+          <div className="sm:hidden hidden" />
         </div>
       </div>
+      {/* Mobile slide-down menu */}
+      {isMobileMenuOpen && (
+        <div className="sm:hidden px-4 pb-4 animate-in slide-in-from-top duration-200">
+          <div className="bg-slate-800/80 backdrop-blur-md rounded-xl border border-slate-700 p-3 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs tracking-wide text-slate-400 uppercase">Navigation</span>
+              <CartStatusIndicator />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant={currentView === 'dashboard' ? 'secondary' : 'ghost'}
+                className="justify-start"
+                onClick={() => { onViewChange('dashboard'); setIsMobileMenuOpen(false) }}
+              >
+                <Home className="w-4 h-4 mr-2" /> Dashboard
+              </Button>
+              <Button
+                variant={currentView === 'cart' ? 'secondary' : 'ghost'}
+                className="justify-start"
+                onClick={() => { onViewChange('cart'); setIsMobileMenuOpen(false) }}
+              >
+                <Briefcase className="w-4 h-4 mr-2" /> Cart
+              </Button>
+            </div>
+            {searchQuery && (
+              <div className="text-xs text-slate-400">Search: <span className="text-slate-300">{searchQuery}</span></div>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   )
 }
