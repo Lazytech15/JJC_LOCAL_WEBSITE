@@ -134,17 +134,15 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
           </div>
         </div>
 
-        {/* Mobile top row actions */}
+        {/* Mobile actions */}
         <div className="absolute right-4 top-3 sm:hidden flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             aria-label="Toggle menu"
             onClick={() => setIsMobileMenuOpen(o => !o)}
-            className={`h-10 w-10 rounded-xl bg-slate-800/60 border border-slate-600 hover:bg-slate-700/70 active:scale-95 transition ${isMobileMenuOpen ? 'ring-2 ring-blue-500/40' : ''}`}
+            className={`h-10 w-10 inline-flex items-center justify-center rounded-xl bg-slate-800/60 border border-slate-600 hover:bg-slate-700/70 active:scale-95 transition ${isMobileMenuOpen ? 'ring-2 ring-blue-500/40' : ''}`}
           >
-            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </Button>
+            {isMobileMenuOpen ? <X className="w-5 h-5 text-slate-200" /> : <Menu className="w-5 h-5 text-slate-200" />}
+          </button>
           <ThemeToggle />
         </div>
 
@@ -250,20 +248,9 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
             </Button>
           </div>
           
-          {/* Mobile cart badge (outside collapsed menu) */}
-          <div className="sm:hidden relative">
-            {cartItemCount > 0 && (
-              <Badge
-                variant="destructive"
-                className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-gradient-to-br from-red-500 to-red-600 border-2 border-slate-800 shadow-lg"
-              >
-                {cartItemCount}
-              </Badge>
-            )}
-          </div>
+          <div className="sm:hidden hidden" />
         </div>
       </div>
-
       {/* Mobile slide-down menu */}
       {isMobileMenuOpen && (
         <div className="sm:hidden px-4 pb-4 animate-in slide-in-from-top duration-200">

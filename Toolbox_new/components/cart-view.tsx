@@ -362,7 +362,7 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-background min-h-screen">
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 bg-background min-h-[calc(100dvh-4rem)]">
       {/* Industrial Header */}
       <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-slate-700 relative">
         {/* Decorative accent line */}

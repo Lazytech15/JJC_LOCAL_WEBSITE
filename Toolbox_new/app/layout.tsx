@@ -14,6 +14,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0f172a" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -42,8 +43,8 @@ export default function RootLayout({
           }}
         />
       </head>
-      {/* Removed global overflow-hidden to allow proper mobile scrolling and fixed header interaction */}
-      <body className="font-sans bg-background text-foreground min-h-screen overflow-x-hidden">
+      {/* Allow page to scroll on mobile and respect safe areas */}
+      <body className="font-sans bg-background text-foreground min-h-screen overflow-x-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <ErrorBoundary>
           <Suspense fallback={null}>
             <ThemeProvider defaultTheme="dark" storageKey="toolbox-theme">
