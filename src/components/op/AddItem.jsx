@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { Trash2, Plus, Copy, Search, User, Flag, Package, AlertTriangle, Sheet, Clock, CheckCircle  } from "lucide-react"
+import { Trash2, Plus, Copy, Search, User, Flag, Package, AlertTriangle, Sheet, Clock, CheckCircle } from "lucide-react"
 import { useAuth } from "../../contexts/AuthContext"
 import ExcelImportModal from "./ImportExcelItem"
 
@@ -252,34 +252,34 @@ function AddItems({ items, submitting, apiService }) {
     ])
   }
 
-const updatePhase = (phaseId, field, value) => {
-  // ✅ Validate phase expected_hours against item expected_completion_hours
-  if (field === 'expected_hours' && expectedCompletionHours) {
-    const newHours = Number.parseFloat(value) || 0
-    const itemHours = Number.parseFloat(expectedCompletionHours)
-    
-    // Calculate total from other phases (excluding current one)
-    const otherPhasesTotal = phases
-      .filter(p => p.id !== phaseId)
-      .reduce((sum, p) => sum + (Number.parseFloat(p.expected_hours) || 0), 0)
-    
-    const totalIfUpdated = otherPhasesTotal + newHours
-    
-    if (totalIfUpdated > itemHours) {
-      const remainingHours = itemHours - otherPhasesTotal
-      alert(
-        `Cannot exceed item expected completion time!\n\n` +
-        `Item Expected: ${itemHours} hours\n` +
-        `Other Phases Total: ${otherPhasesTotal.toFixed(2)} hours\n` +
-        `Remaining: ${remainingHours.toFixed(2)} hours\n\n` +
-        `You can allocate up to ${remainingHours.toFixed(2)} hours for this phase.`
-      )
-      return // ✅ Don't update if it would exceed
+  const updatePhase = (phaseId, field, value) => {
+    // ✅ Validate phase expected_hours against item expected_completion_hours
+    if (field === 'expected_hours' && expectedCompletionHours) {
+      const newHours = Number.parseFloat(value) || 0
+      const itemHours = Number.parseFloat(expectedCompletionHours)
+
+      // Calculate total from other phases (excluding current one)
+      const otherPhasesTotal = phases
+        .filter(p => p.id !== phaseId)
+        .reduce((sum, p) => sum + (Number.parseFloat(p.expected_hours) || 0), 0)
+
+      const totalIfUpdated = otherPhasesTotal + newHours
+
+      if (totalIfUpdated > itemHours) {
+        const remainingHours = itemHours - otherPhasesTotal
+        alert(
+          `Cannot exceed item expected completion time!\n\n` +
+          `Item Expected: ${itemHours} hours\n` +
+          `Other Phases Total: ${otherPhasesTotal.toFixed(2)} hours\n` +
+          `Remaining: ${remainingHours.toFixed(2)} hours\n\n` +
+          `You can allocate up to ${remainingHours.toFixed(2)} hours for this phase.`
+        )
+        return // ✅ Don't update if it would exceed
+      }
     }
+
+    setPhases(phases.map((phase) => (phase.id === phaseId ? { ...phase, [field]: value } : phase)))
   }
-  
-  setPhases(phases.map((phase) => (phase.id === phaseId ? { ...phase, [field]: value } : phase)))
-}
   const removePhase = (phaseId) => {
     setPhases(phases.filter((phase) => phase.id !== phaseId))
   }
@@ -578,25 +578,25 @@ const updatePhase = (phaseId, field, value) => {
   }
 
   const getTotalPhaseHours = () => {
-  return phases.reduce((sum, phase) => {
-    return sum + (Number.parseFloat(phase.expected_hours) || 0)
-  }, 0)
-}
-
-const getItemRemainingHours = () => {
-  if (!expectedCompletionHours) return null
-  
-  const itemHours = Number.parseFloat(expectedCompletionHours)
-  const allocatedHours = getTotalPhaseHours()
-  const remaining = itemHours - allocatedHours
-  
-  return {
-    itemHours: itemHours,
-    allocatedHours: allocatedHours,
-    remainingHours: remaining,
-    isOverAllocated: remaining < 0
+    return phases.reduce((sum, phase) => {
+      return sum + (Number.parseFloat(phase.expected_hours) || 0)
+    }, 0)
   }
-}
+
+  const getItemRemainingHours = () => {
+    if (!expectedCompletionHours) return null
+
+    const itemHours = Number.parseFloat(expectedCompletionHours)
+    const allocatedHours = getTotalPhaseHours()
+    const remaining = itemHours - allocatedHours
+
+    return {
+      itemHours: itemHours,
+      allocatedHours: allocatedHours,
+      remainingHours: remaining,
+      isOverAllocated: remaining < 0
+    }
+  }
 
   const getPriorityColor = (priorityValue) => {
     switch (priorityValue) {
@@ -766,123 +766,116 @@ const getItemRemainingHours = () => {
           </div>
 
           {expectedCompletionHours && phases.length > 0 && (
-  <div
-    className={`mt-4 p-4 rounded-lg border-2 ${
-      (() => {
-        const stats = getItemRemainingHours()
-        return stats?.isOverAllocated
-          ? isDarkMode
-            ? "bg-red-500/10 border-red-500/30"
-            : "bg-red-500/10 border-red-500/30"
-          : isDarkMode
-          ? "bg-purple-500/10 border-purple-500/30"
-          : "bg-purple-500/10 border-purple-500/30"
-      })()
-    }`}
-  >
-    <h4
-      className={`text-sm font-semibold mb-3 flex items-center gap-2 ${
-        isDarkMode ? "text-gray-200" : "text-gray-700"
-      }`}
-    >
-      <Clock size={16} />
-      Item Duration Allocation
-    </h4>
-
-    {(() => {
-      const stats = getItemRemainingHours()
-      if (!stats) return null
-
-      return (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-            <div className="flex justify-between items-center">
-              <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
-                Item Expected:
-              </span>
-              <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
-                {stats.itemHours} hours
-              </span>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
-                Phases Allocated:
-              </span>
-              <span
-                className={`font-bold ${
-                  stats.isOverAllocated
-                    ? isDarkMode
-                      ? "text-red-300"
-                      : "text-red-700"
-                    : isDarkMode
-                    ? "text-blue-300"
-                    : "text-blue-700"
-                }`}
-              >
-                {stats.allocatedHours.toFixed(2)} hours
-              </span>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
-                Remaining:
-              </span>
-              <span
-                className={`font-bold ${
-                  stats.isOverAllocated
-                    ? isDarkMode
-                      ? "text-red-300"
-                      : "text-red-700"
-                    : isDarkMode
-                    ? "text-green-300"
-                    : "text-green-700"
-                }`}
-              >
-                {stats.remainingHours.toFixed(2)} hours
-              </span>
-            </div>
-          </div>
-
-          <div className={`mt-3 w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
             <div
-              className={`h-2 rounded-full transition-all duration-300 ${
-                stats.isOverAllocated ? "bg-red-500" : "bg-purple-500"
-              }`}
-              style={{
-                width: `${Math.min(100, (stats.allocatedHours / stats.itemHours) * 100)}%`,
-              }}
-            ></div>
-          </div>
-
-          {stats.isOverAllocated && (
-            <div
-              className={`flex items-center gap-2 mt-3 ${
-                isDarkMode ? "text-red-300" : "text-red-700"
-              }`}
+              className={`mt-4 p-4 rounded-lg border-2 ${(() => {
+                  const stats = getItemRemainingHours()
+                  return stats?.isOverAllocated
+                    ? isDarkMode
+                      ? "bg-red-500/10 border-red-500/30"
+                      : "bg-red-500/10 border-red-500/30"
+                    : isDarkMode
+                      ? "bg-purple-500/10 border-purple-500/30"
+                      : "bg-purple-500/10 border-purple-500/30"
+                })()
+                }`}
             >
-              <AlertTriangle size={16} />
-              <span className="text-xs font-medium">
-                Over-allocated by {Math.abs(stats.remainingHours).toFixed(2)} hours!
-              </span>
+              <h4
+                className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"
+                  }`}
+              >
+                <Clock size={16} />
+                Item Duration Allocation
+              </h4>
+
+              {(() => {
+                const stats = getItemRemainingHours()
+                if (!stats) return null
+
+                return (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                      <div className="flex justify-between items-center">
+                        <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+                          Item Expected:
+                        </span>
+                        <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
+                          {stats.itemHours} hours
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+                          Phases Allocated:
+                        </span>
+                        <span
+                          className={`font-bold ${stats.isOverAllocated
+                              ? isDarkMode
+                                ? "text-red-300"
+                                : "text-red-700"
+                              : isDarkMode
+                                ? "text-blue-300"
+                                : "text-blue-700"
+                            }`}
+                        >
+                          {stats.allocatedHours.toFixed(2)} hours
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+                          Remaining:
+                        </span>
+                        <span
+                          className={`font-bold ${stats.isOverAllocated
+                              ? isDarkMode
+                                ? "text-red-300"
+                                : "text-red-700"
+                              : isDarkMode
+                                ? "text-green-300"
+                                : "text-green-700"
+                            }`}
+                        >
+                          {stats.remainingHours.toFixed(2)} hours
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={`mt-3 w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
+                      <div
+                        className={`h-2 rounded-full transition-all duration-300 ${stats.isOverAllocated ? "bg-red-500" : "bg-purple-500"
+                          }`}
+                        style={{
+                          width: `${Math.min(100, (stats.allocatedHours / stats.itemHours) * 100)}%`,
+                        }}
+                      ></div>
+                    </div>
+
+                    {stats.isOverAllocated && (
+                      <div
+                        className={`flex items-center gap-2 mt-3 ${isDarkMode ? "text-red-300" : "text-red-700"
+                          }`}
+                      >
+                        <AlertTriangle size={16} />
+                        <span className="text-xs font-medium">
+                          Over-allocated by {Math.abs(stats.remainingHours).toFixed(2)} hours!
+                        </span>
+                      </div>
+                    )}
+
+                    {!stats.isOverAllocated && stats.remainingHours === 0 && (
+                      <div
+                        className={`flex items-center gap-2 mt-3 ${isDarkMode ? "text-green-300" : "text-green-700"
+                          }`}
+                      >
+                        <CheckCircle size={16} />
+                        <span className="text-xs font-medium">Fully allocated</span>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
           )}
-
-          {!stats.isOverAllocated && stats.remainingHours === 0 && (
-            <div
-              className={`flex items-center gap-2 mt-3 ${
-                isDarkMode ? "text-green-300" : "text-green-700"
-              }`}
-            >
-              <CheckCircle size={16} />
-              <span className="text-xs font-medium">Fully allocated</span>
-            </div>
-          )}
-        </>
-      )
-    })()}
-  </div>
-)}
 
           {/* Item Name with Template Search */}
           <div className="relative" ref={dropdownRef}>
@@ -1507,10 +1500,10 @@ const getItemRemainingHours = () => {
                                       }}
                                       disabled={wouldExceed || submitting}
                                       className={`px-2 py-0.5 text-xs rounded transition-colors ${wouldExceed
-                                          ? "opacity-40 cursor-not-allowed line-through"
-                                          : isDarkMode
-                                            ? "bg-purple-500/20 hover:bg-purple-500/30 text-purple-300"
-                                            : "bg-purple-500/20 hover:bg-purple-500/30 text-purple-700"
+                                        ? "opacity-40 cursor-not-allowed line-through"
+                                        : isDarkMode
+                                          ? "bg-purple-500/20 hover:bg-purple-500/30 text-purple-300"
+                                          : "bg-purple-500/20 hover:bg-purple-500/30 text-purple-700"
                                         }`}
                                       title={wouldExceed ? "Would exceed phase allocation" : `Set ${minutes} minutes (${minutesToHours(minutes)}h)`}
                                     >
