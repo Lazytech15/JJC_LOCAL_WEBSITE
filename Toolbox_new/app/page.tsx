@@ -239,7 +239,7 @@ export default function HomePage() {
         onSearch={setHeaderSearchQuery}
       />
 
-      <main className="flex-1 overflow-y-auto pt-16">
+      <main className="flex-1 overflow-y-auto pt-20 sm:pt-16">
         {/* Keep DashboardView mounted but conditionally visible */}
         <div className={currentView === "dashboard" ? "block" : "hidden"}>
           <DashboardView 

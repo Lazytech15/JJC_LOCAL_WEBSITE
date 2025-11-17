@@ -239,6 +239,64 @@ function LoginForm() {
       return
     }
 
+    // Check for employee auto-login from URL parameters (cross-domain support)
+    const urlParams = new URLSearchParams(window.location.search)
+    const autoLogin = urlParams.get('autoLogin')
+    const tokenParam = urlParams.get('token')
+    const usernameParam = urlParams.get('username')
+    const loginTypeParam = urlParams.get('loginType')
+
+    if (autoLogin === 'true' && tokenParam && usernameParam) {
+      console.log('[LoginForm] Auto-login detected from URL parameters')
+      
+      try {
+        // Decode and verify the token
+        const decodedToken = decodeURIComponent(tokenParam)
+        const payload = verifyToken(decodedToken)
+        
+        if (payload) {
+          console.log('[LoginForm] Token valid, logging in automatically...')
+          console.log('[LoginForm] Token payload:', payload)
+          
+          // Remove URL parameters to clean up the URL
+          window.history.replaceState({}, document.title, window.location.pathname)
+          
+          // Store the token
+          storeTokens(decodedToken, false)
+          
+          // Set user data from token
+          const userData = {
+            id: payload.userId || payload.id,
+            username: payload.username || usernameParam,
+            name: payload.name,
+            department: payload.department,
+            role: payload.role || 'user',
+            permissions: payload.permissions || [],
+            access_level: payload.accessLevel || payload.access_level || 'user',
+            loginTime: new Date().toISOString(),
+            hasValidToken: true,
+          }
+          
+          console.log('[LoginForm] User data prepared:', userData)
+          
+          login(userData, departmentName, decodedToken)
+          
+          // Navigate to the department page
+          const urlSlug = DEPARTMENT_NAME_TO_SLUG[departmentName] || deptSlug
+          console.log('[LoginForm] Navigating to:', `/jjcewgsaccess/${urlSlug}`)
+          navigate(`/jjcewgsaccess/${urlSlug}`, { replace: true })
+          
+          setIsInitializing(false)
+          return
+        } else {
+          console.warn('[LoginForm] Token verification failed')
+        }
+      } catch (error) {
+        console.error('[LoginForm] Employee auto-login failed:', error)
+      }
+    }
+
+    // Regular token check
     const existingToken = getStoredToken()
     if (existingToken) {
       const payload = verifyToken(existingToken)
@@ -252,7 +310,7 @@ function LoginForm() {
       setHasValidToken(false)
     }
     setIsInitializing(false)
-  }, [departmentName, isValidDepartment])
+  }, [departmentName, isValidDepartment, deptSlug, login, navigate])
 
   const handleContinueWithToken = () => {
     // FIXED: Navigate to correct route

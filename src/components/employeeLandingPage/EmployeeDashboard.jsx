@@ -7,9 +7,10 @@ import { Button } from "../ui/UiComponents"
 import { Avatar, AvatarFallback } from "../ui/UiComponents"
 import { Badge } from "../ui/UiComponents"
 import { useAuth } from "../../contexts/AuthContext"
+import { DEPARTMENT_SLUG_MAP } from "../../contexts/AuthContext"
 import { useOnlineStatus } from "../../hooks/use-online-status"
 import { useServiceWorker } from "../../hooks/use-service-worker"
-import { getStoredToken, verifyToken, clearTokens } from "../../utils/auth"
+import { getStoredToken, verifyToken, clearTokens, storeTokens } from "../../utils/auth"
 import logo from "../../assets/companyLogo.jpg"
 import apiService from "../../utils/api/api-service"
 import GearLoadingSpinner from "../../../public/LoadingGear"
@@ -19,6 +20,35 @@ import Announcements from "./DashboardComponents/Announcements"
 import TimeAttendance from "./DashboardComponents/TimeAttendance"
 import Performance from "./DashboardComponents/Performance"
 import Profile from "./DashboardComponents/Profile"
+
+// Centralized department routes and normalization
+const DEPARTMENT_ROUTES = {
+  procurement: { label: "Procurement", url: "https://jjcenggworks.com/jjcewgsaccess/procurement" },
+  operations: { label: "Operations", url: "https://jjcenggworks.com/jjcewgsaccess/operations" },
+  hr: { label: "Human Resource", url: "https://jjcenggworks.com/jjcewgsaccess/hr" },
+}
+
+function normalizeDepartmentName(dep) {
+  if (!dep || typeof dep !== "string") return null
+  const lower = dep.toLowerCase().trim()
+
+  // Direct matches to slugs
+  if (DEPARTMENT_ROUTES[lower]) return lower
+
+  // Match by known names from AuthContext mapping (name -> slug)
+  for (const [name, slug] of Object.entries(DEPARTMENT_SLUG_MAP)) {
+    if (lower === name.toLowerCase()) {
+      if (DEPARTMENT_ROUTES[slug]) return slug
+    }
+  }
+
+  // Heuristics for common variants
+  if (lower.includes("proc")) return "procurement"
+  if (lower.includes("oper")) return "operations"
+  if (lower === "hr" || lower.includes("human")) return "hr"
+
+  return null
+}
 
 export default function EmployeeDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard")
@@ -42,6 +72,11 @@ export default function EmployeeDashboard() {
   const { employee, employeeLogout, isDarkMode, toggleDarkMode } = useAuth()
   const { isOnline, connectionQuality } = useOnlineStatus()
   const { updateAvailable, updateServiceWorker } = useServiceWorker()
+  
+  // Resolve department-based navigation via normalization
+  const rawDepartment = employeeData?.department || employee?.department || ""
+  const normalizedDept = normalizeDepartmentName(rawDepartment)
+  const deptRoute = normalizedDept ? DEPARTMENT_ROUTES[normalizedDept] : null
 
   const unreadCount = Array.isArray(announcements) ? announcements.filter((a) => !a.read).length : 0
 
@@ -51,8 +86,35 @@ export default function EmployeeDashboard() {
       setError(null)
 
       try {
-        // Get token and decode to find employee
-        const token = getStoredToken()
+        // Check for auto-login from department pages via URL parameters
+        const urlParams = new URLSearchParams(window.location.search)
+        const autoLogin = urlParams.get('autoLogin')
+        const tokenParam = urlParams.get('token')
+        const usernameParam = urlParams.get('username')
+        const tabParam = urlParams.get('tab')
+
+        let token = null
+        
+        if (autoLogin === 'true' && tokenParam) {
+          console.log('[EmployeeDashboard] Auto-login detected from URL')
+          // Decode and use the token from URL
+          token = decodeURIComponent(tokenParam)
+          
+          // Store the token
+          storeTokens(token, true) // true for employee token
+          
+          // Set the active tab if provided
+          if (tabParam) {
+            setActiveTab(tabParam)
+          }
+          
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname)
+        } else {
+          // Get token from storage
+          token = getStoredToken()
+        }
+        
         if (!token) {
           console.warn("No token found")
           setLoading(false)
@@ -71,7 +133,8 @@ export default function EmployeeDashboard() {
           return
         }
 
-        const uid = payload.userId
+        // Try multiple fields for user ID
+        const uid = payload.userId || payload.id || payload.uid
         console.log("[v0] Using UID from token:", uid)
 
         if (!uid) {
@@ -100,10 +163,12 @@ export default function EmployeeDashboard() {
             name: payload.name,
             department: payload.department,
             role: payload.role,
+            access_level: payload.accessLevel || payload.access_level || 'user',
           }
         }
 
-        console.log("[v0] Found employee ID:", uid)
+        console.log("[v0] Found employee:", foundEmployee)
+        console.log("[v0] Employee access_level:", foundEmployee.access_level)
         setEmployeeData(foundEmployee)
 
         // Fetch all records and filter by current user
@@ -226,6 +291,53 @@ export default function EmployeeDashboard() {
       employeeLogout()
     }
     navigate("/employee/login", { replace: true })
+  }
+
+  const handleDepartmentAccess = async () => {
+    if (!deptRoute) return
+
+    // Check if user is admin
+    if (employeeData?.access_level !== 'admin' && employee?.access_level !== 'admin') {
+      setError("Access denied. Only administrators can access department pages.")
+      setTimeout(() => setError(null), 5000)
+      return
+    }
+
+    try {
+      // Get current token
+      const token = getStoredToken()
+      if (!token) {
+        console.error("No authentication token found")
+        setError("Authentication token not found. Please log in again.")
+        return
+      }
+
+      const payload = verifyToken(token)
+      if (!payload) {
+        console.error("Invalid token")
+        setError("Invalid session. Please log in again.")
+        return
+      }
+
+      console.log("[DepartmentAccess] Token payload:", payload)
+      console.log("[DepartmentAccess] Employee data:", employeeData)
+      console.log("[DepartmentAccess] Target department:", rawDepartment)
+
+      // Encode token for URL parameter (safe for cross-domain)
+      const encodedToken = encodeURIComponent(token)
+      const username = payload.username || employee?.username || employeeData?.username
+      
+      // Build URL with token parameter for auto-login
+      const urlWithAuth = `${deptRoute.url}?autoLogin=true&token=${encodedToken}&username=${encodeURIComponent(username)}&loginType=employee`
+      
+      console.log("[DepartmentAccess] Navigating to:", deptRoute.url)
+      
+      // Navigate to department page with auth params
+      window.location.href = urlWithAuth
+    } catch (error) {
+      console.error("Error accessing department:", error)
+      setError("Failed to access department. Please try again.")
+    }
   }
 
   const menuItems = [
@@ -431,6 +543,31 @@ export default function EmployeeDashboard() {
                         <User className="w-4 h-4" />
                         <span className="text-sm font-medium">View Profile</span>
                       </button>
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false)
+                          navigate("/jjctoolbox")
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
+                          }`}
+                      >
+                        <span className="text-sm font-medium">Go To Toolbox</span>
+                      </button>
+                      
+                      {/* Department Access - Only for admins with department assignment */}
+                      {deptRoute && (employeeData?.access_level === 'admin' || employee?.access_level === 'admin') && (
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false)
+                            handleDepartmentAccess()
+                          }}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
+                            }`}
+                        >
+                          <span className="text-sm font-medium">{`Go to ${deptRoute.label}`}</span>
+                        </button>
+                      )}
+                      
                       <button
                         onClick={() => {
                           setShowProfileMenu(false)
