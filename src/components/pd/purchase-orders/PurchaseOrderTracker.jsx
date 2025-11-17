@@ -626,7 +626,7 @@ function PurchaseOrderTracker() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Purchase Order Tracker</h2>
+          <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 dark:text-gray-200">Purchase Order Tracker</h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Track procurement orders from request to delivery
           </p>
@@ -851,7 +851,7 @@ function PurchaseOrderTracker() {
       {showOrderDetails && selectedOrder && (
         <ModalPortal>
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-1000">
-            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl shadow-2xl w-full max-w-5xl mx-2 sm:mx-4 max-h-[90vh] overflow-hidden flex flex-col">
               {/* Header with Gradient */}
               <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
                 <div>

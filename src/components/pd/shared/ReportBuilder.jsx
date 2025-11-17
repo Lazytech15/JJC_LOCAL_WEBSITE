@@ -274,7 +274,7 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
 
   return createPortal(
     <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-9999 p-4 animate-fadeIn">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border-2 border-slate-200 dark:border-slate-700 animate-scaleIn">
+      <div className="bg-white dark:bg-slate-900 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl max-w-4xl w-full mx-2 sm:mx-4 max-h-[90vh] overflow-hidden border border-slate-200 dark:border-slate-700 sm:border-2 animate-scaleIn">
         {/* Header */}
         <div className="bg-linear-to-r from-purple-600 via-violet-600 to-indigo-600 p-6">
           <div className="flex items-center justify-between">
@@ -285,7 +285,7 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
                 </svg>
               </div>
               <div>
-                <h3 className="text-white font-bold text-2xl">Report Builder</h3>
+                <h3 className="text-white font-bold text-lg sm:text-xl lg:text-2xl">Report Builder</h3>
                 <p className="text-purple-100 text-sm mt-1">Create custom activity reports</p>
               </div>
             </div>

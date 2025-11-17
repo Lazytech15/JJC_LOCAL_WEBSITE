@@ -9,6 +9,11 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   
+  // Input mode toggles for flexibility
+  const [supplierInputMode, setSupplierInputMode] = useState('inventory') // 'inventory' or 'custom'
+  const [itemInputMode, setItemInputMode] = useState('inventory') // 'inventory' or 'custom'
+  const [customItemCounter, setCustomItemCounter] = useState(0) // For generating unique IDs for custom items
+  
   // Available data from API
   const [suppliers, setSuppliers] = useState([])
   // Map supplier name => full supplier record (from API) for exact lookup by name or id
@@ -63,6 +68,15 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     approved_by: "",
     notes: "",
     attached_images: [] // Array of base64 image data
+  })
+
+  // Custom item entry form state
+  const [customItemForm, setCustomItemForm] = useState({
+    item_name: '',
+    description: '',
+    quantity: 1,
+    unit: '',
+    price_per_unit: 0
   })
 
   // Helper to safely format currency numbers
@@ -537,6 +551,59 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     }))
   }
 
+  const handleAddCustomItem = () => {
+    // Validate custom item form
+    if (!customItemForm.item_name.trim()) {
+      setError('Item name is required')
+      return
+    }
+    if (customItemForm.quantity <= 0) {
+      setError('Quantity must be greater than 0')
+      return
+    }
+    if (customItemForm.price_per_unit < 0) {
+      setError('Price cannot be negative')
+      return
+    }
+
+    // Generate unique ID for custom item
+    const customId = `custom-${customItemCounter + 1}`
+    setCustomItemCounter(prev => prev + 1)
+
+    const pricePerUnit = Number(customItemForm.price_per_unit) || 0
+    const quantity = Number(customItemForm.quantity) || 1
+    const amount = quantity * pricePerUnit
+
+    setFormData(prev => ({
+      ...prev,
+      selectedItems: [...prev.selectedItems, {
+        item_no: customId, // Custom ID for non-inventory items
+        item_name: customItemForm.item_name,
+        description: customItemForm.description || "",
+        moq: 0, // No MOQ for custom items
+        quantity: quantity,
+        unit: customItemForm.unit || 'pcs',
+        custom_unit_active: false,
+        custom_unit_value: '',
+        unit_dropdown_open: false,
+        price_per_unit: pricePerUnit,
+        amount: amount,
+        is_custom: true // Flag to identify custom items
+      }]
+    }))
+
+    // Reset custom item form
+    setCustomItemForm({
+      item_name: '',
+      description: '',
+      quantity: 1,
+      unit: '',
+      price_per_unit: 0
+    })
+
+    setError(null)
+  }
+
   const handleRemoveItem = (itemNo) => {
     setFormData(prev => ({
       ...prev,
@@ -850,7 +917,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl w-full max-w-6xl mx-2 sm:mx-4 max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
               <div className="flex items-center justify-between">
@@ -956,21 +1023,79 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                         Select Supplier *
                       </label>
-                      <select
-                        value={formData.supplier_id || formData.supplier_name}
-                        onChange={(e) => handleSupplierSelect(e.target.value)}
-                        disabled={!!editingOrder}
-                        className={`w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                          bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                          focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${editingOrder ? 'opacity-60 cursor-not-allowed' : ''}`}
-                      >
-                        <option value="">-- Choose a supplier --</option>
-                        {suppliers.map((supplier, index) => (
-                          <option key={`${supplier.name}-${index}`} value={supplier.id || supplier.name}>
-                            {supplier.name} ({supplier.item_count} items)
-                          </option>
-                        ))}
-                      </select>
+                      
+                      {/* Input Mode Toggle */}
+                      <div className="flex gap-2 mb-3">
+                        <button
+                          type="button"
+                          onClick={() => setSupplierInputMode('inventory')}
+                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                            supplierInputMode === 'inventory'
+                              ? 'bg-blue-600 text-white shadow-lg'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          📦 From Inventory
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSupplierInputMode('custom')}
+                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                            supplierInputMode === 'custom'
+                              ? 'bg-blue-600 text-white shadow-lg'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          ✏️ Custom Supplier
+                        </button>
+                      </div>
+
+                      {/* Dropdown for inventory mode */}
+                      {supplierInputMode === 'inventory' && (
+                        <select
+                          value={formData.supplier_id || formData.supplier_name}
+                          onChange={(e) => handleSupplierSelect(e.target.value)}
+                          disabled={!!editingOrder}
+                          className={`w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                            bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                            focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${editingOrder ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        >
+                          <option value="">-- Choose a supplier --</option>
+                          {suppliers.map((supplier, index) => (
+                            <option key={`${supplier.name}-${index}`} value={supplier.id || supplier.name}>
+                              {supplier.name} ({supplier.item_count} items)
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      {/* Text input for custom mode */}
+                      {supplierInputMode === 'custom' && (
+                        <div className="space-y-3">
+                          <input
+                            type="text"
+                            value={formData.supplier_name}
+                            onChange={(e) => setFormData(prev => ({
+                              ...prev,
+                              supplier_name: e.target.value,
+                              supplier_id: '' // Clear ID when using custom supplier
+                            }))}
+                            placeholder="Enter supplier name..."
+                            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                              bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                              focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                          />
+                          <textarea
+                            value={formData.supplier_address}
+                            onChange={(e) => setFormData(prev => ({ ...prev, supplier_address: e.target.value }))}
+                            placeholder="Supplier address (optional)..."
+                            rows="2"
+                            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                              bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                              focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all resize-none"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {/* PO Number Generation */}
@@ -1049,10 +1174,12 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                   <div className="space-y-6">
                     <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                       <h3 className="font-semibold text-green-900 dark:text-green-100 mb-2">
-                        📦 Items from {formData.supplier_name}
+                        📦 Add Items to Purchase Order
                       </h3>
                       <p className="text-green-700 dark:text-green-300 text-sm">
-                        Only items from this supplier can be added to this purchase order
+                        {supplierInputMode === 'inventory' 
+                          ? `Items from ${formData.supplier_name} in inventory`
+                          : 'Add items from inventory or create custom items'}
                       </p>
                     </div>
 
@@ -1200,78 +1327,226 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
                     {/* Available Items */}
                     <div>
-                      <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                        Available Items ({availableItems.length})
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
-                          {availableItems.map((item, idx) => {
-                          const isAdded = formData.selectedItems.some(i => i.item_no === item.item_no)
-                          return (
-                            <div
-                              key={`${item.item_no}-${idx}`}
-                              className={`p-4 border-2 rounded-lg transition-all ${
-                                isAdded
-                                  ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/20'
-                                  : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 hover:border-blue-300 dark:hover:border-blue-600'
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">
-                                    #{item.item_no} - {item.item_name}
-                                  </div>
-                                  {item.description && (
-                                    <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
-                                      {item.description}
+                      {/* Item Input Mode Toggle */}
+                      <div className="flex gap-2 mb-4">
+                        <button
+                          type="button"
+                          onClick={() => setItemInputMode('inventory')}
+                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                            itemInputMode === 'inventory'
+                              ? 'bg-green-600 text-white shadow-lg'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          📦 Add from Inventory
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setItemInputMode('custom')}
+                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                            itemInputMode === 'custom'
+                              ? 'bg-green-600 text-white shadow-lg'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          ✏️ Add Custom Item
+                        </button>
+                      </div>
+
+                      {/* Inventory Items Section */}
+                      {itemInputMode === 'inventory' && (
+                        <>
+                          <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                            Available Items ({availableItems.length})
+                          </h4>
+                          {supplierInputMode === 'custom' && availableItems.length === 0 && (
+                            <div className="text-center py-8 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <p className="text-blue-800 dark:text-blue-300 mb-2">
+                                💡 No inventory items available for custom supplier
+                              </p>
+                              <p className="text-sm text-blue-600 dark:text-blue-400">
+                                Switch to "Add Custom Item" to manually add items to this purchase order
+                              </p>
+                            </div>
+                          )}
+                          {availableItems.length > 0 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+                              {availableItems.map((item, idx) => {
+                                const isAdded = formData.selectedItems.some(i => i.item_no === item.item_no)
+                                return (
+                                  <div
+                                    key={`${item.item_no}-${idx}`}
+                                    className={`p-4 border-2 rounded-lg transition-all ${
+                                      isAdded
+                                        ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/20'
+                                        : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 hover:border-blue-300 dark:hover:border-blue-600'
+                                    }`}
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">
+                                          #{item.item_no} - {item.item_name}
+                                        </div>
+                                        {item.description && (
+                                          <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                                            {item.description}
+                                          </div>
+                                        )}
+                                        <div className="flex items-center gap-2 mt-2">
+                                          <span className={`text-xs px-2 py-1 rounded ${
+                                            item.status === 'Out Of Stock'
+                                              ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                              : item.status === 'Low In Stock'
+                                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                                              : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                          }`}>
+                                            {item.status}
+                                          </span>
+                                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                                            ₱{formatAmount(item.price_per_unit || 0, 2)}
+                                          </span>
+                                          {(Number(item.min_stock) || 0) > 0 && (
+                                            <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                                              ROP: {Number(item.min_stock)}
+                                            </span>
+                                          )}
+                                          {(Number(item.moq) || 0) > 0 && (
+                                            <span className="text-[10px] px-2 py-0.5 rounded bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+                                              MOQ: {Number(item.moq)}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() => !isAdded && handleAddItem(item)}
+                                        disabled={isAdded}
+                                        className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
+                                          isAdded
+                                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 cursor-not-allowed'
+                                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                                        }`}
+                                      >
+                                        {isAdded ? '✓ Added' : '+ Add'}
+                                      </button>
                                     </div>
-                                  )}
-                                  <div className="flex items-center gap-2 mt-2">
-                                    <span className={`text-xs px-2 py-1 rounded ${
-                                      item.status === 'Out Of Stock'
-                                        ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                                        : item.status === 'Low In Stock'
-                                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
-                                        : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                                    }`}>
-                                      {item.status}
-                                    </span>
-                                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                                      ₱{formatAmount(item.price_per_unit || 0, 2)}
-                                    </span>
-                                    {/* Show ROP and MOQ badges for buyer context */}
-                                    {(Number(item.min_stock) || 0) > 0 && (
-                                      <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                                        ROP: {Number(item.min_stock)}
-                                      </span>
-                                    )}
-                                    {(Number(item.moq) || 0) > 0 && (
-                                      <span className="text-[10px] px-2 py-0.5 rounded bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
-                                        MOQ: {Number(item.moq)}
-                                      </span>
-                                    )}
                                   </div>
-                                </div>
-                                <button
-                                  onClick={() => !isAdded && handleAddItem(item)}
-                                  disabled={isAdded}
-                                  className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
-                                    isAdded
-                                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 cursor-not-allowed'
-                                      : 'bg-blue-600 text-white hover:bg-blue-700'
-                                  }`}
-                                >
-                                  {isAdded ? '✓ Added' : '+ Add'}
-                                </button>
+                                )
+                              })}
+                            </div>
+                          )}
+                          {supplierInputMode === 'inventory' && availableItems.length === 0 && (
+                            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                              No items needing restock from this supplier
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Custom Item Form */}
+                      {itemInputMode === 'custom' && (
+                        <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 p-6">
+                          <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                            ✏️ Add Custom Item
+                          </h4>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Item Name *
+                              </label>
+                              <input
+                                type="text"
+                                value={customItemForm.item_name}
+                                onChange={(e) => setCustomItemForm(prev => ({ ...prev, item_name: e.target.value }))}
+                                placeholder="Enter item name..."
+                                className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                                  bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                                  focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Description
+                              </label>
+                              <textarea
+                                value={customItemForm.description}
+                                onChange={(e) => setCustomItemForm(prev => ({ ...prev, description: e.target.value }))}
+                                placeholder="Enter item description (optional)..."
+                                rows="2"
+                                className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                                  bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                                  focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all resize-none"
+                              />
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                  Quantity *
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={customItemForm.quantity}
+                                  onChange={(e) => setCustomItemForm(prev => ({ ...prev, quantity: Number(e.target.value) || 1 }))}
+                                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                                    bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                                    focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                  Unit
+                                </label>
+                                <input
+                                  type="text"
+                                  value={customItemForm.unit}
+                                  onChange={(e) => setCustomItemForm(prev => ({ ...prev, unit: e.target.value }))}
+                                  placeholder="pcs, kg, etc."
+                                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                                    bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                                    focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                  Price/Unit
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={customItemForm.price_per_unit}
+                                  onChange={(e) => setCustomItemForm(prev => ({ ...prev, price_per_unit: Number(e.target.value) || 0 }))}
+                                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                                    bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                                    focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                />
                               </div>
                             </div>
-                          )
-                        })}
-                        {availableItems.length === 0 && (
-                          <div className="col-span-2 text-center py-8 text-gray-500 dark:text-gray-400">
-                            No items available from this supplier
+                            <div className="flex justify-end gap-3 pt-2">
+                              <button
+                                type="button"
+                                onClick={() => setCustomItemForm({
+                                  item_name: '',
+                                  description: '',
+                                  quantity: 1,
+                                  unit: '',
+                                  price_per_unit: 0
+                                })}
+                                className="px-4 py-2 rounded-lg font-medium text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+                              >
+                                Clear
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleAddCustomItem}
+                                className="px-4 py-2 rounded-lg font-medium text-sm bg-green-600 text-white hover:bg-green-700 transition-all"
+                              >
+                                + Add Item
+                              </button>
+                            </div>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

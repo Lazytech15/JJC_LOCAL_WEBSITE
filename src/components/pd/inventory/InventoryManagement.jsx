@@ -1501,7 +1501,7 @@ function InventoryManagement() {
       {showItemDetail && selectedItemForDetail && (
         <ModalPortal>
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
-            <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-lg sm:rounded-xl shadow-xl w-full max-w-6xl mx-2 sm:mx-4 max-h-[90vh] overflow-y-auto">
               <ItemDetailView
                 item={selectedItemForDetail}
                 onBack={() => {
@@ -1597,7 +1597,7 @@ function InventoryManagement() {
       {showImportModal && (
         <ModalPortal>
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl w-full max-w-4xl mx-2 sm:mx-4 max-h-[90vh] overflow-y-auto p-4 sm:p-6">
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Import Inventory Data</h3>
               
               <div className="space-y-6">

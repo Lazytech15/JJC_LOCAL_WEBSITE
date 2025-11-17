@@ -1192,7 +1192,7 @@ function EmployeeLogs() {
       {showDetailedView && selectedLog && (
         <ModalPortal>
           <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-9999 p-4 animate-fadeIn">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden border-2 border-slate-200 dark:border-slate-700 animate-scaleIn">
+            <div className="bg-white dark:bg-slate-900 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl max-w-5xl w-full mx-2 sm:mx-4 max-h-[90vh] overflow-hidden border border-slate-200 dark:border-slate-700 sm:border-2 animate-scaleIn">
               {/* Modal Header */}
               <div className="bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 p-6">
                 <div className="flex items-center justify-between">

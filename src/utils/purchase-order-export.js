@@ -591,112 +591,297 @@ export const exportPurchaseOrderToPDF = (poData) => {
     yPos = sigSectionY + sigBoxHeight + sectionSpacing
 
     // ============================================================================
-    // NOTES SECTION
+    // NOTES SECTION - DYNAMIC HEIGHT WITH PAGINATION
     // ============================================================================
     
     if ((poData.notes && poData.notes.trim()) || (poData.attached_images && poData.attached_images.length > 0)) {
       const footerY = pageHeight - margin - 5
-      const availableNotesHeight = footerY - yPos - 8
+      const maxAvailableHeight = footerY - yPos - 8
       
-      if (availableNotesHeight > 15) {
-        doc.setLineWidth(LINE_WEIGHTS.grid)
-        doc.rect(margin + 1, yPos, pageWidth - margin - rightMargin - 2, availableNotesHeight)
+      if (maxAvailableHeight > 15) {
+        // Calculate required content height
+        const headerHeight = 10 // Height for "NOTES:" header and divider
+        let requiredContentHeight = 0
+        let textHeight = 0
+        let imagesHeight = 0
         
-        doc.setFont("helvetica", "bold")
-        doc.setFontSize(FONT_SIZES.body)
-        doc.text("NOTES:", margin + 4, yPos + 5)
-        
-        doc.setLineWidth(LINE_WEIGHTS.grid)
-        doc.line(margin + 1, yPos + 6.5, pageWidth - rightMargin - 1, yPos + 6.5)
-        
-        let contentY = yPos + 10
-        
-        // Display text notes if present
+        // Calculate text height
         if (poData.notes && poData.notes.trim()) {
           doc.setFont("helvetica", "normal")
           doc.setFontSize(FONT_SIZES.body)
-          
           const lineHeight = 4
           const notesLines = doc.splitTextToSize(poData.notes, pageWidth - margin - rightMargin - 8)
-          
-          doc.text(notesLines, margin + 4, contentY)
-          contentY += notesLines.length * lineHeight + 4
+          textHeight = notesLines.length * lineHeight + 4
         }
         
-        // Display attached images if present
+        // Calculate images height
         const images = poData.attached_images
+        let imageArray = []
         if (images && images.length > 0) {
-          // Parse if it's a JSON string
-          const imageArray = typeof images === 'string' ? JSON.parse(images) : images
+          imageArray = typeof images === 'string' ? JSON.parse(images) : images
           
-          const availableWidth = pageWidth - margin - rightMargin - 8
-          const availableImageHeight = availableNotesHeight - (contentY - yPos) - 3
-          const imageSpacing = 4
-          const imagesPerRow = Math.min(imageArray.length, 2)
-          const maxImageWidth = (availableWidth - (imageSpacing * (imagesPerRow - 1))) / imagesPerRow
-          const maxImageHeight = Math.min(availableImageHeight - 10, 80) // Allow taller images
-          
-          let imgX = margin + 4
-          let imgY = contentY
-          let currentRowHeight = 0
-          
-          imageArray.forEach((img, idx) => {
-            // Check if we need to wrap to next row
-            if (idx > 0 && idx % imagesPerRow === 0) {
-              imgX = margin + 4
-              imgY += currentRowHeight + imageSpacing
-              currentRowHeight = 0
-            }
+          if (imageArray.length > 0) {
+            const availableWidth = pageWidth - margin - rightMargin - 8
+            const imageSpacing = 4
+            const imagesPerRow = Math.min(imageArray.length, 2)
+            const maxImageWidth = (availableWidth - (imageSpacing * (imagesPerRow - 1))) / imagesPerRow
+            const maxImageHeight = 80
             
-            try {
-              // Add image (img.data is the base64 data URL)
-              const imgData = img.data || img
-              
-              // Get image format from data URL
-              let format = 'JPEG'
-              if (imgData.includes('image/png')) format = 'PNG'
-              else if (imgData.includes('image/jpeg') || imgData.includes('image/jpg')) format = 'JPEG'
-              
-              // Get actual image properties using jsPDF's internal method
-              const imgProps = doc.getImageProperties(imgData)
-              const aspectRatio = imgProps.width / imgProps.height
-              
-              // Calculate scaled dimensions to fit within constraints while maintaining aspect ratio
-              let finalWidth = maxImageWidth
-              let finalHeight = finalWidth / aspectRatio
-              
-              // If height exceeds max, scale down based on height
-              if (finalHeight > maxImageHeight) {
-                finalHeight = maxImageHeight
-                finalWidth = finalHeight * aspectRatio
-              }
-              
-              // If width still exceeds max (for very wide images), scale down further
-              if (finalWidth > maxImageWidth) {
-                finalWidth = maxImageWidth
-                finalHeight = finalWidth / aspectRatio
-              }
-              
-              // Center the image within its allocated space
-              const xOffset = (maxImageWidth - finalWidth) / 2
-              
-              // Check if there's enough space
-              const requiredSpace = imgY + finalHeight - yPos
-              if (requiredSpace <= availableNotesHeight - 3) {
-                doc.addImage(imgData, format, imgX + xOffset, imgY, finalWidth, finalHeight)
+            let totalRows = Math.ceil(imageArray.length / imagesPerRow)
+            let currentRowHeight = 0
+            let calculatedHeight = 0
+            
+            imageArray.forEach((img, idx) => {
+              try {
+                const imgData = img.data || img
+                const imgProps = doc.getImageProperties(imgData)
+                const aspectRatio = imgProps.width / imgProps.height
                 
-                // Track the tallest image in current row
+                let finalWidth = maxImageWidth
+                let finalHeight = finalWidth / aspectRatio
+                
+                if (finalHeight > maxImageHeight) {
+                  finalHeight = maxImageHeight
+                  finalWidth = finalHeight * aspectRatio
+                }
+                
+                if (finalWidth > maxImageWidth) {
+                  finalWidth = maxImageWidth
+                  finalHeight = finalWidth / aspectRatio
+                }
+                
                 currentRowHeight = Math.max(currentRowHeight, finalHeight)
+                
+                // If row is complete or last image, add to total height
+                if ((idx + 1) % imagesPerRow === 0 || idx === imageArray.length - 1) {
+                  calculatedHeight += currentRowHeight
+                  if (idx < imageArray.length - 1) {
+                    calculatedHeight += imageSpacing
+                  }
+                  currentRowHeight = 0
+                }
+              } catch (err) {
+                console.warn("Error calculating image dimensions:", err)
               }
-            } catch (err) {
-              console.warn("Error adding image to PDF:", err)
-            }
+            })
             
-            // Move X position for next image in row
-            if ((idx + 1) % imagesPerRow !== 0) {
-              imgX += maxImageWidth + imageSpacing
-            }
+            imagesHeight = calculatedHeight + 4
+          }
+        }
+        
+        requiredContentHeight = textHeight + imagesHeight
+        const totalRequiredHeight = headerHeight + requiredContentHeight + 6 // 6 for padding
+        
+        // Check if content fits on current page
+        if (totalRequiredHeight <= maxAvailableHeight) {
+          // Content fits - draw with exact height needed
+          const notesBoxHeight = Math.max(totalRequiredHeight, 20) // Minimum 20 units
+          
+          doc.setLineWidth(LINE_WEIGHTS.grid)
+          doc.rect(margin + 1, yPos, pageWidth - margin - rightMargin - 2, notesBoxHeight)
+          
+          doc.setFont("helvetica", "bold")
+          doc.setFontSize(FONT_SIZES.body)
+          doc.text("NOTES:", margin + 4, yPos + 5)
+          
+          doc.setLineWidth(LINE_WEIGHTS.grid)
+          doc.line(margin + 1, yPos + 6.5, pageWidth - rightMargin - 1, yPos + 6.5)
+          
+          let contentY = yPos + 10
+          
+          // Display text notes
+          if (poData.notes && poData.notes.trim()) {
+            doc.setFont("helvetica", "normal")
+            doc.setFontSize(FONT_SIZES.body)
+            const lineHeight = 4
+            const notesLines = doc.splitTextToSize(poData.notes, pageWidth - margin - rightMargin - 8)
+            doc.text(notesLines, margin + 4, contentY)
+            contentY += notesLines.length * lineHeight + 4
+          }
+          
+          // Display images
+          if (imageArray.length > 0) {
+            const availableWidth = pageWidth - margin - rightMargin - 8
+            const imageSpacing = 4
+            const imagesPerRow = Math.min(imageArray.length, 2)
+            const maxImageWidth = (availableWidth - (imageSpacing * (imagesPerRow - 1))) / imagesPerRow
+            const maxImageHeight = 80
+            
+            let imgX = margin + 4
+            let imgY = contentY
+            let currentRowHeight = 0
+            
+            imageArray.forEach((img, idx) => {
+              if (idx > 0 && idx % imagesPerRow === 0) {
+                imgX = margin + 4
+                imgY += currentRowHeight + imageSpacing
+                currentRowHeight = 0
+              }
+              
+              try {
+                const imgData = img.data || img
+                let format = 'JPEG'
+                if (imgData.includes('image/png')) format = 'PNG'
+                else if (imgData.includes('image/jpeg') || imgData.includes('image/jpg')) format = 'JPEG'
+                
+                const imgProps = doc.getImageProperties(imgData)
+                const aspectRatio = imgProps.width / imgProps.height
+                
+                let finalWidth = maxImageWidth
+                let finalHeight = finalWidth / aspectRatio
+                
+                if (finalHeight > maxImageHeight) {
+                  finalHeight = maxImageHeight
+                  finalWidth = finalHeight * aspectRatio
+                }
+                
+                if (finalWidth > maxImageWidth) {
+                  finalWidth = maxImageWidth
+                  finalHeight = finalWidth / aspectRatio
+                }
+                
+                const xOffset = (maxImageWidth - finalWidth) / 2
+                doc.addImage(imgData, format, imgX + xOffset, imgY, finalWidth, finalHeight)
+                currentRowHeight = Math.max(currentRowHeight, finalHeight)
+              } catch (err) {
+                console.warn("Error adding image to PDF:", err)
+              }
+              
+              if ((idx + 1) % imagesPerRow !== 0) {
+                imgX += maxImageWidth + imageSpacing
+              }
+            })
+          }
+        } else {
+          // Content doesn't fit - need new page
+          doc.addPage()
+          
+          // Draw footer on previous page before moving to new page
+          const prevPageFooterY = pageHeight - margin - 5
+          doc.setLineWidth(LINE_WEIGHTS.grid)
+          doc.line(margin, prevPageFooterY, pageWidth - rightMargin, prevPageFooterY)
+          
+          doc.setFont("helvetica", "normal")
+          doc.setFontSize(FONT_SIZES.tiny)
+          
+          const genDate = new Date().toLocaleString('en-PH', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
           })
+          
+          doc.text(`GENERATED: ${genDate}`, margin + 1, prevPageFooterY + 2.5)
+          doc.text(`PO-${poData.po_number || poData.id || ""}`, pageWidth / 2, prevPageFooterY + 2.5, { align: "center" })
+          
+          // Start notes on new page
+          yPos = margin
+          const newPageMaxHeight = pageHeight - margin - 15 // Leave space for footer
+          
+          doc.setLineWidth(LINE_WEIGHTS.grid)
+          doc.rect(margin + 1, yPos, pageWidth - margin - rightMargin - 2, newPageMaxHeight)
+          
+          doc.setFont("helvetica", "bold")
+          doc.setFontSize(FONT_SIZES.body)
+          doc.text("NOTES (CONTINUED):", margin + 4, yPos + 5)
+          
+          doc.setLineWidth(LINE_WEIGHTS.grid)
+          doc.line(margin + 1, yPos + 6.5, pageWidth - rightMargin - 1, yPos + 6.5)
+          
+          let contentY = yPos + 10
+          
+          // Display text notes
+          if (poData.notes && poData.notes.trim()) {
+            doc.setFont("helvetica", "normal")
+            doc.setFontSize(FONT_SIZES.body)
+            const lineHeight = 4
+            const notesLines = doc.splitTextToSize(poData.notes, pageWidth - margin - rightMargin - 8)
+            doc.text(notesLines, margin + 4, contentY)
+            contentY += notesLines.length * lineHeight + 4
+          }
+          
+          // Display images
+          if (imageArray.length > 0) {
+            const availableWidth = pageWidth - margin - rightMargin - 8
+            const imageSpacing = 4
+            const imagesPerRow = Math.min(imageArray.length, 2)
+            const maxImageWidth = (availableWidth - (imageSpacing * (imagesPerRow - 1))) / imagesPerRow
+            const maxImageHeight = 80
+            
+            let imgX = margin + 4
+            let imgY = contentY
+            let currentRowHeight = 0
+            
+            imageArray.forEach((img, idx) => {
+              if (idx > 0 && idx % imagesPerRow === 0) {
+                imgX = margin + 4
+                imgY += currentRowHeight + imageSpacing
+                currentRowHeight = 0
+              }
+              
+              try {
+                const imgData = img.data || img
+                let format = 'JPEG'
+                if (imgData.includes('image/png')) format = 'PNG'
+                else if (imgData.includes('image/jpeg') || imgData.includes('image/jpg')) format = 'JPEG'
+                
+                const imgProps = doc.getImageProperties(imgData)
+                const aspectRatio = imgProps.width / imgProps.height
+                
+                let finalWidth = maxImageWidth
+                let finalHeight = finalWidth / aspectRatio
+                
+                if (finalHeight > maxImageHeight) {
+                  finalHeight = maxImageHeight
+                  finalWidth = finalHeight * aspectRatio
+                }
+                
+                if (finalWidth > maxImageWidth) {
+                  finalWidth = maxImageWidth
+                  finalHeight = finalWidth / aspectRatio
+                }
+                
+                const xOffset = (maxImageWidth - finalWidth) / 2
+                
+                // Check if image fits on current page
+                if (imgY + finalHeight > pageHeight - margin - 10) {
+                  // Add footer to current page
+                  const currentFooterY = pageHeight - margin - 5
+                  doc.setLineWidth(LINE_WEIGHTS.grid)
+                  doc.line(margin, currentFooterY, pageWidth - rightMargin, currentFooterY)
+                  doc.setFont("helvetica", "normal")
+                  doc.setFontSize(FONT_SIZES.tiny)
+                  doc.text(`GENERATED: ${genDate}`, margin + 1, currentFooterY + 2.5)
+                  doc.text(`PO-${poData.po_number || poData.id || ""}`, pageWidth / 2, currentFooterY + 2.5, { align: "center" })
+                  
+                  // Add new page for remaining images
+                  doc.addPage()
+                  imgY = margin + 10
+                  imgX = margin + 4
+                  
+                  // Draw header on new page
+                  doc.setLineWidth(LINE_WEIGHTS.grid)
+                  doc.rect(margin + 1, margin, pageWidth - margin - rightMargin - 2, pageHeight - margin - 15)
+                  doc.setFont("helvetica", "bold")
+                  doc.setFontSize(FONT_SIZES.body)
+                  doc.text("NOTES (CONTINUED):", margin + 4, margin + 5)
+                  doc.setLineWidth(LINE_WEIGHTS.grid)
+                  doc.line(margin + 1, margin + 6.5, pageWidth - rightMargin - 1, margin + 6.5)
+                }
+                
+                doc.addImage(imgData, format, imgX + xOffset, imgY, finalWidth, finalHeight)
+                currentRowHeight = Math.max(currentRowHeight, finalHeight)
+              } catch (err) {
+                console.warn("Error adding image to PDF:", err)
+              }
+              
+              if ((idx + 1) % imagesPerRow !== 0) {
+                imgX += maxImageWidth + imageSpacing
+              }
+            })
+          }
         }
       }
     }

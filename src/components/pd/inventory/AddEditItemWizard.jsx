@@ -569,7 +569,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
     return (
       <ModalPortal>
   <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-1000">
-          <div className="bg-linear-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col border-2 border-slate-200 dark:border-slate-700">
+          <div className="bg-linear-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl w-full max-w-5xl mx-2 sm:mx-4 max-h-[95vh] overflow-hidden flex flex-col border border-slate-200 dark:border-slate-700 sm:border-2">
             {/* Enhanced Header with Industrial Theme */}
             <div className="bg-linear-to-r from-slate-800 via-zinc-800 to-slate-800 dark:from-slate-900 dark:via-zinc-900 dark:to-slate-900 p-4 sm:p-6 text-white relative overflow-hidden">
               {/* Clickable step breadcrumbs */}

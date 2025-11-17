@@ -47,8 +47,8 @@ function AppContent() {
       <div
         className={`min-h-screen flex items-center justify-center transition-all duration-300 ${
           isDarkMode
-            ? "bg-linear-to-br from-gray-900 via-slate-900 to-zinc-900 text-gray-100"
-            : "bg-linear-to-br from-slate-50 via-gray-50 to-stone-50 text-gray-900"
+            ? "bg-slate-900 text-gray-100"
+            : "bg-slate-50 text-gray-900"
         }`}
       >
         <div className="text-center">
@@ -92,8 +92,8 @@ function RoutesWrapper() {
     <div
       className={`min-h-screen transition-all duration-300 ${
         isDarkMode
-          ? "bg-linear-to-br from-gray-900 via-slate-900 to-zinc-900 text-gray-100"
-          : "bg-linear-to-br from-slate-50 via-gray-50 to-stone-50 text-gray-900"
+          ? "bg-slate-900 text-gray-100"
+          : "bg-slate-50 text-gray-900"
       }`}
     >
       <Suspense fallback={<LoadingFallback />}>
