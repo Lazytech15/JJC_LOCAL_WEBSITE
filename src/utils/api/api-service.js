@@ -27,7 +27,7 @@ class APIService {
     this.profiles = new ProfileService()
     this.attendance = new AttendanceService()
     this.recruitment = new RecruitmentService()
-    this.socket = new PollingManager()
+    this._socket = null // Lazy initialization to prevent circular dependency
     this.document = new DocumentService()
     this.summary = new DailySummaryService()
     this.items = new ItemsService()
@@ -37,6 +37,14 @@ class APIService {
     this.editAttendance = new AttendanceEditService()
     this.announcements =  new AnnouncementService();
     this.operations = new OperationsService()
+  }
+
+  // Lazy initialization for socket to avoid circular dependency issues
+  get socket() {
+    if (!this._socket) {
+      this._socket = new PollingManager()
+    }
+    return this._socket
   }
 
   // Initialize all services
@@ -54,9 +62,12 @@ class APIService {
 // Create and export singleton instance
 const apiService = new APIService()
 
-// Initialize services
+// Initialize services after a microtask to ensure all modules are loaded
 if (typeof window !== "undefined") {
-  apiService.initialize()
+  // Delay initialization to avoid circular dependency issues
+  queueMicrotask(() => {
+    apiService.initialize()
+  })
 
   // Cleanup on page unload
   window.addEventListener("beforeunload", () => {
@@ -67,6 +78,7 @@ if (typeof window !== "undefined") {
 export default apiService
 
 // Export individual services for direct access if needed
+// Note: socket is excluded from destructuring to maintain lazy initialization
 export const {
   auth,
   employees,
@@ -74,7 +86,6 @@ export const {
   profiles,
   attendance,
   recruitment,
-  socket,
   document,
   summary,
   items,
@@ -85,3 +96,6 @@ export const {
   announcements,
   operations
 } = apiService
+
+// Export socket separately to maintain lazy initialization
+export const getSocket = () => apiService.socket

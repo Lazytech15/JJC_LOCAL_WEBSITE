@@ -1749,109 +1749,70 @@ export function DashboardView({
             </div>
 
             {/* Mobile Layout - Visible only on mobile */}
-            <div className="lg:hidden space-y-3">
-              {/* Row 1: Header with hamburger menu */}
-              <div className="flex items-center justify-between px-2">
-                <div className="flex items-center space-x-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsMobileSidebarOpen(true)}
-                    className="h-9 w-9 p-0"
-                    title="Open filters"
-                  >
-                    <Menu className="w-5 h-5" />
-                  </Button>
-                  <div>
-                    <h1 className="text-lg font-bold text-foreground">All Items</h1>
-                    <span className="text-xs text-muted-foreground">
-                      {paginatedProducts.length} of {totalFilteredCount}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 2: Collapsible Search + View Mode + Sort */}
+            <div className="lg:hidden space-y-2">
+              {/* Single row: Hamburger + Title + View Mode + Sort */}
               <div className="flex items-center gap-2 px-2">
-                {/* Collapsible Search Bar */}
-                {isMobileSearchExpanded ? (
-                  <div className="flex items-center gap-2 flex-1">
-                    <Input
-                      placeholder="Search..."
-                      value={localSearchQuery}
-                      onChange={(e) => setLocalSearchQuery(e.target.value)}
-                      className="flex-1 h-9 text-sm bg-card border-border"
-                      autoFocus
-                    />
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => {
-                        setIsMobileSearchExpanded(false)
-                        setLocalSearchQuery('')
-                      }}
-                      className="h-9 w-9 p-0 shrink-0"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setIsMobileSearchExpanded(true)}
-                      className="h-9 w-9 p-0 shrink-0"
-                    >
-                      <Scan className="w-4 h-4" />
-                    </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsMobileSidebarOpen(true)}
+                  className="h-9 w-9 p-0 shrink-0 bg-slate-800/60 border-2 border-slate-600 hover:bg-slate-700/70"
+                  title="Open filters"
+                >
+                  <Menu className="w-5 h-5" />
+                </Button>
+                
+                <div className="min-w-0 flex-shrink">
+                  <h1 className="text-base font-bold text-foreground truncate">All Items</h1>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                    {paginatedProducts.length} of {totalFilteredCount}
+                  </span>
+                </div>
 
-                    {/* View Mode Toggle */}
-                    <div className="flex border rounded-lg border-border bg-card shrink-0">
-                      <Button
-                        variant={viewMode === "grid" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("grid")}
-                        className={`h-9 w-9 p-0 ${
-                          viewMode === "grid"
-                            ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                        }`}
-                      >
-                        <Grid className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant={viewMode === "list" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("list")}
-                        className={`h-9 w-9 p-0 ${
-                          viewMode === "list"
-                            ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                        }`}
-                      >
-                        <List className="w-4 h-4" />
-                      </Button>
-                    </div>
+                {/* View Mode Toggle */}
+                <div className="flex border rounded-lg border-border bg-card shrink-0 ml-auto">
+                  <Button
+                    variant={viewMode === "grid" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("grid")}
+                    className={`h-8 w-8 p-0 ${
+                      viewMode === "grid"
+                        ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <Grid className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === "list" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("list")}
+                    className={`h-8 w-8 p-0 ${
+                      viewMode === "list"
+                        ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <List className="w-4 h-4" />
+                  </Button>
+                </div>
 
-                    {/* Sort Dropdown */}
-                    <Select value={sortBy} onValueChange={setSortBy}>
-                      <SelectTrigger className="flex-1 h-9 text-xs bg-card border-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
-                        <SelectItem value="name-asc" className="text-xs">A-Z</SelectItem>
-                        <SelectItem value="name-desc" className="text-xs">Z-A</SelectItem>
-                        <SelectItem value="stock-high" className="text-xs">High Stock</SelectItem>
-                        <SelectItem value="stock-low" className="text-xs">Low Stock</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </>
-                )}
+                {/* Sort Dropdown */}
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-28 h-8 text-xs bg-card border-border shrink-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    <SelectItem value="name-asc" className="text-xs">A-Z</SelectItem>
+                    <SelectItem value="name-desc" className="text-xs">Z-A</SelectItem>
+                    <SelectItem value="stock-high" className="text-xs">High Stock</SelectItem>
+                    <SelectItem value="stock-low" className="text-xs">Low Stock</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Active Search Badge */}
-              {(searchQuery || localSearchQuery) && !isMobileSearchExpanded && (
+              {(searchQuery || localSearchQuery) && (
                 <div className="px-2">
                   <Badge
                     variant="outline"
@@ -1941,7 +1902,7 @@ export function DashboardView({
           ) : (
             <>
               {viewMode === "grid" ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-3 md:gap-4 pb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-3 md:gap-4 pb-6">
                   {paginatedProducts.map((product) => 
                     useEnhancedCards ? (
                       <EnhancedItemCard
