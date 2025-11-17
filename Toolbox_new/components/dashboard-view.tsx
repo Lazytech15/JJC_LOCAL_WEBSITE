@@ -137,6 +137,7 @@ export function DashboardView({
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? navigator.onLine : true)
   const [isCategoriesCollapsed, setIsCategoriesCollapsed] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+  const [isMobileSearchExpanded, setIsMobileSearchExpanded] = useState(false)
   const { toast } = useToast()
   const { setSearchLoading } = useLoading()
 
@@ -1670,18 +1671,9 @@ export function DashboardView({
         <div className="flex-1 overflow-y-auto p-6">
           {/* Top Controls */}
           <div className="bg-background relative z-10 mb-6">
-            <div className="flex items-center justify-between">
+            {/* Desktop Layout - Hidden on mobile */}
+            <div className="hidden lg:flex items-center justify-between">
               <div className="flex items-center space-x-4 px-2 py-1 rounded">
-                {/* Mobile Menu Button - Hidden on desktop (lg+) */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="lg:hidden"
-                  onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-                  title="Toggle filters"
-                >
-                  <Menu className="w-5 h-5" />
-                </Button>
                 <h1 className="text-2xl font-bold text-foreground">All Items</h1>
                 <Badge
                   variant="secondary"
@@ -1754,6 +1746,121 @@ export function DashboardView({
                   </Button>
                 </div>
               </div>
+            </div>
+
+            {/* Mobile Layout - Visible only on mobile */}
+            <div className="lg:hidden space-y-3">
+              {/* Row 1: Header with hamburger menu */}
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center space-x-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsMobileSidebarOpen(true)}
+                    className="h-9 w-9 p-0"
+                    title="Open filters"
+                  >
+                    <Menu className="w-5 h-5" />
+                  </Button>
+                  <div>
+                    <h1 className="text-lg font-bold text-foreground">All Items</h1>
+                    <span className="text-xs text-muted-foreground">
+                      {paginatedProducts.length} of {totalFilteredCount}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Collapsible Search + View Mode + Sort */}
+              <div className="flex items-center gap-2 px-2">
+                {/* Collapsible Search Bar */}
+                {isMobileSearchExpanded ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <Input
+                      placeholder="Search..."
+                      value={localSearchQuery}
+                      onChange={(e) => setLocalSearchQuery(e.target.value)}
+                      className="flex-1 h-9 text-sm bg-card border-border"
+                      autoFocus
+                    />
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        setIsMobileSearchExpanded(false)
+                        setLocalSearchQuery('')
+                      }}
+                      className="h-9 w-9 p-0 shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setIsMobileSearchExpanded(true)}
+                      className="h-9 w-9 p-0 shrink-0"
+                    >
+                      <Scan className="w-4 h-4" />
+                    </Button>
+
+                    {/* View Mode Toggle */}
+                    <div className="flex border rounded-lg border-border bg-card shrink-0">
+                      <Button
+                        variant={viewMode === "grid" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("grid")}
+                        className={`h-9 w-9 p-0 ${
+                          viewMode === "grid"
+                            ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <Grid className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant={viewMode === "list" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("list")}
+                        className={`h-9 w-9 p-0 ${
+                          viewMode === "list"
+                            ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <List className="w-4 h-4" />
+                      </Button>
+                    </div>
+
+                    {/* Sort Dropdown */}
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                      <SelectTrigger className="flex-1 h-9 text-xs bg-card border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        <SelectItem value="name-asc" className="text-xs">A-Z</SelectItem>
+                        <SelectItem value="name-desc" className="text-xs">Z-A</SelectItem>
+                        <SelectItem value="stock-high" className="text-xs">High Stock</SelectItem>
+                        <SelectItem value="stock-low" className="text-xs">Low Stock</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
+              </div>
+
+              {/* Active Search Badge */}
+              {(searchQuery || localSearchQuery) && !isMobileSearchExpanded && (
+                <div className="px-2">
+                  <Badge
+                    variant="outline"
+                    className="border-border text-muted-foreground text-xs"
+                  >
+                    Searching: "{searchQuery || localSearchQuery}"
+                  </Badge>
+                </div>
+              )}
             </div>
           </div>
 
