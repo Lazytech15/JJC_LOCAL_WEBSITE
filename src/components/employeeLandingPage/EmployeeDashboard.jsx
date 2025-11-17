@@ -7,6 +7,7 @@ import { Button } from "../ui/UiComponents"
 import { Avatar, AvatarFallback } from "../ui/UiComponents"
 import { Badge } from "../ui/UiComponents"
 import { useAuth } from "../../contexts/AuthContext"
+import { DEPARTMENT_SLUG_MAP } from "../../contexts/AuthContext"
 import { useOnlineStatus } from "../../hooks/use-online-status"
 import { useServiceWorker } from "../../hooks/use-service-worker"
 import { getStoredToken, verifyToken, clearTokens } from "../../utils/auth"
@@ -19,6 +20,35 @@ import Announcements from "./DashboardComponents/Announcements"
 import TimeAttendance from "./DashboardComponents/TimeAttendance"
 import Performance from "./DashboardComponents/Performance"
 import Profile from "./DashboardComponents/Profile"
+
+// Centralized department routes and normalization
+const DEPARTMENT_ROUTES = {
+  procurement: { label: "Procurement", url: "https://jjcenggworks.com/jjcewgsaccess/procurement" },
+  operations: { label: "Operations", url: "https://jjcenggworks.com/jjcewgsaccess/operations" },
+  hr: { label: "Human Resource", url: "https://jjcenggworks.com/jjcewgsaccess/hr" },
+}
+
+function normalizeDepartmentName(dep) {
+  if (!dep || typeof dep !== "string") return null
+  const lower = dep.toLowerCase().trim()
+
+  // Direct matches to slugs
+  if (DEPARTMENT_ROUTES[lower]) return lower
+
+  // Match by known names from AuthContext mapping (name -> slug)
+  for (const [name, slug] of Object.entries(DEPARTMENT_SLUG_MAP)) {
+    if (lower === name.toLowerCase()) {
+      if (DEPARTMENT_ROUTES[slug]) return slug
+    }
+  }
+
+  // Heuristics for common variants
+  if (lower.includes("proc")) return "procurement"
+  if (lower.includes("oper")) return "operations"
+  if (lower === "hr" || lower.includes("human")) return "hr"
+
+  return null
+}
 
 export default function EmployeeDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard")
@@ -42,6 +72,11 @@ export default function EmployeeDashboard() {
   const { employee, employeeLogout, isDarkMode, toggleDarkMode } = useAuth()
   const { isOnline, connectionQuality } = useOnlineStatus()
   const { updateAvailable, updateServiceWorker } = useServiceWorker()
+  
+  // Resolve department-based navigation via normalization
+  const rawDepartment = employeeData?.department || employee?.department || ""
+  const normalizedDept = normalizeDepartmentName(rawDepartment)
+  const deptRoute = normalizedDept ? DEPARTMENT_ROUTES[normalizedDept] : null
 
   const unreadCount = Array.isArray(announcements) ? announcements.filter((a) => !a.read).length : 0
 
@@ -357,6 +392,24 @@ export default function EmployeeDashboard() {
                   </span>
                 )}
               </Button>
+
+              {/* Quick Access Buttons */}
+              <div className="hidden md:flex items-center gap-2">
+                <Button
+                  onClick={() => navigate("/jjctoolbox")}
+                  className={`${isDarkMode ? "bg-zinc-800 text-white hover:bg-zinc-700" : "bg-zinc-200 text-zinc-900 hover:bg-zinc-300"} px-3 py-2 rounded-lg`}
+                >
+                  Toolbox
+                </Button>
+                {deptRoute && (
+                  <Button
+                    onClick={() => window.open(deptRoute.url, "_blank", "noopener,noreferrer")}
+                    className={`${isDarkMode ? "bg-indigo-600 text-white hover:bg-indigo-500" : "bg-indigo-600 text-white hover:bg-indigo-500"} px-3 py-2 rounded-lg`}
+                  >
+                    {`Go to ${deptRoute.label}`}
+                  </Button>
+                )}
+              </div>
 
               {/* Profile Dropdown */}
               <div className="relative" ref={profileMenuRef}>
