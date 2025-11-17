@@ -263,6 +263,44 @@ export default function EmployeeDashboard() {
     navigate("/employee/login", { replace: true })
   }
 
+  const handleDepartmentAccess = async () => {
+    if (!deptRoute) return
+
+    try {
+      // Get current token
+      const token = getStoredToken()
+      if (!token) {
+        console.error("No authentication token found")
+        return
+      }
+
+      const payload = verifyToken(token)
+      if (!payload) {
+        console.error("Invalid token")
+        return
+      }
+
+      // Store employee credentials for auto-login
+      const employeeAuthData = {
+        username: payload.username || employee?.username || employeeData?.username,
+        department: rawDepartment,
+        token: token,
+        autoLogin: true,
+        loginType: 'employee'
+      }
+
+      // Store in sessionStorage for the department page to pick up
+      sessionStorage.setItem('employeeAutoLogin', JSON.stringify(employeeAuthData))
+
+      // Navigate to department page
+      window.location.href = deptRoute.url
+    } catch (error) {
+      console.error("Error accessing department:", error)
+      // Fallback to regular navigation
+      window.open(deptRoute.url, "_blank", "noopener,noreferrer")
+    }
+  }
+
   const menuItems = [
     { id: "dashboard", icon: Home, label: "Dashboard" },
     { id: "announcements", icon: Bell, label: "Announcements", badge: unreadCount },
@@ -393,24 +431,6 @@ export default function EmployeeDashboard() {
                 )}
               </Button>
 
-              {/* Quick Access Buttons */}
-              <div className="hidden md:flex items-center gap-2">
-                <Button
-                  onClick={() => navigate("/jjctoolbox")}
-                  className={`${isDarkMode ? "bg-zinc-800 text-white hover:bg-zinc-700" : "bg-zinc-200 text-zinc-900 hover:bg-zinc-300"} px-3 py-2 rounded-lg`}
-                >
-                  Toolbox
-                </Button>
-                {deptRoute && (
-                  <Button
-                    onClick={() => window.open(deptRoute.url, "_blank", "noopener,noreferrer")}
-                    className={`${isDarkMode ? "bg-indigo-600 text-white hover:bg-indigo-500" : "bg-indigo-600 text-white hover:bg-indigo-500"} px-3 py-2 rounded-lg`}
-                  >
-                    {`Go to ${deptRoute.label}`}
-                  </Button>
-                )}
-              </div>
-
               {/* Profile Dropdown */}
               <div className="relative" ref={profileMenuRef}>
                 <button onClick={() => setShowProfileMenu(!showProfileMenu)} className="focus:outline-none">
@@ -484,6 +504,28 @@ export default function EmployeeDashboard() {
                         <User className="w-4 h-4" />
                         <span className="text-sm font-medium">View Profile</span>
                       </button>
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false)
+                          navigate("/jjctoolbox")
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
+                          }`}
+                      >
+                        <span className="text-sm font-medium">Go To Toolbox</span>
+                      </button>
+                      {deptRoute && (
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false)
+                            handleDepartmentAccess()
+                          }}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
+                            }`}
+                        >
+                          <span className="text-sm font-medium">{`Go to ${deptRoute.label}`}</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setShowProfileMenu(false)
