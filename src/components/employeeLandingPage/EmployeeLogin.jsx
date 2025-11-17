@@ -284,6 +284,15 @@ export default function EmployeeLogin() {
         permissions: userData.permissions
       }, accessTokenExpiry)
 
+      console.log("Created token with payload:", {
+        userId: userData.id,
+        username: userData.username,
+        name: userData.name,
+        department: userData.department,
+        accessLevel: userData.access_level,
+        role: userData.role
+      })
+
       const refreshToken = response.refreshToken || createToken({
         id: userData.id,
         type: "refresh",
@@ -302,10 +311,11 @@ export default function EmployeeLogin() {
           position: userData.access_level,
           role: userData.role,
           permissions: userData.permissions,
+          access_level: userData.access_level,
           loginTime: new Date().toISOString(),
           tokenExpiry: rememberMe ? "24 hours" : "1 hour",
           hasValidToken: true
-        })
+        }, accessToken)
       }
 
       console.log("Login successful with JWT authentication")

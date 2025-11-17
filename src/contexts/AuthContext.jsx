@@ -80,12 +80,13 @@ export function AuthProvider({ children }) {
           const payload = verifyToken(employeeToken)
           if (payload) {
             setEmployee({
-              id: payload.id,
+              id: payload.id || payload.userId,
               username: payload.username,
               name: payload.name,
               employeeId: payload.employeeId,
               department: payload.department,
               position: payload.position,
+              access_level: payload.accessLevel || payload.access_level || 'user',
               loginTime: payload.iat ? new Date(payload.iat * 1000).toISOString() : new Date().toISOString(),
             })
           } else {

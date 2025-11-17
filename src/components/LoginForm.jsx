@@ -239,57 +239,60 @@ function LoginForm() {
       return
     }
 
-    // Check for employee auto-login first
-    const employeeAutoLoginData = sessionStorage.getItem('employeeAutoLogin')
-    if (employeeAutoLoginData) {
+    // Check for employee auto-login from URL parameters (cross-domain support)
+    const urlParams = new URLSearchParams(window.location.search)
+    const autoLogin = urlParams.get('autoLogin')
+    const tokenParam = urlParams.get('token')
+    const usernameParam = urlParams.get('username')
+    const loginTypeParam = urlParams.get('loginType')
+
+    if (autoLogin === 'true' && tokenParam && usernameParam) {
+      console.log('[LoginForm] Auto-login detected from URL parameters')
+      
       try {
-        const autoLoginData = JSON.parse(employeeAutoLoginData)
+        // Decode and verify the token
+        const decodedToken = decodeURIComponent(tokenParam)
+        const payload = verifyToken(decodedToken)
         
-        // Clear the auto-login data immediately to prevent reuse
-        sessionStorage.removeItem('employeeAutoLogin')
-        
-        // Verify the token is still valid
-        if (autoLoginData.token && autoLoginData.username && autoLoginData.autoLogin) {
-          const payload = verifyToken(autoLoginData.token)
+        if (payload) {
+          console.log('[LoginForm] Token valid, logging in automatically...')
+          console.log('[LoginForm] Token payload:', payload)
           
-          if (payload && autoLoginData.department === departmentName) {
-            console.log('Employee auto-login detected, authenticating...')
-            
-            // Auto-login with the employee's credentials
-            setFormData({
-              username: autoLoginData.username,
-              password: '' // We don't need password since we have valid token
-            })
-            
-            // Store the token directly
-            storeTokens(autoLoginData.token, false)
-            
-            // Set user data from token
-            const userData = {
-              id: payload.userId || payload.id,
-              username: payload.username,
-              name: payload.name,
-              department: payload.department,
-              role: payload.role || 'user',
-              permissions: payload.permissions || [],
-              access_level: payload.accessLevel || 'user',
-              loginTime: new Date().toISOString(),
-              hasValidToken: true,
-            }
-            
-            login(userData, departmentName, autoLoginData.token)
-            
-            // Navigate to the department page
-            const urlSlug = DEPARTMENT_NAME_TO_SLUG[departmentName] || deptSlug
-            navigate(`/jjcewgsaccess/${urlSlug}`, { replace: true })
-            
-            setIsInitializing(false)
-            return
+          // Remove URL parameters to clean up the URL
+          window.history.replaceState({}, document.title, window.location.pathname)
+          
+          // Store the token
+          storeTokens(decodedToken, false)
+          
+          // Set user data from token
+          const userData = {
+            id: payload.userId || payload.id,
+            username: payload.username || usernameParam,
+            name: payload.name,
+            department: payload.department,
+            role: payload.role || 'user',
+            permissions: payload.permissions || [],
+            access_level: payload.accessLevel || payload.access_level || 'user',
+            loginTime: new Date().toISOString(),
+            hasValidToken: true,
           }
+          
+          console.log('[LoginForm] User data prepared:', userData)
+          
+          login(userData, departmentName, decodedToken)
+          
+          // Navigate to the department page
+          const urlSlug = DEPARTMENT_NAME_TO_SLUG[departmentName] || deptSlug
+          console.log('[LoginForm] Navigating to:', `/jjcewgsaccess/${urlSlug}`)
+          navigate(`/jjcewgsaccess/${urlSlug}`, { replace: true })
+          
+          setIsInitializing(false)
+          return
+        } else {
+          console.warn('[LoginForm] Token verification failed')
         }
       } catch (error) {
-        console.error('Employee auto-login failed:', error)
-        sessionStorage.removeItem('employeeAutoLogin')
+        console.error('[LoginForm] Employee auto-login failed:', error)
       }
     }
 
