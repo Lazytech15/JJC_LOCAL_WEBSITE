@@ -42,7 +42,8 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="font-sans bg-background text-foreground overflow-hidden h-screen">
+      {/* Removed global overflow-hidden to allow proper mobile scrolling and fixed header interaction */}
+      <body className="font-sans bg-background text-foreground min-h-screen overflow-x-hidden">
         <ErrorBoundary>
           <Suspense fallback={null}>
             <ThemeProvider defaultTheme="dark" storageKey="toolbox-theme">
