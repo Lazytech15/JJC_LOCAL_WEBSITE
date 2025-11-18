@@ -3,7 +3,7 @@ import { Trash2, Plus, Copy, Search, User, Flag, Package, AlertTriangle, Sheet, 
 import { useAuth } from "../../contexts/AuthContext"
 import ExcelImportModal from "./ImportExcelItem"
 
-function AddItems({ items, submitting, apiService }) {
+function AddItems({ items, submitting, setSubmitting, apiService }) {
   const [partNumber, setPartNumber] = useState("")
   const [itemName, setItemName] = useState("")
   const [clientName, setClientName] = useState("")
@@ -25,10 +25,10 @@ function AddItems({ items, submitting, apiService }) {
   const clientDropdownRef = useRef(null)
 
   const { isDarkMode, user } = useAuth()
-  const [showImportModal, setShowImportModal] = useState(false)
+const [showImportModal, setShowImportModal] = useState(false)
 
-  const [isTemplateSelected, setIsTemplateSelected] = useState(false)
-  const [isSearching, setIsSearching] = useState(false)
+const [isTemplateSelected, setIsTemplateSelected] = useState(false)
+const [isSearching, setIsSearching] = useState(false)
   const [searchPagination, setSearchPagination] = useState({
     current_page: 1,
     per_page: 10,
@@ -417,13 +417,11 @@ function AddItems({ items, submitting, apiService }) {
     const totalQty = getTotalAllocatedQuantity()
     const batchQty = Number.parseInt(qty) || 0
 
-    // NEW: Validate total doesn't exceed batch quantity
     if (totalQty > batchQty) {
       alert(`Total allocated quantity (${totalQty}) cannot exceed batch quantity (${batchQty})`)
       return
     }
 
-    // NEW: Validate phase duration allocations
     for (const phase of validPhases) {
       if (phase.expected_hours) {
         const phaseStats = getPhaseRemainingDuration(phase)
@@ -462,15 +460,16 @@ function AddItems({ items, submitting, apiService }) {
           .filter((sub) => sub.name.trim())
           .map((sub) => ({
             name: sub.name.trim(),
-            // CONVERT MINUTES TO SECONDS FOR STORAGE
             expected_duration: (Number.parseFloat(sub.expectedDuration) || 0) * 60,
             expected_quantity: Number.parseInt(sub.expectedQuantity) || 0,
           })),
       })),
     }
 
-    try {
-      await apiService.operations.createItemWithStructure(itemData)
+setSubmitting(true)
+
+try {
+  await apiService.operations.createItemWithStructure(itemData)
 
       setPartNumber("")
       setItemName("")
@@ -614,861 +613,850 @@ function AddItems({ items, submitting, apiService }) {
   const totalQty = getTotalAllocatedQuantity()
   const batchQty = Number.parseInt(qty) || 0
 
-  return (
-    <div className="space-y-6">
-      {/* UPDATED HEADER - Add Import Button */}
-      <div className="flex justify-between items-center">
+return (
+<div className="space-y-6">
+    {/* Header */}
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div>
+        <h2 className={`text-2xl font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+          Add Item with Phases & Sub-Phases
+        </h2>
+        {loadingTemplate && (
+          <span className={`text-sm flex items-center gap-2 mt-2 ${isDarkMode ? "text-blue-400" : "text-blue-500"}`}>
+            <div className={`animate-spin rounded-full h-4 w-4 border-b-2 ${isDarkMode ? "border-blue-400" : "border-blue-500"}`}></div>
+            Loading template...
+          </span>
+        )}
+      </div>
+
+      {/* Import Button */}
+      <button
+        onClick={() => setShowImportModal(true)}
+        className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg transition-all shadow-lg hover:shadow-xl font-medium text-sm sm:text-base w-full sm:w-auto justify-center"
+      >
+        <Sheet size={20} />
+        Import from Excel
+      </button>
+    </div>
+
+    {/* Item Basic Info */}
+    <div
+      className={`backdrop-blur-md rounded-lg p-4 sm:p-6 border transition-all shadow-sm ${
+        isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+      }`}
+    >
+      <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+        Item Information
+      </h3>
+      <div className="space-y-3">
+        {/* Part Number */}
         <div>
-          <h2 className={`text-2xl font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
-            Add Item with Phases & Sub-Phases
-          </h2>
-          {loadingTemplate && (
-            <span className={`text-sm flex items-center gap-2 mt-2 ${isDarkMode ? "text-blue-400" : "text-blue-500"}`}>
-              <div className={`animate-spin rounded-full h-4 w-4 border-b-2 ${isDarkMode ? "border-blue-400" : "border-blue-500"}`}></div>
-              Loading template...
+          <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+            Part Number *{" "}
+            <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>(Base part number)</span>
+          </label>
+          <input
+            type="text"
+            placeholder="Enter base part number (e.g., PN-001)"
+            value={partNumber}
+            onChange={(e) => setPartNumber(e.target.value)}
+            disabled={submitting}
+            className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+              isDarkMode
+                ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+            }`}
+          />
+        </div>
+
+        {/* Batch Number */}
+        <div>
+          <label className={`text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+            <Package size={16} />
+            Batch Number *
+            <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              (Unique identifier for this batch)
             </span>
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Batch number"
+              value={batchNumber}
+              onChange={(e) => {
+                setBatchNumber(e.target.value)
+                setAutoBatch(false)
+              }}
+              disabled={submitting || autoBatch}
+              className={`flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+                isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+              }`}
+            />
+            <button
+              onClick={() => setAutoBatch(!autoBatch)}
+              className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base ${
+                autoBatch
+                  ? "bg-green-600 hover:bg-green-700 text-white"
+                  : isDarkMode
+                  ? "bg-gray-700 hover:bg-gray-600 text-white"
+                  : "bg-gray-600 hover:bg-gray-700 text-white"
+              }`}
+              title={autoBatch ? "Auto-generate enabled" : "Auto-generate disabled"}
+            >
+              {autoBatch ? "Auto" : "Manual"}
+            </button>
+          </div>
+          {partNumber && batchNumber && (
+            <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+              Final Part Number:{" "}
+              <span className={`font-mono font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+                {partNumber}-{batchNumber}
+              </span>
+            </p>
           )}
         </div>
 
-        {/* NEW: Import Button */}
-        <button
-          onClick={() => setShowImportModal(true)}
-          className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white px-6 py-3 rounded-lg transition-all shadow-lg hover:shadow-xl font-medium"
-        >
-          <Sheet size={20} />
-          Import from Excel
-        </button>
-      </div>
+        {/* Expected Completion Time */}
+        <div>
+          <label className={`block text-sm font-medium mb-1 flex flex-wrap items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+            <Clock size={16} />
+            <span>Expected Completion Time (Hours)</span>
+            <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              (Optional - Total hours to complete this item)
+            </span>
+          </label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              placeholder="e.g., 24 hours or 1 day"
+              value={expectedCompletionHours}
+              onChange={(e) => setExpectedCompletionHours(e.target.value)}
+              disabled={submitting}
+              className={`flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+                isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+              }`}
+            />
+            {expectedCompletionHours && phases.length > 0 && (
+              <button
+                onClick={handleDistributeDuration}
+                disabled={submitting}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 text-sm sm:text-base w-full sm:w-auto"
+                title="Distribute hours equally across all phases"
+              >
+                Distribute
+              </button>
+            )}
+          </div>
+          {expectedCompletionHours && (
+            <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+              Total expected: <span className="font-bold">{expectedCompletionHours} hours</span>
+              {phases.length > 0 && (
+                <>
+                  {" "}• Average per phase:{" "}
+                  <span className="font-bold">{(parseFloat(expectedCompletionHours) / phases.length).toFixed(2)} hours</span>
+                </>
+              )}
+            </p>
+          )}
+        </div>
 
-      {/* Item Basic Info */}
-      <div
-        className={`backdrop-blur-md rounded-lg p-6 border transition-all shadow-sm ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-          }`}
-      >
-        <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
-          Item Information
-        </h3>
-        <div className="space-y-3">
-          {/* Part Number */}
-          <div>
-            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-              Part Number *{" "}
-              <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}> (Base part number)</span>
-            </label>
+        {/* Item Duration Allocation */}
+        {expectedCompletionHours && phases.length > 0 && (
+          <div
+            className={`mt-4 p-3 sm:p-4 rounded-lg border-2 ${(() => {
+              const stats = getItemRemainingHours()
+              return stats?.isOverAllocated
+                ? isDarkMode
+                  ? "bg-red-500/10 border-red-500/30"
+                  : "bg-red-500/10 border-red-500/30"
+                : isDarkMode
+                ? "bg-purple-500/10 border-purple-500/30"
+                : "bg-purple-500/10 border-purple-500/30"
+            })()}`}
+          >
+            <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+              <Clock size={16} />
+              Item Duration Allocation
+            </h4>
+
+            {(() => {
+              const stats = getItemRemainingHours()
+              if (!stats) return null
+
+              return (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>Item Expected:</span>
+                      <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
+                        {stats.itemHours} hrs
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>Phases Allocated:</span>
+                      <span
+                        className={`font-bold ${
+                          stats.isOverAllocated
+                            ? isDarkMode
+                              ? "text-red-300"
+                              : "text-red-700"
+                            : isDarkMode
+                            ? "text-blue-300"
+                            : "text-blue-700"
+                        }`}
+                      >
+                        {stats.allocatedHours.toFixed(2)} hrs
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>Remaining:</span>
+                      <span
+                        className={`font-bold ${
+                          stats.isOverAllocated
+                            ? isDarkMode
+                              ? "text-red-300"
+                              : "text-red-700"
+                            : isDarkMode
+                            ? "text-green-300"
+                            : "text-green-700"
+                        }`}
+                      >
+                        {stats.remainingHours.toFixed(2)} hrs
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className={`mt-3 w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
+                    <div
+                      className={`h-2 rounded-full transition-all duration-300 ${stats.isOverAllocated ? "bg-red-500" : "bg-purple-500"}`}
+                      style={{
+                        width: `${Math.min(100, (stats.allocatedHours / stats.itemHours) * 100)}%`,
+                      }}
+                    ></div>
+                  </div>
+
+                  {stats.isOverAllocated && (
+                    <div className={`flex items-center gap-2 mt-3 ${isDarkMode ? "text-red-300" : "text-red-700"}`}>
+                      <AlertTriangle size={16} />
+                      <span className="text-xs font-medium">Over-allocated by {Math.abs(stats.remainingHours).toFixed(2)} hours!</span>
+                    </div>
+                  )}
+
+                  {!stats.isOverAllocated && stats.remainingHours === 0 && (
+                    <div className={`flex items-center gap-2 mt-3 ${isDarkMode ? "text-green-300" : "text-green-700"}`}>
+                      <CheckCircle size={16} />
+                      <span className="text-xs font-medium">Fully allocated</span>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+          </div>
+        )}
+
+        {/* Item Name with Template Search */}
+        <div className="relative" ref={dropdownRef}>
+          <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+            Item Name *
+            {selectedTemplateId && (
+              <span className="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded">Template Loaded</span>
+            )}
+          </label>
+          <div className="relative">
             <input
               type="text"
-              placeholder="Enter base part number (e.g., PN-001)"
-              value={partNumber}
-              onChange={(e) => setPartNumber(e.target.value)}
+              placeholder="Enter item name or search existing to use as template..."
+              value={itemName}
+              onChange={(e) => setItemName(e.target.value)}
+              onFocus={() => setItemNameHasFocus(true)}
+              onBlur={() => {
+                setTimeout(() => setItemNameHasFocus(false), 200)
+              }}
               disabled={submitting}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                }`}
+              className={`w-full px-4 py-2 pr-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+                isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+              }`}
             />
-          </div>
-
-          {/* Batch Number */}
-          <div>
-            <label
-              className={`text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
-            >
-              <Package size={16} />
-              Batch Number *
-              <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                (Unique identifier for this batch)
-              </span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Batch number"
-                value={batchNumber}
-                onChange={(e) => {
-                  setBatchNumber(e.target.value)
-                  setAutoBatch(false)
-                }}
-                disabled={submitting || autoBatch}
-                className={`flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                  }`}
-              />
-              <button
-                onClick={() => setAutoBatch(!autoBatch)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${autoBatch
-                  ? "bg-green-600 hover:bg-green-700 text-white"
-                  : isDarkMode
-                    ? "bg-gray-700 hover:bg-gray-600 text-white"
-                    : "bg-gray-600 hover:bg-gray-700 text-white"
-                  }`}
-                title={autoBatch ? "Auto-generate enabled" : "Auto-generate disabled"}
-              >
-                {autoBatch ? "Auto" : "Manual"}
-              </button>
-            </div>
-            {partNumber && batchNumber && (
-              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                Final Part Number:{" "}
-                <span className={`font-mono font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
-                  {partNumber}-{batchNumber}
-                </span>
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label
-              className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-                }`}
-            >
-              <Clock size={16} />
-              Expected Completion Time (Hours)
-              <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                (Optional - Total hours to complete this item)
-              </span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                step="0.5"
-                min="0"
-                placeholder="e.g., 24 hours or 1 day"
-                value={expectedCompletionHours}
-                onChange={(e) => setExpectedCompletionHours(e.target.value)}
-                disabled={submitting}
-                className={`flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                  }`}
-              />
-              {expectedCompletionHours && phases.length > 0 && (
-                <button
-                  onClick={handleDistributeDuration}
-                  disabled={submitting}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50"
-                  title="Distribute hours equally across all phases"
-                >
-                  Distribute
-                </button>
-              )}
-            </div>
-            {expectedCompletionHours && (
-              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                Total expected: <span className="font-bold">{expectedCompletionHours} hours</span>
-                {phases.length > 0 && (
-                  <> • Average per phase: <span className="font-bold">
-                    {(Number.parseFloat(expectedCompletionHours) / phases.length).toFixed(2)} hours
-                  </span></>
-                )}
-              </p>
-            )}
-          </div>
-
-          {expectedCompletionHours && phases.length > 0 && (
-            <div
-              className={`mt-4 p-4 rounded-lg border-2 ${(() => {
-                  const stats = getItemRemainingHours()
-                  return stats?.isOverAllocated
-                    ? isDarkMode
-                      ? "bg-red-500/10 border-red-500/30"
-                      : "bg-red-500/10 border-red-500/30"
-                    : isDarkMode
-                      ? "bg-purple-500/10 border-purple-500/30"
-                      : "bg-purple-500/10 border-purple-500/30"
-                })()
-                }`}
-            >
-              <h4
-                className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"
-                  }`}
-              >
-                <Clock size={16} />
-                Item Duration Allocation
-              </h4>
-
-              {(() => {
-                const stats = getItemRemainingHours()
-                if (!stats) return null
-
-                return (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                      <div className="flex justify-between items-center">
-                        <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
-                          Item Expected:
-                        </span>
-                        <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
-                          {stats.itemHours} hours
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
-                          Phases Allocated:
-                        </span>
-                        <span
-                          className={`font-bold ${stats.isOverAllocated
-                              ? isDarkMode
-                                ? "text-red-300"
-                                : "text-red-700"
-                              : isDarkMode
-                                ? "text-blue-300"
-                                : "text-blue-700"
-                            }`}
-                        >
-                          {stats.allocatedHours.toFixed(2)} hours
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
-                          Remaining:
-                        </span>
-                        <span
-                          className={`font-bold ${stats.isOverAllocated
-                              ? isDarkMode
-                                ? "text-red-300"
-                                : "text-red-700"
-                              : isDarkMode
-                                ? "text-green-300"
-                                : "text-green-700"
-                            }`}
-                        >
-                          {stats.remainingHours.toFixed(2)} hours
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className={`mt-3 w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
-                      <div
-                        className={`h-2 rounded-full transition-all duration-300 ${stats.isOverAllocated ? "bg-red-500" : "bg-purple-500"
-                          }`}
-                        style={{
-                          width: `${Math.min(100, (stats.allocatedHours / stats.itemHours) * 100)}%`,
-                        }}
-                      ></div>
-                    </div>
-
-                    {stats.isOverAllocated && (
-                      <div
-                        className={`flex items-center gap-2 mt-3 ${isDarkMode ? "text-red-300" : "text-red-700"
-                          }`}
-                      >
-                        <AlertTriangle size={16} />
-                        <span className="text-xs font-medium">
-                          Over-allocated by {Math.abs(stats.remainingHours).toFixed(2)} hours!
-                        </span>
-                      </div>
-                    )}
-
-                    {!stats.isOverAllocated && stats.remainingHours === 0 && (
-                      <div
-                        className={`flex items-center gap-2 mt-3 ${isDarkMode ? "text-green-300" : "text-green-700"
-                          }`}
-                      >
-                        <CheckCircle size={16} />
-                        <span className="text-xs font-medium">Fully allocated</span>
-                      </div>
-                    )}
-                  </>
-                )
-              })()}
-            </div>
-          )}
-
-          {/* Item Name with Template Search */}
-          <div className="relative" ref={dropdownRef}>
-            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-              Item Name *
-              {selectedTemplateId && (
-                <span className="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded">Template Loaded</span>
-              )}
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Enter item name or search existing to use as template..."
-                value={itemName}
-                onChange={(e) => setItemName(e.target.value)}
-                onFocus={() => setItemNameHasFocus(true)}
-                onBlur={() => {
-                  // Delay to allow click on dropdown item
-                  setTimeout(() => setItemNameHasFocus(false), 200)
-                }}
-                disabled={submitting}
-                className={`w-full px-4 py-2 pr-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                  }`}
-              />
-              {isSearching ? (
-                <div className={`absolute right-3 top-1/2 transform -translate-y-1/2 animate-spin rounded-full h-4 w-4 border-b-2 ${isDarkMode ? "border-blue-400" : "border-blue-600"
-                  }`}></div>
-              ) : (
-                <Search size={18} className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? "text-gray-400" : "text-gray-500"
-                  }`} />
-              )}
-            </div>
-
-            {showTemplateDropdown && filteredItems.length > 0 && (
+            {isSearching ? (
               <div
-                className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg border ${isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"
-                  }`}
-              >
-                {/* Header with count and loading indicator */}
-                <div
-                  className={`p-2 border-b ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-gray-100 border-gray-300"
-                    }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <p className={`text-xs font-medium ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
-                      {isSearching ? "Searching..." : `Select a template (${searchPagination.total_items} found)`}
-                    </p>
-                    {isSearching && (
-                      <div className={`animate-spin rounded-full h-3 w-3 border-b-2 ${isDarkMode ? "border-blue-400" : "border-blue-600"
-                        }`}></div>
-                    )}
-                  </div>
-                </div>
+                className={`absolute right-3 top-1/2 transform -translate-y-1/2 animate-spin rounded-full h-4 w-4 border-b-2 ${
+                  isDarkMode ? "border-blue-400" : "border-blue-600"
+                }`}
+              ></div>
+            ) : (
+              <Search
+                size={18}
+                className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+              />
+            )}
+          </div>
 
-                {/* Results list */}
-                <div className="max-h-60 overflow-y-auto">
-                  {filteredItems.map((item) => {
-                    const itemKey = item.part_number || item.id
-                    return (
-                      <button
-                        key={itemKey}
-                        onClick={() => loadTemplateFromItem(item)}
-                        disabled={loadingTemplate}
-                        className={`w-full text-left px-4 py-3 border-b last:border-b-0 transition-colors disabled:opacity-50 ${isDarkMode
+          {showTemplateDropdown && filteredItems.length > 0 && (
+            <div
+              className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg border ${
+                isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"
+              }`}
+            >
+              <div className={`p-2 border-b ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-gray-100 border-gray-300"}`}>
+                <div className="flex items-center justify-between">
+                  <p className={`text-xs font-medium ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                    {isSearching ? "Searching..." : `Select a template (${searchPagination.total_items} found)`}
+                  </p>
+                  {isSearching && (
+                    <div
+                      className={`animate-spin rounded-full h-3 w-3 border-b-2 ${isDarkMode ? "border-blue-400" : "border-blue-600"}`}
+                    ></div>
+                  )}
+                </div>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto">
+                {filteredItems.map((item) => {
+                  const itemKey = item.part_number || item.id
+                  return (
+                    <button
+                      key={itemKey}
+                      onClick={() => loadTemplateFromItem(item)}
+                      disabled={loadingTemplate}
+                      className={`w-full text-left px-4 py-3 border-b last:border-b-0 transition-colors disabled:opacity-50 ${
+                        isDarkMode
                           ? "hover:bg-gray-700 border-gray-700 text-gray-100"
                           : "hover:bg-gray-50 border-gray-200 text-gray-800"
-                          }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1">
-                            <p className={`font-medium ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
-                              {item.name}
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <p className={`font-medium ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>{item.name}</p>
+                          <p className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>Part #: {item.part_number}</p>
+                          {item.client_name && (
+                            <p className={`text-xs mt-1 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
+                              Client: {item.client_name}
                             </p>
-                            <p className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
-                              Part #: {item.part_number}
-                            </p>
-                            {item.client_name && (
-                              <p className={`text-xs mt-1 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
-                                Client: {item.client_name}
-                              </p>
-                            )}
-                          </div>
-                          <div className={`flex items-center gap-2 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                            <span className={`px-2 py-1 rounded ${isDarkMode ? "bg-blue-500/20 text-blue-300" : "bg-blue-500/20 text-blue-700"
-                              }`}>
-                              {item.phases?.length || item.phase_count || 0} phases
-                            </span>
-                            <Copy size={14} />
-                          </div>
+                          )}
                         </div>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {/* Pagination controls */}
-                {searchPagination.total_pages > 1 && (
-                  <div className={`p-2 border-t ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-gray-100 border-gray-300"
-                    }`}>
-                    <div className="flex items-center justify-between text-xs">
-                      <button
-                        onClick={() => searchItemsFromAPI(itemName.trim().toLowerCase(), searchPagination.current_page - 1)}
-                        disabled={!searchPagination.has_previous || isSearching}
-                        className={`px-2 py-1 rounded transition-colors ${searchPagination.has_previous && !isSearching
-                          ? isDarkMode
-                            ? "bg-gray-600 hover:bg-gray-500 text-gray-200"
-                            : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                          : "opacity-50 cursor-not-allowed text-gray-500"
-                          }`}
-                      >
-                        Previous
-                      </button>
-
-                      <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
-                        Page {searchPagination.current_page} of {searchPagination.total_pages}
-                      </span>
-
-                      <button
-                        onClick={() => searchItemsFromAPI(itemName.trim().toLowerCase(), searchPagination.current_page + 1)}
-                        disabled={!searchPagination.has_next || isSearching}
-                        className={`px-2 py-1 rounded transition-colors ${searchPagination.has_next && !isSearching
-                          ? isDarkMode
-                            ? "bg-gray-600 hover:bg-gray-500 text-gray-200"
-                            : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                          : "opacity-50 cursor-not-allowed text-gray-500"
-                          }`}
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
-                )}
+                        <div className={`flex items-center gap-2 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          <span
+                            className={`px-2 py-1 rounded ${
+                              isDarkMode ? "bg-blue-500/20 text-blue-300" : "bg-blue-500/20 text-blue-700"
+                            }`}
+                          >
+                            {item.phases?.length || item.phase_count || 0} phases
+                          </span>
+                          <Copy size={14} />
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
-            )}
-          </div>
 
-          {/* Client Name with Dropdown */}
-          <div className="relative" ref={clientDropdownRef}>
-            <label
-              className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
-            >
-              <User size={16} />
-              Client Name *
-            </label>
-            <input
-              type="text"
-              placeholder="Enter or select client name"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              onFocus={() => setShowClientDropdown(clients.length > 0)}
-              disabled={submitting}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
+              {searchPagination.total_pages > 1 && (
+                <div className={`p-2 border-t ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-gray-100 border-gray-300"}`}>
+                  <div className="flex items-center justify-between text-xs">
+                    <button
+                      onClick={() => searchItemsFromAPI(itemName.trim().toLowerCase(), searchPagination.current_page - 1)}
+                      disabled={!searchPagination.has_previous || isSearching}
+                      className={`px-2 py-1 rounded transition-colors ${
+                        searchPagination.has_previous && !isSearching
+                          ? isDarkMode
+                            ? "bg-gray-600 hover:bg-gray-500 text-gray-200"
+                            : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                          : "opacity-50 cursor-not-allowed text-gray-500"
+                      }`}
+                    >
+                      Previous
+                    </button>
+
+                    <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+                      Page {searchPagination.current_page} of {searchPagination.total_pages}
+                    </span>
+
+                    <button
+                      onClick={() => searchItemsFromAPI(itemName.trim().toLowerCase(), searchPagination.current_page + 1)}
+                      disabled={!searchPagination.has_next || isSearching}
+                      className={`px-2 py-1 rounded transition-colors ${
+                        searchPagination.has_next && !isSearching
+                          ? isDarkMode
+                            ? "bg-gray-600 hover:bg-gray-500 text-gray-200"
+                            : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                          : "opacity-50 cursor-not-allowed text-gray-500"
+                      }`}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Client Name with Dropdown */}
+        <div className="relative" ref={clientDropdownRef}>
+          <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+            <User size={16} />
+            Client Name *
+          </label>
+          <input
+            type="text"
+            placeholder="Enter or select client name"
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+            onFocus={() => setShowClientDropdown(clients.length > 0)}
+            disabled={submitting}
+            className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+              isDarkMode
                 ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                 : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                }`}
-            />
+            }`}
+          />
 
-            {showClientDropdown && filteredClients.length > 0 && (
-              <div
-                className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto border ${isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"
-                  }`}
-              >
-                {filteredClients.map((client, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => {
-                      setClientName(client)
-                      setShowClientDropdown(false)
-                    }}
-                    className={`w-full text-left px-4 py-2 border-b last:border-b-0 transition-colors ${isDarkMode
-                      ? "hover:bg-gray-700 border-gray-700 text-gray-100"
-                      : "hover:bg-gray-50 border-gray-200 text-gray-800"
-                      }`}
-                  >
-                    {client}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Priority */}
-          <div>
-            <label
-              className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+          {showClientDropdown && filteredClients.length > 0 && (
+            <div
+              className={`absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto border ${
+                isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"
+              }`}
             >
-              <Flag size={16} />
-              Priority *
-            </label>
-            <div className="flex gap-2">
-              {["High", "Medium", "Low"].map((p) => (
+              {filteredClients.map((client, idx) => (
                 <button
-                  key={p}
-                  onClick={() => setPriority(p)}
-                  className={`flex-1 px-4 py-2 rounded-lg border-2 font-medium transition-colors ${priority === p
-                    ? getPriorityColor(p)
-                    : isDarkMode
-                      ? "bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-700"
-                      : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
-                    }`}
+                  key={idx}
+                  onClick={() => {
+                    setClientName(client)
+                    setShowClientDropdown(false)
+                  }}
+                  className={`w-full text-left px-4 py-2 border-b last:border-b-0 transition-colors ${
+                    isDarkMode ? "hover:bg-gray-700 border-gray-700 text-gray-100" : "hover:bg-gray-50 border-gray-200 text-gray-800"
+                  }`}
                 >
-                  {p}
+                  {client}
                 </button>
               ))}
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* Batch Quantity */}
-          <div>
-            <label
-              className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
-            >
-              <Package size={16} />
-              Batch Quantity *
-              <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                (This is the qty field - items in this batch)
-              </span>
-            </label>
-            <input
-              type="number"
-              min="1"
-              placeholder="Enter batch quantity"
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              disabled={submitting}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
+        {/* Priority */}
+        <div>
+          <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+            <Flag size={16} />
+            Priority *
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {["High", "Medium", "Low"].map((p) => (
+              <button
+                key={p}
+                onClick={() => setPriority(p)}
+                className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors text-sm sm:text-base ${
+                  priority === p
+                    ? getPriorityColor(p)
+                    : isDarkMode
+                    ? "bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-700"
+                    : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Batch Quantity */}
+        <div>
+          <label className={`block text-sm font-medium mb-1 flex flex-wrap items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+            <Package size={16} />
+            <span>Batch Quantity *</span>
+            <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>(Items in this batch)</span>
+          </label>
+          <input
+            type="number"
+            min="1"
+            placeholder="Enter batch quantity"
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+            disabled={submitting}
+            className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+              isDarkMode
                 ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                 : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                }`}
-            />
-          </div>
+            }`}
+          />
+        </div>
 
-          <div
-            className={`mt-4 p-4 rounded-lg border-2 ${isDarkMode ? "bg-blue-500/10 border-blue-500/30" : "bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/30"
-              }`}
-          >
-            <h4 className={`text-sm font-semibold mb-3 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
-              Quantity Summary
-            </h4>
+        {/* Quantity Summary */}
+        <div
+          className={`mt-4 p-3 sm:p-4 rounded-lg border-2 ${
+            isDarkMode ? "bg-blue-500/10 border-blue-500/30" : "bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/30"
+          }`}
+        >
+          <h4 className={`text-sm font-semibold mb-3 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>Quantity Summary</h4>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-              <div className="flex justify-between items-center">
-                <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>Batch Quantity (qty):</span>
-                <span className={`font-bold ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>{batchQty} units</span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>Total Expected (from subphases):</span>
-                <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
-                  {totalQty} units
-                </span>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
+            <div className="flex justify-between items-center">
+              <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>Batch Quantity (qty):</span>
+              <span className={`font-bold ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>{batchQty} units</span>
             </div>
 
-            {totalQty > 0 && (
-              <div className={`mt-3 pt-3 border-t ${isDarkMode ? "border-gray-600/30" : "border-gray-300/30"}`}>
-                <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                  <strong>Note:</strong> qty = Expected batch quantity | total_qty = Sum of current completed quantities
-                  (updates as work progresses)
-                </p>
-              </div>
-            )}
+            <div className="flex justify-between items-center">
+              <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>Total Expected:</span>
+              <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>{totalQty} units</span>
+            </div>
           </div>
 
-          {/* Total Quantity Display */}
-          {phases.length > 0 && (
-            <div
-              className={`p-4 rounded-lg border-2 ${totalQty > batchQty
+          {totalQty > 0 && (
+            <div className={`mt-3 pt-3 border-t ${isDarkMode ? "border-gray-600/30" : "border-gray-300/30"}`}>
+              <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                <strong>Note:</strong> qty = Expected batch quantity | total_qty = Sum of current completed quantities (updates as work
+                progresses)
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Total Quantity Display */}
+        {phases.length > 0 && (
+          <div
+            className={`p-3 sm:p-4 rounded-lg border-2 ${
+              totalQty > batchQty
                 ? isDarkMode
                   ? "bg-red-500/10 border-red-500/40"
                   : "bg-red-500/10 border-red-500/30"
                 : isDarkMode
-                  ? "bg-blue-500/10 border-blue-500/40"
-                  : "bg-blue-500/10 border-blue-500/30"
+                ? "bg-blue-500/10 border-blue-500/40"
+                : "bg-blue-500/10 border-blue-500/30"
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-2">
+              <span className={`text-sm font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>Total Quantity Allocation</span>
+              <span
+                className={`text-lg font-bold ${
+                  totalQty > batchQty ? (isDarkMode ? "text-red-300" : "text-red-700") : isDarkMode ? "text-blue-300" : "text-blue-700"
                 }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className={`text-sm font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
-                  Total Quantity Allocation
-                </span>
-                <span
-                  className={`text-lg font-bold ${totalQty > batchQty
-                    ? isDarkMode
-                      ? "text-red-300"
-                      : "text-red-700"
-                    : isDarkMode
-                      ? "text-blue-300"
-                      : "text-blue-700"
-                    }`}
-                >
-                  {totalQty} / {batchQty} units
-                </span>
+              >
+                {totalQty} / {batchQty} units
+              </span>
+            </div>
+            {totalQty > batchQty && (
+              <div className={`flex items-center gap-2 mt-2 ${isDarkMode ? "text-red-300" : "text-red-600"}`}>
+                <AlertTriangle size={16} />
+                <p className="text-xs font-medium">Total exceeds batch quantity by {totalQty - batchQty} units!</p>
               </div>
-              {totalQty > batchQty && (
-                <div className={`flex items-center gap-2 mt-2 ${isDarkMode ? "text-red-300" : "text-red-600"}`}>
-                  <AlertTriangle size={16} />
-                  <p className="text-xs font-medium">Total exceeds batch quantity by {totalQty - batchQty} units!</p>
+            )}
+            <p className={`text-xs mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+              This is the total_qty field - calculated from all subphase expected quantities
+            </p>
+          </div>
+        )}
+
+        {/* Expected Duration Summary */}
+        {(expectedCompletionHours || phases.some((p) => p.expected_hours || p.subphases.some((s) => s.expectedDuration))) && (
+          <div
+            className={`mt-4 p-3 sm:p-4 rounded-lg border-2 ${
+              isDarkMode ? "bg-purple-500/10 border-purple-500/30" : "bg-purple-500/10 border-purple-500/30"
+            }`}
+          >
+            <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+              <Clock size={16} />
+              Expected Duration Summary
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
+              {expectedCompletionHours && (
+                <div className="flex justify-between items-center">
+                  <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>Item Expected Completion:</span>
+                  <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>{expectedCompletionHours} hours</span>
                 </div>
               )}
-              <p className={`text-xs mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                This is the total_qty field - calculated from all subphase expected quantities
+
+              <div className="flex justify-between items-center">
+                <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>Total Allocated:</span>
+                <span className={`font-bold ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
+                  {getTotalAllocatedExpectedHours().toFixed(2)} hours
+                </span>
+              </div>
+            </div>
+
+            <div className={`mt-3 pt-3 border-t ${isDarkMode ? "border-gray-600/30" : "border-gray-300/30"}`}>
+              <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                <strong>Note:</strong> Expected hours help track performance. Actual duration will be tracked automatically as work
+                progresses, allowing you to compare and improve estimates over time.
               </p>
             </div>
-          )}
+          </div>
+        )}
+      </div>
+    </div>
 
-          {(expectedCompletionHours || phases.some(p => p.expected_hours || p.subphases.some(s => s.expectedDuration))) && (
-            <div
-              className={`mt-4 p-4 rounded-lg border-2 ${isDarkMode ? "bg-purple-500/10 border-purple-500/30" : "bg-purple-500/10 border-purple-500/30"
-                }`}
-            >
-              <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"
-                }`}>
-                <Clock size={16} />
-                Expected Duration Summary
-              </h4>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                {expectedCompletionHours && (
-                  <div className="flex justify-between items-center">
-                    <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
-                      Item Expected Completion:
-                    </span>
-                    <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
-                      {expectedCompletionHours} hours
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex justify-between items-center">
-                  <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
-                    Total Allocated (from phases/subphases):
-                  </span>
-                  <span className={`font-bold ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
-                    {getTotalAllocatedExpectedHours().toFixed(2)} hours
-                  </span>
-                </div>
-              </div>
-
-              <div className={`mt-3 pt-3 border-t ${isDarkMode ? "border-gray-600/30" : "border-gray-300/30"}`}>
-                <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                  <strong>Note:</strong> Expected hours help track performance. Actual duration will be tracked
-                  automatically as work progresses, allowing you to compare and improve estimates over time.
-                </p>
-              </div>
-            </div>
-          )}
-
-        </div>
+    {/* Phases Section */}
+    <div
+      className={`backdrop-blur-md rounded-lg p-4 sm:p-6 border transition-all shadow-sm ${
+        isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+      }`}
+    >
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+        <h3 className={`text-lg font-semibold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>Phases</h3>
+        <button
+          onClick={addNewPhase}
+          disabled={submitting}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium disabled:opacity-50 w-full sm:w-auto justify-center"
+        >
+          <Plus size={16} />
+          Add Phase
+        </button>
       </div>
 
-      {/* Phases Section */}
-      <div
-        className={`backdrop-blur-md rounded-lg p-6 border transition-all shadow-sm ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-          }`}
-      >
-        <div className="flex justify-between items-center mb-4">
-          <h3 className={`text-lg font-semibold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>Phases</h3>
-          <button
-            onClick={addNewPhase}
-            disabled={submitting}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
-          >
-            <Plus size={16} />
-            Add Phase
-          </button>
-        </div>
-
-        {phases.length === 0 ? (
-          <p className={`text-center py-4 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-            No phases added yet. Click "Add Phase" to get started or search for an existing item above to use as
-            template.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {phases.map((phase, phaseIndex) => (
-              <div
-                key={phase.id}
-                className={`rounded-lg p-4 border ${isDarkMode ? "bg-gray-700/40 border-gray-600/50" : "bg-white/40 border-gray-300/30"
-                  }`}
-              >
-                <div className="flex gap-3 mb-3">
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      placeholder={`Phase ${phaseIndex + 1} Name (e.g., Design, Development)`}
-                      value={phase.name}
-                      onChange={(e) => updatePhase(phase.id, "name", e.target.value)}
-                      disabled={submitting}
-                      className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
+      {phases.length === 0 ? (
+        <p className={`text-center py-4 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+          No phases added yet. Click "Add Phase" to get started or search for an existing item above to use as template.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {phases.map((phase, phaseIndex) => (
+            <div
+              key={phase.id}
+              className={`rounded-lg p-3 sm:p-4 border ${isDarkMode ? "bg-gray-700/40 border-gray-600/50" : "bg-white/40 border-gray-300/30"}`}
+            >
+              {/* Phase Input Row */}
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-3">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    placeholder={`Phase ${phaseIndex + 1} Name (e.g., Design, Development)`}
+                    value={phase.name}
+                    onChange={(e) => updatePhase(phase.id, "name", e.target.value)}
+                    disabled={submitting}
+                    className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all text-sm sm:text-base ${
+                      isDarkMode
                         ? "bg-gray-800/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                         : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                        }`}
-                    />
-                  </div>
+                    }`}
+                  />
+                </div>
 
-                  {/* ADD THIS NEW INPUT */}
-                  <div className="w-40">
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      placeholder="Expected hrs"
-                      value={phase.expected_hours || ""}
-                      onChange={(e) => updatePhase(phase.id, "expected_hours", e.target.value)}
-                      disabled={submitting}
-                      className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 transition-all ${isDarkMode
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    placeholder="Expected hrs"
+                    value={phase.expected_hours || ""}
+                    onChange={(e) => updatePhase(phase.id, "expected_hours", e.target.value)}
+                    disabled={submitting}
+                    className={`w-full sm:w-32 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 transition-all text-sm sm:text-base ${
+                      isDarkMode
                         ? "bg-gray-800/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                         : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                        }`}
-                      title="Expected hours for this phase"
-                    />
-                    {phase.expected_hours && (
-                      <div className={`mt-2 p-2 rounded text-xs ${getPhaseRemainingDuration(phase)?.isOverAllocated
-                        ? isDarkMode ? "bg-red-500/10 border border-red-500/30 text-red-300" : "bg-red-500/10 border border-red-500/30 text-red-700"
-                        : isDarkMode ? "bg-purple-500/10 border border-purple-500/30 text-purple-300" : "bg-purple-500/10 border border-purple-500/30 text-purple-700"
-                        }`}>
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Phase Duration Allocation:</span>
-                          <span className="font-bold">
-                            {getTotalSubphaseDurationForPhase(phase).toFixed(0)} / {hoursToMinutes(phase.expected_hours).toFixed(0)} minutes
-                          </span>
-                        </div>
-                        {(() => {
-                          const stats = getPhaseRemainingDuration(phase)
-                          return (
-                            <>
-                              <div className={`mt-1 w-full rounded-full h-1.5 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
-                                <div
-                                  className={`h-1.5 rounded-full transition-all duration-300 ${stats.isOverAllocated ? "bg-red-500" : "bg-purple-500"
-                                    }`}
-                                  style={{
-                                    width: `${Math.min(100, (stats.allocatedMinutes / stats.totalMinutes * 100))}%`,
-                                  }}
-                                ></div>
-                              </div>
-                              {stats.isOverAllocated ? (
-                                <div className="flex items-center gap-1 mt-1">
-                                  <AlertTriangle size={12} />
-                                  <span className="font-medium">
-                                    Over-allocated by {Math.abs(stats.remainingMinutes).toFixed(0)} minutes ({Math.abs(stats.remainingHours)}h)
-                                  </span>
-                                </div>
-                              ) : stats.remainingMinutes > 0 ? (
-                                <div className="mt-1">
-                                  Remaining: {stats.remainingMinutes.toFixed(0)} minutes ({stats.remainingHours}h)
-                                </div>
-                              ) : (
-                                <div className="mt-1 flex items-center gap-1">
-                                  <CheckCircle size={12} />
-                                  <span>Fully allocated</span>
-                                </div>
-                              )}
-                            </>
-                          )
-                        })()}
-                      </div>
-                    )}
-                  </div>
+                    }`}
+                    title="Expected hours for this phase"
+                  />
 
                   <button
                     onClick={() => removePhase(phase.id)}
                     disabled={submitting}
-                    className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${isDarkMode ? "text-red-400 hover:bg-red-500/20" : "text-red-500 hover:bg-red-500/10"
-                      }`}
+                    className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${
+                      isDarkMode ? "text-red-400 hover:bg-red-500/20" : "text-red-500 hover:bg-red-500/10"
+                    }`}
                     title="Remove phase"
                   >
                     <Trash2 size={18} />
                   </button>
                 </div>
+              </div>
 
-                {/* Subphases */}
-                <div className="ml-4 space-y-2">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
-                      Sub-Phases
+              {/* Phase Duration Allocation - PLACED AFTER INPUT ROW */}
+              {phase.expected_hours && (
+                <div
+                  className={`mb-3 p-3 rounded text-xs ${
+                    getPhaseRemainingDuration(phase)?.isOverAllocated
+                      ? isDarkMode
+                        ? "bg-red-500/10 border border-red-500/30 text-red-300"
+                        : "bg-red-500/10 border border-red-500/30 text-red-700"
+                      : isDarkMode
+                      ? "bg-purple-500/10 border border-purple-500/30 text-purple-300"
+                      : "bg-purple-500/10 border border-purple-500/30 text-purple-700"
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-2">
+                    <span className="font-medium text-sm">Phase Duration Allocation</span>
+                    <span className="font-bold text-sm sm:text-base">
+                      {getTotalSubphaseDurationForPhase(phase).toFixed(0)} / {hoursToMinutes(phase.expected_hours).toFixed(0)} min
                     </span>
-                    <button
-                      onClick={() => addSubphaseToPhase(phase.id)}
-                      disabled={submitting}
-                      className={`flex items-center gap-1 text-sm px-3 py-1 rounded transition-colors disabled:opacity-50 ${isDarkMode
-                        ? "bg-slate-700 hover:bg-slate-600 text-white"
-                        : "bg-slate-600 hover:bg-slate-700 text-white"
-                        }`}
-                    >
-                      <Plus size={14} />
-                      Add Sub-Phase
-                    </button>
                   </div>
 
-                  {phase.subphases.length === 0 ? (
-                    <p className={`text-sm italic ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                      No sub-phases yet
-                    </p>
-                  ) : (
-                    phase.subphases.map((subphase, subIndex) => {
-                      return (
-                        <div
-                          key={subphase.id}
-                          className={`rounded p-3 space-y-2 ${isDarkMode ? "bg-gray-800/50" : "bg-white/50"
+                  {(() => {
+                    const stats = getPhaseRemainingDuration(phase)
+                    return (
+                      <>
+                        <div className={`w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
+                          <div
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              stats.isOverAllocated ? "bg-red-500" : "bg-purple-500"
                             }`}
-                        >
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              placeholder={`Sub-phase ${subIndex + 1} name`}
-                              value={subphase.name}
-                              onChange={(e) => updateSubphase(phase.id, subphase.id, "name", e.target.value)}
-                              disabled={submitting}
-                              className={`flex-1 px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
+                            style={{
+                              width: `${Math.min(100, (stats.allocatedMinutes / stats.totalMinutes) * 100)}%`,
+                            }}
+                          ></div>
+                        </div>
+
+                        <div className="mt-2 space-y-1">
+                          {stats.isOverAllocated ? (
+                            <div className="flex items-start sm:items-center gap-2">
+                              <AlertTriangle size={14} className="flex-shrink-0 mt-0.5 sm:mt-0" />
+                              <span className="font-medium text-xs sm:text-sm break-words">
+                                Over-allocated by {Math.abs(stats.remainingMinutes).toFixed(0)} min ({Math.abs(stats.remainingHours)}h)
+                              </span>
+                            </div>
+                          ) : stats.remainingMinutes > 0 ? (
+                            <div className="text-xs sm:text-sm">
+                              Remaining: <span className="font-semibold">{stats.remainingMinutes.toFixed(0)} min</span> (
+                              {stats.remainingHours}h)
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <CheckCircle size={14} className="flex-shrink-0" />
+                              <span className="text-xs sm:text-sm font-medium">Fully allocated</span>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )
+                  })()}
+                </div>
+              )}
+
+              {/* Subphases Section */}
+              <div className="ml-0 sm:ml-4 space-y-2">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
+                  <span className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>Sub-Phases</span>
+                  <button
+                    onClick={() => addSubphaseToPhase(phase.id)}
+                    disabled={submitting}
+                    className={`flex items-center gap-1 text-sm px-3 py-1.5 rounded transition-colors disabled:opacity-50 w-full sm:w-auto justify-center ${
+                      isDarkMode ? "bg-slate-700 hover:bg-slate-600 text-white" : "bg-slate-600 hover:bg-slate-700 text-white"
+                    }`}
+                  >
+                    <Plus size={14} />
+                    Add Sub-Phase
+                  </button>
+                </div>
+
+                {phase.subphases.length === 0 ? (
+                  <p className={`text-sm italic ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>No sub-phases yet</p>
+                ) : (
+                  phase.subphases.map((subphase, subIndex) => {
+                    return (
+                      <div key={subphase.id} className={`rounded p-3 space-y-2 ${isDarkMode ? "bg-gray-800/50" : "bg-white/50"}`}>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder={`Sub-phase ${subIndex + 1} name`}
+                            value={subphase.name}
+                            onChange={(e) => updateSubphase(phase.id, subphase.id, "name", e.target.value)}
+                            disabled={submitting}
+                            className={`flex-1 px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+                              isDarkMode
                                 ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                                 : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                                }`}
-                            />
-                            <button
-                              onClick={() => removeSubphase(phase.id, subphase.id)}
-                              disabled={submitting}
-                              className={`p-1.5 rounded transition-colors disabled:opacity-50 ${isDarkMode
-                                ? "text-red-400 hover:bg-red-500/20"
-                                : "text-red-500 hover:bg-red-500/10"
-                                }`}
-                              title="Remove sub-phase"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {/* Duration Input - Minutes with Conversion Display */}
-                            <div>
-                              <div className="relative">
-                                <input
-                                  type="number"
-                                  step="1"
-                                  min="0"
-                                  placeholder="Duration (minutes)"
-                                  value={subphase.expectedDuration}
-                                  onChange={(e) => {
-                                    const newMinutes = e.target.value
-                                    updateSubphase(phase.id, subphase.id, "expectedDuration", newMinutes)
-                                  }}
-                                  disabled={submitting}
-                                  className={`w-full px-3 py-1.5 pr-12 text-sm rounded focus:outline-none focus:ring-2 ${(() => {
-                                    // Check if this would exceed phase allocation
-                                    if (phase.expected_hours && subphase.expectedDuration) {
-                                      const currentMinutes = Number.parseFloat(subphase.expectedDuration) || 0
-                                      const otherSubphasesDuration = phase.subphases
-                                        .filter(s => s.id !== subphase.id)
-                                        .reduce((sum, s) => sum + (Number.parseFloat(s.expectedDuration) || 0), 0)
-                                      const totalWithThis = otherSubphasesDuration + currentMinutes
-                                      const phaseMinutes = hoursToMinutes(phase.expected_hours)
+                            }`}
+                          />
+                          <button
+                            onClick={() => removeSubphase(phase.id, subphase.id)}
+                            disabled={submitting}
+                            className={`p-1.5 rounded transition-colors disabled:opacity-50 ${
+                              isDarkMode ? "text-red-400 hover:bg-red-500/20" : "text-red-500 hover:bg-red-500/10"
+                            }`}
+                            title="Remove sub-phase"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
 
-                                      if (totalWithThis > phaseMinutes) {
-                                        return isDarkMode
-                                          ? "bg-red-500/20 border border-red-500/50 text-red-300 focus:ring-red-500"
-                                          : "bg-red-500/20 border border-red-500/50 text-red-700 focus:ring-red-500"
-                                      }
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {/* Duration Input */}
+                          <div>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="1"
+                                min="0"
+                                placeholder="Duration (minutes)"
+                                value={subphase.expectedDuration}
+                                onChange={(e) => {
+                                  const newMinutes = e.target.value
+                                  updateSubphase(phase.id, subphase.id, "expectedDuration", newMinutes)
+                                }}
+                                disabled={submitting}
+                                className={`w-full px-3 py-1.5 pr-12 text-sm rounded focus:outline-none focus:ring-2 ${(() => {
+                                  if (phase.expected_hours && subphase.expectedDuration) {
+                                    const currentMinutes = parseFloat(subphase.expectedDuration) || 0
+                                    const otherSubphasesDuration = phase.subphases
+                                      .filter((s) => s.id !== subphase.id)
+                                      .reduce((sum, s) => sum + (parseFloat(s.expectedDuration) || 0), 0)
+                                    const totalWithThis = otherSubphasesDuration + currentMinutes
+                                    const phaseMinutes = hoursToMinutes(phase.expected_hours)
+
+                                    if (totalWithThis > phaseMinutes) {
+                                      return isDarkMode
+                                        ? "bg-red-500/20 border border-red-500/50 text-red-300 focus:ring-red-500"
+                                        : "bg-red-500/20 border border-red-500/50 text-red-700 focus:ring-red-500"
                                     }
-                                    return isDarkMode
-                                      ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400 focus:ring-blue-500"
-                                      : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500 focus:ring-blue-500"
-                                  })()
-                                    } disabled:opacity-50 transition-all`}
-                                />
-                                <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"
-                                  }`}>
-                                  min
-                                </span>
-                              </div>
-                              {/* Show hours conversion */}
-                              {subphase.expectedDuration && Number.parseFloat(subphase.expectedDuration) > 0 && (
-                                <p className={`text-xs mt-0.5 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                                  ≈ {minutesToHours(subphase.expectedDuration)} hours
-                                  {phase.expected_hours && (
-                                    <>
-                                      {" "}• {((Number.parseFloat(subphase.expectedDuration) / hoursToMinutes(phase.expected_hours)) * 100).toFixed(0)}% of phase
-                                    </>
-                                  )}
-                                </p>
-                              )}
-                              {/* Show warning if exceeds phase allocation */}
-                              {phase.expected_hours && subphase.expectedDuration && (() => {
-                                const currentMinutes = Number.parseFloat(subphase.expectedDuration) || 0
+                                  }
+                                  return isDarkMode
+                                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400 focus:ring-blue-500"
+                                    : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500 focus:ring-blue-500"
+                                })()}disabled:opacity-50 transition-all`}
+                              />
+                              <span
+                                className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium ${
+                                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                                }`}
+                              >
+                                min
+                              </span>
+                            </div>
+
+                            {/* Show hours conversion */}
+                            {subphase.expectedDuration && parseFloat(subphase.expectedDuration) > 0 && (
+                              <p className={`text-xs mt-0.5 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                                ≈ {minutesToHours(subphase.expectedDuration)} hours
+                                {phase.expected_hours && (
+                                  <>
+                                    {" "}
+                                    •{" "}
+                                    {((parseFloat(subphase.expectedDuration) / hoursToMinutes(phase.expected_hours)) * 100).toFixed(0)}% of
+                                    phase
+                                  </>
+                                )}
+                              </p>
+                            )}
+
+                            {/* Show warning if exceeds phase allocation */}
+                            {phase.expected_hours &&
+                              subphase.expectedDuration &&
+                              (() => {
+                                const currentMinutes = parseFloat(subphase.expectedDuration) || 0
                                 const otherSubphasesDuration = phase.subphases
-                                  .filter(s => s.id !== subphase.id)
-                                  .reduce((sum, s) => sum + (Number.parseFloat(s.expectedDuration) || 0), 0)
+                                  .filter((s) => s.id !== subphase.id)
+                                  .reduce((sum, s) => sum + (parseFloat(s.expectedDuration) || 0), 0)
                                 const totalWithThis = otherSubphasesDuration + currentMinutes
                                 const phaseMinutes = hoursToMinutes(phase.expected_hours)
 
                                 if (totalWithThis > phaseMinutes) {
                                   return (
-                                    <p className={`text-xs mt-0.5 flex items-center gap-1 font-medium ${isDarkMode ? "text-red-300" : "text-red-700"
-                                      }`}>
+                                    <p
+                                      className={`text-xs mt-0.5 flex items-center gap-1 font-medium ${
+                                        isDarkMode ? "text-red-300" : "text-red-700"
+                                      }`}
+                                    >
                                       <AlertTriangle size={10} />
                                       Exceeds phase allocation by {(totalWithThis - phaseMinutes).toFixed(0)} min
                                     </p>
@@ -1476,19 +1464,17 @@ function AddItems({ items, submitting, apiService }) {
                                 }
                                 return null
                               })()}
-                            </div>
 
+                            {/* Quick minute buttons */}
                             {phase.expected_hours && !subphase.expectedDuration && (
                               <div className="flex gap-1 flex-wrap mt-1">
-                                <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                                  Quick:
-                                </span>
+                                <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Quick:</span>
                                 {[15, 30, 45, 60, 90, 120].map((minutes) => {
                                   const phaseMinutes = hoursToMinutes(phase.expected_hours)
                                   const otherSubphasesDuration = phase.subphases
-                                    .filter(s => s.id !== subphase.id)
-                                    .reduce((sum, s) => sum + (Number.parseFloat(s.expectedDuration) || 0), 0)
-                                  const wouldExceed = (otherSubphasesDuration + minutes) > phaseMinutes
+                                    .filter((s) => s.id !== subphase.id)
+                                    .reduce((sum, s) => sum + (parseFloat(s.expectedDuration) || 0), 0)
+                                  const wouldExceed = otherSubphasesDuration + minutes > phaseMinutes
 
                                   return (
                                     <button
@@ -1499,13 +1485,18 @@ function AddItems({ items, submitting, apiService }) {
                                         }
                                       }}
                                       disabled={wouldExceed || submitting}
-                                      className={`px-2 py-0.5 text-xs rounded transition-colors ${wouldExceed
-                                        ? "opacity-40 cursor-not-allowed line-through"
-                                        : isDarkMode
+                                      className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                                        wouldExceed
+                                          ? "opacity-40 cursor-not-allowed line-through"
+                                          : isDarkMode
                                           ? "bg-purple-500/20 hover:bg-purple-500/30 text-purple-300"
                                           : "bg-purple-500/20 hover:bg-purple-500/30 text-purple-700"
-                                        }`}
-                                      title={wouldExceed ? "Would exceed phase allocation" : `Set ${minutes} minutes (${minutesToHours(minutes)}h)`}
+                                      }`}
+                                      title={
+                                        wouldExceed
+                                          ? "Would exceed phase allocation"
+                                          : `Set ${minutes} minutes (${minutesToHours(minutes)}h)`
+                                      }
                                     >
                                       {minutes}m
                                     </button>
@@ -1513,67 +1504,67 @@ function AddItems({ items, submitting, apiService }) {
                                 })}
                               </div>
                             )}
+                          </div>
 
-                            {/* Quantity Input - Keep as is */}
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="Expected quantity"
-                              value={subphase.expectedQuantity}
-                              onChange={(e) =>
-                                updateSubphase(phase.id, subphase.id, "expectedQuantity", e.target.value)
-                              }
-                              disabled={submitting}
-                              className={`px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
+                          {/* Quantity Input */}
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="Expected quantity"
+                            value={subphase.expectedQuantity}
+                            onChange={(e) => updateSubphase(phase.id, subphase.id, "expectedQuantity", e.target.value)}
+                            disabled={submitting}
+                            className={`px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
+                              isDarkMode
                                 ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                                 : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                                }`}
-                            />
-                          </div>
+                            }`}
+                          />
                         </div>
-                      )
-                    })
-                  )}
-                </div>
+                      </div>
+                    )
+                  })
+                )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Save Button at Bottom */}
-      <div className="flex flex-col sm:flex-row gap-3 justify-end">
-        <button
-          onClick={handleClear}
-          disabled={submitting}
-          className={`px-6 py-3 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode
-            ? "bg-gray-700 hover:bg-gray-600 text-white"
-            : "bg-gray-600 hover:bg-gray-700 text-white"
-            }`}
-        >
-          Clear All
-        </button>
-        <button
-          onClick={handleSave}
-          disabled={submitting}
-          className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {submitting ? "Saving..." : "Save Item"}
-        </button>
-      </div>
-      {/* NEW: Import Modal at the bottom */}
-      <ExcelImportModal
-        isDarkMode={isDarkMode}
-        apiService={apiService}
-        isOpen={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onImportComplete={() => {
-          setShowImportModal(false)
-          window.location.reload()
-        }}
-      />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
-  )
+
+    {/* Save Button at Bottom */}
+    <div className="flex flex-col sm:flex-row gap-3 justify-end">
+      <button
+        onClick={handleClear}
+        disabled={submitting}
+        className={`px-6 py-3 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
+          isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-600 hover:bg-gray-700 text-white"
+        }`}
+      >
+        Clear All
+      </button>
+      <button
+        onClick={handleSave}
+        disabled={submitting}
+        className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {submitting ? "Saving..." : "Save Item"}
+      </button>
+    </div>
+
+    {/* Import Modal */}
+    <ExcelImportModal
+      isDarkMode={isDarkMode}
+      apiService={apiService}
+      isOpen={showImportModal}
+      onClose={() => setShowImportModal(false)}
+      onImportComplete={() => {
+        setShowImportModal(false)
+        window.location.reload()
+      }}
+    />
+ </div>
+)
 }
 
 export default AddItems

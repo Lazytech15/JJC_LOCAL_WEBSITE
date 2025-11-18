@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, Calendar, Package, CheckCircle, Clock, Users, Activity, TrendingUp, AlertCircle } from 'lucide-react';
 
-function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMode, formatTime}) {
+function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMode, formatTime }) {
   const [selectedItem, setSelectedItem] = useState(null);
   const [itemDetails, setItemDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -91,7 +91,7 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
       }
 
       const response = await apiService.operations.getItemsPaginated(page, pagination.per_page, params);
-      
+
       setFilteredItems(response.items || []);
       setPagination(response.pagination || {
         current_page: page,
@@ -157,22 +157,21 @@ function Dashboard({ items, calculateItemProgress, loading, apiService, isDarkMo
   const textSecondaryClass = isDarkMode ? "text-gray-300" : "text-gray-600";
 
   // Calculate statistics from statistics API
-const stats = statistics?.overall || {
-  total_items: 0,
-  completed_items: 0,
-  in_progress_items: 0,
-  not_started_items: 0,
-  avg_progress: 0
-};
+  const stats = statistics?.overall || {
+    total_items: 0,
+    completed_items: 0,
+    in_progress_items: 0,
+    not_started_items: 0,
+    avg_progress: 0
+  };
 
-const overallProgress = Math.round(parseFloat(stats.avg_progress) || 0);
+  const overallProgress = Math.round(parseFloat(stats.avg_progress) || 0);
 
   if (loading) {
     return (
       <div className="text-center py-8">
-        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 mx-auto ${
-          isDarkMode ? "border-slate-400" : "border-slate-600"
-        }`}></div>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 mx-auto ${isDarkMode ? "border-slate-400" : "border-slate-600"
+          }`}></div>
         <p className={`mt-4 ${textSecondaryClass}`}>Loading dashboard...</p>
       </div>
     );
@@ -197,11 +196,10 @@ const overallProgress = Math.round(parseFloat(stats.avg_progress) || 0);
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
               placeholder="Search items..."
-              className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                isDarkMode
+              className={`w-full px-3 py-2 rounded-lg border text-sm ${isDarkMode
                   ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400'
                   : 'bg-white border-gray-300 text-gray-800 placeholder-gray-500'
-              }`}
+                }`}
             />
           </div>
 
@@ -213,11 +211,10 @@ const overallProgress = Math.round(parseFloat(stats.avg_progress) || 0);
             <select
               value={filters.status}
               onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                isDarkMode
+              className={`w-full px-3 py-2 rounded-lg border text-sm ${isDarkMode
                   ? 'bg-gray-700 border-gray-600 text-gray-100'
                   : 'bg-white border-gray-300 text-gray-800'
-              }`}
+                }`}
             >
               <option value="all">All Status</option>
               <option value="completed">Completed</option>
@@ -234,11 +231,10 @@ const overallProgress = Math.round(parseFloat(stats.avg_progress) || 0);
             <select
               value={filters.priority}
               onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
-              className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                isDarkMode
+              className={`w-full px-3 py-2 rounded-lg border text-sm ${isDarkMode
                   ? 'bg-gray-700 border-gray-600 text-gray-100'
                   : 'bg-white border-gray-300 text-gray-800'
-              }`}
+                }`}
             >
               <option value="all">All Priorities</option>
               <option value="High">High</option>
@@ -255,11 +251,10 @@ const overallProgress = Math.round(parseFloat(stats.avg_progress) || 0);
             <select
               value={filters.client}
               onChange={(e) => setFilters({ ...filters, client: e.target.value })}
-              className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                isDarkMode
+              className={`w-full px-3 py-2 rounded-lg border text-sm ${isDarkMode
                   ? 'bg-gray-700 border-gray-600 text-gray-100'
                   : 'bg-white border-gray-300 text-gray-800'
-              }`}
+                }`}
             >
               <option value="all">All Clients</option>
               {uniqueClients.map(client => (
@@ -274,40 +269,35 @@ const overallProgress = Math.round(parseFloat(stats.avg_progress) || 0);
           <div className="mt-3 flex flex-wrap gap-2">
             <span className={`text-xs ${textSecondaryClass}`}>Active filters:</span>
             {filters.status !== 'all' && (
-              <span className={`px-2 py-1 rounded text-xs ${
-                isDarkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'
-              }`}>
+              <span className={`px-2 py-1 rounded text-xs ${isDarkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'
+                }`}>
                 Status: {filters.status}
               </span>
             )}
             {filters.priority !== 'all' && (
-              <span className={`px-2 py-1 rounded text-xs ${
-                isDarkMode ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-100 text-purple-700'
-              }`}>
+              <span className={`px-2 py-1 rounded text-xs ${isDarkMode ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-100 text-purple-700'
+                }`}>
                 Priority: {filters.priority}
               </span>
             )}
             {filters.client !== 'all' && (
-              <span className={`px-2 py-1 rounded text-xs ${
-                isDarkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700'
-              }`}>
+              <span className={`px-2 py-1 rounded text-xs ${isDarkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700'
+                }`}>
                 Client: {filters.client}
               </span>
             )}
             {filters.search && (
-              <span className={`px-2 py-1 rounded text-xs ${
-                isDarkMode ? 'bg-orange-900/30 text-orange-300' : 'bg-orange-100 text-orange-700'
-              }`}>
+              <span className={`px-2 py-1 rounded text-xs ${isDarkMode ? 'bg-orange-900/30 text-orange-300' : 'bg-orange-100 text-orange-700'
+                }`}>
                 Search: "{filters.search}"
               </span>
             )}
             <button
               onClick={() => setFilters({ status: 'all', priority: 'all', client: 'all', search: '' })}
-              className={`px-2 py-1 rounded text-xs font-medium ${
-                isDarkMode
+              className={`px-2 py-1 rounded text-xs font-medium ${isDarkMode
                   ? 'bg-red-900/30 text-red-300 hover:bg-red-900/50'
                   : 'bg-red-100 text-red-700 hover:bg-red-200'
-              }`}
+                }`}
             >
               Clear all
             </button>
@@ -317,82 +307,87 @@ const overallProgress = Math.round(parseFloat(stats.avg_progress) || 0);
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 sm:p-5 rounded-lg shadow-md text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xs sm:text-sm font-medium opacity-90">Total Items</h3>
-              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.total_items}</p>
-            </div>
-            <Activity className="w-6 h-6 sm:w-8 sm:h-8 opacity-80" />
-          </div>
-        </div>
-        <div className="bg-gradient-to-br from-green-500 to-green-600 p-3 sm:p-5 rounded-lg shadow-md text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xs sm:text-sm font-medium opacity-90">Completed</h3>
-              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.completed_items}</p>
-            </div>
-            <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 opacity-80" />
-          </div>
-        </div>
-        <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 p-3 sm:p-5 rounded-lg shadow-md text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xs sm:text-sm font-medium opacity-90">In Progress</h3>
-              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.in_progress_items}</p>
-            </div>
-            <Clock className="w-6 h-6 sm:w-8 sm:h-8 opacity-80" />
-          </div>
-        </div>
-        <div className="bg-gradient-to-br from-gray-500 to-gray-600 p-3 sm:p-5 rounded-lg shadow-md text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xs sm:text-sm font-medium opacity-90">Not Started</h3>
-              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.not_started_items}</p>
-            </div>
-            <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 opacity-80" />
-          </div>
-        </div>
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-3 sm:p-5 rounded-lg shadow-md text-white col-span-2 sm:col-span-1">
-  <div className="flex items-center justify-between">
-    <div>
-      <h3 className="text-xs sm:text-sm font-medium opacity-90">Overall Progress</h3>
-      <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">
-        {overallProgress}%
-      </p>
+  {/* Total Items */}
+  <div className={`p-3 sm:p-5 rounded-lg shadow-md ${isDarkMode ? "bg-gradient-to-br from-blue-700 to-blue-800 text-gray-200" : "bg-gradient-to-br from-blue-500 to-blue-600 text-white"}`}>
+    <div className="flex items-center justify-between">
+      <div>
+        <h3 className="text-xs sm:text-sm font-medium opacity-90">Total Items</h3>
+        <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.total_items}</p>
+      </div>
+      <Activity className={`w-6 h-6 sm:w-8 sm:h-8 opacity-80 ${isDarkMode ? "text-gray-200" : "text-white"}`} />
     </div>
-    <div className="relative w-16 h-16 sm:w-20 sm:h-20">
-      <svg className="transform -rotate-90 w-full h-full" viewBox="0 0 80 80">
-        {/* Background circle */}
-        <circle
-          cx="40"
-          cy="40"
-          r="32"
-          stroke="rgba(255, 255, 255, 0.2)"
-          strokeWidth="8"
-          fill="none"
-        />
-        {/* Progress circle */}
-        <circle
-          cx="40"
-          cy="40"
-          r="32"
-          stroke="white"
-          strokeWidth="8"
-          fill="none"
-          strokeDasharray={`${2 * Math.PI * 32}`}
-          strokeDashoffset={`${2 * Math.PI * 32 * (1 - overallProgress / 100)}`}
-          strokeLinecap="round"
-          className="transition-all duration-1000 ease-out"
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-xs sm:text-sm font-bold">{overallProgress}%</span>
+  </div>
+
+  {/* Completed */}
+  <div className={`p-3 sm:p-5 rounded-lg shadow-md ${isDarkMode ? "bg-gradient-to-br from-green-700 to-green-800 text-gray-200" : "bg-gradient-to-br from-green-500 to-green-600 text-white"}`}>
+    <div className="flex items-center justify-between">
+      <div>
+        <h3 className="text-xs sm:text-sm font-medium opacity-90">Completed</h3>
+        <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.completed_items}</p>
+      </div>
+      <CheckCircle className={`w-6 h-6 sm:w-8 sm:h-8 opacity-80 ${isDarkMode ? "text-gray-200" : "text-white"}`} />
+    </div>
+  </div>
+
+  {/* In Progress */}
+  <div className={`p-3 sm:p-5 rounded-lg shadow-md ${isDarkMode ? "bg-gradient-to-br from-yellow-700 to-yellow-800 text-gray-200" : "bg-gradient-to-br from-yellow-500 to-yellow-600 text-white"}`}>
+    <div className="flex items-center justify-between">
+      <div>
+        <h3 className="text-xs sm:text-sm font-medium opacity-90">In Progress</h3>
+        <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.in_progress_items}</p>
+      </div>
+      <Clock className={`w-6 h-6 sm:w-8 sm:h-8 opacity-80 ${isDarkMode ? "text-gray-200" : "text-white"}`} />
+    </div>
+  </div>
+
+  {/* Not Started */}
+  <div className={`p-3 sm:p-5 rounded-lg shadow-md ${isDarkMode ? "bg-gradient-to-br from-gray-700 to-gray-800 text-gray-200" : "bg-gradient-to-br from-gray-500 to-gray-600 text-white"}`}>
+    <div className="flex items-center justify-between">
+      <div>
+        <h3 className="text-xs sm:text-sm font-medium opacity-90">Not Started</h3>
+        <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{stats.not_started_items}</p>
+      </div>
+      <AlertCircle className={`w-6 h-6 sm:w-8 sm:h-8 opacity-80 ${isDarkMode ? "text-gray-200" : "text-white"}`} />
+    </div>
+  </div>
+
+  {/* Overall Progress */}
+  <div className={`p-3 sm:p-5 rounded-lg shadow-md col-span-2 sm:col-span-1 ${isDarkMode ? "bg-gradient-to-br from-purple-700 to-purple-800 text-gray-200" : "bg-gradient-to-br from-purple-500 to-purple-600 text-white"}`}>
+    <div className="flex items-center justify-between">
+      <div>
+        <h3 className="text-xs sm:text-sm font-medium opacity-90">Overall Progress</h3>
+        <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2">{overallProgress}%</p>
+      </div>
+      <div className="relative w-16 h-16 sm:w-20 sm:h-20">
+        <svg className="transform -rotate-90 w-full h-full" viewBox="0 0 80 80">
+          <circle
+            cx="40"
+            cy="40"
+            r="32"
+            stroke={isDarkMode ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.2)"}
+            strokeWidth="8"
+            fill="none"
+          />
+          <circle
+            cx="40"
+            cy="40"
+            r="32"
+            stroke={isDarkMode ? "gray" : "white"}
+            strokeWidth="8"
+            fill="none"
+            strokeDasharray={`${2 * Math.PI * 32}`}
+            strokeDashoffset={`${2 * Math.PI * 32 * (1 - overallProgress / 100)}`}
+            strokeLinecap="round"
+            className="transition-all duration-1000 ease-out"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-xs sm:text-sm font-bold">{overallProgress}%</span>
+        </div>
       </div>
     </div>
   </div>
 </div>
-      </div>
 
       {/* Items Progress List */}
       <div className="space-y-3">
@@ -409,9 +404,8 @@ const overallProgress = Math.round(parseFloat(stats.avg_progress) || 0);
 
         {isFiltering ? (
           <div className="text-center py-8">
-            <div className={`animate-spin rounded-full h-8 w-8 border-b-2 mx-auto ${
-              isDarkMode ? "border-slate-400" : "border-slate-600"
-            }`}></div>
+            <div className={`animate-spin rounded-full h-8 w-8 border-b-2 mx-auto ${isDarkMode ? "border-slate-400" : "border-slate-600"
+              }`}></div>
             <p className={`mt-4 text-sm ${textSecondaryClass}`}>Filtering items...</p>
           </div>
         ) : filteredItems.length > 0 ? (
@@ -425,15 +419,14 @@ const overallProgress = Math.round(parseFloat(stats.avg_progress) || 0);
                 <div key={itemKey}>
                   <div
                     onClick={() => handleItemClick(item)}
-                    className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border cursor-pointer transition-all duration-200 hover:shadow-lg ${
-                      isSelected
+                    className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border cursor-pointer transition-all duration-200 hover:shadow-lg ${isSelected
                         ? isDarkMode
                           ? 'border-blue-400 bg-blue-900/20'
                           : 'border-blue-500 bg-blue-50/20'
                         : isDarkMode
                           ? 'border-gray-700/50 bg-gray-800/40 hover:bg-gray-800/60'
                           : 'border-white/30 bg-white/10 hover:bg-white/20'
-                    }`}
+                      }`}
                   >
                     <div className="flex justify-between items-start mb-2 gap-2">
                       <div className="flex-1 min-w-0">
@@ -455,77 +448,72 @@ const overallProgress = Math.round(parseFloat(stats.avg_progress) || 0);
                         )}
                       </div>
                       <div className="flex flex-col items-end gap-2 flex-shrink-0">
-  <div className="flex items-center gap-2">
-    {/* Circular Progress Indicator */}
-    <div className="relative w-12 h-12 sm:w-14 sm:h-14">
-      <svg className="transform -rotate-90 w-full h-full" viewBox="0 0 48 48">
-        {/* Background circle */}
-        <circle
-          cx="24"
-          cy="24"
-          r="20"
-          stroke={isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"}
-          strokeWidth="4"
-          fill="none"
-        />
-        {/* Progress circle */}
-        <circle
-          cx="24"
-          cy="24"
-          r="20"
-          stroke={
-            progress === 100 ? '#22c55e' :
-            progress > 0 ? '#eab308' :
-            '#6b7280'
-          }
-          strokeWidth="4"
-          fill="none"
-          strokeDasharray={`${2 * Math.PI * 20}`}
-          strokeDashoffset={`${2 * Math.PI * 20 * (1 - progress / 100)}`}
-          strokeLinecap="round"
-          className="transition-all duration-500 ease-out"
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className={`text-xs font-bold ${
-          progress === 100 ? 'text-green-500' :
-          progress > 0 ? 'text-yellow-500' :
-          'text-gray-500'
-        }`}>
-          {progress}%
-        </span>
-      </div>
-    </div>
-    {isSelected ? (
-      <ChevronUp className={`w-4 h-4 sm:w-5 sm:h-5 ${
-        isDarkMode ? "text-blue-400" : "text-blue-500"
-      }`} />
-    ) : (
-      <ChevronDown className={`w-4 h-4 sm:w-5 sm:h-5 ${
-        isDarkMode ? "text-gray-400" : "text-gray-500"
-      }`} />
-    )}
-  </div>
-  {item.priority && (
-    <span className={`px-2 py-1 rounded text-xs font-medium ${
-      item.priority === 'High'
-        ? isDarkMode ? 'bg-red-500/20 text-red-300' : 'bg-red-500/20 text-red-700'
-        : item.priority === 'Medium'
-          ? isDarkMode ? 'bg-yellow-500/20 text-yellow-300' : 'bg-yellow-500/20 text-yellow-700'
-          : isDarkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-500/20 text-blue-700'
-    }`}>
-      {item.priority}
-    </span>
-  )}
-</div>
+                        <div className="flex items-center gap-2">
+                          {/* Circular Progress Indicator */}
+                          <div className="relative w-12 h-12 sm:w-14 sm:h-14">
+                            <svg className="transform -rotate-90 w-full h-full" viewBox="0 0 48 48">
+                              {/* Background circle */}
+                              <circle
+                                cx="24"
+                                cy="24"
+                                r="20"
+                                stroke={isDarkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"}
+                                strokeWidth="4"
+                                fill="none"
+                              />
+                              {/* Progress circle */}
+                              <circle
+                                cx="24"
+                                cy="24"
+                                r="20"
+                                stroke={
+                                  progress === 100 ? '#22c55e' :
+                                    progress > 0 ? '#eab308' :
+                                      '#6b7280'
+                                }
+                                strokeWidth="4"
+                                fill="none"
+                                strokeDasharray={`${2 * Math.PI * 20}`}
+                                strokeDashoffset={`${2 * Math.PI * 20 * (1 - progress / 100)}`}
+                                strokeLinecap="round"
+                                className="transition-all duration-500 ease-out"
+                              />
+                            </svg>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className={`text-xs font-bold ${progress === 100 ? 'text-green-500' :
+                                  progress > 0 ? 'text-yellow-500' :
+                                    'text-gray-500'
+                                }`}>
+                                {progress}%
+                              </span>
+                            </div>
+                          </div>
+                          {isSelected ? (
+                            <ChevronUp className={`w-4 h-4 sm:w-5 sm:h-5 ${isDarkMode ? "text-blue-400" : "text-blue-500"
+                              }`} />
+                          ) : (
+                            <ChevronDown className={`w-4 h-4 sm:w-5 sm:h-5 ${isDarkMode ? "text-gray-400" : "text-gray-500"
+                              }`} />
+                          )}
+                        </div>
+                        {item.priority && (
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${item.priority === 'High'
+                              ? isDarkMode ? 'bg-red-500/20 text-red-300' : 'bg-red-500/20 text-red-700'
+                              : item.priority === 'Medium'
+                                ? isDarkMode ? 'bg-yellow-500/20 text-yellow-300' : 'bg-yellow-500/20 text-yellow-700'
+                                : isDarkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-500/20 text-blue-700'
+                            }`}>
+                            {item.priority}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className={`w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
                       <div
-                        className={`h-2 rounded-full transition-all duration-300 ${
-                          progress === 100 ? 'bg-green-500' :
-                          progress > 0 ? 'bg-yellow-500' :
-                          'bg-gray-500'
-                        }`}
+                        className={`h-2 rounded-full transition-all duration-300 ${progress === 100 ? 'bg-green-500' :
+                            progress > 0 ? 'bg-yellow-500' :
+                              'bg-gray-500'
+                          }`}
                         style={{ width: `${progress}%` }}
                       ></div>
                     </div>
@@ -710,8 +698,8 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
   return (
     <div className="mt-2 animate-slideDown">
       <div className={`backdrop-blur-md rounded-lg border-2 overflow-hidden ${isDarkMode
-          ? "bg-gradient-to-r from-slate-800 to-slate-900 border-blue-400/30"
-          : "bg-gradient-to-r from-slate-50 to-slate-100 border-blue-500/30"
+        ? "bg-gradient-to-r from-slate-800 to-slate-900 border-blue-400/30"
+        : "bg-gradient-to-r from-slate-50 to-slate-100 border-blue-500/30"
         }`}>
         {loadingDetails ? (
           <div className="p-8 text-center">
@@ -776,8 +764,8 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                     <p className={`text-xs ${textSecondaryClass}`}>Efficiency</p>
                   </div>
                   <p className={`text-xs sm:text-sm font-semibold ${parseFloat(efficiency) >= 100
-                      ? isDarkMode ? 'text-green-400' : 'text-green-600'
-                      : isDarkMode ? 'text-orange-400' : 'text-orange-600'
+                    ? isDarkMode ? 'text-green-400' : 'text-green-600'
+                    : isDarkMode ? 'text-orange-400' : 'text-orange-600'
                     }`}>{efficiency}%</p>
                 </div>
               )}
@@ -798,8 +786,8 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
             {/* Remarks Section */}
             {item.remarks && (
               <div className={`p-3 sm:p-4 rounded-lg border mb-3 sm:mb-4 ${isDarkMode
-                  ? "bg-amber-900/20 border-amber-700"
-                  : "bg-amber-50 border-amber-200"
+                ? "bg-amber-900/20 border-amber-700"
+                : "bg-amber-50 border-amber-200"
                 }`}>
                 <p className={`text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${isDarkMode ? "text-amber-300" : "text-amber-800"
                   }`}>Remarks Summary:</p>
@@ -808,8 +796,8 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                     if (transaction.type === 'OUT') {
                       return (
                         <div key={idx} className={`p-2 sm:p-3 rounded border ${isDarkMode
-                            ? "bg-slate-800 border-amber-700"
-                            : "bg-white border-amber-200"
+                          ? "bg-slate-800 border-amber-700"
+                          : "bg-white border-amber-200"
                           }`}>
                           <p className={`font-semibold text-xs sm:text-sm mb-1 sm:mb-2 ${textPrimaryClass}`}>
                             Transaction {transaction.index} – Transferred OUT
@@ -832,8 +820,8 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                     } else if (transaction.type === 'IN') {
                       return (
                         <div key={idx} className={`p-2 sm:p-3 rounded border ${isDarkMode
-                            ? "bg-slate-800 border-amber-700"
-                            : "bg-white border-amber-200"
+                          ? "bg-slate-800 border-amber-700"
+                          : "bg-white border-amber-200"
                           }`}>
                           <p className={`font-semibold text-xs sm:text-sm mb-1 sm:mb-2 ${textPrimaryClass}`}>
                             Transaction {transaction.index} – Received IN
@@ -856,8 +844,8 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                     } else if (transaction.type === 'OTHER') {
                       return (
                         <div key={idx} className={`p-2 sm:p-3 rounded border ${isDarkMode
-                            ? "bg-slate-800 border-amber-700"
-                            : "bg-white border-amber-200"
+                          ? "bg-slate-800 border-amber-700"
+                          : "bg-white border-amber-200"
                           }`}>
                           <p className={`text-xs sm:text-sm break-words ${textSecondaryClass}`}>{transaction.text}</p>
                         </div>
@@ -904,10 +892,10 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                               )}
                             </div>
                             <span className={`text-xs font-medium px-2 py-1 rounded flex-shrink-0 ${phaseProgress === 100
-                                ? isDarkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700'
-                                : phaseProgress > 0
-                                  ? isDarkMode ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-100 text-yellow-700'
-                                  : isDarkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
+                              ? isDarkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700'
+                              : phaseProgress > 0
+                                ? isDarkMode ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-100 text-yellow-700'
+                                : isDarkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600'
                               }`}>
                               {phaseCompleted}/{phaseTotal} tasks
                             </span>
@@ -916,8 +904,8 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                             }`}>
                             <div
                               className={`h-1.5 rounded-full transition-all duration-300 ${phaseProgress === 100 ? 'bg-green-500' :
-                                  phaseProgress > 0 ? 'bg-yellow-500' :
-                                    'bg-gray-400'
+                                phaseProgress > 0 ? 'bg-yellow-500' :
+                                  'bg-gray-400'
                                 }`}
                               style={{ width: `${phaseProgress}%` }}
                             ></div>
@@ -927,8 +915,8 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                         {/* Subphases */}
                         {isExpanded && phase.subphases && phase.subphases.length > 0 && (
                           <div className={`border-t p-2 sm:p-3 ${isDarkMode
-                              ? "border-gray-700 bg-slate-900/50"
-                              : "border-gray-200 bg-gray-50"
+                            ? "border-gray-700 bg-slate-900/50"
+                            : "border-gray-200 bg-gray-50"
                             }`}>
                             <div className="space-y-2">
                               {phase.subphases.map((subphase, subIdx) => {
@@ -940,12 +928,12 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
 
                                 return (
                                   <div key={subphase.id} className={`p-2 rounded border ${isCompleted
-                                      ? isDarkMode
-                                        ? 'bg-green-900/20 border-green-700'
-                                        : 'bg-green-50 border-green-200'
-                                      : isDarkMode
-                                        ? 'bg-slate-800 border-gray-700'
-                                        : 'bg-white border-gray-200'
+                                    ? isDarkMode
+                                      ? 'bg-green-900/20 border-green-700'
+                                      : 'bg-green-50 border-green-200'
+                                    : isDarkMode
+                                      ? 'bg-slate-800 border-gray-700'
+                                      : 'bg-white border-gray-200'
                                     }`}>
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex-1 min-w-0">
@@ -1006,12 +994,12 @@ function ItemDetailsSlidePanel({ item, itemDetails, loadingDetails, onClose, isD
                                       </div>
 
                                       <span className={`text-xs font-medium px-2 py-1 rounded flex-shrink-0 ${isCompleted
-                                          ? isDarkMode
-                                            ? 'bg-green-900/30 text-green-300'
-                                            : 'bg-green-100 text-green-700'
-                                          : isDarkMode
-                                            ? 'bg-gray-700 text-gray-400'
-                                            : 'bg-gray-100 text-gray-600'
+                                        ? isDarkMode
+                                          ? 'bg-green-900/30 text-green-300'
+                                          : 'bg-green-100 text-green-700'
+                                        : isDarkMode
+                                          ? 'bg-gray-700 text-gray-400'
+                                          : 'bg-gray-100 text-gray-600'
                                         }`}>
                                         {isCompleted ? 'Done' : 'Pending'}
                                       </span>
@@ -1056,20 +1044,18 @@ function PaginationControls({ pagination, onPageChange, onItemsPerPageChange, is
   }
 
   return (
-    <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t ${
-      isDarkMode ? 'border-gray-700' : 'border-gray-300'
-    }`}>
+    <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-300'
+      }`}>
       {/* Items per page */}
       <div className="flex items-center gap-2">
         <label className={`text-sm ${textSecondaryClass}`}>Items per page:</label>
         <select
           value={per_page}
           onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-          className={`px-3 py-1 rounded-lg border transition-colors ${
-            isDarkMode
+          className={`px-3 py-1 rounded-lg border transition-colors ${isDarkMode
               ? 'bg-gray-800 border-gray-700 text-gray-200'
               : 'bg-white border-gray-300 text-gray-800'
-          }`}
+            }`}
         >
           <option value={10}>10</option>
           <option value={20}>20</option>
@@ -1089,13 +1075,12 @@ function PaginationControls({ pagination, onPageChange, onItemsPerPageChange, is
         <button
           onClick={() => onPageChange(current_page - 1)}
           disabled={!has_previous}
-          className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-            has_previous
+          className={`px-3 py-1 rounded-lg font-medium transition-colors ${has_previous
               ? isDarkMode
                 ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
                 : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
               : 'opacity-50 cursor-not-allowed bg-gray-600 text-gray-400'
-          }`}
+            }`}
         >
           Previous
         </button>
@@ -1104,11 +1089,10 @@ function PaginationControls({ pagination, onPageChange, onItemsPerPageChange, is
           <>
             <button
               onClick={() => onPageChange(1)}
-              className={`px-3 py-1 rounded-lg transition-colors ${
-                isDarkMode
+              className={`px-3 py-1 rounded-lg transition-colors ${isDarkMode
                   ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
                   : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-              }`}
+                }`}
             >
               1
             </button>
@@ -1120,15 +1104,14 @@ function PaginationControls({ pagination, onPageChange, onItemsPerPageChange, is
           <button
             key={pageNum}
             onClick={() => onPageChange(pageNum)}
-            className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-              pageNum === current_page
+            className={`px-3 py-1 rounded-lg font-medium transition-colors ${pageNum === current_page
                 ? isDarkMode
                   ? 'bg-blue-600 text-white'
                   : 'bg-blue-500 text-white'
                 : isDarkMode
                   ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
                   : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-            }`}
+              }`}
           >
             {pageNum}
           </button>
@@ -1139,11 +1122,10 @@ function PaginationControls({ pagination, onPageChange, onItemsPerPageChange, is
             {endPage < total_pages - 1 && <span className={textSecondaryClass}>...</span>}
             <button
               onClick={() => onPageChange(total_pages)}
-              className={`px-3 py-1 rounded-lg transition-colors ${
-                isDarkMode
+              className={`px-3 py-1 rounded-lg transition-colors ${isDarkMode
                   ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
                   : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-              }`}
+                }`}
             >
               {total_pages}
             </button>
@@ -1153,13 +1135,12 @@ function PaginationControls({ pagination, onPageChange, onItemsPerPageChange, is
         <button
           onClick={() => onPageChange(current_page + 1)}
           disabled={!has_next}
-          className={`px-3 py-1 rounded-lg font-medium transition-colors ${
-            has_next
+          className={`px-3 py-1 rounded-lg font-medium transition-colors ${has_next
               ? isDarkMode
                 ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
                 : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
               : 'opacity-50 cursor-not-allowed bg-gray-600 text-gray-400'
-          }`}
+            }`}
         >
           Next
         </button>

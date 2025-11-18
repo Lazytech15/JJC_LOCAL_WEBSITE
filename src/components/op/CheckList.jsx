@@ -39,6 +39,30 @@ function Checklist({
   apiService,
   formatTime,
   loadData,
+
+  openTransferModal,
+  transferModalOpen,
+  setTransferModalOpen,
+  selectedSubphaseForTransfer,
+  selectedItemForTransfer,
+  selectedPhaseForTransfer,
+  newClient,
+  setNewClient,
+  transferQuantity,
+  setTransferQuantity,
+  transferRemarks,
+  setTransferRemarks,
+  clientItems,
+  showClientDropdown,
+  setShowClientDropdown,
+  selectedTargetItem,
+  setSelectedTargetItem,
+  selectedTargetPhase,
+  setSelectedTargetPhase,
+  selectedTargetSubphase,
+  setSelectedTargetSubphase,
+  handleTransferClient,
+  getBasePartNumber,
   // ADD THESE NEW PROPS:
   setShowEditItemModal,
   setShowEditPhaseModal,
@@ -61,21 +85,12 @@ function Checklist({
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState("name-asc")
   const [filterStatus, setFilterStatus] = useState("")
-  const [transferModalOpen, setTransferModalOpen] = useState(false)
   const [selectedSubphase, setSelectedSubphase] = useState(null)
   const [selectedItem, setSelectedItem] = useState(null)
   const [selectedPhase, setSelectedPhase] = useState(null)
-  const [newClient, setNewClient] = useState("")
-  const [transferQuantity, setTransferQuantity] = useState("")
-  const [transferRemarks, setTransferRemarks] = useState("")
-  const [clientItems, setClientItems] = useState([])
-  const [showClientDropdown, setShowClientDropdown] = useState(false)
   const [quantityModalOpen, setQuantityModalOpen] = useState(false)
   const [quantityModalData, setQuantityModalData] = useState(null)
   const [tempQuantity, setTempQuantity] = useState("")
-  const [selectedTargetItem, setSelectedTargetItem] = useState(null)
-  const [selectedTargetPhase, setSelectedTargetPhase] = useState(null)
-  const [selectedTargetSubphase, setSelectedTargetSubphase] = useState(null)
   const [, forceUpdate] = useState(0)
   const [itemCheckboxes, setItemCheckboxes] = useState({})
 
@@ -275,20 +290,6 @@ function Checklist({
     })
   }, [items])
 
-  // Load items for selected client
-  useEffect(() => {
-    if (newClient.trim() && transferModalOpen) {
-      const basePartNumber = getBasePartNumber(selectedItem?.part_number);
-      const filtered = items.filter((item) => {
-        const itemBasePartNumber = getBasePartNumber(item.part_number);
-        return item.client_name === newClient.trim() && itemBasePartNumber === basePartNumber;
-      });
-      setClientItems(filtered)
-    } else {
-      setClientItems([])
-    }
-  }, [newClient, items, selectedItem, transferModalOpen])
-
   // Filter clients for dropdown
   useEffect(() => {
     if (!Array.isArray(clients)) {
@@ -357,141 +358,6 @@ function Checklist({
       console.error("Error updating completed quantity:", error)
       alert("Failed to update completed quantity: " + error.message)
       await loadData()
-    }
-  }
-
-  const openTransferModal = (item, phase, subphase) => {
-    setSelectedItem(item)
-    setSelectedPhase(phase)
-    setSelectedSubphase(subphase)
-    setNewClient("")
-    setTransferQuantity("")
-    setTransferRemarks("")
-    setSelectedTargetItem(null)
-    setSelectedTargetPhase(null)
-    setSelectedTargetSubphase(null)
-    setTransferModalOpen(true)
-    setClientItems([])
-  }
-  const handleTransferClient = async () => {
-    if (!newClient.trim()) {
-      alert("Please enter a client name")
-      return
-    }
-
-    if (!selectedTargetItem) {
-      alert("Please select a target item")
-      return
-    }
-
-    if (!selectedTargetPhase) {
-      alert("Please select a target phase")
-      return
-    }
-
-    if (!selectedTargetSubphase) {
-      alert("Please select a target subphase")
-      return
-    }
-
-    const transferQty = Number.parseInt(transferQuantity)
-    if (!transferQty || transferQty < 1) {
-      alert("Please enter a valid transfer quantity")
-      return
-    }
-
-    const currentQty = selectedSubphase.current_completed_quantity || 0
-    if (transferQty > currentQty) {
-      alert(`Transfer quantity (${transferQty}) cannot exceed current completed quantity (${currentQty})`)
-      return
-    }
-
-    try {
-      const timestamp = new Date().toLocaleString("en-PH", {
-        timeZone: "Asia/Manila",
-      })
-
-      // Get full target item details
-      const targetItem = await apiService.operations.getItem(selectedTargetItem.part_number)
-      const targetPhase = targetItem.phases?.find((p) => p.id === Number.parseInt(selectedTargetPhase))
-      const targetSubphase = targetPhase?.subphases?.find((s) => s.id === Number.parseInt(selectedTargetSubphase))
-
-      if (!targetSubphase) {
-        alert("Could not find target subphase")
-        return
-      }
-
-      // Calculate new quantities
-      const newSourceQty = currentQty - transferQty
-      const targetCurrentQty = targetSubphase.current_completed_quantity || 0
-      const newTargetQty = targetCurrentQty + transferQty
-
-      // Optimistic update for source subphase quantity
-      updateSubphaseInState(selectedItem.part_number, selectedPhase.id, selectedSubphase.id, {
-        current_completed_quantity: newSourceQty,
-      })
-
-      // *** NEW CODE: Auto-uncheck if quantity drops below expected ***
-      if (selectedSubphase.completed == 1 && newSourceQty < selectedSubphase.expected_quantity) {
-        updateSubphaseInState(selectedItem.part_number, selectedPhase.id, selectedSubphase.id, {
-          current_completed_quantity: newSourceQty,
-          completed: 0,
-          completed_at: null,
-        })
-      }
-
-      // Optimistic update for target subphase quantity
-      updateSubphaseInState(
-        selectedTargetItem.part_number,
-        Number.parseInt(selectedTargetPhase),
-        Number.parseInt(selectedTargetSubphase),
-        { current_completed_quantity: newTargetQty },
-      )
-
-      // Close modal immediately
-      setTransferModalOpen(false)
-      setSelectedItem(null)
-      setSelectedPhase(null)
-      setSelectedSubphase(null)
-      setNewClient("")
-      setTransferQuantity("")
-      setTransferRemarks("")
-      setSelectedTargetItem(null)
-      setSelectedTargetPhase(null)
-      setSelectedTargetSubphase(null)
-
-      // Show success message
-      alert(`Successfully transferred ${transferQty} units to ${targetPhase.name} > ${targetSubphase.name}!`)
-
-      // API call to update source quantity
-      await apiService.operations.updateSubphaseCompletedQuantity(selectedSubphase.id, newSourceQty)
-
-      // *** NEW CODE: If subphase was marked complete and now quantity is insufficient, uncheck it ***
-      if (selectedSubphase.completed == 1 && newSourceQty < selectedSubphase.expected_quantity) {
-        await apiService.operations.completeSubphaseWithDuration(selectedSubphase.id, false)
-      }
-
-      // API call to update target quantity
-      await apiService.operations.updateSubphaseCompletedQuantity(targetSubphase.id, newTargetQty)
-
-      // Add remarks with transfer details
-      const transferRemark = `[${timestamp}] Transferred OUT ${transferQty} units to ${newClient} (${selectedTargetItem.part_number}) - ${targetPhase.name} > ${targetSubphase.name} | From: ${selectedPhase.name} > ${selectedSubphase.name}: ${transferRemarks.trim() || "No remarks"}`
-      const receiveRemark = `[${timestamp}] Received IN ${transferQty} units from ${selectedItem.client_name} (${selectedItem.part_number}) - ${selectedPhase.name} > ${selectedSubphase.name} | To: ${targetPhase.name} > ${targetSubphase.name}: ${transferRemarks.trim() || "No remarks"}`
-
-      await apiService.operations.updateItem(selectedItem.part_number, {
-        remarks: selectedItem.remarks ? `${selectedItem.remarks}\n${transferRemark}` : transferRemark,
-      })
-
-      await apiService.operations.updateItem(selectedTargetItem.part_number, {
-        remarks: selectedTargetItem.remarks ? `${selectedTargetItem.remarks}\n${receiveRemark}` : receiveRemark,
-      })
-
-      // Reload data in background to sync all changes
-      loadData()
-    } catch (error) {
-      console.error("Error transferring:", error)
-      alert("Failed to transfer: " + error.message)
-      await loadData() // Reload on error
     }
   }
 
@@ -1101,14 +967,6 @@ function Checklist({
     return calculatePhaseProgress(previousPhase) === 100 && previousPhase.end_time
   }
 
-  // Helper function to extract base part number (remove batch suffix)
-  const getBasePartNumber = (partNumber) => {
-    if (!partNumber) return '';
-    // Extract only the numeric part before "-BATCH-"
-    const match = partNumber.match(/^(\d+)/);
-    return match ? match[1] : partNumber;
-  };
-
   // Toggle Item Checkbox
   const toggleItemCheckbox = (partNumber) => {
     setItemCheckboxes(prev => ({
@@ -1123,776 +981,503 @@ function Checklist({
   }
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h2 className={`text-2xl font-bold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-          Progress Checklist
-        </h2>
-      </div>
+  <div className="pb-20 sm:pb-6">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
+      <h2 className={`text-xl sm:text-2xl font-bold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+        Progress Checklist
+      </h2>
+    </div>
 
-      {/* Search and Filter Bar */}
-      <div
-        className={`backdrop-blur-md rounded-lg p-4 mb-6 border transition-all shadow-sm ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-          }`}
-      >
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* Search */}
-          <div className="flex-1 relative">
-            <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by name, part number, or client..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value)
-                setCurrentPage(1) // ADD THIS LINE
-              }}
-              className={`w-full pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all ${isDarkMode
+    {/* Search and Filter Bar - Mobile Optimized */}
+    <div
+      className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 border transition-all shadow-sm ${
+        isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+      }`}
+    >
+      <div className="flex flex-col gap-3">
+        {/* Search - Full width on mobile */}
+        <div className="relative">
+          <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value)
+              setCurrentPage(1)
+            }}
+            className={`w-full pl-10 pr-4 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
+              isDarkMode
                 ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                 : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                }`}
-            />
-          </div>
-
-          {/* Filter Button */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors"
-          >
-            <Filter size={18} />
-            <span className="hidden sm:inline">Filters</span>
-            {(filterClient || filterPriority || filterStatus || sortBy) &&
-              `(${[filterClient, filterPriority, filterStatus, sortBy].filter(Boolean).length})`
-            }
-          </button>
-        </div>
-
-        {/* Filter Options */}
-        {showFilters && (
-          <div className="mt-3 pt-3 border-t border-gray-300/20 dark:border-gray-700/20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Filter by Client
-              </label>
-              <select
-                value={filterClient}
-                onChange={(e) => setFilterClient(e.target.value)}
-                className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800"
-                  }`}
-              >
-                <option value="">All Clients</option>
-                {uniqueClients.map((client) => (
-                  <option key={client} value={client}>
-                    {client}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Filter by Priority
-              </label>
-              <select
-                value={filterPriority}
-                onChange={(e) => setFilterPriority(e.target.value)}
-                className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800"
-                  }`}
-              >
-                <option value="">All Priorities</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
-            </div>
-
-            {/* NEW: Status Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Filter by Status
-              </label>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800"
-                  }`}
-              >
-                <option value="">All Statuses</option>
-                <option value="not-started">Not Started</option>
-                <option value="in-progress">In Progress</option>
-                <option value="completed">Completed</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Sort by
-              </label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className={`w-full px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800"
-                  }`}
-              >
-                <option value="">Default</option>
-                <option value="name-asc">Name (A-Z)</option>
-                <option value="name-desc">Name (Z-A)</option>
-                <option value="date-newest">Date Added (Newest)</option>
-                <option value="date-oldest">Date Added (Oldest)</option>
-              </select>
-            </div>
-
-            {/* UPDATE: Clear filters to include status */}
-            {(filterClient || filterPriority || filterStatus || sortBy) && (
-              <div className="sm:col-span-2 lg:col-span-4">
-                <button
-                  onClick={() => {
-                    setFilterClient("")
-                    setFilterPriority("")
-                    setFilterStatus("")
-                    setSortBy("")
-                    setCurrentPage(1)
-                  }}
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  Clear all filters
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      {isFiltering && (
-        <div className="text-center py-8">
-          <div className={`animate-spin rounded-full h-8 w-8 border-b-2 mx-auto ${isDarkMode ? "border-slate-400" : "border-slate-600"
-            }`}></div>
-          <p className={`mt-4 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-            Filtering items...
-          </p>
-        </div>
-      )}
-
-      {/* Bulk Edit Section */}
-      {getCheckedItemsCount() > 0 && (
-        <div className={`backdrop-blur-md rounded-lg p-4 mb-4 border transition-all shadow-sm ${isDarkMode ? "bg-purple-500/10 border-purple-500/30" : "bg-purple-500/10 border-purple-500/30"
-          }`}>
-          <div className="flex items-center justify-between">
-            <span className={`text-sm font-medium ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
-              {getCheckedItemsCount()} item(s) selected
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  const selected = Object.keys(itemCheckboxes)
-                    .filter(partNumber => itemCheckboxes[partNumber])
-                    .map(partNumber => items.find(item => item.part_number === partNumber))
-                    .filter(Boolean)
-                  setSelectedItemsForBulk(selected)
-                  setShowBulkEditModal(true)
-                }}
-                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-              >
-                <Edit2 size={16} />
-                Bulk Edit
-              </button>
-              <button
-                onClick={() => setItemCheckboxes({})}
-                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm font-medium"
-              >
-                Clear Selection
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div
-          className={`backdrop-blur-md rounded-lg p-4 border transition-all shadow-sm ${isDarkMode ? "bg-blue-500/10 border-blue-500/30" : "bg-gradient-to-r from-blue-500/10 to-blue-400/10 border-blue-500/30"
             }`}
-        >
-          <h3 className={`text-lg font-semibold ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>In Progress</h3>
-          <p className={`text-3xl font-bold mt-2 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
-            {inProgressItems.length}
-          </p>
+          />
         </div>
-        <div
-          className={`backdrop-blur-md rounded-lg p-4 border transition-all shadow-sm ${isDarkMode ? "bg-green-500/10 border-green-500/30" : "bg-gradient-to-r from-green-500/10 to-green-400/10 border-green-500/30"
-            }`}
+
+        {/* Filter Button - Full width on mobile */}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="flex items-center justify-center gap-2 px-4 py-3 sm:py-2 bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white rounded-lg transition-colors text-base sm:text-sm font-medium w-full sm:w-auto"
         >
-          <h3 className={`text-lg font-semibold ${isDarkMode ? "text-green-300" : "text-green-700"}`}>Completed</h3>
-          <p className={`text-3xl font-bold mt-2 ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
-            {completedItems.length}
-          </p>
-        </div>
+          <Filter size={18} />
+          <span>Filters</span>
+          {(filterClient || filterPriority || filterStatus || sortBy) &&
+            ` (${[filterClient, filterPriority, filterStatus, sortBy].filter(Boolean).length})`}
+        </button>
       </div>
 
-      {/* Transfer Modal */}
-      {transferModalOpen && selectedItem && selectedSubphase && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div
-            className={`rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto ${isDarkMode ? "bg-gray-800" : "bg-white"
+      {/* Filter Options - Mobile Optimized */}
+      {showFilters && (
+        <div className="mt-3 pt-3 border-t border-gray-300/20 dark:border-gray-700/20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Filter by Client
+            </label>
+            <select
+              value={filterClient}
+              onChange={(e) => setFilterClient(e.target.value)}
+              className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
+                isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800"
               }`}
-          >
-            <h3
-              className={`text-xl font-bold mb-4 flex items-center gap-2 ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                }`}
             >
-              <ArrowRightLeft size={20} />
-              Transfer Subphase Quantity
-            </h3>
+              <option value="">All Clients</option>
+              {uniqueClients.map((client) => (
+                <option key={client} value={client}>
+                  {client}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            <div className={`mb-4 p-3 rounded-lg space-y-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
-              <div>
-                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>From Item:</p>
-                <p className={`font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>{selectedItem.name}</p>
-                <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                  Client: {selectedItem.client_name}
-                </p>
-              </div>
-              <div>
-                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Phase / Subphase:</p>
-                <p className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                  {selectedPhase.name} → {selectedSubphase.name}
-                </p>
-              </div>
-              <div>
-                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Available to Transfer:</p>
-                <p className={`font-bold ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
-                  {selectedSubphase.current_completed_quantity || 0} units
-                </p>
-              </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Filter by Priority
+            </label>
+            <select
+              value={filterPriority}
+              onChange={(e) => setFilterPriority(e.target.value)}
+              className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
+                isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800"
+              }`}
+            >
+              <option value="">All Priorities</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Filter by Status
+            </label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
+                isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800"
+              }`}
+            >
+              <option value="">All Statuses</option>
+              <option value="not-started">Not Started</option>
+              <option value="in-progress">In Progress</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Sort by
+            </label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
+                isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800"
+              }`}
+            >
+              <option value="">Default</option>
+              <option value="name-asc">Name (A-Z)</option>
+              <option value="name-desc">Name (Z-A)</option>
+              <option value="date-newest">Date Added (Newest)</option>
+              <option value="date-oldest">Date Added (Oldest)</option>
+            </select>
+          </div>
+
+          {(filterClient || filterPriority || filterStatus || sortBy) && (
+            <div className="sm:col-span-2 lg:col-span-4">
+              <button
+                onClick={() => {
+                  setFilterClient("")
+                  setFilterPriority("")
+                  setFilterStatus("")
+                  setSortBy("")
+                  setCurrentPage(1)
+                }}
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline active:text-blue-700 py-2"
+              >
+                Clear all filters
+              </button>
             </div>
+          )}
+        </div>
+      )}
+    </div>
 
-            <div className="space-y-4">
-              {/* Client Selection */}
-              <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Target Client *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter client name"
-                  value={newClient}
-                  onChange={(e) => {
-                    setNewClient(e.target.value)
-                    setSelectedTargetItem(null)
-                    setSelectedTargetPhase(null)
-                    setSelectedTargetSubphase(null)
-                  }}
-                  autoFocus
-                  className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
-                    ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                    : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
-                    }`}
-                />
+    {isFiltering && (
+      <div className="text-center py-8">
+        <div
+          className={`animate-spin rounded-full h-8 w-8 border-b-2 mx-auto ${
+            isDarkMode ? "border-slate-400" : "border-slate-600"
+          }`}
+        ></div>
+        <p className={`mt-4 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+          Filtering items...
+        </p>
+      </div>
+    )}
 
-                {showClientDropdown && (
+    {/* Bulk Edit Section - Mobile Optimized */}
+    {getCheckedItemsCount() > 0 && (
+      <div
+        className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mb-4 border transition-all shadow-sm ${
+          isDarkMode ? "bg-purple-500/10 border-purple-500/30" : "bg-purple-500/10 border-purple-500/30"
+        }`}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <span className={`text-sm font-medium ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
+            {getCheckedItemsCount()} item(s) selected
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                const selected = Object.keys(itemCheckboxes)
+                  .filter((partNumber) => itemCheckboxes[partNumber])
+                  .map((partNumber) => items.find((item) => item.part_number === partNumber))
+                  .filter(Boolean)
+                setSelectedItemsForBulk(selected)
+                setShowBulkEditModal(true)
+              }}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white px-4 py-2.5 sm:py-2 rounded-lg transition-colors text-sm font-medium"
+            >
+              <Edit2 size={16} />
+              <span>Bulk Edit</span>
+            </button>
+            <button
+              onClick={() => setItemCheckboxes({})}
+              className="flex-1 sm:flex-none px-4 py-2.5 sm:py-2 bg-gray-500 hover:bg-gray-600 active:bg-gray-700 text-white rounded-lg transition-colors text-sm font-medium"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Summary Stats - Mobile Optimized */}
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
+      <div
+        className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border transition-all shadow-sm ${
+          isDarkMode ? "bg-blue-500/10 border-blue-500/30" : "bg-gradient-to-r from-blue-500/10 to-blue-400/10 border-blue-500/30"
+        }`}
+      >
+        <h3 className={`text-sm sm:text-lg font-semibold ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
+          In Progress
+        </h3>
+        <p className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
+          {inProgressItems.length}
+        </p>
+      </div>
+      <div
+        className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border transition-all shadow-sm ${
+          isDarkMode ? "bg-green-500/10 border-green-500/30" : "bg-gradient-to-r from-green-500/10 to-green-400/10 border-green-500/30"
+        }`}
+      >
+        <h3 className={`text-sm sm:text-lg font-semibold ${isDarkMode ? "text-green-300" : "text-green-700"}`}>
+          Completed
+        </h3>
+        <p className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
+          {completedItems.length}
+        </p>
+      </div>
+    </div>
+
+    
+
+    {!isFiltering && items.length > 0 ? (
+      <div className="space-y-6 sm:space-y-8">
+        {/* In Progress Items */}
+        {inProgressItems.length > 0 && (
+          <div>
+            <h3
+              className={`text-xl sm:text-2xl font-bold mb-3 sm:mb-4 flex items-center gap-2 ${
+                isDarkMode ? "text-gray-200" : "text-gray-800"
+              }`}
+            >
+              <Clock size={20} />
+              In Progress ({inProgressItems.length})
+            </h3>
+            <div className="space-y-3 sm:space-y-4">
+              {sortedInProgressItems.map((item) => {
+                const itemKey = item.part_number || item.id
+                const priority = item.priority || "Medium"
+                const elapsedSeconds = getItemElapsedTime(item)
+                const progress = calculateItemProgress(item)
+
+                return (
                   <div
-                    className={`absolute z-10 w-full mt-1 border rounded-lg shadow-lg max-h-40 overflow-y-auto ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"
-                      }`}
+                    key={itemKey}
+                    className={`backdrop-blur-md rounded-lg border overflow-hidden transition-all shadow-sm ${
+                      isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+                    }`}
                   >
-                    {clients
-                      .filter(
-                        (c) => c !== selectedItem?.client_name && c.toLowerCase().includes(newClient.toLowerCase()),
-                      )
-                      .map((client, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            setNewClient(client)
-                            setShowClientDropdown(false)
-                          }}
-                          className={`w-full text-left px-4 py-2 border-b transition-colors ${isDarkMode
-                            ? "hover:bg-gray-600 border-gray-600 text-gray-200"
-                            : "hover:bg-gray-100 border-gray-200 text-gray-800"
-                            } last:border-b-0`}
-                        >
-                          {client}
-                        </button>
-                      ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Target Item Selection */}
-              {newClient.trim() && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Target Item *
-                    </label>
-                    {clientItems.length > 0 ? (
-                      <select
-                        value={selectedTargetItem?.part_number || ""}
-                        onChange={(e) => {
-                          const item = clientItems.find((i) => i.part_number === e.target.value)
-                          setSelectedTargetItem(item || null)
-                          setSelectedTargetPhase(null)
-                          setSelectedTargetSubphase(null)
-                        }}
-                        className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-200"
-                          : "bg-gray-100 border-gray-300 text-gray-800"
-                          }`}
-                      >
-                        <option value="">Select target item</option>
-                        {clientItems.map((item) => (
-                          <option key={item.part_number} value={item.part_number}>
-                            {item.part_number} ({item.quantity || 0} qty)
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <p
-                        className={`text-sm p-3 rounded ${isDarkMode ? "text-yellow-400 bg-yellow-500/10" : "text-yellow-600 bg-yellow-500/10"
-                          }`}
-                      >
-                        No matching items found for part number "{getBasePartNumber(selectedItem?.part_number)}" under client "{newClient}"
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Target Phase Selection */}
-                  {selectedTargetItem && selectedTargetItem.phases && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Target Phase *
-                      </label>
-                      <select
-                        value={selectedTargetPhase || ""}
-                        onChange={(e) => {
-                          setSelectedTargetPhase(e.target.value)
-                          setSelectedTargetSubphase(null)
-                        }}
-                        className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-200"
-                          : "bg-gray-100 border-gray-300 text-gray-800"
-                          }`}
-                      >
-                        <option value="">Select target phase</option>
-                        {selectedTargetItem.phases.map((phase) => (
-                          <option key={phase.id} value={phase.id}>
-                            {phase.name} ({phase.subphases?.length || 0} subphases)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Target Subphase Selection */}
-                  {selectedTargetItem && selectedTargetPhase && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Target Subphase *
-                      </label>
-                      <select
-                        value={selectedTargetSubphase || ""}
-                        onChange={(e) => {
-                          setSelectedTargetSubphase(e.target.value)
-                        }}
-                        className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-200"
-                          : "bg-gray-100 border-gray-300 text-gray-800"
-                          }`}
-                      >
-                        <option value="">Select target subphase</option>
-                        {selectedTargetItem.phases
-                          .find((p) => p.id === Number.parseInt(selectedTargetPhase))
-                          ?.subphases?.map((subphase) => (
-                            <option key={subphase.id} value={subphase.id}>
-                              {subphase.name} (Current: {subphase.current_completed_quantity || 0} / Expected:{" "}
-                              {subphase.expected_quantity})
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Show selected target info */}
-                  {selectedTargetItem && selectedTargetPhase && selectedTargetSubphase && (
-                    <div
-                      className={`p-3 rounded-lg border ${isDarkMode ? "bg-green-500/10 border-green-500/30" : "bg-green-500/10 border-green-500/30"
-                        }`}
-                    >
-                      <p className={`text-sm font-medium ${isDarkMode ? "text-green-300" : "text-green-700"}`}>
-                        ✓ Transfer destination selected
-                      </p>
-                      <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"} mt-1`}>
-                        {selectedTargetItem.phases.find((p) => p.id === Number.parseInt(selectedTargetPhase))?.name} →{" "}
-                        {
-                          selectedTargetItem.phases
-                            .find((p) => p.id === Number.parseInt(selectedTargetPhase))
-                            ?.subphases?.find((s) => s.id === Number.parseInt(selectedTargetSubphase))?.name
-                        }
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Transfer Quantity */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-                  <Package size={16} />
-                  Quantity to Transfer *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max={selectedSubphase.current_completed_quantity || 0}
-                  value={transferQuantity}
-                  onChange={(e) => setTransferQuantity(e.target.value)}
-                  className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
-                    ? "bg-gray-700 border-gray-600 text-gray-200"
-                    : "bg-gray-100 border-gray-300 text-gray-800"
-                    }`}
-                />
-              </div>
-
-              {/* Transfer Remarks */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-                  <FileText size={16} />
-                  Transfer Remarks
-                </label>
-                <textarea
-                  placeholder="Enter reason for transfer..."
-                  value={transferRemarks}
-                  onChange={(e) => setTransferRemarks(e.target.value)}
-                  rows={3}
-                  className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 resize-none ${isDarkMode
-                    ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                    : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
-                    }`}
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={handleTransferClient}
-                disabled={!selectedTargetItem || !selectedTargetPhase || !selectedTargetSubphase || !transferQuantity}
-                className="flex-1 bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Transfer
-              </button>
-              <button
-                onClick={() => {
-                  setTransferModalOpen(false)
-                  setSelectedItem(null)
-                  setSelectedPhase(null)
-                  setSelectedSubphase(null)
-                  setNewClient("")
-                  setTransferQuantity("")
-                  setTransferRemarks("")
-                  setSelectedTargetItem(null)
-                  setSelectedTargetPhase(null)
-                  setSelectedTargetSubphase(null)
-                  setShowClientDropdown(false)
-                }}
-                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Barcode Scanner Modal */}
-      {scanningFor && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className={`rounded-lg p-6 max-w-md w-full mx-4 ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
-            <h3 className={`text-xl font-bold mb-4 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-              Scan Employee Barcode
-            </h3>
-            <input
-              type="text"
-              placeholder="Enter barcode or employee ID"
-              value={barcodeInput}
-              onChange={(e) => setBarcodeInput(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && submitBarcode()}
-              autoFocus
-              className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 mb-4 ${isDarkMode
-                ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
-                }`}
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={submitBarcode}
-                className="flex-1 bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-              >
-                Submit
-              </button>
-              <button
-                onClick={() => {
-                  setScanningFor(null)
-                  setBarcodeInput("")
-                }}
-                className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!isFiltering && items.length > 0 ? (
-        <div className="space-y-8">
-          {/* In Progress Items */}
-          {inProgressItems.length > 0 && (
-            <div>
-              <h3
-                className={`text-2xl font-bold mb-4 flex items-center gap-2 ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                  }`}
-              >
-                <Clock size={20} />
-                In Progress Items ({inProgressItems.length})
-              </h3>
-              <div className="space-y-4">
-                {sortedInProgressItems.map((item) => {
-                  const itemKey = item.part_number || item.id
-                  const priority = item.priority || "Medium"
-                  const elapsedSeconds = getItemElapsedTime(item)
-                  const progress = calculateItemProgress(item)
-
-                  return (
-                    <div
-                      key={itemKey}
-                      className={`backdrop-blur-md rounded-lg border overflow-hidden transition-all shadow-sm ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-                        }`}
-                    >
-                      {/* Item Header */}
-                      <div className="p-4">
-                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
-                          <div
+                    {/* Item Header - Mobile Optimized */}
+                    <div className="p-3 sm:p-4">
+                      <div className="flex flex-col gap-3 mb-3">
+                        {/* Top Row: Expand + Title + Progress */}
+                        <div className="flex items-start gap-3">
+                          <button
                             onClick={() => toggleItemExpansion(item.part_number)}
-                            className="flex items-center gap-3 cursor-pointer flex-1"
+                            className="shrink-0 p-1 hover:bg-gray-200/20 active:bg-gray-200/30 rounded transition-colors mt-0.5"
                           >
-                            <span className="text-xl shrink-0">{expandedItems[item.part_number] ? "▼" : "▶"}</span>
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h3
-                                  className={`font-semibold text-lg sm:text-xl ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}
-                                >
-                                  {item.name}
-                                </h3>
-                                <div
-                                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${getPriorityColor(priority)}`}
-                                >
-                                  <Flag size={12} />
-                                  {priority}
-                                </div>
-                                {item.client_name && (
-                                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500">
-                                    <User size={12} />
-                                    {item.client_name}
-                                  </div>
-                                )}
-                                {item.quantity && item.quantity > 1 && (
-                                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500">
-                                    <Package size={12} />
-                                    Qty: {item.quantity}
-                                  </div>
-                                )}
-                              </div>
-                              <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"} mt-1`}>
-                                Part #: {item.part_number} • {item.phases?.length || 0} phases
-                              </p>
-                              {item.remarks && (
-                                <p
-                                  className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"} mt-1 italic flex items-start gap-1`}
-                                >
-                                  <FileText size={12} className="mt-0.5 shrink-0" />
-                                  <span className="line-clamp-2">{item.remarks}</span>
-                                </p>
-                              )}
-                            </div>
+                            <span className="text-xl">{expandedItems[item.part_number] ? "▼" : "▶"}</span>
+                          </button>
+                          
+                          <div className="flex-1 min-w-0">
+                            <h3
+                              className={`font-semibold text-base sm:text-lg lg:text-xl ${
+                                isDarkMode ? "text-gray-200" : "text-gray-800"
+                              } break-words`}
+                            >
+                              {item.name}
+                            </h3>
+                            <p className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"} mt-1`}>
+                              Part #: {item.part_number}
+                            </p>
                           </div>
-                          <div className="flex items-center gap-3 justify-end sm:justify-start w-full sm:w-auto">
-                            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                              {["High", "Medium", "Low"].map((p) => (
-                                <button
-                                  key={p}
-                                  onClick={() => handleUpdatePriority(item.part_number, p)}
-                                  className={`px-2 py-1 text-xs rounded transition-colors ${priority === p
+                          
+                          <span className={`text-lg sm:text-xl font-bold shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                            {progress}%
+                          </span>
+                        </div>
+
+                        {/* Badges Row */}
+                        <div className="flex flex-wrap gap-2 pl-10">
+                          <div
+                            className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs border ${getPriorityColor(priority)}`}
+                          >
+                            <Flag size={12} />
+                            {priority}
+                          </div>
+                          {item.client_name && (
+                            <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500">
+                              <User size={12} />
+                              <span className="max-w-[150px] sm:max-w-none truncate">{item.client_name}</span>
+                            </div>
+                          )}
+                          {item.quantity && item.quantity > 1 && (
+                            <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500">
+                              <Package size={12} />
+                              Qty: {item.quantity}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Action Buttons Row */}
+                        <div className="flex flex-wrap items-center gap-2 pl-10">
+                          {/* Priority Buttons */}
+                          <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                            {["High", "Medium", "Low"].map((p) => (
+                              <button
+                                key={p}
+                                onClick={() => handleUpdatePriority(item.part_number, p)}
+                                className={`p-2 text-xs rounded transition-colors active:scale-95 ${
+                                  priority === p
                                     ? getPriorityColor(p)
                                     : isDarkMode
-                                      ? "text-gray-400 hover:text-gray-300"
-                                      : "text-gray-400 hover:text-gray-600"
-                                    }`}
-                                  title={`Set ${p} priority`}
-                                >
-                                  <Flag size={14} />
-                                </button>
-                              ))}
-                            </div>
-                            <div className="flex items-center gap-2 justify-end sm:justify-start w-full sm:w-auto">
-                              {/* ADD CHECKBOX FOR BULK SELECTION */}
-                              <input
-                                type="checkbox"
-                                checked={itemCheckboxes[item.part_number] || false}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  toggleItemCheckbox(item.part_number);
-                                }}
-                                className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                                title="Select for bulk edit"
-                              />
-
-                              {/* EDIT ITEM BUTTON */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedItemForEdit(item);
-                                  setShowEditItemModal(true);
-                                }}
-                                className="px-2 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
-                                title="Edit item details"
+                                    ? "text-gray-400 hover:text-gray-300 active:bg-gray-700"
+                                    : "text-gray-400 hover:text-gray-600 active:bg-gray-200"
+                                }`}
+                                title={`Set ${p} priority`}
                               >
-                                <Edit2 size={16} />
+                                <Flag size={16} />
                               </button>
-
-                              {/* ADD PHASE BUTTON */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedItemForEdit(item);
-                                  setShowAddPhaseModal(true);
-                                }}
-                                className="px-2 py-1 text-green-600 dark:text-green-400 hover:bg-green-500/10 rounded transition-colors"
-                                title="Add phase"
-                              >
-                                <Plus size={16} />
-                              </button>
-
-                              {/* DELETE ITEM BUTTON */}
-                              <button
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (window.confirm(`Delete "${item.name}" (${item.part_number})?\n\nThis will permanently delete all phases and subphases. This action cannot be undone.`)) {
-                                    try {
-                                      // Optimistically remove from UI
-                                      setItems(prevItems => prevItems.filter(i => i.part_number !== item.part_number));
-
-                                      // API call in background
-                                      await apiService.operations.deleteItem(item.part_number);
-
-                                      alert(`"${item.name}" has been deleted successfully.`);
-                                    } catch (error) {
-                                      console.error("Error deleting item:", error);
-                                      alert("Failed to delete item: " + error.message);
-                                      // Reload on error to restore state
-                                      await loadData();
-                                    }
-                                  }
-                                }}
-                                className="px-2 py-1 text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded transition-colors"
-                                title="Delete item"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-
-                              {/* TRANSFER BUTTON */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openTransferModal(item);
-                                }}
-                                className="px-2 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
-                                title="Transfer to another client"
-                              >
-                                <ArrowRightLeft size={16} />
-                              </button>
-
-
-                              {/* PROGRESS */}
-                              <span className={`text-lg font-bold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                                {progress}%
-                              </span>
-                            </div>
+                            ))}
                           </div>
+
+                          {/* Checkbox */}
+                          <label className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={itemCheckboxes[item.part_number] || false}
+                              onChange={() => toggleItemCheckbox(item.part_number)}
+                              className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                              title="Select for bulk edit"
+                            />
+                          </label>
+
+                          {/* Action Buttons */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedItemForEdit(item)
+                              setShowEditItemModal(true)
+                            }}
+                            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 active:bg-blue-500/20 rounded transition-colors"
+                            title="Edit item"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedItemForEdit(item)
+                              setShowAddPhaseModal(true)
+                            }}
+                            className="p-2 text-green-600 dark:text-green-400 hover:bg-green-500/10 active:bg-green-500/20 rounded transition-colors"
+                            title="Add phase"
+                          >
+                            <Plus size={16} />
+                          </button>
+
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation()
+                              if (
+                                window.confirm(
+                                  `Delete "${item.name}" (${item.part_number})?\n\nThis will permanently delete all phases and subphases. This action cannot be undone.`
+                                )
+                              ) {
+                                try {
+                                  setItems((prevItems) => prevItems.filter((i) => i.part_number !== item.part_number))
+                                  await apiService.operations.deleteItem(item.part_number)
+                                  alert(`"${item.name}" has been deleted successfully.`)
+                                } catch (error) {
+                                  console.error("Error deleting item:", error)
+                                  alert("Failed to delete item: " + error.message)
+                                  await loadData()
+                                }
+                              }
+                            }}
+                            className="p-2 text-red-600 dark:text-red-400 hover:bg-red-500/10 active:bg-red-500/20 rounded transition-colors"
+                            title="Delete item"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openTransferModal(item)
+                            }}
+                            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 active:bg-blue-500/20 rounded transition-colors"
+                            title="Transfer"
+                          >
+                            <ArrowRightLeft size={16} />
+                          </button>
                         </div>
+
+                        {/* Remarks */}
+                        {item.remarks && (
+                          <div className="pl-10">
+                            <p
+                              className={`text-xs ${
+                                isDarkMode ? "text-gray-400" : "text-gray-500"
+                              } italic flex items-start gap-1`}
+                            >
+                              <FileText size={12} className="mt-0.5 shrink-0" />
+                              <span className="line-clamp-2">{item.remarks}</span>
+                            </p>
+                          </div>
+                        )}
                       </div>
+                    </div>
 
-                      {/* Phases */}
-                      {expandedItems[item.part_number] && (
-                        <div className="px-4 pb-4 space-y-3">
-                          {item.phases && item.phases.length > 0 ? (
-                            item.phases.map((phase, phaseIndex) => {
-                              const phaseKey = phase.id
-                              const isFirstPhase = phaseIndex === 0
-                              const isPreviousPhaseComplete = isPreviousPhaseCompleted(item, phaseIndex)
-                              const isPhaseDisabled = !isFirstPhase && !isPreviousPhaseComplete
+                    {/* Phases - Mobile Optimized */}
+                    {expandedItems[item.part_number] && (
+                      <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-3">
+                        {item.phases && item.phases.length > 0 ? (
+                          item.phases.map((phase, phaseIndex) => {
+                            const phaseKey = phase.id
+                            const isFirstPhase = phaseIndex === 0
+                            const isPreviousPhaseComplete = isPreviousPhaseCompleted(item, phaseIndex)
+                            const isPhaseDisabled = !isFirstPhase && !isPreviousPhaseComplete
 
-                              return (
-                                <div
-                                  key={phaseKey}
-                                  className={`rounded-lg border ${isPhaseDisabled
+                            return (
+                              <div
+                                key={phaseKey}
+                                className={`rounded-lg border ${
+                                  isPhaseDisabled
                                     ? "border-yellow-500/30 opacity-60"
                                     : isDarkMode
-                                      ? "border-gray-700/10"
-                                      : "border-gray-300/10"
-                                    }`}
-                                >
-                                  {/* Add warning if phase is disabled */}
-                                  {isPhaseDisabled && (
-                                    <div className="px-3 pt-3">
-                                      <div
-                                        className={`p-2 rounded text-xs ${isDarkMode
+                                    ? "border-gray-700/10"
+                                    : "border-gray-300/10"
+                                }`}
+                              >
+                                {isPhaseDisabled && (
+                                  <div className="px-3 pt-3">
+                                    <div
+                                      className={`p-2 rounded text-xs ${
+                                        isDarkMode
                                           ? "text-yellow-400 bg-yellow-500/10 border border-yellow-500/30"
                                           : "text-yellow-700 bg-yellow-500/10 border border-yellow-500/30"
-                                          }`}
-                                      >
-                                        ⚠️ Complete previous phase first
-                                      </div>
+                                      }`}
+                                    >
+                                      ⚠️ Complete previous phase first
                                     </div>
-                                  )}
+                                  </div>
+                                )}
 
-                                  {/* Phase Header */}
-                                  <div className="p-3">
-                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-3">
-                                      <div
+                                {/* Phase Header - Mobile Optimized */}
+                                <div className="p-3">
+                                  <div className="flex flex-col gap-3">
+                                    {/* Phase Title Row */}
+                                    <div className="flex items-start gap-2">
+                                      <button
                                         onClick={() => togglePhaseExpansion(phase.id)}
-                                        className="flex items-center gap-2 cursor-pointer flex-1"
+                                        className="shrink-0 p-1 hover:bg-gray-200/20 active:bg-gray-200/30 rounded transition-colors"
                                       >
-                                        <span className="shrink-0">{expandedPhases[phase.id] ? "▼" : "▶"}</span>
-                                        <span
-                                          className={`font-medium text-base sm:text-lg ${isDarkMode ? "text-gray-200" : "text-gray-800"
+                                        <span className="text-base">{expandedPhases[phase.id] ? "▼" : "▶"}</span>
+                                      </button>
+                                      
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <span
+                                            className={`font-medium text-base sm:text-lg ${
+                                              isDarkMode ? "text-gray-200" : "text-gray-800"
                                             }`}
-                                        >
-                                          {phase.name}
+                                          >
+                                            {phase.name}
+                                          </span>
                                           {isFirstPhase && (
-                                            <span className="ml-2 text-xs bg-blue-500 text-white px-2 py-0.5 rounded">
+                                            <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded">
                                               Phase 1
                                             </span>
                                           )}
-                                        </span>
-
-                                        <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                                          ({phase.subphases?.length || 0} sub-phases)
-                                        </span>
+                                          <span className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                                            ({phase.subphases?.length || 0} sub)
+                                          </span>
+                                        </div>
                                       </div>
-                                      <div className="flex gap-1 ml-auto" onClick={(e) => e.stopPropagation()}>
+
+                                      {/* Edit/Add Buttons */}
+                                      <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                                         <button
                                           onClick={() => {
                                             setSelectedItemForEdit(item)
                                             setSelectedPhaseForEdit(phase)
                                             setShowEditPhaseModal(true)
                                           }}
-                                          className="px-2 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
+                                          className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 active:bg-blue-500/20 rounded transition-colors"
                                           title="Edit phase"
                                         >
                                           <Edit2 size={14} />
@@ -1903,970 +1488,947 @@ function Checklist({
                                             setSelectedPhaseForEdit(phase)
                                             setShowAddSubphaseModal(true)
                                           }}
-                                          className="px-2 py-1 text-green-600 dark:text-green-400 hover:bg-green-500/10 rounded transition-colors"
+                                          className="p-1.5 text-green-600 dark:text-green-400 hover:bg-green-500/10 active:bg-green-500/20 rounded transition-colors"
                                           title="Add subphase"
                                         >
                                           <Plus size={14} />
                                         </button>
                                       </div>
-                                      <div className="flex items-center gap-3 w-full sm:w-auto">
-                                        <div
-                                          className={`w-full sm:w-32 rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"
-                                            }`}
-                                        >
-                                          <div
-                                            className="bg-slate-600 dark:bg-slate-400 h-2 rounded-full transition-all duration-300"
-                                            style={{
-                                              width: `${calculatePhaseProgress(phase)}%`,
-                                            }}
-                                          ></div>
-                                        </div>
-                                        <span
-                                          className={`text-sm font-semibold w-12 text-right ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                            }`}
-                                        >
-                                          {calculatePhaseProgress(phase)}%
-                                        </span>
-                                      </div>
                                     </div>
 
-                                    {/* Phase Duration Tracker */}
-                                    <div className={`rounded-lg p-3 ${isDarkMode ? "bg-slate-500/20" : "bg-slate-500/10"}`}>
-                                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
-                                        <span className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-                                          }`}>
-                                          <Calendar size={16} />
-                                          Phase Duration
-                                          {phase.expected_hours && (
-                                            <span className={`text-xs px-2 py-0.5 rounded ${isDarkMode ? "bg-purple-500/20 text-purple-300" : "bg-purple-500/20 text-purple-700"
-                                              }`}>
-                                              Expected: {Number.parseFloat(phase.expected_hours).toFixed(1)}h
-                                            </span>
-                                          )}
-                                        </span>
-                                        <div className="flex items-center gap-2">
-                                          <Clock size={16} className="text-slate-600 dark:text-slate-400" />
-                                          <span className={`text-lg font-mono font-bold ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                            }`}>
-                                            {formatTime(getPhaseElapsedTime(phase))}
-                                          </span>
-                                          {/* Show variance indicator if phase is complete and has expected hours */}
-                                          {phase.end_time && phase.expected_hours && phase.actual_hours && (
-                                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${phase.actual_hours > phase.expected_hours
-                                                ? "bg-red-500/20 text-red-700 dark:text-red-300"
-                                                : "bg-green-500/20 text-green-700 dark:text-green-300"
-                                              }`}>
-                                              {phase.actual_hours > phase.expected_hours ? "+" : ""}
-                                              {(phase.actual_hours - phase.expected_hours).toFixed(1)}h
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      {/* Show progress bar for expected vs actual if expected hours set */}
-                                      {phase.expected_hours && phase.start_time && !phase.end_time && (
-                                        <div className="mb-2">
-                                          <div className="flex justify-between text-xs mb-1">
-                                            <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
-                                              Progress vs Expected
-                                            </span>
-                                            <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
-                                              {((getPhaseElapsedTime(phase) / 3600) / phase.expected_hours * 100).toFixed(0)}%
-                                            </span>
-                                          </div>
-                                          <div className={`w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
-                                            <div
-                                              className={`h-2 rounded-full transition-all duration-300 ${(getPhaseElapsedTime(phase) / 3600) > phase.expected_hours
-                                                  ? "bg-red-500"
-                                                  : "bg-purple-500"
-                                                }`}
-                                              style={{
-                                                width: `${Math.min(100, ((getPhaseElapsedTime(phase) / 3600) / phase.expected_hours * 100))}%`,
-                                              }}
-                                            ></div>
-                                          </div>
-                                          <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                                            {(getPhaseElapsedTime(phase) / 3600).toFixed(2)}h of {phase.expected_hours}h expected
-                                          </p>
-                                        </div>
-                                      )}
-
-                                      <div className="flex justify-between items-center text-xs mb-3">
-                                        <div>
-                                          <span className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""}`}>Start: </span>
-                                          <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                                            {formatDateTime(phase.start_time)}
-                                          </span>
-                                        </div>
-                                        <div>
-                                          <span className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""}`}>End: </span>
-                                          <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                                            {phase.end_time
-                                              ? formatDateTime(phase.end_time)
-                                              : phase.pause_time
-                                                ? "Paused"
-                                                : "In progress"}
-                                          </span>
-                                        </div>
-                                      </div>
-
+                                    {/* Progress Bar */}
+                                    <div className="flex items-center gap-3">
                                       <div
-                                        className={`grid gap-2 w-full ${!phase.start_time || (phase.pause_time && !phase.end_time && calculatePhaseProgress(phase) < 100)
-                                          ? "grid-flow-col justify-center"
-                                          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-                                          }`}
+                                        className={`flex-1 rounded-full h-2 ${
+                                          isDarkMode ? "bg-gray-700" : "bg-gray-300"
+                                        }`}
                                       >
-                                        {!phase.start_time ? (
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleStartPhase(item.part_number, phase.id);
-                                            }}
-                                            className="flex w-full items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                                          >
-                                            <Play size={16} />
-                                            Start Phase
-                                          </button>
-                                        ) : phase.pause_time && !phase.end_time ? (
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleResumePhase(item.part_number, phase.id);
-                                            }}
-                                            className="flex-1 flexs w-2xl items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                                          >
-                                            <Play size={16} />
-                                            Resume Phase
-                                          </button>
-                                        ) : !phase.end_time ? (
-                                          <>
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handlePausePhase(item.part_number, phase.id);
-                                              }}
-                                              className="flex-1 flex items-center justify-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                                            >
-                                              <Pause size={16} />
-                                              Pause Phase
-                                            </button>
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleStopPhase(item.part_number, phase.id);
-                                              }}
-                                              className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                                              disabled={calculatePhaseProgress(phase) < 100}
-                                              title={
-                                                calculatePhaseProgress(phase) < 100
-                                                  ? "Complete all subphases to stop"
-                                                  : "Stop phase"
-                                              }
-                                            >
-                                              <StopCircle size={16} />
-                                              {calculatePhaseProgress(phase) === 100 ? "Stop Phase" : "Complete to Stop"}
-                                            </button>
-                                          </>
-                                        ) : (
-                                          <div className="flex-1 flex items-center justify-center gap-2 bg-green-600/80 text-white px-3 py-2 rounded-lg text-sm font-medium">
-                                            <CheckCircle size={16} />
-
-                                            Phase Completed
-                                          </div>
-                                        )}
-
-                                        {phase.start_time && (
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleResetPhase(item.part_number, phase.id);
-                                            }}
-                                            className="px-3 py-2 bg-gray-600 justify-center hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
-                                            title="Reset duration"
-                                          >
-                                            <RotateCcw size={14} />
-                                            Reset
-                                          </button>
-                                        )}
+                                        <div
+                                          className="bg-slate-600 dark:bg-slate-400 h-2 rounded-full transition-all duration-300"
+                                          style={{
+                                            width: `${calculatePhaseProgress(phase)}%`,
+                                          }}
+                                        ></div>
                                       </div>
+                                      <span
+                                        className={`text-sm font-semibold w-12 text-right ${
+                                          isDarkMode ? "text-gray-200" : "text-gray-800"
+                                        }`}
+                                      >
+                                        {calculatePhaseProgress(phase)}%
+                                      </span>
                                     </div>
                                   </div>
 
-                                  {/* Sub-Phases */}
-                                  {expandedPhases[phase.id] && (
-                                    <div className="px-3 pb-3 space-y-2">
-                                      {phase.subphases && phase.subphases.length > 0 ? (
-                                        phase.subphases.map((subphase, subphaseIndex) => {
-                                          const subPhaseKey = subphase.id
-                                          const conditionMet = isSubphaseConditionMet(
-                                            item,
-                                            phase,
-                                            subphase,
-                                            subphaseIndex,
-                                          )
-                                          const isDisabled = !conditionMet && subphase.completed != 1
-
-                                          return (
-                                            <div
-                                              key={subPhaseKey}
-                                              className={`p-3 rounded-lg border ${isDarkMode
-                                                ? "bg-black/10 border-gray-700/10"
-                                                : "bg-white/5 border-gray-300/10"
-                                                }`}
-                                            >
-                                              <div className="flex items-start gap-3">
-                                                <div className="relative shrink-0">
-                                                  <input
-                                                    type="checkbox"
-                                                    checked={subphase.completed == 1}
-                                                    disabled={isDisabled}
-                                                    onChange={() => {
-                                                      if (!isDisabled) {
-                                                        const action =
-                                                          subphase.completed != 1 ? "complete" : "incomplete"
-                                                        if (window.confirm(`Mark "${subphase.name}" as ${action}?`)) {
-                                                          handleToggleSubPhase(
-                                                            item.part_number,
-                                                            phase.id,
-                                                            subphase.id,
-                                                            subphase.completed == 1,
-                                                          )
-                                                        }
-                                                      }
-                                                    }}
-                                                    className={`mt-1 w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-slate-600 focus:ring-slate-500 ${isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
-                                                      }`}
-                                                    title={
-                                                      isDisabled
-                                                        ? !phase.start_time
-                                                          ? "Phase not started yet"
-                                                          : phase.pause_time
-                                                            ? "Phase is paused - resume to continue"
-                                                            : phase.end_time
-                                                              ? "Phase already completed"
-                                                              : !subphase.employee_barcode
-                                                                ? "Assign employee first"
-                                                                : subphaseIndex > 0 &&
-                                                                  !isPreviousSubphaseCompleted(
-                                                                    item,
-                                                                    phase,
-                                                                    subphaseIndex,
-                                                                  )
-                                                                  ? "Complete previous subphase first"
-                                                                  : subphase.expected_quantity > 0 &&
-                                                                    (subphase.current_completed_quantity || 0) < subphase.expected_quantity
-                                                                    ? `Complete ${subphase.expected_quantity} units first (current: ${subphase.current_completed_quantity || 0})`
-                                                                    : "Conditions not met"
-                                                        : subphase.completed == 1
-                                                          ? "Mark as incomplete"
-                                                          : "Mark as complete"
-                                                    }
-                                                  />
-                                                  {isDisabled && (
-                                                    <div
-                                                      className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"
-                                                      title="Conditions not met"
-                                                    />
-                                                  )}
-                                                </div>
-                                                <div className="flex-1">
-                                                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                      <p className={`font-medium ${subphase.completed == 1
-                                                        ? "line-through opacity-60"
-                                                        : isDisabled
-                                                          ? "opacity-50"
-                                                          : ""
-                                                        } ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                                                        {subphase.name}
-                                                      </p>
-
-                                                      {/* ADD EDIT SUBPHASE BUTTON */}
-                                                      <button
-                                                        onClick={() => {
-                                                          setSelectedItemForEdit(item)
-                                                          setSelectedPhaseForEdit(phase)
-                                                          setSelectedSubphaseForEdit(subphase)
-                                                          setShowEditSubphaseModal(true)
-                                                        }}
-                                                        className="px-1.5 py-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
-                                                        title="Edit subphase"
-                                                      >
-                                                        <Edit2 size={12} />
-                                                      </button>
-                                                    </div>
-                                                    {subphase.completed == 1 && (
-                                                      <CheckCircle size={18} className="text-green-500 shrink-0 ml-2" />
-                                                    )}
-                                                  </div>
-
-                                                  {/* Show condition warning if not met */}
-                                                  {isDisabled && (
-                                                    <div
-                                                      className={`mt-2 p-2 rounded text-xs ${isDarkMode
-                                                        ? "text-yellow-400 bg-yellow-500/10 border border-yellow-500/30"
-                                                        : "text-yellow-700 bg-yellow-500/10 border border-yellow-500/30"
-                                                        }`}
-                                                    >
-                                                      {!subphase.employee_barcode ? (
-                                                        <>⚠️ Assign an employee first before marking complete</>
-                                                      ) : subphaseIndex > 0 &&
-                                                        !isPreviousSubphaseCompleted(item, phase, subphaseIndex) ? (
-                                                        <>⚠️ Complete previous subphase first</>
-                                                      ) : subphase.expected_quantity > 0 &&
-                                                        (subphase.current_completed_quantity || 0) < subphase.expected_quantity ? (
-                                                        <>
-                                                          ⚠️ Complete {subphase.expected_quantity} units first (current:{" "}
-                                                          {subphase.current_completed_quantity || 0})
-                                                        </>
-                                                      ) : !phase.start_time ? (
-                                                        <>
-                                                          ⚠️ Start the phase first before marking subphases (time-based)
-                                                        </>
-                                                      ) : phase.pause_time ? (
-                                                        <>⚠️ Phase is paused - resume to continue marking subphases</>
-                                                      ) : phase.end_time ? (
-                                                        <>⚠️ Phase is already completed</>
-                                                      ) : (
-                                                        <>⚠️ Conditions not met</>
-                                                      )}
-                                                    </div>
-                                                  )}
-
-                                                  {subphase.time_duration > 0 && (
-                                                    <p
-                                                      className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"
-                                                        } italic mt-1 flex items-center gap-1`}
-                                                    >
-                                                      <Clock size={12} />
-                                                      Duration: {formatDuration(subphase.time_duration)} completion
-                                                    </p>
-                                                  )}
-
-                                                  <div className="mt-2 flex flex-wrap gap-2 items-center">
-                                                    <span className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded flex items-center gap-1">
-                                                      <Clock size={12} />
-                                                      Expected: {formatTime(subphase.expected_duration)}
-                                                    </span>
-
-                                                    {/* Quantity Tracking */}
-                                                    {subphase.expected_quantity !== undefined &&
-                                                      subphase.expected_quantity !== null &&
-                                                      subphase.expected_quantity > 0 && (
-                                                        <div className="flex items-center gap-2">
-                                                          <span className="text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 px-2 py-1 rounded flex items-center gap-1">
-                                                            <Package size={12} />
-                                                            Current: {subphase.current_completed_quantity || 0} /{" "}
-                                                            {subphase.expected_quantity}
-                                                          </span>
-                                                          <div className="flex items-center gap-1">
-                                                            <button
-                                                              onClick={() => openQuantityModal(item, phase, subphase)}
-                                                              className="px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
-                                                            >
-                                                              Update
-                                                            </button>
-                                                          </div>
-                                                          {/* Quantity Update Modal */}
-                                                          {quantityModalOpen && quantityModalData && (
-                                                            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                                                              <div
-                                                                className={`rounded-lg p-6 max-w-md w-full ${isDarkMode ? "bg-gray-800" : "bg-white"
-                                                                  }`}
-                                                              >
-                                                                <h3
-                                                                  className={`text-xl font-bold mb-4 flex items-center gap-2 ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                                                    }`}
-                                                                >
-                                                                  <Package size={20} />
-                                                                  Update Completed Quantity
-                                                                </h3>
-
-                                                                <div
-                                                                  className={`mb-4 p-3 rounded-lg space-y-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-100"
-                                                                    }`}
-                                                                >
-                                                                  <div>
-                                                                    <p
-                                                                      className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"
-                                                                        }`}
-                                                                    >
-                                                                      Item:
-                                                                    </p>
-                                                                    <p
-                                                                      className={`font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                                                        }`}
-                                                                    >
-                                                                      {quantityModalData.item.name}
-                                                                    </p>
-                                                                  </div>
-                                                                  <div>
-                                                                    <p
-                                                                      className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"
-                                                                        }`}
-                                                                    >
-                                                                      Phase / Subphase:
-                                                                    </p>
-                                                                    <p
-                                                                      className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                                                        }`}
-                                                                    >
-                                                                      {quantityModalData.phase.name} →{" "}
-                                                                      {quantityModalData.subphase.name}
-                                                                    </p>
-                                                                  </div>
-                                                                  <div>
-                                                                    <p
-                                                                      className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"
-                                                                        }`}
-                                                                    >
-                                                                      Expected Quantity:
-                                                                    </p>
-                                                                    <p
-                                                                      className={`font-bold ${isDarkMode ? "text-blue-400" : "text-blue-600"
-                                                                        }`}
-                                                                    >
-                                                                      {quantityModalData.subphase.expected_quantity}
-                                                                    </p>
-                                                                  </div>
-                                                                </div>
-
-                                                                <div className="mb-4">
-                                                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                                    Current Completed Quantity
-                                                                  </label>
-                                                                  <input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    max={quantityModalData.subphase.expected_quantity}
-                                                                    value={tempQuantity}
-                                                                    onChange={(e) => setTempQuantity(e.target.value)}
-                                                                    onKeyPress={(e) =>
-                                                                      e.key === "Enter" &&
-                                                                      handleUpdateCompletedQuantity()
-                                                                    }
-                                                                    autoFocus
-                                                                    className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
-                                                                      ? "bg-gray-700 border-gray-600 text-gray-200"
-                                                                      : "bg-gray-100 border-gray-300 text-gray-800"
-                                                                      }`}
-                                                                  />
-                                                                </div>
-
-                                                                <div className="flex gap-3">
-                                                                  <button
-                                                                    onClick={handleUpdateCompletedQuantity}
-                                                                    className="flex-1 bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-                                                                  >
-                                                                    Update
-                                                                  </button>
-                                                                  <button
-                                                                    onClick={() => {
-                                                                      setQuantityModalOpen(false)
-                                                                      setQuantityModalData(null)
-                                                                      setTempQuantity("")
-                                                                    }}
-                                                                    className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-                                                                  >
-                                                                    Cancel
-                                                                  </button>
-                                                                </div>
-                                                              </div>
-                                                            </div>
-                                                          )}
-                                                          {subphase.current_completed_quantity > 0 && (
-                                                            <button
-                                                              onClick={() => openTransferModal(item, phase, subphase)}
-                                                              className="flex items-center gap-1 px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-                                                            >
-                                                              <ArrowRightLeft size={12} />
-                                                              Transfer ({subphase.current_completed_quantity} available)
-                                                            </button>
-                                                          )}
-                                                        </div>
-                                                      )}
-                                                  </div>
-
-                                                  {subphase.employee_barcode && (
-                                                    <div
-                                                      className={`mt-2 text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${isDarkMode
-                                                        ? "bg-slate-500/20 text-slate-300"
-                                                        : "bg-slate-500/20 text-slate-700"
-                                                        }`}
-                                                    >
-                                                      <User size={12} />
-                                                      {subphase.employee_name || "Unknown"} ({subphase.employee_barcode}
-                                                      )
-                                                    </div>
-                                                  )}
-
-                                                  <div className="mt-3">
-                                                    <button
-                                                      onClick={() =>
-                                                        handleBarcodeScan(item.part_number, phase.id, subphase.id)
-                                                      }
-                                                      className="w-full px-3 py-1.5 text-sm bg-slate-600 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded transition-colors flex items-center justify-center gap-1"
-                                                    >
-                                                      <User size={14} />
-                                                      Assign Employee
-                                                    </button>
-                                                  </div>
-
-                                                  {/* Show completion time with duration */}
-                                                  {subphase.completed_at && (
-                                                    <div
-                                                      className={`text-xs mt-2 space-y-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"
-                                                        }`}
-                                                    >
-                                                      <p className="flex items-center gap-1">
-                                                        <CheckCircle size={12} />
-                                                        Completed: {new Date(subphase.completed_at).toLocaleString()}
-                                                      </p>
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            </div>
-                                          )
-                                        })
-                                      ) : (
-                                        <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"} py-2`}>
-                                          No sub-phases added yet.
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            })
-                          ) : (
-                            <p className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""} py-4`}>
-                              No phases added yet. Go to "Add Items" to add phases.
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Completed Items */}
-          {completedItems.length > 0 && (
-            <div>
-              <h3
-                className={`text-2xl font-bold mb-4 flex items-center gap-2 ${isDarkMode ? "text-green-300" : "text-green-700"
-                  }`}
-              >
-                <CheckCircle size={20} />
-                Completed Items ({completedItems.length})
-              </h3>
-              <div className="space-y-4 opacity-75">
-                {completedItems.map((item) => {
-                  const itemKey = item.part_number || item.id
-                  const elapsedSeconds = getItemElapsedTime(item)
-
-                  return (
-                    <div
-                      key={itemKey}
-                      className={`backdrop-blur-md rounded-lg border overflow-hidden transition-all shadow-sm ${isDarkMode ? "bg-green-500/10 border-green-500/30" : "bg-gradient-to-r from-green-500/10 to-green-400/10 border-green-500/30"
-                        }`}
-                    >
-                      <div className="p-4">
-                        <div onClick={() => toggleItemExpansion(item.part_number)} className="cursor-pointer">
-                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 gap-3">
-                            <div className="flex items-center gap-3 flex-1">
-                              <span className="text-xl shrink-0">{expandedItems[item.part_number] ? "▼" : "▶"}</span>
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h3
-                                    className={`font-semibold text-lg sm:text-xl ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                      }`}
-                                  >
-                                    {item.name}
-                                  </h3>
-                                  <CheckCircle size={16} className="text-green-500" />
-                                  {item.client_name && (
-                                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500">
-                                      <User size={12} />
-                                      {item.client_name}
-                                    </div>
-                                  )}
-                                  {item.quantity && item.quantity > 1 && (
-                                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500">
-                                      <Package size={12} />
-                                      Qty: {item.quantity}
-                                    </div>
-                                  )}
-                                </div>
-                                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                                  Part #: {item.part_number} • {item.phases?.length || 0} phases
-                                </p>
-                                {item.remarks && (
-                                  <p
-                                    className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"
-                                      } mt-1 italic flex items-start gap-1`}
-                                  >
-                                    <FileText size={12} className="mt-0.5 shrink-0" />
-                                    <span className="line-clamp-2">{item.remarks}</span>
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3 justify-end sm:justify-start w-full sm:w-auto">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (!expandedItems[item.part_number]) {
-                                    toggleItemExpansion(item.part_number)
-                                  }
-                                  alert("Please expand phases below and select a specific subphase to transfer from")
-                                }}
-                                className="px-2 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
-                                title="Expand to transfer quantities"
-                              >
-                                <ArrowRightLeft size={16} />
-                              </button>
-                              <span className={`text-lg font-bold ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
-                                100%
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {item.start_time && (
-                          <div className={`rounded-lg p-3 ${isDarkMode ? "bg-green-500/20" : "bg-green-500/10"}`}>
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
-                              <span
-                                className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? "text-green-300" : "text-green-700"
-                                  }`}
-                              >
-                                <CheckCircle size={16} />
-                                Process Completed
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <Clock size={16} className="text-green-600 dark:text-green-400" />
-                                <span
-                                  className={`text-lg font-mono font-bold ${isDarkMode ? "text-green-400" : "text-green-700"
+                                  {/* Phase Duration Tracker - Mobile Optimized */}
+                                  <div
+                                    className={`rounded-lg p-3 mt-3 ${
+                                      isDarkMode ? "bg-slate-500/20" : "bg-slate-500/10"
                                     }`}
-                                >
-                                  {formatTime(elapsedSeconds)}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                              <div>
-                                <span className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""}`}>
-                                  Started:{" "}
-                                </span>
-                                <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                                  {formatDateTime(item.start_time)}
-                                </span>
-                              </div>
-                              <div>
-                                <span className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""}`}>
-                                  Completed:{" "}
-                                </span>
-                                <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                                  {formatDateTime(item.end_time)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {expandedItems[item.part_number] && (
-                        <div className="px-4 pb-4 space-y-3">
-                          {item.phases && item.phases.length > 0 ? (
-                            item.phases.map((phase) => {
-                              const phaseKey = phase.id
-
-                              return (
-                                <div
-                                  key={phaseKey}
-                                  className={`rounded-lg border ${isDarkMode ? "border-gray-700/10" : "border-gray-300/10"
-                                    }`}
-                                >
-                                  <div className="p-3">
-                                    <div
-                                      className="flex justify-between items-center cursor-pointer"
-                                      onClick={() => togglePhaseExpansion(phase.id)}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <span className="shrink-0">{expandedPhases[phase.id] ? "▼" : "▶"}</span>
+                                  >
+                                    <div className="flex flex-col gap-2 mb-3">
+                                      <div className="flex items-center justify-between">
                                         <span
-                                          className={`font-medium text-base sm:text-lg ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                            }`}
+                                          className={`text-sm font-semibold flex items-center gap-2 ${
+                                            isDarkMode ? "text-gray-300" : "text-gray-700"
+                                          }`}
                                         >
-                                          {phase.name}
+                                          <Calendar size={16} />
+                                          Duration
+                                        </span>
+                                        {phase.expected_hours && (
+                                          <span
+                                            className={`text-xs px-2 py-1 rounded ${
+                                              isDarkMode
+                                                ? "bg-purple-500/20 text-purple-300"
+                                                : "bg-purple-500/20 text-purple-700"
+                                            }`}
+                                          >
+                                            Expected: {Number.parseFloat(phase.expected_hours).toFixed(1)}h
+                                          </span>
+                                        )}
+                                      </div>
+                                      
+                                      <div className="flex items-center justify-between">
+                                        <Clock size={18} className="text-slate-600 dark:text-slate-400" />
+                                        <span
+                                          className={`text-lg sm:text-xl font-mono font-bold ${
+                                            isDarkMode ? "text-gray-200" : "text-gray-800"
+                                          }`}
+                                        >
+                                          {formatTime(getPhaseElapsedTime(phase))}
+                                        </span>
+                                        {phase.end_time && phase.expected_hours && phase.actual_hours && (
+                                          <span
+                                            className={`text-xs px-2 py-1 rounded font-medium ${
+                                              phase.actual_hours > phase.expected_hours
+                                                ? "bg-red-500/20 text-red-700 dark:text-red-300"
+                                                : "bg-green-500/20 text-green-700 dark:text-green-300"
+                                            }`}
+                                          >
+                                            {phase.actual_hours > phase.expected_hours ? "+" : ""}
+                                            {(phase.actual_hours - phase.expected_hours).toFixed(1)}h
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Progress vs Expected */}
+                                    {phase.expected_hours && phase.start_time && !phase.end_time && (
+                                      <div className="mb-3">
+                                        <div className="flex justify-between text-xs mb-1">
+                                          <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
+                                            Progress vs Expected
+                                          </span>
+                                          <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
+                                            {(((getPhaseElapsedTime(phase) / 3600) / phase.expected_hours) * 100).toFixed(0)}%
+                                          </span>
+                                        </div>
+                                        <div
+                                          className={`w-full rounded-full h-2 ${
+                                            isDarkMode ? "bg-gray-700" : "bg-gray-300"
+                                          }`}
+                                        >
+                                          <div
+                                            className={`h-2 rounded-full transition-all duration-300 ${
+                                              getPhaseElapsedTime(phase) / 3600 > phase.expected_hours
+                                                ? "bg-red-500"
+                                                : "bg-purple-500"
+                                            }`}
+                                            style={{
+                                              width: `${Math.min(
+                                                100,
+                                                ((getPhaseElapsedTime(phase) / 3600) / phase.expected_hours) * 100
+                                              )}%`,
+                                            }}
+                                          ></div>
+                                        </div>
+                                        <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                                          {(getPhaseElapsedTime(phase) / 3600).toFixed(2)}h of {phase.expected_hours}h
+                                        </p>
+                                      </div>
+                                    )}
+
+                                    {/* Start/End Times - Mobile Optimized */}
+                                    <div className="space-y-1 text-xs mb-3">
+                                      <div className="flex justify-between">
+                                        <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Start:</span>
+                                        <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                          {formatDateTime(phase.start_time)}
                                         </span>
                                       </div>
-                                      <span
-                                        className={`text-sm font-semibold ${isDarkMode ? "text-green-400" : "text-green-600"
-                                          }`}
-                                      >
-                                        100%
-                                      </span>
+                                      <div className="flex justify-between">
+                                        <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>End:</span>
+                                        <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                          {phase.end_time
+                                            ? formatDateTime(phase.end_time)
+                                            : phase.pause_time
+                                            ? "Paused"
+                                            : "In progress"}
+                                        </span>
+                                      </div>
                                     </div>
 
-                                    {/* ADD THIS: Show subphases when phase is expanded */}
-                                    {expandedPhases[phase.id] && phase.subphases && phase.subphases.length > 0 && (
-                                      <div className="mt-3 space-y-2 pl-4 border-l-2 dark:border-gray-700/20 border-gray-300/20">
-                                        {phase.subphases.map((subphase) => (
-                                          <div
-                                            key={subphase.id}
-                                            className={`p-3 rounded-lg ${isDarkMode ? "bg-black/10" : "bg-white/5"}`}
+                                    {/* Action Buttons - Mobile Optimized */}
+                                    <div className="grid grid-cols-1 gap-2">
+                                      {!phase.start_time ? (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleStartPhase(item.part_number, phase.id)
+                                          }}
+                                          className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                                        >
+                                          <Play size={16} />
+                                          Start Phase
+                                        </button>
+                                      ) : phase.pause_time && !phase.end_time ? (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleResumePhase(item.part_number, phase.id)
+                                          }}
+                                          className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                                        >
+                                          <Play size={16} />
+                                          Resume Phase
+                                        </button>
+                                      ) : !phase.end_time ? (
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handlePausePhase(item.part_number, phase.id)
+                                            }}
+                                            className="flex items-center justify-center gap-2 bg-yellow-600 hover:bg-yellow-700 active:bg-yellow-800 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
                                           >
-                                            <div className="flex items-start justify-between">
-                                              <div className="flex-1">
-                                                <div className="flex items-center gap-2">
-                                                  <CheckCircle size={14} className="text-green-500 shrink-0" />
-                                                  <span
-                                                    className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                                      }`}
-                                                  >
-                                                    {subphase.name}
-                                                  </span>
+                                            <Pause size={16} />
+                                            Pause
+                                          </button>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleStopPhase(item.part_number, phase.id)
+                                            }}
+                                            className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                                            disabled={calculatePhaseProgress(phase) < 100}
+                                          >
+                                            <StopCircle size={16} />
+                                            {calculatePhaseProgress(phase) === 100 ? "Stop" : "Complete First"}
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center justify-center gap-2 bg-green-600/80 text-white px-3 py-2.5 rounded-lg text-sm font-medium">
+                                          <CheckCircle size={16} />
+                                          Phase Completed
+                                        </div>
+                                      )}
+
+                                      {phase.start_time && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleResetPhase(item.part_number, phase.id)
+                                          }}
+                                          className="px-3 py-2.5 bg-gray-600 hover:bg-gray-700 active:bg-gray-800 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                                        >
+                                          <RotateCcw size={16} />
+                                          Reset Duration
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Sub-Phases - Mobile Optimized */}
+                                {expandedPhases[phase.id] && (
+                                  <div className="px-3 pb-3 space-y-2">
+                                    {phase.subphases && phase.subphases.length > 0 ? (
+                                      phase.subphases.map((subphase, subphaseIndex) => {
+                                        const subPhaseKey = subphase.id
+                                        const conditionMet = isSubphaseConditionMet(item, phase, subphase, subphaseIndex)
+                                        const isDisabled = !conditionMet && subphase.completed != 1
+
+                                        return (
+                                          <div
+                                            key={subPhaseKey}
+                                            className={`p-3 rounded-lg border ${
+                                              isDarkMode ? "bg-black/10 border-gray-700/10" : "bg-white/5 border-gray-300/10"
+                                            }`}
+                                          >
+                                            <div className="flex items-start gap-3">
+                                              {/* Checkbox - Larger touch target */}
+                                              <div className="relative shrink-0 pt-0.5">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={subphase.completed == 1}
+                                                  disabled={isDisabled}
+                                                  onChange={() => {
+                                                    if (!isDisabled) {
+                                                      const action = subphase.completed != 1 ? "complete" : "incomplete"
+                                                      if (window.confirm(`Mark "${subphase.name}" as ${action}?`)) {
+                                                        handleToggleSubPhase(
+                                                          item.part_number,
+                                                          phase.id,
+                                                          subphase.id,
+                                                          subphase.completed == 1
+                                                        )
+                                                      }
+                                                    }
+                                                  }}
+                                                  className={`w-6 h-6 rounded border-gray-300 dark:border-gray-600 text-slate-600 focus:ring-slate-500 focus:ring-2 ${
+                                                    isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                                                  }`}
+                                                  title={
+                                                    isDisabled
+                                                      ? !phase.start_time
+                                                        ? "Phase not started"
+                                                        : phase.pause_time
+                                                        ? "Phase paused"
+                                                        : phase.end_time
+                                                        ? "Phase completed"
+                                                        : !subphase.employee_barcode
+                                                        ? "Assign employee first"
+                                                        : "Conditions not met"
+                                                      : subphase.completed == 1
+                                                      ? "Mark incomplete"
+                                                      : "Mark complete"
+                                                  }
+                                                />
+                                                {isDisabled && (
+                                                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white dark:border-gray-800" />
+                                                )}
+                                              </div>
+
+                                              <div className="flex-1 min-w-0">
+                                                <div className="flex items-start justify-between gap-2 mb-2">
+                                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    <p
+                                                      className={`font-medium text-sm sm:text-base break-words ${
+                                                        subphase.completed == 1
+                                                          ? "line-through opacity-60"
+                                                          : isDisabled
+                                                          ? "opacity-50"
+                                                          : ""
+                                                      } ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}
+                                                    >
+                                                      {subphase.name}
+                                                    </p>
+                                                    <button
+                                                      onClick={() => {
+                                                        setSelectedItemForEdit(item)
+                                                        setSelectedPhaseForEdit(phase)
+                                                        setSelectedSubphaseForEdit(subphase)
+                                                        setShowEditSubphaseModal(true)
+                                                      }}
+                                                      className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 active:bg-blue-500/20 rounded transition-colors shrink-0"
+                                                      title="Edit"
+                                                    >
+                                                      <Edit2 size={14} />
+                                                    </button>
+                                                  </div>
+                                                  {subphase.completed == 1 && (
+                                                    <CheckCircle size={18} className="text-green-500 shrink-0" />
+                                                  )}
                                                 </div>
 
-                                                {/* Show quantity info if available */}
-                                                {subphase.expected_quantity > 0 && (
-                                                  <div className="mt-2 flex flex-wrap gap-2 items-center">
-                                                    <span className={`text-xs bg-purple-500/20 ${isDarkMode ? "text-purple-300" : "text-purple-800"} px-2 py-1 rounded flex items-center gap-1`}>
-                                                      <Package size={12} />
-                                                      Completed: {subphase.current_completed_quantity || 0} /{" "}
-                                                      {subphase.expected_quantity}
-                                                    </span>
-
-                                                    {/* ADD TRANSFER BUTTON HERE */}
-                                                    {(subphase.current_completed_quantity || 0) > 0 && (
-                                                      <button
-                                                        onClick={() => openTransferModal(item, phase, subphase)}
-                                                        className="flex items-center gap-1 px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-                                                      >
-                                                        <ArrowRightLeft size={12} />
-                                                        Transfer ({subphase.current_completed_quantity} available)
-                                                      </button>
+                                                {/* Condition Warning */}
+                                                {isDisabled && (
+                                                  <div
+                                                    className={`mb-2 p-2 rounded text-xs ${
+                                                      isDarkMode
+                                                        ? "text-yellow-400 bg-yellow-500/10 border border-yellow-500/30"
+                                                        : "text-yellow-700 bg-yellow-500/10 border border-yellow-500/30"
+                                                    }`}
+                                                  >
+                                                    {!subphase.employee_barcode ? (
+                                                      <>⚠️ Assign employee first</>
+                                                    ) : subphaseIndex > 0 &&
+                                                      !isPreviousSubphaseCompleted(item, phase, subphaseIndex) ? (
+                                                      <>⚠️ Complete previous first</>
+                                                    ) : subphase.expected_quantity > 0 &&
+                                                      (subphase.current_completed_quantity || 0) < subphase.expected_quantity ? (
+                                                      <>
+                                                        ⚠️ Need {subphase.expected_quantity} units (have:{" "}
+                                                        {subphase.current_completed_quantity || 0})
+                                                      </>
+                                                    ) : !phase.start_time ? (
+                                                      <>⚠️ Start phase first</>
+                                                    ) : phase.pause_time ? (
+                                                      <>⚠️ Phase paused</>
+                                                    ) : phase.end_time ? (
+                                                      <>⚠️ Phase completed</>
+                                                    ) : (
+                                                      <>⚠️ Conditions not met</>
                                                     )}
                                                   </div>
                                                 )}
 
-                                                {/* Show employee info if available */}
+                                                {/* Time Duration */}
+                                                {subphase.time_duration > 0 && (
+                                                  <p
+                                                    className={`text-xs sm:text-sm ${
+                                                      isDarkMode ? "text-gray-400" : "text-gray-600"
+                                                    } italic flex items-center gap-1 mb-2`}
+                                                  >
+                                                    <Clock size={12} />
+                                                    {formatDuration(subphase.time_duration)}
+                                                  </p>
+                                                )}
+
+                                                {/* Expected Duration & Quantity */}
+                                                <div className="flex flex-wrap gap-2 items-center mb-2">
+                                                  <span className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded flex items-center gap-1">
+                                                    <Clock size={12} />
+                                                    {formatTime(subphase.expected_duration)}
+                                                  </span>
+
+                                                  {/* Quantity Tracking */}
+                                                  {subphase.expected_quantity !== undefined &&
+                                                    subphase.expected_quantity !== null &&
+                                                    subphase.expected_quantity > 0 && (
+                                                      <>
+                                                        <span className="text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 px-2 py-1 rounded flex items-center gap-1">
+                                                          <Package size={12} />
+                                                          {subphase.current_completed_quantity || 0} /{" "}
+                                                          {subphase.expected_quantity}
+                                                        </span>
+                                                        <button
+                                                          onClick={() => openQuantityModal(item, phase, subphase)}
+                                                          className="text-xs bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white px-3 py-1.5 rounded transition-colors"
+                                                        >
+                                                          Update
+                                                        </button>
+                                                        <button
+                                                            onClick={() => openTransferModal(item, phase, subphase)}
+                                                            className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-3 py-1.5 rounded transition-colors"
+                                                          >
+                                                            <ArrowRightLeft size={12} />
+                                                            Transfer
+                                                          </button>
+                                                      </>
+                                                    )}
+                                                </div>
+
+                                                {/* Quantity Update Modal - Mobile Optimized */}
+                                                {quantityModalOpen && quantityModalData && (
+                                                  <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+                                                    <div
+                                                      className={`rounded-t-2xl sm:rounded-lg w-full sm:max-w-md sm:w-full p-4 sm:p-6 ${
+                                                        isDarkMode ? "bg-gray-800" : "bg-white"
+                                                      }`}
+                                                    >
+                                                      <h3
+                                                        className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${
+                                                          isDarkMode ? "text-gray-200" : "text-gray-800"
+                                                        }`}
+                                                      >
+                                                        <Package size={20} />
+                                                        Update Quantity
+                                                      </h3>
+
+                                                      <div
+                                                        className={`mb-4 p-3 rounded-lg space-y-2 ${
+                                                          isDarkMode ? "bg-gray-700" : "bg-gray-100"
+                                                        }`}
+                                                      >
+                                                        <div>
+                                                          <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                                                            Item:
+                                                          </p>
+                                                          <p className={`font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                                            {quantityModalData.item.name}
+                                                          </p>
+                                                        </div>
+                                                        <div>
+                                                          <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                                                            Phase / Subphase:
+                                                          </p>
+                                                          <p className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                                            {quantityModalData.phase.name} → {quantityModalData.subphase.name}
+                                                          </p>
+                                                        </div>
+                                                        <div>
+                                                          <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                                                            Expected:
+                                                          </p>
+                                                          <p className={`font-bold ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
+                                                            {quantityModalData.subphase.expected_quantity}
+                                                          </p>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="mb-4">
+                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                          Completed Quantity
+                                                        </label>
+                                                        <input
+                                                          type="number"
+                                                          min="0"
+                                                          max={quantityModalData.subphase.expected_quantity}
+                                                          value={tempQuantity}
+                                                          onChange={(e) => setTempQuantity(e.target.value)}
+                                                          onKeyPress={(e) => e.key === "Enter" && handleUpdateCompletedQuantity()}
+                                                          autoFocus
+                                                          className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
+                                                            isDarkMode
+                                                              ? "bg-gray-700 border-gray-600 text-gray-200"
+                                                              : "bg-gray-100 border-gray-300 text-gray-800"
+                                                          }`}
+                                                        />
+                                                      </div>
+
+                                                      <div className="flex flex-col sm:flex-row gap-3">
+                                                        <button
+                                                          onClick={handleUpdateCompletedQuantity}
+                                                          className="flex-1 bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
+                                                        >
+                                                          Update
+                                                        </button>
+                                                        <button
+                                                          onClick={() => {
+                                                            setQuantityModalOpen(false)
+                                                            setQuantityModalData(null)
+                                                            setTempQuantity("")
+                                                          }}
+                                                          className="flex-1 bg-gray-500 hover:bg-gray-600 active:bg-gray-700 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
+                                                        >
+                                                          Cancel
+                                                        </button>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                )}
+
+                                                {/* Employee Badge */}
                                                 {subphase.employee_barcode && (
                                                   <div
-                                                    className={`mt-2 text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${isDarkMode
-                                                      ? "bg-slate-500/20 text-slate-300"
-                                                      : "bg-slate-500/20 text-slate-700"
-                                                      }`}
+                                                    className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 mb-2 ${
+                                                      isDarkMode ? "bg-slate-500/20 text-slate-300" : "bg-slate-500/20 text-slate-700"
+                                                    }`}
                                                   >
                                                     <User size={12} />
                                                     {subphase.employee_name || "Unknown"} ({subphase.employee_barcode})
                                                   </div>
                                                 )}
 
-                                                {/* Show completion time */}
+                                                {/* Assign Employee Button - Full Width on Mobile */}
+                                                <button
+                                                  onClick={() => handleBarcodeScan(item.part_number, phase.id, subphase.id)}
+                                                  className="w-full px-3 py-2.5 text-sm bg-slate-600 hover:bg-slate-700 active:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded transition-colors flex items-center justify-center gap-2 mt-2"
+                                                >
+                                                  <User size={14} />
+                                                  Assign Employee
+                                                </button>
+
+                                                {/* Completion Time */}
                                                 {subphase.completed_at && (
-                                                  <div
-                                                    className={`text-xs mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"
-                                                      }`}
-                                                  >
-                                                    <p className=" flex items-center gap-1">
+                                                  <div className={`text-xs mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                                                    <p className="flex items-center gap-1">
                                                       <CheckCircle size={12} />
-                                                      Completed: {new Date(subphase.completed_at).toLocaleString()}
+                                                      {new Date(subphase.completed_at).toLocaleString()}
                                                     </p>
                                                   </div>
                                                 )}
                                               </div>
                                             </div>
                                           </div>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    {item.expected_completion_hours && item.actual_completion_hours && (
-                                      <div className={`mt-3 p-3 rounded-lg border ${isDarkMode ? "bg-purple-500/10 border-purple-500/30" : "bg-purple-500/10 border-purple-500/30"
-                                        }`}>
-                                        <div className="flex items-center justify-between mb-2">
-                                          <span className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? "text-purple-300" : "text-purple-700"
-                                            }`}>
-                                            <Clock size={14} />
-                                            Duration Analysis
-                                          </span>
-                                          <span className={`text-xs px-2 py-1 rounded font-bold ${item.actual_completion_hours > item.expected_completion_hours
-                                              ? "bg-red-500/20 text-red-700 dark:text-red-300"
-                                              : "bg-green-500/20 text-green-700 dark:text-green-300"
-                                            }`}>
-                                            {item.actual_completion_hours > item.expected_completion_hours ? "Over" : "Under"} by{" "}
-                                            {Math.abs(item.actual_completion_hours - item.expected_completion_hours).toFixed(1)}h
-                                          </span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 text-xs">
-                                          <div>
-                                            <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Expected: </span>
-                                            <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
-                                              {Number.parseFloat(item.expected_completion_hours).toFixed(1)}h
-                                            </span>
-                                          </div>
-                                          <div>
-                                            <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Actual: </span>
-                                            <span className={`font-bold ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
-                                              {Number.parseFloat(item.actual_completion_hours).toFixed(1)}h
-                                            </span>
-                                          </div>
-                                        </div>
-                                        <div className={`mt-2 w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
-                                          <div
-                                            className={`h-2 rounded-full ${item.actual_completion_hours > item.expected_completion_hours
-                                                ? "bg-red-500"
-                                                : "bg-green-500"
-                                              }`}
-                                            style={{
-                                              width: `${Math.min(100, (item.actual_completion_hours / item.expected_completion_hours * 100))}%`,
-                                            }}
-                                          ></div>
-                                        </div>
-                                      </div>
+                                        )
+                                      })
+                                    ) : (
+                                      <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"} py-2`}>
+                                        No sub-phases yet.
+                                      </p>
                                     )}
                                   </div>
-                                </div>
-                              )
-                            })
-                          ) : (
-                            <p className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""} py-4`}>No phases.</p>
+                                )}
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <p className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""} py-4`}>
+                            No phases added yet.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Completed Items - Mobile Optimized */}
+        {completedItems.length > 0 && (
+          <div>
+            <h3
+              className={`text-xl sm:text-2xl font-bold mb-3 sm:mb-4 flex items-center gap-2 ${
+                isDarkMode ? "text-green-300" : "text-green-700"
+              }`}
+            >
+              <CheckCircle size={20} />
+              Completed ({completedItems.length})
+            </h3>
+            <div className="space-y-3 sm:space-y-4 opacity-75">
+              {completedItems.map((item) => {
+                const itemKey = item.part_number || item.id
+                const elapsedSeconds = getItemElapsedTime(item)
+
+                return (
+                  <div
+                    key={itemKey}
+                    className={`backdrop-blur-md rounded-lg border overflow-hidden transition-all shadow-sm ${
+                      isDarkMode
+                        ? "bg-green-500/10 border-green-500/30"
+                        : "bg-gradient-to-r from-green-500/10 to-green-400/10 border-green-500/30"
+                    }`}
+                  >
+                    <div className="p-3 sm:p-4">
+                      <div className="flex items-start gap-3 mb-3">
+                        <button
+                          onClick={() => toggleItemExpansion(item.part_number)}
+                          className="shrink-0 p-1 hover:bg-gray-200/20 active:bg-gray-200/30 rounded transition-colors"
+                        >
+                          <span className="text-xl">{expandedItems[item.part_number] ? "▼" : "▶"}</span>
+                        </button>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <h3 className={`font-semibold text-base sm:text-lg lg:text-xl ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                              {item.name}
+                            </h3>
+                            <CheckCircle size={16} className="text-green-500" />
+                            {item.client_name && (
+                              <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500">
+                                <User size={12} />
+                                <span className="max-w-[150px] sm:max-w-none truncate">{item.client_name}</span>
+                              </div>
+                            )}
+                            {item.quantity && item.quantity > 1 && (
+                              <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500">
+                                <Package size={12} />
+                                Qty: {item.quantity}
+                              </div>
+                            )}
+                          </div>
+                          <p className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                            Part #: {item.part_number} • {item.phases?.length || 0} phases
+                          </p>
+                          {item.remarks && (
+                            <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"} mt-1 italic flex items-start gap-1`}>
+                              <FileText size={12} className="mt-0.5 shrink-0" />
+                              <span className="line-clamp-2">{item.remarks}</span>
+                            </p>
                           )}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (!expandedItems[item.part_number]) {
+                                toggleItemExpansion(item.part_number)
+                              }
+                              alert("Please expand phases below and select a specific subphase to transfer from")
+                            }}
+                            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 active:bg-blue-500/20 rounded transition-colors"
+                            title="Transfer"
+                          >
+                            <ArrowRightLeft size={16} />
+                          </button>
+                          <span className={`text-lg font-bold ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
+                            100%
+                          </span>
+                        </div>
+                      </div>
+
+                      {item.start_time && (
+                        <div className={`rounded-lg p-3 ${isDarkMode ? "bg-green-500/20" : "bg-green-500/10"}`}>
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
+                            <span
+                              className={`text-sm font-semibold flex items-center gap-2 ${
+                                isDarkMode ? "text-green-300" : "text-green-700"
+                              }`}
+                            >
+                              <CheckCircle size={16} />
+                              Completed
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <Clock size={16} className="text-green-600 dark:text-green-400" />
+                              <span className={`text-lg font-mono font-bold ${isDarkMode ? "text-green-400" : "text-green-700"}`}>
+                                {formatTime(elapsedSeconds)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Started:</span>
+                              <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                {formatDateTime(item.start_time)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Completed:</span>
+                              <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                {formatDateTime(item.end_time)}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <p className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-          {!isFiltering && items.length === 0 ? (
-            <p className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              {searchTerm || filterClient || filterPriority || filterStatus
-                ? "No items match your search or filters."
-                : 'No items yet. Go to "Add Items" to create your first item.'}
-            </p>
-          ) : null}
-        </p>
-      )}
 
-      {/* Pagination Controls */}
-      {!isFiltering && pagination.total_pages > 1 && (
-        <div className={`backdrop-blur-md rounded-lg p-4 mt-6 border transition-all shadow-sm ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-          }`}>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            {/* Page Info */}
-            <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-              Showing {((pagination.current_page - 1) * pagination.per_page) + 1} - {Math.min(pagination.current_page * pagination.per_page, pagination.total_items)} of {pagination.total_items} items
-            </div>
+                    {/* Completed Item Phases */}
+                    {expandedItems[item.part_number] && (
+                      <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-3">
+                        {item.phases && item.phases.length > 0 ? (
+                          item.phases.map((phase) => {
+                            const phaseKey = phase.id
 
-            {/* Pagination Buttons */}
-            <div className="flex items-center gap-2">
-              {/* First Page */}
-              <button
-                onClick={() => handlePageChange(1)}
-                disabled={!pagination.has_previous}
-                className={`px-3 py-2 rounded-lg font-medium transition-colors ${pagination.has_previous
-                    ? isDarkMode
-                      ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                      : "bg-white/50 hover:bg-white/70 text-gray-700"
-                    : "opacity-50 cursor-not-allowed"
-                  }`}
-              >
-                ««
-              </button>
+                            return (
+                              <div
+                                key={phaseKey}
+                                className={`rounded-lg border ${isDarkMode ? "border-gray-700/10" : "border-gray-300/10"}`}
+                              >
+                                <div className="p-3">
+                                  <div className="flex items-start gap-2 mb-2">
+                                    <button
+                                      onClick={() => togglePhaseExpansion(phase.id)}
+                                      className="shrink-0 p-1 hover:bg-gray-200/20 active:bg-gray-200/30 rounded transition-colors"
+                                    >
+                                      <span className="text-base">{expandedPhases[phase.id] ? "▼" : "▶"}</span>
+                                    </button>
+                                    <span className={`font-medium text-base flex-1 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                      {phase.name}
+                                    </span>
+                                    <span className={`text-sm font-semibold ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
+                                      100%
+                                    </span>
+                                  </div>
 
-              {/* Previous */}
-              <button
-                onClick={handlePreviousPage}
-                disabled={!pagination.has_previous}
-                className={`px-3 py-2 rounded-lg font-medium transition-colors ${pagination.has_previous
-                    ? isDarkMode
-                      ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                      : "bg-white/50 hover:bg-white/70 text-gray-700"
-                    : "opacity-50 cursor-not-allowed"
-                  }`}
-              >
-                « Previous
-              </button>
+                                  {/* Completed Phase Subphases */}
+                                  {expandedPhases[phase.id] && phase.subphases && phase.subphases.length > 0 && (
+                                    <div className="mt-3 space-y-2 pl-4 border-l-2 dark:border-gray-700/20 border-gray-300/20">
+                                      {phase.subphases.map((subphase) => (
+                                        <div key={subphase.id} className={`p-3 rounded-lg ${isDarkMode ? "bg-black/10" : "bg-white/5"}`}>
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div className="flex-1 min-w-0">
+                                              <div className="flex items-center gap-2 mb-2">
+                                                <CheckCircle size={14} className="text-green-500 shrink-0" />
+                                                <span className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                                  {subphase.name}
+                                                </span>
+                                              </div>
 
-              {/* Page Numbers */}
-              <div className="flex gap-1">
-                {(() => {
-                  const pages = []
-                  const showPages = 5
-                  let startPage = Math.max(1, pagination.current_page - Math.floor(showPages / 2))
-                  let endPage = Math.min(pagination.total_pages, startPage + showPages - 1)
+                                              {/* Quantity info */}
+                                              {subphase.expected_quantity > 0 && (
+                                                <div className="flex flex-wrap gap-2 items-center mb-2">
+                                                  <span
+                                                    className={`text-xs bg-purple-500/20 ${
+                                                      isDarkMode ? "text-purple-300" : "text-purple-800"
+                                                    } px-2 py-1 rounded flex items-center gap-1`}
+                                                  >
+                                                    <Package size={12} />
+                                                    {subphase.current_completed_quantity || 0} / {subphase.expected_quantity}
+                                                  </span>
+                                                </div>
+                                              )}
 
-                  if (endPage - startPage < showPages - 1) {
-                    startPage = Math.max(1, endPage - showPages + 1)
-                  }
+                                              {/* Employee info */}
+                                              {subphase.employee_barcode && (
+                                                <div
+                                                  className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 mb-2 ${
+                                                    isDarkMode ? "bg-slate-500/20 text-slate-300" : "bg-slate-500/20 text-slate-700"
+                                                  }`}
+                                                >
+                                                  <User size={12} />
+                                                  {subphase.employee_name || "Unknown"} ({subphase.employee_barcode})
+                                                </div>
+                                              )}
 
-                  for (let i = startPage; i <= endPage; i++) {
-                    pages.push(
-                      <button
-                        key={i}
-                        onClick={() => handlePageChange(i)}
-                        className={`px-3 py-2 rounded-lg font-medium transition-colors ${pagination.current_page === i
-                            ? isDarkMode ? "bg-slate-600 text-white" : "bg-slate-600 text-white"
-                            : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-200" : "bg-white/50 hover:bg-white/70 text-gray-700"
-                          }`}
-                      >
-                        {i}
-                      </button>
-                    )
-                  }
-                  return pages
-                })()}
-              </div>
+                                              {/* Completion time */}
+                                              {subphase.completed_at && (
+                                                <div className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                                                  <p className="flex items-center gap-1">
+                                                    <CheckCircle size={12} />
+                                                    {new Date(subphase.completed_at).toLocaleString()}
+                                                  </p>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
 
-              {/* Next */}
-              <button
-                onClick={handleNextPage}
-                disabled={!pagination.has_next}
-                className={`px-3 py-2 rounded-lg font-medium transition-colors ${pagination.has_next
-                    ? isDarkMode
-                      ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                      : "bg-white/50 hover:bg-white/70 text-gray-700"
-                    : "opacity-50 cursor-not-allowed"
-                  }`}
-              >
-                Next »
-              </button>
-
-              {/* Last Page */}
-              <button
-                onClick={() => handlePageChange(pagination.total_pages)}
-                disabled={!pagination.has_next}
-                className={`px-3 py-2 rounded-lg font-medium transition-colors ${pagination.has_next
-                    ? isDarkMode
-                      ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                      : "bg-white/50 hover:bg-white/70 text-gray-700"
-                    : "opacity-50 cursor-not-allowed"
-                  }`}
-              >
-                »»
-              </button>
-            </div>
-
-            {/* Items per page selector */}
-            <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-              Page {pagination.current_page} of {pagination.total_pages}
+                                  {/* Duration Analysis */}
+                                  {item.expected_completion_hours && item.actual_completion_hours && (
+                                    <div
+                                      className={`mt-3 p-3 rounded-lg border ${
+                                        isDarkMode ? "bg-purple-500/10 border-purple-500/30" : "bg-purple-500/10 border-purple-500/30"
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span
+                                          className={`text-sm font-semibold flex items-center gap-2 ${
+                                            isDarkMode ? "text-purple-300" : "text-purple-700"
+                                          }`}
+                                        >
+                                          <Clock size={14} />
+                                          Analysis
+                                        </span>
+                                        <span
+                                          className={`text-xs px-2 py-1 rounded font-bold ${
+                                            item.actual_completion_hours > item.expected_completion_hours
+                                              ? "bg-red-500/20 text-red-700 dark:text-red-300"
+                                              : "bg-green-500/20 text-green-700 dark:text-green-300"
+                                          }`}
+                                        >
+                                          {item.actual_completion_hours > item.expected_completion_hours ? "Over" : "Under"} by{" "}
+                                          {Math.abs(item.actual_completion_hours - item.expected_completion_hours).toFixed(1)}h
+                                        </span>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div>
+                                          <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Expected: </span>
+                                          <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
+                                            {Number.parseFloat(item.expected_completion_hours).toFixed(1)}h
+                                          </span>
+                                        </div>
+                                        <div>
+                                          <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Actual: </span>
+                                          <span className={`font-bold ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
+                                            {Number.parseFloat(item.actual_completion_hours).toFixed(1)}h
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div className={`mt-2 w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
+                                        <div
+                                          className={`h-2 rounded-full ${
+                                            item.actual_completion_hours > item.expected_completion_hours
+                                              ? "bg-red-500"
+                                              : "bg-green-500"
+                                          }`}
+                                          style={{
+                                            width: `${Math.min(
+                                              100,
+                                              (item.actual_completion_hours / item.expected_completion_hours) * 100
+                                            )}%`,
+                                          }}
+                                        ></div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <p className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""} py-4`}>No phases.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
+        )}
+      </div>
+    ) : (
+      <p className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+        {!isFiltering && items.length === 0 ? (
+          searchTerm || filterClient || filterPriority || filterStatus
+            ? "No items match your search or filters."
+            : 'No items yet. Go to "Add Items" to create your first item.'
+        ) : null}
+      </p>
+    )}
+
+    {/* Pagination Controls - Mobile Optimized */}
+    {!isFiltering && pagination.total_pages > 1 && (
+      <div
+        className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mt-6 border transition-all shadow-sm ${
+          isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
+        }`}
+      >
+        <div className="flex flex-col gap-4">
+          {/* Page Info */}
+          <div className={`text-sm text-center sm:text-left ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+            Showing {(pagination.current_page - 1) * pagination.per_page + 1} -{" "}
+            {Math.min(pagination.current_page * pagination.per_page, pagination.total_items)} of {pagination.total_items}
+          </div>
+
+          {/* Pagination Buttons */}
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            {/* First Page */}
+            <button
+              onClick={() => handlePageChange(1)}
+              disabled={!pagination.has_previous}
+              className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+                pagination.has_previous
+                  ? isDarkMode
+                    ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
+                    : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
+                  : "opacity-50 cursor-not-allowed"
+              }`}
+            >
+              ««
+            </button>
+
+            {/* Previous */}
+            <button
+              onClick={handlePreviousPage}
+              disabled={!pagination.has_previous}
+              className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+                pagination.has_previous
+                  ? isDarkMode
+                    ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
+                    : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
+                  : "opacity-50 cursor-not-allowed"
+              }`}
+            >
+              ‹
+            </button>
+
+            {/* Page Numbers - Responsive */}
+            <div className="flex gap-1">
+              {(() => {
+                const pages = []
+                const showPages = window.innerWidth < 640 ? 3 : 5
+                let startPage = Math.max(1, pagination.current_page - Math.floor(showPages / 2))
+                let endPage = Math.min(pagination.total_pages, startPage + showPages - 1)
+
+                if (endPage - startPage < showPages - 1) {
+                  startPage = Math.max(1, endPage - showPages + 1)
+                }
+
+                for (let i = startPage; i <= endPage; i++) {
+                  pages.push(
+                    <button
+                      key={i}
+                      onClick={() => handlePageChange(i)}
+                      className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm min-w-[40px] ${
+                        pagination.current_page === i
+                          ? isDarkMode
+                            ? "bg-slate-600 text-white"
+                            : "bg-slate-600 text-white"
+                          : isDarkMode
+                          ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
+                          : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
+                      }`}
+                    >
+                      {i}
+                    </button>
+                  )
+                }
+                return pages
+              })()}
+            </div>
+
+            {/* Next */}
+            <button
+              onClick={handleNextPage}
+              disabled={!pagination.has_next}
+              className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+                pagination.has_next
+                  ? isDarkMode
+                    ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
+                    : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
+                  : "opacity-50 cursor-not-allowed"
+              }`}
+            >
+              ›
+            </button>
+
+            {/* Last Page */}
+            <button
+              onClick={() => handlePageChange(pagination.total_pages)}
+              disabled={!pagination.has_next}
+              className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+                pagination.has_next
+                  ? isDarkMode
+                    ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
+                    : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
+                  : "opacity-50 cursor-not-allowed"
+              }`}
+            >
+              »»
+            </button>
+          </div>
+
+          {/* Page indicator */}
+          <div className={`text-sm text-center ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+            Page {pagination.current_page} of {pagination.total_pages}
+          </div>
         </div>
-      )}
-    </div>
-  )
+      </div>
+    )}
+  </div>
+)
 }
 
 export default Checklist
