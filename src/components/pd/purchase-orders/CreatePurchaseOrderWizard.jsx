@@ -3,11 +3,67 @@ import { ModalPortal } from "../shared"
 import apiService from "../../../utils/api/api-service"
 import { exportPurchaseOrderToPDF } from "../../../utils/purchase-order-export"
 
+// Helper: Compress/convert images to JPEG and limit dimensions to reduce size
+const compressImageFile = (file, { maxDim = 1600, quality = 0.75 } = {}) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const img = new Image()
+          img.onload = () => {
+            try {
+              let { width, height } = img
+              if (width > height) {
+                if (width > maxDim) {
+                  height = Math.round(height * (maxDim / width))
+                  width = maxDim
+                }
+              } else {
+                if (height > maxDim) {
+                  width = Math.round(width * (maxDim / height))
+                  height = maxDim
+                }
+              }
+
+              const canvas = document.createElement('canvas')
+              canvas.width = width
+              canvas.height = height
+              const ctx = canvas.getContext('2d')
+              ctx.drawImage(img, 0, 0, width, height)
+
+              // Always output JPEG to ensure jsPDF compatibility and smaller size
+              const dataUrl = canvas.toDataURL('image/jpeg', quality)
+              const baseName = (file.name || 'image').replace(/\.[^.]+$/i, '')
+              resolve({ data: dataUrl, name: `${baseName}.jpg`, type: 'image/jpeg' })
+            } catch (err) {
+              reject(err)
+            }
+          }
+          img.onerror = reject
+          img.src = e.target.result
+        } catch (err) {
+          reject(err)
+        }
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    } catch (err) {
+      reject(err)
+    }
+  })
+}
+
 function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = null }) {
   // If editingOrder is provided, start at step 2 (skip PO Number & Supplier)
   const [currentStep, setCurrentStep] = useState(editingOrder ? 2 : 1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  
+  // Input mode toggles for flexibility
+  const [supplierInputMode, setSupplierInputMode] = useState('inventory') // 'inventory' or 'custom'
+  const [itemInputMode, setItemInputMode] = useState('inventory') // 'inventory' or 'custom'
+  const [customItemCounter, setCustomItemCounter] = useState(0) // For generating unique IDs for custom items
   
   // Available data from API
   const [suppliers, setSuppliers] = useState([])
@@ -63,6 +119,15 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     approved_by: "",
     notes: "",
     attached_images: [] // Array of base64 image data
+  })
+
+  // Custom item entry form state
+  const [customItemForm, setCustomItemForm] = useState({
+    item_name: '',
+    description: '',
+    quantity: 1,
+    unit: '',
+    price_per_unit: 0
   })
 
   // Helper to safely format currency numbers
@@ -537,6 +602,59 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     }))
   }
 
+  const handleAddCustomItem = () => {
+    // Validate custom item form
+    if (!customItemForm.item_name.trim()) {
+      setError('Item name is required')
+      return
+    }
+    if (customItemForm.quantity <= 0) {
+      setError('Quantity must be greater than 0')
+      return
+    }
+    if (customItemForm.price_per_unit < 0) {
+      setError('Price cannot be negative')
+      return
+    }
+
+    // Generate unique ID for custom item
+    const customId = `custom-${customItemCounter + 1}`
+    setCustomItemCounter(prev => prev + 1)
+
+    const pricePerUnit = Number(customItemForm.price_per_unit) || 0
+    const quantity = Number(customItemForm.quantity) || 1
+    const amount = quantity * pricePerUnit
+
+    setFormData(prev => ({
+      ...prev,
+      selectedItems: [...prev.selectedItems, {
+        item_no: customId, // Custom ID for non-inventory items
+        item_name: customItemForm.item_name,
+        description: customItemForm.description || "",
+        moq: 0, // No MOQ for custom items
+        quantity: quantity,
+        unit: customItemForm.unit || 'pcs',
+        custom_unit_active: false,
+        custom_unit_value: '',
+        unit_dropdown_open: false,
+        price_per_unit: pricePerUnit,
+        amount: amount,
+        is_custom: true // Flag to identify custom items
+      }]
+    }))
+
+    // Reset custom item form
+    setCustomItemForm({
+      item_name: '',
+      description: '',
+      quantity: 1,
+      unit: '',
+      price_per_unit: 0
+    })
+
+    setError(null)
+  }
+
   const handleRemoveItem = (itemNo) => {
     setFormData(prev => ({
       ...prev,
@@ -748,7 +866,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         verified_by: formData.verified_by,
         approved_by: formData.approved_by,
         notes: formData.notes,
-        attached_images: JSON.stringify(formData.attached_images), // Serialize images array
+        // attached_images intentionally omitted from API payload to avoid 413 due to large base64 images
         // Add status field - 'draft' if saveAsDraft, otherwise 'requested'
         status: saveAsDraft ? 'draft' : 'requested',
         // Tax and discount information
@@ -765,9 +883,12 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         grand_total: taxBreakdown.grandTotal,
         items: formData.selectedItems.map(item => ({
           item_no: item.item_no,
+          item_name: item.is_custom ? item.item_name : undefined, // Include item name for custom items
+          description: item.is_custom ? item.description : undefined, // Include description for custom items
           quantity: item.quantity,
           unit: item.custom_unit_active ? (item.custom_unit_value || item.unit) : item.unit,
-          price_per_unit: item.price_per_unit
+          price_per_unit: item.price_per_unit,
+          is_custom: item.is_custom || false // Include custom flag
         })),
         overwrite_existing: overwriteExisting
       }
@@ -850,9 +971,9 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl w-full max-w-6xl mx-2 sm:mx-4 max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
               <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold">{editingOrder ? 'Edit Purchase Order' : 'Create Purchase Order'}</h2>
@@ -895,7 +1016,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       w-10 h-10 rounded-full flex items-center justify-center text-lg font-semibold
                       transition-all duration-300
                       ${currentStep >= step.number 
-                        ? 'bg-white text-blue-600 shadow-lg' 
+                        ? 'bg-white text-black shadow-lg' 
                         : 'bg-blue-500/30 text-white'
                       }
                     `}>
@@ -922,11 +1043,11 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
           {/* Error Display */}
           {error && (
             <div className="mx-6 mt-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3">
-              <span className="text-red-600 dark:text-red-400 text-2xl">⚠️</span>
-              <span className="text-red-800 dark:text-red-300 font-medium">{error}</span>
+              <span className="text-black dark:text-red-400 text-2xl">⚠️</span>
+              <span className="text-black dark:text-red-300 font-medium">{error}</span>
               <button
                 onClick={() => setError(null)}
-                className="ml-auto text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+                className="ml-auto text-black dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
               >
                 ✕
               </button>
@@ -945,44 +1066,102 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                 {currentStep === 1 && (
                   <div className="space-y-6">
                     <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                      <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 PO Number Format</h3>
-                      <p className="text-blue-700 dark:text-blue-300 text-sm">
+                      <h3 className="font-semibold text-black dark:text-blue-100 mb-2">📋 PO Number Format</h3>
+                      <p className="text-black dark:text-blue-300 text-sm">
                         Purchase Orders must follow the <strong>MMYY-XXX</strong> format (e.g., 1025-015)
                       </p>
                     </div>
 
                     {/* Supplier Selection */}
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                         Select Supplier *
                       </label>
-                      <select
-                        value={formData.supplier_id || formData.supplier_name}
-                        onChange={(e) => handleSupplierSelect(e.target.value)}
-                        disabled={!!editingOrder}
-                        className={`w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                          bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                          focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${editingOrder ? 'opacity-60 cursor-not-allowed' : ''}`}
-                      >
-                        <option value="">-- Choose a supplier --</option>
-                        {suppliers.map((supplier, index) => (
-                          <option key={`${supplier.name}-${index}`} value={supplier.id || supplier.name}>
-                            {supplier.name} ({supplier.item_count} items)
-                          </option>
-                        ))}
-                      </select>
+                      
+                      {/* Input Mode Toggle */}
+                      <div className="flex gap-2 mb-3">
+                        <button
+                          type="button"
+                          onClick={() => setSupplierInputMode('inventory')}
+                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                            supplierInputMode === 'inventory'
+                              ? 'bg-blue-600 text-white shadow-lg'
+                              : 'bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          📦 From Inventory
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSupplierInputMode('custom')}
+                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                            supplierInputMode === 'custom'
+                              ? 'bg-blue-600 text-white shadow-lg'
+                              : 'bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          ✏️ Custom Supplier
+                        </button>
+                      </div>
+
+                      {/* Dropdown for inventory mode */}
+                      {supplierInputMode === 'inventory' && (
+                        <select
+                          value={formData.supplier_id || formData.supplier_name}
+                          onChange={(e) => handleSupplierSelect(e.target.value)}
+                          disabled={!!editingOrder}
+                          className={`w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                            bg-white dark:bg-gray-800 text-black dark:text-gray-100
+                            focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${editingOrder ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        >
+                          <option value="">-- Choose a supplier --</option>
+                          {suppliers.map((supplier, index) => (
+                            <option key={`${supplier.name}-${index}`} value={supplier.id || supplier.name}>
+                              {supplier.name} ({supplier.item_count} items)
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      {/* Text input for custom mode */}
+                      {supplierInputMode === 'custom' && (
+                        <div className="space-y-3">
+                          <input
+                            type="text"
+                            value={formData.supplier_name}
+                            onChange={(e) => setFormData(prev => ({
+                              ...prev,
+                              supplier_name: e.target.value,
+                              supplier_id: '' // Clear ID when using custom supplier
+                            }))}
+                            placeholder="Enter supplier name..."
+                            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                              bg-white dark:bg-gray-800 text-black dark:text-gray-100
+                              focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                          />
+                          <textarea
+                            value={formData.supplier_address}
+                            onChange={(e) => setFormData(prev => ({ ...prev, supplier_address: e.target.value }))}
+                            placeholder="Supplier address (optional)..."
+                            rows="2"
+                            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                              bg-white dark:bg-gray-800 text-black dark:text-gray-100
+                              focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all resize-none"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {/* PO Number Generation */}
                     {(formData.supplier_id || formData.supplier_name) && (
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                          <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                             Purchase Order Number *
                           </label>
                           <div className="flex items-center gap-3">
                             <div className="bg-gray-100 dark:bg-gray-800 px-6 py-3 rounded-lg border-2 border-gray-300 dark:border-gray-600">
-                              <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                              <span className="text-2xl font-bold text-black dark:text-gray-100">
                                 {poPrefix}-
                               </span>
                             </div>
@@ -993,7 +1172,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                               placeholder="000"
                               maxLength="3"
                               className="w-32 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                                bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-2xl font-bold text-center
+                                bg-white dark:bg-gray-800 text-black dark:text-gray-100 text-2xl font-bold text-center
                                 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                             />
                             {poNumberStatus.checking && (
@@ -1002,8 +1181,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                             {!poNumberStatus.checking && formData.po_sequence.length === 3 && (
                               <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
                                 poNumberStatus.exists 
-                                  ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-                                  : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                                  ? 'bg-yellow-100 dark:bg-yellow-900/30 text-black dark:text-yellow-300'
+                                  : 'bg-green-100 dark:bg-green-900/30 text-black dark:text-green-300'
                               }`}>
                                 <span className="text-xl">
                                   {poNumberStatus.exists ? '⚠️' : '✅'}
@@ -1014,13 +1193,13 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                               </div>
                             )}
                           </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                          <p className="text-xs text-black dark:text-gray-400 mt-2">
                             Enter a 3-digit sequence number (001-999)
                           </p>
                         </div>
 
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                          <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                             Supplier Address
                           </label>
                           <textarea
@@ -1028,11 +1207,11 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                             onChange={(e) => setFormData(prev => ({ ...prev, supplier_address: e.target.value }))}
                             rows="3"
                             className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                              bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                              bg-white dark:bg-gray-800 text-black dark:text-gray-100
                               focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                             placeholder="Enter supplier's complete address..."
                           />
-                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 flex items-start gap-1">
+                          <p className="text-xs text-black dark:text-blue-400 mt-2 flex items-start gap-1">
                             <span className="mt-0.5">ℹ️</span>
                             <span>
                               This address will be saved for future reference. You can edit or update it anytime when creating new purchase orders.
@@ -1048,11 +1227,13 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                 {currentStep === 2 && (
                   <div className="space-y-6">
                     <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                      <h3 className="font-semibold text-green-900 dark:text-green-100 mb-2">
-                        📦 Items from {formData.supplier_name}
+                      <h3 className="font-semibold text-black dark:text-green-100 mb-2">
+                        📦 Add Items to Purchase Order
                       </h3>
-                      <p className="text-green-700 dark:text-green-300 text-sm">
-                        Only items from this supplier can be added to this purchase order
+                      <p className="text-black dark:text-green-300 text-sm">
+                        {supplierInputMode === 'inventory' 
+                          ? `Items from ${formData.supplier_name} in inventory`
+                          : 'Add items from inventory or create custom items'}
                       </p>
                     </div>
 
@@ -1060,7 +1241,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                     {formData.selectedItems.length > 0 && (
                       <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 overflow-visible">
                         <div className="bg-gray-50 dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                          <h4 className="font-semibold text-gray-900 dark:text-gray-100">
+                          <h4 className="font-semibold text-black dark:text-gray-100">
                             Selected Items ({formData.selectedItems.length})
                           </h4>
                         </div>
@@ -1069,31 +1250,31 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                             <div key={`${item.item_no}-${idx}`} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                               <div className="flex items-start gap-4">
                                 <div className="flex-1">
-                                  <div className="font-semibold text-gray-900 dark:text-gray-100">
+                                  <div className="font-semibold text-black dark:text-gray-100">
                                     #{item.item_no} - {item.item_name}
                                   </div>
                                   {item.description && (
-                                    <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                    <div className="text-sm text-black dark:text-gray-400 mt-1">
                                       {item.description}
                                     </div>
                                   )}
                                   <div className="grid grid-cols-4 gap-3 mt-3">
                                     <div>
-                                      <label className="text-xs text-gray-600 dark:text-gray-400">Quantity</label>
+                                      <label className="text-xs text-black dark:text-gray-400">Quantity</label>
                                       <input
                                         type="number"
                                         min={(Number(item.moq) || 0) > 0 ? Number(item.moq) : 1}
                                         value={item.quantity}
                                         onChange={(e) => handleUpdateItem(item.item_no, 'quantity', e.target.value)}
                                         className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded
-                                          bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                                          bg-white dark:bg-gray-800 text-black dark:text-gray-100 text-sm"
                                       />
                                       {(Number(item.moq) || 0) > 0 && (
-                                        <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400">MOQ: {Number(item.moq)}</p>
+                                        <p className="mt-1 text-[10px] text-black dark:text-gray-400">MOQ: {Number(item.moq)}</p>
                                       )}
                                     </div>
                                     <div>
-                                      <label className="text-xs text-gray-600 dark:text-gray-400">Unit</label>
+                                      <label className="text-xs text-black dark:text-gray-400">Unit</label>
                                       <div className="relative" onClick={(e) => e.stopPropagation()}>
                                         <button
                                           type="button"
@@ -1101,7 +1282,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                             e.stopPropagation()
                                             handleUpdateItem(item.item_no, 'unit_dropdown_open', !item.unit_dropdown_open)
                                           }}
-                                          className="w-full text-left px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                                          className="w-full text-left px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-black dark:text-gray-100 text-sm"
                                         >
                                           {item.unit || (item.custom_unit_active ? item.custom_unit_value || 'Other' : 'Select unit')}
                                         </button>
@@ -1121,7 +1302,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                                   handleUpdateItem(item.item_no, 'unit', u)
                                                   handleUpdateItem(item.item_no, 'unit_dropdown_open', false)
                                                 }}
-                                                className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-900 dark:text-gray-100"
+                                                className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm text-black dark:text-gray-100"
                                               >
                                                 {u}
                                               </li>
@@ -1133,7 +1314,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                                 handleUpdateItem(item.item_no, 'unit', item.custom_unit_value || '')
                                                 handleUpdateItem(item.item_no, 'unit_dropdown_open', false)
                                               }}
-                                              className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-900 dark:text-gray-100"
+                                              className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm text-black dark:text-gray-100"
                                             >
                                               Other (specify)
                                             </li>
@@ -1150,13 +1331,13 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                               handleUpdateItem(item.item_no, 'unit', e.target.value)
                                             }}
                                             placeholder="Enter custom unit (e.g., rolls, liters)"
-                                            className="mt-2 w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                                            className="mt-2 w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-black dark:text-gray-100 text-sm"
                                           />
                                         )}
                                       </div>
                                     </div>
                                     <div>
-                                      <label className="text-xs text-gray-600 dark:text-gray-400">Price/Unit</label>
+                                      <label className="text-xs text-black dark:text-gray-400">Price/Unit</label>
                                       <input
                                         type="number"
                                         min="0"
@@ -1164,12 +1345,12 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                         value={item.price_per_unit}
                                         onChange={(e) => handleUpdateItem(item.item_no, 'price_per_unit', e.target.value)}
                                         className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded
-                                          bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                                          bg-white dark:bg-gray-800 text-black dark:text-gray-100 text-sm"
                                       />
                                     </div>
                                     <div>
-                                      <label className="text-xs text-gray-600 dark:text-gray-400">Amount</label>
-                                      <div className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                      <label className="text-xs text-black dark:text-gray-400">Amount</label>
+                                      <div className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm font-semibold text-black dark:text-gray-100">
                                         ₱{formatAmount(item.amount, 2)}
                                       </div>
                                     </div>
@@ -1189,8 +1370,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-900 px-4 py-3 border-t border-gray-200 dark:border-gray-700">
                           <div className="flex items-center justify-between">
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">Total Amount:</span>
-                            <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                            <span className="font-semibold text-black dark:text-gray-300">Total Amount:</span>
+                            <span className="text-2xl font-bold text-black dark:text-blue-400">
                               ₱{formatAmount(calculateTotal(), 2)}
                             </span>
                           </div>
@@ -1200,78 +1381,226 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
                     {/* Available Items */}
                     <div>
-                      <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                        Available Items ({availableItems.length})
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
-                          {availableItems.map((item, idx) => {
-                          const isAdded = formData.selectedItems.some(i => i.item_no === item.item_no)
-                          return (
-                            <div
-                              key={`${item.item_no}-${idx}`}
-                              className={`p-4 border-2 rounded-lg transition-all ${
-                                isAdded
-                                  ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/20'
-                                  : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 hover:border-blue-300 dark:hover:border-blue-600'
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">
-                                    #{item.item_no} - {item.item_name}
-                                  </div>
-                                  {item.description && (
-                                    <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
-                                      {item.description}
+                      {/* Item Input Mode Toggle */}
+                      <div className="flex gap-2 mb-4">
+                        <button
+                          type="button"
+                          onClick={() => setItemInputMode('inventory')}
+                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                            itemInputMode === 'inventory'
+                              ? 'bg-green-600 text-white shadow-lg'
+                              : 'bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          📦 Add from Inventory
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setItemInputMode('custom')}
+                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                            itemInputMode === 'custom'
+                              ? 'bg-green-600 text-white shadow-lg'
+                              : 'bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          ✏️ Add Custom Item
+                        </button>
+                      </div>
+
+                      {/* Inventory Items Section */}
+                      {itemInputMode === 'inventory' && (
+                        <>
+                          <h4 className="font-semibold text-black dark:text-gray-100 mb-3">
+                            Available Items ({availableItems.length})
+                          </h4>
+                          {supplierInputMode === 'custom' && availableItems.length === 0 && (
+                            <div className="text-center py-8 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <p className="text-black dark:text-blue-300 mb-2">
+                                💡 No inventory items available for custom supplier
+                              </p>
+                              <p className="text-sm text-black dark:text-blue-400">
+                                Switch to "Add Custom Item" to manually add items to this purchase order
+                              </p>
+                            </div>
+                          )}
+                          {availableItems.length > 0 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+                              {availableItems.map((item, idx) => {
+                                const isAdded = formData.selectedItems.some(i => i.item_no === item.item_no)
+                                return (
+                                  <div
+                                    key={`${item.item_no}-${idx}`}
+                                    className={`p-4 border-2 rounded-lg transition-all ${
+                                      isAdded
+                                        ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/20'
+                                        : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 hover:border-blue-300 dark:hover:border-blue-600'
+                                    }`}
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-semibold text-black dark:text-gray-100 truncate">
+                                          #{item.item_no} - {item.item_name}
+                                        </div>
+                                        {item.description && (
+                                          <div className="text-sm text-black dark:text-gray-400 mt-1 line-clamp-2">
+                                            {item.description}
+                                          </div>
+                                        )}
+                                        <div className="flex items-center gap-2 mt-2">
+                                          <span className={`text-xs px-2 py-1 rounded ${
+                                            item.status === 'Out Of Stock'
+                                              ? 'bg-red-100 text-black dark:bg-red-900/30 dark:text-red-300'
+                                              : item.status === 'Low In Stock'
+                                              ? 'bg-yellow-100 text-black dark:bg-yellow-900/30 dark:text-yellow-300'
+                                              : 'bg-green-100 text-black dark:bg-green-900/30 dark:text-green-300'
+                                          }`}>
+                                            {item.status}
+                                          </span>
+                                          <span className="text-sm text-black dark:text-gray-400">
+                                            ₱{formatAmount(item.price_per_unit || 0, 2)}
+                                          </span>
+                                          {(Number(item.min_stock) || 0) > 0 && (
+                                            <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 text-black dark:bg-blue-900/30 dark:text-blue-300">
+                                              ROP: {Number(item.min_stock)}
+                                            </span>
+                                          )}
+                                          {(Number(item.moq) || 0) > 0 && (
+                                            <span className="text-[10px] px-2 py-0.5 rounded bg-purple-100 text-black dark:bg-purple-900/30 dark:text-purple-300">
+                                              MOQ: {Number(item.moq)}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() => !isAdded && handleAddItem(item)}
+                                        disabled={isAdded}
+                                        className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
+                                          isAdded
+                                            ? 'bg-green-100 text-black dark:bg-green-900/30 dark:text-green-300 cursor-not-allowed'
+                                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                                        }`}
+                                      >
+                                        {isAdded ? '✓ Added' : '+ Add'}
+                                      </button>
                                     </div>
-                                  )}
-                                  <div className="flex items-center gap-2 mt-2">
-                                    <span className={`text-xs px-2 py-1 rounded ${
-                                      item.status === 'Out Of Stock'
-                                        ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                                        : item.status === 'Low In Stock'
-                                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
-                                        : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                                    }`}>
-                                      {item.status}
-                                    </span>
-                                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                                      ₱{formatAmount(item.price_per_unit || 0, 2)}
-                                    </span>
-                                    {/* Show ROP and MOQ badges for buyer context */}
-                                    {(Number(item.min_stock) || 0) > 0 && (
-                                      <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                                        ROP: {Number(item.min_stock)}
-                                      </span>
-                                    )}
-                                    {(Number(item.moq) || 0) > 0 && (
-                                      <span className="text-[10px] px-2 py-0.5 rounded bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
-                                        MOQ: {Number(item.moq)}
-                                      </span>
-                                    )}
                                   </div>
-                                </div>
-                                <button
-                                  onClick={() => !isAdded && handleAddItem(item)}
-                                  disabled={isAdded}
-                                  className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
-                                    isAdded
-                                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 cursor-not-allowed'
-                                      : 'bg-blue-600 text-white hover:bg-blue-700'
-                                  }`}
-                                >
-                                  {isAdded ? '✓ Added' : '+ Add'}
-                                </button>
+                                )
+                              })}
+                            </div>
+                          )}
+                          {supplierInputMode === 'inventory' && availableItems.length === 0 && (
+                            <div className="text-center py-8 text-black dark:text-gray-400">
+                              No items needing restock from this supplier
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Custom Item Form */}
+                      {itemInputMode === 'custom' && (
+                        <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 p-6">
+                          <h4 className="font-semibold text-black dark:text-gray-100 mb-4">
+                            ✏️ Add Custom Item
+                          </h4>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
+                                Item Name *
+                              </label>
+                              <input
+                                type="text"
+                                value={customItemForm.item_name}
+                                onChange={(e) => setCustomItemForm(prev => ({ ...prev, item_name: e.target.value }))}
+                                placeholder="Enter item name..."
+                                className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                                  bg-white dark:bg-gray-800 text-black dark:text-gray-100
+                                  focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
+                                Description
+                              </label>
+                              <textarea
+                                value={customItemForm.description}
+                                onChange={(e) => setCustomItemForm(prev => ({ ...prev, description: e.target.value }))}
+                                placeholder="Enter item description (optional)..."
+                                rows="2"
+                                className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                                  bg-white dark:bg-gray-800 text-black dark:text-gray-100
+                                  focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all resize-none"
+                              />
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
+                                  Quantity *
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={customItemForm.quantity}
+                                  onChange={(e) => setCustomItemForm(prev => ({ ...prev, quantity: Number(e.target.value) || 1 }))}
+                                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                                    bg-white dark:bg-gray-800 text-black dark:text-gray-100
+                                    focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
+                                  Unit
+                                </label>
+                                <input
+                                  type="text"
+                                  value={customItemForm.unit}
+                                  onChange={(e) => setCustomItemForm(prev => ({ ...prev, unit: e.target.value }))}
+                                  placeholder="pcs, kg, etc."
+                                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                                    bg-white dark:bg-gray-800 text-black dark:text-gray-100
+                                    focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
+                                  Price/Unit
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={customItemForm.price_per_unit}
+                                  onChange={(e) => setCustomItemForm(prev => ({ ...prev, price_per_unit: Number(e.target.value) || 0 }))}
+                                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                                    bg-white dark:bg-gray-800 text-black dark:text-gray-100
+                                    focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                />
                               </div>
                             </div>
-                          )
-                        })}
-                        {availableItems.length === 0 && (
-                          <div className="col-span-2 text-center py-8 text-gray-500 dark:text-gray-400">
-                            No items available from this supplier
+                            <div className="flex justify-end gap-3 pt-2">
+                              <button
+                                type="button"
+                                onClick={() => setCustomItemForm({
+                                  item_name: '',
+                                  description: '',
+                                  quantity: 1,
+                                  unit: '',
+                                  price_per_unit: 0
+                                })}
+                                className="px-4 py-2 rounded-lg font-medium text-sm bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+                              >
+                                Clear
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleAddCustomItem}
+                                className="px-4 py-2 rounded-lg font-medium text-sm bg-green-600 text-white hover:bg-green-700 transition-all"
+                              >
+                                + Add Item
+                              </button>
+                            </div>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1280,10 +1609,10 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                 {currentStep === 3 && (
                   <div className="space-y-6">
                     <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                      <h3 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
+                      <h3 className="font-semibold text-black dark:text-yellow-100 mb-2">
                         💰 Tax Calculation & Discounts
                       </h3>
-                      <p className="text-yellow-700 dark:text-yellow-300 text-sm">
+                      <p className="text-black dark:text-yellow-300 text-sm">
                         Configure withholding tax type and optional discounts for this purchase order
                       </p>
                     </div>
@@ -1296,13 +1625,13 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           id="applyTax"
                           checked={formData.apply_tax}
                           onChange={(e) => setFormData(prev => ({ ...prev, apply_tax: e.target.checked }))}
-                          className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                          className="w-5 h-5 text-black rounded focus:ring-2 focus:ring-blue-500"
                         />
-                        <label htmlFor="applyTax" className="font-semibold text-gray-900 dark:text-gray-100 cursor-pointer">
+                        <label htmlFor="applyTax" className="font-semibold text-black dark:text-gray-100 cursor-pointer">
                           Apply Withholding Tax
                         </label>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-black dark:text-gray-400">
                         {formData.apply_tax 
                           ? "Tax calculations will be applied (12% VAT removal + withholding tax)" 
                           : "No tax calculations will be applied - simple total only"
@@ -1313,7 +1642,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                     {/* Tax Type Selection - Only show if tax is applied */}
                     {formData.apply_tax && (
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                        <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-3">
                           Withholding Tax Type *
                         </label>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1333,12 +1662,12 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                               }`}
                             >
                               <div className="flex items-center justify-between mb-2">
-                                <span className="font-semibold text-gray-900 dark:text-gray-100">{option.label}</span>
-                                <span className="text-xl font-bold text-blue-600 dark:text-blue-400">{option.rate}</span>
+                                <span className="font-semibold text-black dark:text-gray-100">{option.label}</span>
+                                <span className="text-xl font-bold text-black dark:text-blue-400">{option.rate}</span>
                               </div>
-                              <p className="text-xs text-gray-600 dark:text-gray-400">{option.description}</p>
+                              <p className="text-xs text-black dark:text-gray-400">{option.description}</p>
                               {formData.tax_type === option.value && (
-                                <div className="mt-2 flex items-center gap-1 text-blue-600 dark:text-blue-400 text-sm">
+                                <div className="mt-2 flex items-center gap-1 text-black dark:text-blue-400 text-sm">
                                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                   </svg>
@@ -1351,7 +1680,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       </div>
                     )}                    {/* Tax Calculation Preview */}
                     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-                      <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                      <h4 className="font-semibold text-black dark:text-gray-100 mb-4">
                         {formData.apply_tax ? "Tax Calculation Breakdown" : "Total Calculation"}
                       </h4>
                       <div className="space-y-3">
@@ -1360,29 +1689,29 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           return (
                             <>
                               <div className="flex justify-between items-center pb-2 border-b border-gray-300 dark:border-gray-600">
-                                <span className="text-sm text-gray-700 dark:text-gray-300">
+                                <span className="text-sm text-black dark:text-gray-300">
                                   {formData.apply_tax ? "Total Before Withholding Tax (TBWT)" : "Total Amount"}
                                 </span>
-                                <span className="font-semibold text-gray-900 dark:text-gray-100">₱{formatAmount(breakdown.totalBeforeWithholdingTax, 2)}</span>
+                                <span className="font-semibold text-black dark:text-gray-100">₱{formatAmount(breakdown.totalBeforeWithholdingTax, 2)}</span>
                               </div>
                               
                               {formData.apply_tax && (
                                 <>
                                   <div className="flex justify-between items-center text-sm">
-                                    <span className="text-gray-600 dark:text-gray-400">÷ 1.12 (Remove 12% VAT)</span>
+                                    <span className="text-black dark:text-gray-400">÷ 1.12 (Remove 12% VAT)</span>
                                     <span></span>
                                   </div>
                                   <div className="flex justify-between items-center pb-2 border-b border-gray-300 dark:border-gray-600">
-                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Subtotal (Gross Total)</span>
-                                    <span className="font-semibold text-gray-900 dark:text-gray-100">₱{formatAmount(breakdown.subtotal, 2)}</span>
+                                    <span className="text-sm font-medium text-black dark:text-gray-300">Subtotal (Gross Total)</span>
+                                    <span className="font-semibold text-black dark:text-gray-100">₱{formatAmount(breakdown.subtotal, 2)}</span>
                                   </div>
                                   <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">Withholding Tax ({breakdown.taxRate}%)</span>
-                                    <span className="font-semibold text-red-600 dark:text-red-400">- ₱{formatAmount(breakdown.withholdingTax, 2)}</span>
+                                    <span className="text-sm text-black dark:text-gray-300">Withholding Tax ({breakdown.taxRate}%)</span>
+                                    <span className="font-semibold text-black dark:text-red-400">- ₱{formatAmount(breakdown.withholdingTax, 2)}</span>
                                   </div>
                                   <div className="flex justify-between items-center pb-2 border-b-2 border-gray-400 dark:border-gray-500">
-                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Total After Withholding Tax</span>
-                                    <span className="font-semibold text-gray-900 dark:text-gray-100">₱{formatAmount(breakdown.totalAfterWithholdingTax, 2)}</span>
+                                    <span className="text-sm font-medium text-black dark:text-gray-300">Total After Withholding Tax</span>
+                                    <span className="font-semibold text-black dark:text-gray-100">₱{formatAmount(breakdown.totalAfterWithholdingTax, 2)}</span>
                                   </div>
                                 </>
                               )}
@@ -1390,19 +1719,19 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                               {breakdown.discountAmount > 0 && (
                                 <>
                                   <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                                    <span className="text-sm text-black dark:text-gray-300">
                                       Discount {breakdown.discountType === "percentage" 
                                         ? `(${breakdown.discountPercentage}%)` 
                                         : "(Fixed Amount)"}
                                     </span>
-                                    <span className="font-semibold text-red-600 dark:text-red-400">- ₱{formatAmount(breakdown.discountAmount, 2)}</span>
+                                    <span className="font-semibold text-black dark:text-red-400">- ₱{formatAmount(breakdown.discountAmount, 2)}</span>
                                   </div>
                                 </>
                               )}
                               
                               <div className="flex justify-between items-center pt-2 border-t-2 border-gray-400 dark:border-gray-500">
-                                <span className="text-lg font-bold text-gray-900 dark:text-gray-100">Grand Total</span>
-                                <span className="text-2xl font-bold text-green-600 dark:text-green-400">₱{formatAmount(breakdown.grandTotal, 2)}</span>
+                                <span className="text-lg font-bold text-black dark:text-gray-100">Grand Total</span>
+                                <span className="text-2xl font-bold text-black dark:text-green-400">₱{formatAmount(breakdown.grandTotal, 2)}</span>
                               </div>
                             </>
                           )
@@ -1422,9 +1751,9 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                             has_discount: e.target.checked,
                             discount_value: e.target.checked ? prev.discount_value : 0
                           }))}
-                          className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                          className="w-5 h-5 text-black rounded focus:ring-2 focus:ring-blue-500"
                         />
-                        <label htmlFor="hasDiscount" className="font-semibold text-gray-900 dark:text-gray-100 cursor-pointer">
+                        <label htmlFor="hasDiscount" className="font-semibold text-black dark:text-gray-100 cursor-pointer">
                           Apply Discount
                         </label>
                       </div>
@@ -1433,7 +1762,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                         <div className="space-y-4 mt-4">
                           {/* Discount Type Selector */}
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                               Discount Type
                             </label>
                             <div className="grid grid-cols-2 gap-3">
@@ -1446,8 +1775,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                 }))}
                                 className={`p-3 rounded-lg border-2 transition-all ${
                                   formData.discount_type === "percentage"
-                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                                    : 'border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 text-gray-700 dark:text-gray-300'
+                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-black dark:text-blue-300'
+                                    : 'border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 text-black dark:text-gray-300'
                                 }`}
                               >
                                 <div className="flex items-center justify-center gap-2">
@@ -1464,8 +1793,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                 }))}
                                 className={`p-3 rounded-lg border-2 transition-all ${
                                   formData.discount_type === "fixed"
-                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                                    : 'border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 text-gray-700 dark:text-gray-300'
+                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-black dark:text-blue-300'
+                                    : 'border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 text-black dark:text-gray-300'
                                 }`}
                               >
                                 <div className="flex items-center justify-center gap-2">
@@ -1478,7 +1807,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
                           {/* Discount Value Input */}
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                               {formData.discount_type === "percentage" 
                                 ? "Discount Percentage (%)" 
                                 : "Discount Amount (₱)"}
@@ -1500,17 +1829,17 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                   }))
                                 }}
                                 className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                                  bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-lg font-semibold
+                                  bg-white dark:bg-gray-800 text-black dark:text-gray-100 text-lg font-semibold
                                   focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                                 placeholder={formData.discount_type === "percentage" 
                                   ? "Enter discount percentage (0-100)" 
                                   : "Enter discount amount in pesos"}
                               />
-                              <span className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                              <span className="text-2xl font-bold text-black dark:text-gray-400">
                                 {formData.discount_type === "percentage" ? "%" : "₱"}
                               </span>
                             </div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                            <p className="text-xs text-black dark:text-gray-400 mt-2">
                               {formData.discount_type === "percentage" 
                                 ? "Enter a percentage value between 0 and 100" 
                                 : "Enter a fixed discount amount in Philippine Pesos"}
@@ -1526,17 +1855,17 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                 {currentStep === 4 && (
                   <div className="space-y-6">
                     <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-                      <h3 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">
+                      <h3 className="font-semibold text-black dark:text-purple-100 mb-2">
                         📝 Purchase Order Details
                       </h3>
-                      <p className="text-purple-700 dark:text-purple-300 text-sm">
+                      <p className="text-black dark:text-purple-300 text-sm">
                         Fill in the required details for the purchase order
                       </p>
                     </div>
 
                     {/* Priority Selection (P0 - P4) */}
                     <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border-2 border-gray-200 dark:border-gray-700">
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Priority</label>
+                      <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-3">Priority</label>
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                         {[
                           { id: 'P0', title: 'P0 (Critical)', desc: 'Immediate emergency response' },
@@ -1552,10 +1881,10 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                             className={`p-3 rounded-lg border-2 text-left transition-all ${formData.priority === option.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500'}`}>
                             <div className="flex items-center justify-between">
                               <div>
-                                <div className="font-semibold text-gray-900 dark:text-gray-100">{option.title}</div>
-                                <div className="text-xs text-gray-600 dark:text-gray-400">{option.desc}</div>
+                                <div className="font-semibold text-black dark:text-gray-100">{option.title}</div>
+                                <div className="text-xs text-black dark:text-gray-400">{option.desc}</div>
                               </div>
-                              <div className="text-sm font-bold text-blue-600">{option.id}</div>
+                              <div className="text-sm font-bold text-black">{option.id}</div>
                             </div>
                           </button>
                         ))}
@@ -1564,7 +1893,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
                     <div className="grid grid-cols-2 gap-6">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                           Attention Person
                         </label>
                         <div className="relative">
@@ -1577,18 +1906,18 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                               setAutofilledFields(prev => ({ ...prev, attention_person: false }))
                             }}
                             className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                              bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                              bg-white dark:bg-gray-800 text-black dark:text-gray-100
                               focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                             placeholder="Contact person name"
                           />
                           {autofilledFields.attention_person && (
-                            <span className="absolute top-1 right-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">Autofilled</span>
+                            <span className="absolute top-1 right-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-black">Autofilled</span>
                           )}
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                           Terms *
                         </label>
                         <div className="relative">
@@ -1600,18 +1929,18 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                               setAutofilledFields(prev => ({ ...prev, terms: false }))
                             }}
                             className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                              bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                              bg-white dark:bg-gray-800 text-black dark:text-gray-100
                               focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                             placeholder="e.g., 30-DAYS, 60-DAYS, 90-DAYS, COD"
                           />
                           {autofilledFields.terms && (
-                            <span className="absolute top-1 right-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">Autofilled</span>
+                            <span className="absolute top-1 right-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-black">Autofilled</span>
                           )}
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                           PO Date *
                         </label>
                         <input
@@ -1619,13 +1948,13 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           value={formData.po_date}
                           onChange={(e) => setFormData(prev => ({ ...prev, po_date: e.target.value }))}
                           className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                            bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                            bg-white dark:bg-gray-800 text-black dark:text-gray-100
                             focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                         />
                       </div>
 
                       <div className="col-span-2">
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                           Prepared By (Multiple people allowed)
                         </label>
                         <div className="space-y-2">
@@ -1640,7 +1969,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                   setFormData(prev => ({ ...prev, prepared_by: newPreparedBy }))
                                 }}
                                 className="flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                                  bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                                  bg-white dark:bg-gray-800 text-black dark:text-gray-100
                                   focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                                 placeholder={`Person ${index + 1} name`}
                               />
@@ -1671,7 +2000,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       </div>
 
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                           Verified By
                         </label>
                         <input
@@ -1679,14 +2008,14 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           value={formData.verified_by}
                           onChange={(e) => setFormData(prev => ({ ...prev, verified_by: e.target.value }))}
                           className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                            bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                            bg-white dark:bg-gray-800 text-black dark:text-gray-100
                             focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                           placeholder="Name of person verifying"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                           Approved By
                         </label>
                         <input
@@ -1694,7 +2023,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           value={formData.approved_by}
                           onChange={(e) => setFormData(prev => ({ ...prev, approved_by: e.target.value }))}
                           className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                            bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                            bg-white dark:bg-gray-800 text-black dark:text-gray-100
                             focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                             placeholder="Name of person approving"
                         />
@@ -1702,7 +2031,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                         Notes / Additional Information
                       </label>
                       <div className="relative">
@@ -1714,18 +2043,18 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           }}
                           rows="4"
                           className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                            bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                            bg-white dark:bg-gray-800 text-black dark:text-gray-100
                             focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                           placeholder="Any additional notes or special instructions..."
                         />
                         {autofilledFields.notes && (
-                          <span className="absolute top-1 right-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800">Autofilled</span>
+                          <span className="absolute top-1 right-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-black">Autofilled</span>
                         )}
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                         Attach Images (Drawings, Photos, etc.)
                       </label>
                       <input
@@ -1734,30 +2063,19 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                         multiple
                         onChange={async (e) => {
                           const files = Array.from(e.target.files || [])
-                          const imagePromises = files.map(file => {
-                            return new Promise((resolve, reject) => {
-                              const reader = new FileReader()
-                              reader.onload = (event) => resolve({
-                                data: event.target.result,
-                                name: file.name,
-                                type: file.type
-                              })
-                              reader.onerror = reject
-                              reader.readAsDataURL(file)
-                            })
-                          })
                           try {
-                            const newImages = await Promise.all(imagePromises)
+                            // Compress/convert all images to JPEG to reduce size and ensure compatibility
+                            const newImages = await Promise.all(files.map(file => compressImageFile(file)))
                             setFormData(prev => ({
                               ...prev,
                               attached_images: [...prev.attached_images, ...newImages]
                             }))
                           } catch (err) {
-                            console.error('Error loading images:', err)
+                            console.error('Error loading/compressing images:', err)
                           }
                         }}
                         className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                          bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                          bg-white dark:bg-gray-800 text-black dark:text-gray-100
                           focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all
                           file:mr-4 file:py-2 file:px-4 file:rounded file:border-0
                           file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700
@@ -1771,7 +2089,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           <button
                             type="button"
                             onClick={() => setShowImagePreview(true)}
-                            className="w-full px-4 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center justify-center gap-2 border-2 border-blue-200 dark:border-blue-700"
+                            className="w-full px-4 py-3 bg-blue-50 dark:bg-blue-900/20 text-black dark:text-blue-300 rounded-lg font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center justify-center gap-2 border-2 border-blue-200 dark:border-blue-700"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1788,7 +2106,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                   alt={img.name}
                                   className="w-full h-32 object-contain rounded"
                                 />
-                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">{img.name}</p>
+                                <p className="text-xs text-black dark:text-gray-400 mt-1 truncate">{img.name}</p>
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1817,26 +2135,26 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                     <div className="bg-white border-4 border-gray-900 rounded-lg p-8 shadow-lg">
                       {/* Header */}
                       <div className="text-center border-b-2 border-gray-900 pb-4 mb-6">
-                        <h2 className="text-3xl font-bold text-gray-900">JJC ENGINEERING</h2>
-                        <p className="text-sm text-gray-700 mt-1">Purchase Order</p>
+                        <h2 className="text-3xl font-bold text-black">JJC ENGINEERING</h2>
+                        <p className="text-sm text-black mt-1">Purchase Order</p>
                       </div>
 
                       {/* PO Info */}
                       <div className="grid grid-cols-2 gap-6 mb-6">
                         <div>
-                          <div className="text-sm text-gray-700">P.O.#</div>
-                          <div className="text-2xl font-bold text-gray-900">{formData.po_number}</div>
-                          <div className="text-sm text-gray-800 mt-2">Date: {formData.po_date}</div>
-                          <div className="text-sm text-gray-800">Terms: {formData.terms}</div>
+                          <div className="text-sm text-black">P.O.#</div>
+                          <div className="text-2xl font-bold text-black">{formData.po_number}</div>
+                          <div className="text-sm text-black mt-2">Date: {formData.po_date}</div>
+                          <div className="text-sm text-black">Terms: {formData.terms}</div>
                         </div>
                         <div>
-                          <div className="text-sm font-semibold text-gray-800">SUPPLIER:</div>
-                          <div className="font-bold text-gray-900">{formData.supplier_name}</div>
-                          <div className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">
+                          <div className="text-sm font-semibold text-black">SUPPLIER:</div>
+                          <div className="font-bold text-black">{formData.supplier_name}</div>
+                          <div className="text-sm text-black mt-1 whitespace-pre-wrap">
                             {formData.supplier_address}
                           </div>
                           {formData.supplier_details && (
-                            <div className="mt-3 text-sm text-gray-700 space-y-1">
+                            <div className="mt-3 text-sm text-black space-y-1">
                               <div><strong>Contact:</strong> {formData.supplier_details.contact_person || formData.supplier_details.contact || 'N/A'}</div>
                               <div><strong>Email:</strong> {formData.supplier_details.email || 'N/A'}</div>
                               <div><strong>Phone:</strong> {formData.supplier_details.phone || 'N/A'}</div>
@@ -1846,7 +2164,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                             </div>
                           )}
                           {formData.attention_person && (
-                            <div className="text-sm text-gray-800 mt-2">
+                            <div className="text-sm text-black mt-2">
                               Attn: {formData.attention_person}
                             </div>
                           )}
@@ -1857,23 +2175,23 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       <table className="w-full border-collapse border-2 border-gray-900 mb-6">
                         <thead>
                           <tr className="bg-gray-100">
-                            <th className="border border-gray-900 px-3 py-2 text-left text-sm font-bold text-gray-900">ITEM</th>
-                            <th className="border border-gray-900 px-3 py-2 text-center text-sm font-bold text-gray-900">QTY</th>
-                            <th className="border border-gray-900 px-3 py-2 text-center text-sm font-bold text-gray-900">UNIT</th>
-                            <th className="border border-gray-900 px-3 py-2 text-left text-sm font-bold text-gray-900">DESCRIPTION</th>
-                            <th className="border border-gray-900 px-3 py-2 text-right text-sm font-bold text-gray-900">UNIT PRICE</th>
-                            <th className="border border-gray-900 px-3 py-2 text-right text-sm font-bold text-gray-900">AMOUNT</th>
+                            <th className="border border-gray-900 px-3 py-2 text-left text-sm font-bold text-black">ITEM</th>
+                            <th className="border border-gray-900 px-3 py-2 text-center text-sm font-bold text-black">QTY</th>
+                            <th className="border border-gray-900 px-3 py-2 text-center text-sm font-bold text-black">UNIT</th>
+                            <th className="border border-gray-900 px-3 py-2 text-left text-sm font-bold text-black">DESCRIPTION</th>
+                            <th className="border border-gray-900 px-3 py-2 text-right text-sm font-bold text-black">UNIT PRICE</th>
+                            <th className="border border-gray-900 px-3 py-2 text-right text-sm font-bold text-black">AMOUNT</th>
                           </tr>
                         </thead>
                         <tbody>
                           {formData.selectedItems.map((item, index) => (
                             <tr key={`${item.item_no}-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="border border-gray-900 px-3 py-2 text-sm text-gray-900">#{item.item_no}</td>
-                              <td className="border border-gray-900 px-3 py-2 text-center text-sm text-gray-900">{item.quantity}</td>
-                              <td className="border border-gray-900 px-3 py-2 text-center text-sm text-gray-900">{item.unit}</td>
-                              <td className="border border-gray-900 px-3 py-2 text-sm text-gray-900">{item.item_name}</td>
-                              <td className="border border-gray-900 px-3 py-2 text-right text-sm text-gray-900">{formatAmount(item.price_per_unit, 2)}</td>
-                              <td className="border border-gray-900 px-3 py-2 text-right text-sm font-semibold text-gray-900">{formatAmount(item.amount, 2)}</td>
+                              <td className="border border-gray-900 px-3 py-2 text-sm text-black">#{item.item_no}</td>
+                              <td className="border border-gray-900 px-3 py-2 text-center text-sm text-black">{item.quantity}</td>
+                              <td className="border border-gray-900 px-3 py-2 text-center text-sm text-black">{item.unit}</td>
+                              <td className="border border-gray-900 px-3 py-2 text-sm text-black">{item.item_name}</td>
+                              <td className="border border-gray-900 px-3 py-2 text-right text-sm text-black">{formatAmount(item.price_per_unit, 2)}</td>
+                              <td className="border border-gray-900 px-3 py-2 text-right text-sm font-semibold text-black">{formatAmount(item.amount, 2)}</td>
                             </tr>
                           ))}
                           {(() => {
@@ -1884,38 +2202,38 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                 {formData.apply_tax ? (
                                   <>
                                     <tr className="bg-gray-100">
-                                      <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right font-semibold text-gray-900">
+                                      <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right font-semibold text-black">
                                         GROSS TOTAL (with 12% VAT):
                                       </td>
-                                      <td className="border border-gray-900 px-3 py-2 text-right font-bold text-gray-900">
+                                      <td className="border border-gray-900 px-3 py-2 text-right font-bold text-black">
                                         ₱{formatAmount(breakdown.totalBeforeWithholdingTax, 2)}
                                       </td>
                                     </tr>
                                     {/* Subtotal after VAT removal */}
                                     <tr className="bg-white">
-                                      <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right text-sm text-gray-700">
+                                      <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right text-sm text-black">
                                         Subtotal (Gross Total ÷ 1.12):
                                       </td>
-                                      <td className="border border-gray-900 px-3 py-2 text-right font-semibold text-gray-900">
+                                      <td className="border border-gray-900 px-3 py-2 text-right font-semibold text-black">
                                         ₱{formatAmount(breakdown.subtotal, 2)}
                                       </td>
                                     </tr>
                                     {/* Withholding Tax */}
                                     <tr className="bg-white">
-                                      <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right text-sm text-gray-700">
+                                      <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right text-sm text-black">
                                         Less: Withholding Tax ({breakdown.taxRate}% - {formData.tax_type.charAt(0).toUpperCase() + formData.tax_type.slice(1)}):
                                       </td>
-                                      <td className="border border-gray-900 px-3 py-2 text-right font-semibold text-red-700">
+                                      <td className="border border-gray-900 px-3 py-2 text-right font-semibold text-black">
                                         (₱{formatAmount(breakdown.withholdingTax, 2)})
                                       </td>
                                     </tr>
                                   </>
                                 ) : (
                                   <tr className="bg-gray-100">
-                                    <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right font-semibold text-gray-900">
+                                    <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right font-semibold text-black">
                                       TOTAL AMOUNT:
                                     </td>
-                                    <td className="border border-gray-900 px-3 py-2 text-right font-bold text-gray-900">
+                                    <td className="border border-gray-900 px-3 py-2 text-right font-bold text-black">
                                       ₱{formatAmount(breakdown.totalBeforeWithholdingTax, 2)}
                                     </td>
                                   </tr>
@@ -1923,20 +2241,20 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                 {/* Discount if applicable */}
                                 {breakdown.discountAmount > 0 && (
                                   <tr className="bg-white">
-                                    <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right text-sm text-gray-700">
+                                    <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right text-sm text-black">
                                       Less: Discount ({breakdown.discountPercentage}%):
                                     </td>
-                                    <td className="border border-gray-900 px-3 py-2 text-right font-semibold text-red-700">
+                                    <td className="border border-gray-900 px-3 py-2 text-right font-semibold text-black">
                                       (₱{formatAmount(breakdown.discountAmount, 2)})
                                     </td>
                                   </tr>
                                 )}
                                 {/* Grand Total */}
                                 <tr className="bg-gray-200">
-                                  <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right font-bold text-gray-900">
+                                  <td colSpan="5" className="border border-gray-900 px-3 py-2 text-right font-bold text-black">
                                     GRAND TOTAL:
                                   </td>
-                                  <td className="border border-gray-900 px-3 py-2 text-right font-bold text-lg text-green-700">
+                                  <td className="border border-gray-900 px-3 py-2 text-right font-bold text-lg text-black">
                                     ₱{formatAmount(breakdown.grandTotal, 2)}
                                   </td>
                                 </tr>
@@ -1949,43 +2267,43 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       {/* Signatures */}
                       <div className="grid grid-cols-3 gap-6 pt-6 border-t-2 border-gray-900">
                         <div>
-                          <div className="text-sm text-gray-700 mb-1">Prepared by:</div>
+                          <div className="text-sm text-black mb-1">Prepared by:</div>
                           <div className="space-y-2">
                             {formData.prepared_by.filter(p => p.trim()).length > 0 ? (
                               formData.prepared_by.filter(p => p.trim()).map((person, idx) => (
                                 <div key={idx}>
-                                  <div className="font-semibold text-gray-900">{person}</div>
+                                  <div className="font-semibold text-black">{person}</div>
                                   <div className="border-t border-gray-400 mt-6"></div>
-                                  <div className="text-xs text-gray-600 text-center mt-1">Signature</div>
+                                  <div className="text-xs text-black text-center mt-1">Signature</div>
                                 </div>
                               ))
                             ) : (
-                              <div className="text-gray-500 italic">Not specified</div>
+                              <div className="text-black italic">Not specified</div>
                             )}
                           </div>
                         </div>
                         <div>
-                          <div className="text-sm text-gray-700 mb-1">Verified by:</div>
+                          <div className="text-sm text-black mb-1">Verified by:</div>
                           {formData.verified_by ? (
                             <>
-                              <div className="font-semibold text-gray-900">{formData.verified_by}</div>
+                              <div className="font-semibold text-black">{formData.verified_by}</div>
                               <div className="border-t border-gray-400 mt-8"></div>
-                              <div className="text-xs text-gray-600 text-center mt-1">Signature</div>
+                              <div className="text-xs text-black text-center mt-1">Signature</div>
                             </>
                           ) : (
-                            <div className="text-gray-500 italic">Not specified</div>
+                            <div className="text-black italic">Not specified</div>
                           )}
                         </div>
                         <div>
-                          <div className="text-sm text-gray-700 mb-1">Approved by:</div>
+                          <div className="text-sm text-black mb-1">Approved by:</div>
                           {formData.approved_by ? (
                             <>
-                              <div className="font-semibold text-gray-900">{formData.approved_by}</div>
+                              <div className="font-semibold text-black">{formData.approved_by}</div>
                               <div className="border-t border-gray-400 mt-8"></div>
-                              <div className="text-xs text-gray-600 text-center mt-1">Signature</div>
+                              <div className="text-xs text-black text-center mt-1">Signature</div>
                             </>
                           ) : (
-                            <div className="text-gray-500 italic">Not specified</div>
+                            <div className="text-black italic">Not specified</div>
                           )}
                         </div>
                       </div>
@@ -1993,8 +2311,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       {/* Notes */}
                       {formData.notes && (
                         <div className="mt-6 pt-4 border-t border-gray-300">
-                          <div className="text-sm font-semibold text-gray-800">Notes:</div>
-                          <div className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">
+                          <div className="text-sm font-semibold text-black">Notes:</div>
+                          <div className="text-sm text-black mt-1 whitespace-pre-wrap">
                             {formData.notes}
                           </div>
                         </div>
@@ -2003,7 +2321,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       {/* Attached Images */}
                       {formData.attached_images && formData.attached_images.length > 0 && (
                         <div className="mt-6 pt-4 border-t border-gray-300">
-                          <div className="text-sm font-semibold text-gray-800 mb-3">Attached Images:</div>
+                          <div className="text-sm font-semibold text-black mb-3">Attached Images:</div>
                           <div className="grid grid-cols-2 gap-4">
                             {formData.attached_images.map((img, idx) => (
                               <div key={idx} className="border border-gray-300 rounded p-2">
@@ -2012,7 +2330,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                   alt={img.name || `Attachment ${idx + 1}`}
                                   className="w-full h-32 object-contain rounded"
                                 />
-                                <p className="text-xs text-gray-600 mt-1 text-center truncate">
+                                <p className="text-xs text-black mt-1 text-center truncate">
                                   {img.name || `Image ${idx + 1}`}
                                 </p>
                               </div>
@@ -2039,7 +2357,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                     <div className="flex items-center justify-center gap-4">
                       <button
                         onClick={() => setCurrentStep(4)}
-                        className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                        className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                       >
                         ← Edit Details
                       </button>
@@ -2093,12 +2411,12 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
             <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between bg-gray-50 dark:bg-gray-800">
               <button
                 onClick={currentStep === 1 ? handleClose : handleBack}
-                className="px-6 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                className="px-6 py-2 bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
               >
                 {currentStep === 1 ? 'Cancel' : '← Back'}
               </button>
               
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-black dark:text-gray-400">
                 Step {currentStep} of 5
               </div>
               
@@ -2118,17 +2436,17 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full mx-4 p-6">
               <div className="text-center mb-4">
                 <div className="text-5xl mb-3">⚠️</div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                <h3 className="text-xl font-bold text-black dark:text-gray-100 mb-2">
                   Purchase Order Already Exists
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-black dark:text-gray-400">
                   PO# <strong>{formData.po_number}</strong> already exists. What would you like to do?
                 </p>
               </div>
               
               {existingPO && (
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4">
-                  <div className="text-sm text-yellow-900 dark:text-yellow-100">
+                  <div className="text-sm text-black dark:text-yellow-100">
                     <div><strong>Supplier:</strong> {existingPO.supplier_name}</div>
                     <div><strong>Date:</strong> {existingPO.po_date}</div>
                     <div><strong>Items:</strong> {existingPO.item_count} item(s)</div>
@@ -2143,7 +2461,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                     setFormData(prev => ({ ...prev, po_sequence: "", po_number: "" }))
                     setCurrentStep(1)
                   }}
-                  className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                  className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                 >
                   Change Number
                 </button>
@@ -2160,7 +2478,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
               
               <button
                 onClick={() => setShowOverwriteModal(false)}
-                className="w-full mt-3 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                className="w-full mt-3 text-sm text-black dark:text-gray-400 hover:text-black dark:hover:text-gray-100"
               >
                 Cancel
               </button>
@@ -2173,21 +2491,21 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-100 p-4">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
               {/* Header */}
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-linear-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-750">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-750">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <h3 className="text-xl font-bold text-black dark:text-white flex items-center gap-2">
+                    <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     PDF Image Preview
                   </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  <p className="text-sm text-black dark:text-gray-400 mt-1">
                     This shows how your images will appear in the Notes section of the PDF
                   </p>
                 </div>
                 <button
                   onClick={() => setShowImagePreview(false)}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                  className="text-black hover:text-black dark:text-black dark:hover:text-gray-200 transition-colors"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2201,15 +2519,15 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                   {/* Simulated PDF Notes Container */}
                   <div className="border-2 border-gray-400 rounded p-4 min-h-[500px]">
                     <div className="flex items-center gap-2 mb-4 pb-2 border-b-2 border-gray-400">
-                      <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
-                      <span className="font-bold text-gray-900 text-sm">NOTES:</span>
+                      <span className="font-bold text-black text-sm">NOTES:</span>
                     </div>
                     
                     {/* Notes Text */}
                     {formData.notes && formData.notes.trim() && (
-                      <div className="mb-6 text-sm text-gray-800 whitespace-pre-wrap">
+                      <div className="mb-6 text-sm text-black whitespace-pre-wrap">
                         {formData.notes}
                       </div>
                     )}
@@ -2226,7 +2544,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                               style={{ maxHeight: '280px' }}
                             />
                           </div>
-                          <p className="text-xs text-gray-600 mt-2 text-center truncate font-medium">
+                          <p className="text-xs text-black mt-2 text-center truncate font-medium">
                             {img.name || `Image ${idx + 1}`}
                           </p>
                         </div>
@@ -2237,10 +2555,10 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                   {/* Info Box */}
                   <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded">
                     <div className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-black mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <div className="text-sm text-blue-800 dark:text-blue-300">
+                      <div className="text-sm text-black dark:text-blue-300">
                         <p className="font-semibold mb-1">PDF Layout Information:</p>
                         <ul className="list-disc list-inside space-y-1 text-xs">
                           <li>Images are displayed in a 2-column grid layout</li>
@@ -2257,7 +2575,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
               {/* Footer */}
               <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750 flex items-center justify-between">
-                <div className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="text-sm text-black dark:text-gray-400">
                   {formData.attached_images.length} image{formData.attached_images.length !== 1 ? 's' : ''} attached
                 </div>
                 <button
@@ -2276,3 +2594,4 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 }
 
 export default CreatePurchaseOrderWizard
+

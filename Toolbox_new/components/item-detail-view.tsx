@@ -19,7 +19,6 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
-  const [imageCache, setImageCache] = useState<Map<string, string>>(new Map())
   const [images, setImages] = useState<any[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const rotationTimer = useRef<NodeJS.Timeout | null>(null)
@@ -38,55 +37,31 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
 
       const imageList = res.data || []
 
-      // Load each image individually with existence check
-      imageList.forEach((img: any) => {
-        (async () => {
-          try {
-            const imageUrl = apiService.getItemImageUrl(itemId, img.filename)
+      if (imageList.length === 0) {
+        // No images in list, try latest
+        throw new Error('No images in list')
+      }
 
-            // Test if the image exists by fetching it
-            const response = await fetch(imageUrl, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
-              }
-            })
+      // Build URLs directly without validation (let browser handle 404)
+      const imagesWithUrls = imageList.map((img: any) => ({
+        ...img,
+        url: apiService.getItemImageUrl(itemId, img.filename)
+      }))
 
-            if (response.ok) {
-              // Cache the URL
-              setImageCache(prev => new Map(prev).set(img.filename, imageUrl))
-            }
-          } catch (err) {
-            console.log(`[Toolbox ItemDetailView] ✗ Error loading image ${img.filename}:`, (err as Error).message)
-          }
-        })()
-      })
-
-      // Set images list and initial image
-      const validImages = imageList.filter((img: any) => imageCache.has(img.filename))
-      setImages(validImages)
+      // Set images and display first one
+      setImages(imagesWithUrls)
       setCurrentIndex(0)
-      if (validImages.length > 0) {
-        setImageUrl(imageCache.get(validImages[0].filename) || null)
+      if (imagesWithUrls.length > 0) {
+        setImageUrl(imagesWithUrls[0].url)
       }
 
     } catch (e) {
       console.error('[Toolbox ItemDetailView] Failed to load images list:', e)
-      // Fallback to latest image
+      // Fallback to latest image endpoint
       try {
         const latestUrl = apiService.getItemLatestImageUrl(itemId)
-        const response = await fetch(latestUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
-          }
-        })
-
-        if (response.ok) {
-          setImageCache(prev => new Map(prev).set('latest', latestUrl))
-          setImages([{ filename: 'latest', url: latestUrl }])
-          setImageUrl(latestUrl)
-        }
+        setImages([{ filename: 'latest', url: latestUrl }])
+        setImageUrl(latestUrl)
       } catch (fallbackErr) {
         console.log('[Toolbox ItemDetailView] No images available')
       }
@@ -165,7 +140,10 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
       rotationTimer.current = setInterval(() => {
         setCurrentIndex((prev) => {
           const next = (prev + 1) % images.length
-          setImageUrl(images[next]?.url || null)
+          const nextImage = images[next]
+          if (nextImage) {
+            setImageUrl(nextImage.url)
+          }
           return next
         })
       }, 5000) // Change image every 5 seconds

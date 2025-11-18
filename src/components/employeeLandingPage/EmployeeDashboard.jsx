@@ -22,10 +22,19 @@ import Performance from "./DashboardComponents/Performance"
 import Profile from "./DashboardComponents/Profile"
 
 // Centralized department routes and normalization
+const DEPARTMENT_BASE_URL = import.meta.env.VITE_DEPT_BASE_URL || (typeof window !== "undefined" ? window.location.origin : "")
+const DEPARTMENT_BASE_PATH = import.meta.env.VITE_DEPT_BASE_PATH || "/jjcewgsaccess"
+
+function buildDeptUrl(slug) {
+  const base = (DEPARTMENT_BASE_URL || "").replace(/\/+$/, "")
+  const path = (DEPARTMENT_BASE_PATH || "").replace(/^\/+/, "").replace(/\/+$/, "")
+  return `${base}/${path}/${slug}`
+}
+
 const DEPARTMENT_ROUTES = {
-  procurement: { label: "Procurement", url: "https://jjcenggworks.com/jjcewgsaccess/procurement" },
-  operations: { label: "Operations", url: "https://jjcenggworks.com/jjcewgsaccess/operations" },
-  hr: { label: "Human Resource", url: "https://jjcenggworks.com/jjcewgsaccess/hr" },
+  procurement: { label: "Procurement", url: buildDeptUrl("procurement") },
+  operations: { label: "Operations", url: buildDeptUrl("operations") },
+  hr: { label: "Human Resource", url: buildDeptUrl("hr") },
 }
 
 function normalizeDepartmentName(dep) {

@@ -383,10 +383,10 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
               </div>
             </div>
             <div>
-              <h1 className="text-2xl font-black text-transparent bg-clip-text bg-linear-to-r from-slate-200 via-slate-100 to-slate-300">
+              <h1 className="text-2xl md:text-2xl font-black text-transparent bg-clip-text bg-linear-to-r from-slate-200 via-slate-100 to-slate-300">
                 CART
               </h1>
-              <div className="text-xs text-slate-500 font-mono">Work Order Items</div>
+              <div className="text-xs text-slate-500 font-mono hidden md:block">Work Order Items</div>
             </div>
           </div>
           <Badge variant="secondary" className="bg-slate-800 text-slate-300 border border-slate-600">
@@ -396,7 +396,8 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
           <CartStatusIndicator />
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Desktop Controls */}
+        <div className="hidden md:flex items-center gap-2">
           <CartRecoveryPanel 
             trigger={
               <Button variant="outline" size="sm" className="flex items-center gap-2 border-slate-600 hover:bg-slate-800">
@@ -413,6 +414,27 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
             <SelectContent>
               <SelectItem value="name-asc">Name A-Z</SelectItem>
               <SelectItem value="name-desc">Name Z-A</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Mobile Controls */}
+        <div className="md:hidden flex items-center gap-2">
+          <CartRecoveryPanel 
+            trigger={
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0 border-slate-600">
+                <History className="w-4 h-4" />
+              </Button>
+            }
+          />
+          
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-24 h-8 text-xs border-slate-600">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name-asc" className="text-xs">A-Z</SelectItem>
+              <SelectItem value="name-desc" className="text-xs">Z-A</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -449,7 +471,8 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
                 <div className="absolute bottom-2 left-2 w-3 h-3 border-l-2 border-b-2 border-slate-600"></div>
                 <div className="absolute bottom-2 right-2 w-3 h-3 border-r-2 border-b-2 border-slate-600"></div>
                 
-                <div className="flex items-center space-x-4">
+                {/* Desktop Layout */}
+                <div className="hidden md:flex items-center space-x-4">
                   {/* Checkbox */}
                   <Checkbox
                     checked={selectedItems.has(item.id)}
@@ -498,32 +521,23 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
                       step={1}
                       value={item.quantity}
                       onChange={(e) => {
-                        // Real-time sanitization: remove non-digits and clamp to integer
                         const raw = e.target.value
-                        // Allow empty string while typing, but treat as 0 for parsing
                         const numeric = raw === '' ? '' : raw.replace(/[^0-9]/g, '')
-                        // If emptied, update to '' locally via onUpdateQuantity? Keep UI controlled by parent value
-                        // Parse to integer and apply bounds
                         if (numeric === '') {
-                          // do not call onUpdateQuantity with empty; let blur handler correct if needed
-                          // but for responsiveness, set to 1 immediately
                           onUpdateQuantity(item.id, 1)
                           return
                         }
-
                         const parsed = parseInt(numeric, 10)
                         if (isNaN(parsed)) {
                           onUpdateQuantity(item.id, 1)
                           return
                         }
-
                         const clamped = Math.max(1, Math.min(parsed, item.balance))
                         if (clamped !== item.quantity) {
                           onUpdateQuantity(item.id, clamped)
                         }
                       }}
                       onBlur={(e) => {
-                        // Ensure value is at least 1 on blur
                         const raw = e.target.value
                         const parsed = parseInt(String(raw).replace(/[^0-9]/g, ''), 10)
                         const finalVal = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, item.balance)
@@ -556,6 +570,100 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
                     Remove
                   </Button>
                 </div>
+
+                {/* Mobile Layout - Amazon/Shopee Style */}
+                <div className="md:hidden space-y-3">
+                  {/* Row 1: Checkbox + Image + Basic Info + Remove */}
+                  <div className="flex gap-3">
+                    <Checkbox
+                      checked={selectedItems.has(item.id)}
+                      onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
+                      className="border-slate-600 mt-1"
+                    />
+                    
+                    <CartItemImage itemId={item.id} itemName={item.name} />
+                    
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm text-foreground line-clamp-2 mb-1">{item.name}</h3>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <p className="truncate">Brand: {item.brand}</p>
+                        <p className="truncate">Type: {item.itemType}</p>
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRemoveItem(item.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 h-8 w-8 p-0 shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* Row 2: Balance + Quantity Controls */}
+                  <div className="flex items-center justify-between pl-[72px]">
+                    <div className="text-xs text-muted-foreground">
+                      <span className="font-medium">Balance:</span> {item.balance}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
+                        disabled={item.quantity <= 1}
+                        className="w-7 h-7 p-0"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </Button>
+
+                      <input
+                        aria-label={`Quantity for ${item.name}`}
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const raw = e.target.value
+                          const numeric = raw === '' ? '' : raw.replace(/[^0-9]/g, '')
+                          if (numeric === '') {
+                            onUpdateQuantity(item.id, 1)
+                            return
+                          }
+                          const parsed = parseInt(numeric, 10)
+                          if (isNaN(parsed)) {
+                            onUpdateQuantity(item.id, 1)
+                            return
+                          }
+                          const clamped = Math.max(1, Math.min(parsed, item.balance))
+                          if (clamped !== item.quantity) {
+                            onUpdateQuantity(item.id, clamped)
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const raw = e.target.value
+                          const parsed = parseInt(String(raw).replace(/[^0-9]/g, ''), 10)
+                          const finalVal = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, item.balance)
+                          if (finalVal !== item.quantity) {
+                            onUpdateQuantity(item.id, finalVal)
+                          }
+                        }}
+                        className="w-12 text-center text-sm font-medium text-foreground bg-transparent border border-slate-700 rounded px-1 py-1"
+                      />
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+                        disabled={item.quantity >= item.balance}
+                        className="w-7 h-7 p-0"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           ))
@@ -564,9 +672,10 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
 
       {/* Footer */}
       {items.length > 0 && (
-        <Card>
+        <Card className="sticky bottom-0 z-10">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+            {/* Desktop Footer */}
+            <div className="hidden md:flex items-center justify-between">
               {/* Bulk Actions */}
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
@@ -607,6 +716,57 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
                     </div>
                   ) : (
                     "Proceed to checkout"
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Mobile Footer - Amazon/Shopee Style */}
+            <div className="md:hidden space-y-3">
+              {/* Row 1: Select All + Bulk Delete */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    checked={allSelected} 
+                    onCheckedChange={handleSelectAll}
+                    className="scale-90"
+                  />
+                  <span className="text-xs dark:text-slate-300">All ({selectedItems.size})</span>
+                </div>
+
+                {selectedItems.size > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBulkDelete}
+                    className="text-red-600 hover:text-red-700 h-8 text-xs"
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    Delete
+                  </Button>
+                )}
+              </div>
+
+              {/* Row 2: Total + Checkout Button */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Total</p>
+                  <p className="text-lg font-bold dark:text-slate-100">{totalItems} items</p>
+                </div>
+
+                <Button
+                  size="lg"
+                  className="bg-teal-600 hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600 flex-1"
+                  onClick={handleCheckout}
+                  disabled={isCommitting}
+                >
+                  {isCommitting ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm">Processing...</span>
+                    </div>
+                  ) : (
+                    <span className="text-sm">Checkout</span>
                   )}
                 </Button>
               </div>

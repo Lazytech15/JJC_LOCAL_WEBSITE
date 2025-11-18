@@ -218,7 +218,7 @@ function AdminDashboard({ onNavigate }) {
 
   if (error) {
     return (
-      <div className="bg-red-50 dark:bg-red-950/30 border-2 border-red-300 dark:border-red-800 rounded-xl p-4 sm:p-6 shadow-lg">
+      <div className={isDarkMode ? "bg-red-950/30 border-red-800 border-2 rounded-xl p-4 sm:p-6 shadow-lg" : "bg-red-50 border-red-300 border-2 rounded-xl p-4 sm:p-6 shadow-lg"}>
         <div className="flex items-start gap-3">
           <svg className="w-6 h-6 text-red-600 dark:text-red-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -243,7 +243,7 @@ function AdminDashboard({ onNavigate }) {
       {/* Enhanced Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-linear-to-br from-slate-700 to-slate-800 dark:from-slate-800 dark:to-slate-900 rounded-lg border border-slate-600 dark:border-slate-700">
+          <div className="p-2 bg-gradient-to-br from-slate-600 to-slate-700 dark:from-slate-700 dark:to-slate-800 rounded-lg border border-slate-500 dark:border-slate-600">
             <svg className="w-6 h-6 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
               <path d="M3,13H15V11H3M3,6V8H21V6M3,18H9V16H3V18Z" />
             </svg>
@@ -257,7 +257,7 @@ function AdminDashboard({ onNavigate }) {
         </div>
         <button
           onClick={handleRefreshData}
-          className="px-4 py-2 bg-linear-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 dark:from-slate-700 dark:to-slate-800 dark:hover:from-slate-600 dark:hover:to-slate-700 text-white rounded-lg transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg text-sm font-medium"
+          className="px-4 py-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 dark:from-slate-700 dark:to-slate-800 dark:hover:from-slate-600 dark:hover:to-slate-700 text-white rounded-lg transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg text-sm font-medium"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -268,7 +268,7 @@ function AdminDashboard({ onNavigate }) {
 
       {/* Enhanced Stats Cards - Industrial Theme */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-        <div className="bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-900/50 rounded-xl p-4 sm:p-6 border-2 border-slate-300 dark:border-slate-700 relative overflow-hidden group hover:shadow-xl transition-shadow">
+        <div className={isDarkMode ? "bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 sm:p-6 border-2 border-slate-700 relative overflow-hidden group hover:shadow-xl transition-shadow" : "bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 sm:p-6 border-2 border-slate-300 relative overflow-hidden group hover:shadow-xl transition-shadow"}>
           <div className="absolute top-0 right-0 w-20 h-20 opacity-5">
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-slate-700">
               <path d="M19,15H17V13H19M19,19H17V17H19M13,7H11V5H13M13,11H11V9H13M13,15H11V13H13M13,19H11V17H13M7,11H5V9H7M7,15H5V13H7M7,19H5V17H7M15,11V5L12,2L9,5V7H3V21H21V11H15Z" />
@@ -290,7 +290,7 @@ function AdminDashboard({ onNavigate }) {
           </div>
         </div>
 
-        <div className="bg-linear-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-4 sm:p-6 border-2 border-blue-300 dark:border-blue-800 relative overflow-hidden group hover:shadow-xl transition-shadow">
+        <div className={isDarkMode ? "bg-gradient-to-br from-blue-950 to-blue-900 rounded-xl p-4 sm:p-6 border-2 border-blue-700 relative overflow-hidden group hover:shadow-xl transition-shadow" : "bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 sm:p-6 border-2 border-blue-300 relative overflow-hidden group hover:shadow-xl transition-shadow"}>
           <div className="absolute top-0 right-0 w-20 h-20 opacity-5">
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-blue-700">
               <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
@@ -312,7 +312,7 @@ function AdminDashboard({ onNavigate }) {
           </div>
         </div>
 
-        <div className="bg-linear-to-br from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-800/20 rounded-xl p-4 sm:p-6 border-2 border-green-300 dark:border-green-800 relative overflow-hidden group hover:shadow-xl transition-shadow">
+        <div className={isDarkMode ? "bg-gradient-to-br from-green-950 to-emerald-900 rounded-xl p-4 sm:p-6 border-2 border-green-700 relative overflow-hidden group hover:shadow-xl transition-shadow" : "bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl p-4 sm:p-6 border-2 border-green-300 relative overflow-hidden group hover:shadow-xl transition-shadow"}>
           <div className="absolute top-0 right-0 w-20 h-20 opacity-5">
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-green-700">
               <path d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
@@ -334,7 +334,7 @@ function AdminDashboard({ onNavigate }) {
           </div>
         </div>
 
-        <div className="bg-linear-to-br from-amber-50 to-yellow-100 dark:from-amber-900/20 dark:to-yellow-800/20 rounded-xl p-4 sm:p-6 border-2 border-amber-300 dark:border-amber-800 relative overflow-hidden group hover:shadow-xl transition-shadow">
+        <div className={isDarkMode ? "bg-gradient-to-br from-amber-950 to-yellow-900 rounded-xl p-4 sm:p-6 border-2 border-amber-700 relative overflow-hidden group hover:shadow-xl transition-shadow" : "bg-gradient-to-br from-amber-50 to-yellow-100 rounded-xl p-4 sm:p-6 border-2 border-amber-300 relative overflow-hidden group hover:shadow-xl transition-shadow"}>
           <div className="absolute top-0 right-0 w-20 h-20 opacity-5">
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full text-amber-700">
               <path d="M7,15H9C9,16.08 10.37,17 12,17C13.63,17 15,16.08 15,15C15,13.9 13.96,13.5 11.76,12.97C9.64,12.44 7,11.78 7,9C7,7.21 8.47,5.69 10.5,5.18V3H13.5V5.18C15.53,5.69 17,7.21 17,9H15C15,7.92 13.63,7 12,7C10.37,7 9,7.92 9,9C9,10.1 10.04,10.5 12.24,11.03C14.36,11.56 17,12.22 17,15C17,16.79 15.53,18.31 13.5,18.82V21H10.5V18.82C8.47,18.31 7,16.79 7,15Z" />
@@ -360,7 +360,7 @@ function AdminDashboard({ onNavigate }) {
       {/* Purchase Order Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Purchase Orders Overview */}
-        <div className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20">
+        <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-xl p-6 border shadow-sm" : "bg-white border-slate-200 rounded-xl p-6 border shadow-sm"}>
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">📋 Purchase Orders Summary</h3>
             <button
@@ -373,86 +373,86 @@ function AdminDashboard({ onNavigate }) {
           <div className="space-y-4">
             {/* Main metrics */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{purchaseOrderSummary.total_orders}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Total Orders</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Total Orders</div>
               </div>
-              <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{purchaseOrderSummary.pending_orders}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Active Orders</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Active Orders</div>
               </div>
             </div>
             
             {/* Financial overview */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
-                <div className="text-lg font-bold text-gray-700 dark:text-gray-300">{formatCurrency(purchaseOrderSummary.total_value)}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Total Value</div>
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+                <div className="text-lg font-bold text-slate-800 dark:text-slate-200">{formatCurrency(purchaseOrderSummary.total_value)}</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Total Value</div>
               </div>
-              <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className="text-lg font-bold text-orange-600 dark:text-orange-400">{formatCurrency(purchaseOrderSummary.pending_value)}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Pending Value</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Pending Value</div>
               </div>
             </div>
 
             {/* Status breakdown */}
-            <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
-              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Order Status Breakdown</div>
+            <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+              <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-3">Order Status Breakdown</div>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 <div className="text-center">
-                  <div className="text-lg font-bold text-gray-600 dark:text-gray-400">{purchaseOrderSummary.status_breakdown.requested}</div>
-                  <div className="text-gray-500 dark:text-gray-500">Requested</div>
+                  <div className="text-lg font-bold text-slate-700 dark:text-slate-300">{purchaseOrderSummary.status_breakdown.requested}</div>
+                  <div className="text-slate-600 dark:text-slate-400">Requested</div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{purchaseOrderSummary.status_breakdown.ordered}</div>
-                  <div className="text-gray-500 dark:text-gray-500">Ordered</div>
+                  <div className="text-slate-600 dark:text-slate-400">Ordered</div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{purchaseOrderSummary.status_breakdown.in_transit}</div>
-                  <div className="text-gray-500 dark:text-gray-500">In Transit</div>
+                  <div className="text-slate-600 dark:text-slate-400">In Transit</div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-orange-600 dark:text-orange-400">{purchaseOrderSummary.status_breakdown.ready_for_pickup}</div>
-                  <div className="text-gray-500 dark:text-gray-500">Ready</div>
+                  <div className="text-slate-600 dark:text-slate-400">Ready</div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-green-600 dark:text-green-400">{purchaseOrderSummary.status_breakdown.received}</div>
-                  <div className="text-gray-500 dark:text-gray-500">Received</div>
+                  <div className="text-slate-600 dark:text-slate-400">Received</div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-red-600 dark:text-red-400">{purchaseOrderSummary.status_breakdown.cancelled}</div>
-                  <div className="text-gray-500 dark:text-gray-500">Cancelled</div>
+                  <div className="text-slate-600 dark:text-slate-400">Cancelled</div>
                 </div>
               </div>
             </div>
 
             {/* Performance metrics */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className="text-lg font-bold text-green-600 dark:text-green-400">
                   {purchaseOrderSummary.total_orders > 0 ? 
                     Math.round((purchaseOrderSummary.completed_orders / purchaseOrderSummary.total_orders) * 100) : 0}%
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Completion Rate</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Completion Rate</div>
               </div>
-              <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
                   {formatCurrency(purchaseOrderSummary.total_orders > 0 ? 
                     purchaseOrderSummary.total_value / purchaseOrderSummary.total_orders : 0)}
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Avg Order Value</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Employee Logs Summary */}
-        <div className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">👥 Recent Employee Activity</h3>
+        <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-xl p-6 border shadow-sm" : "bg-white border-slate-200 rounded-xl p-6 border shadow-sm"}>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">👥 Recent Employee Activity</h3>
           <div className="space-y-3">
             {employeeLogsSummary.length > 0 ? (
               employeeLogsSummary.map((log) => (
-                <div key={log.id} className="flex items-center gap-3 p-3 bg-white/10 dark:bg-black/20 rounded-lg">
+                <div key={log.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
                   <div className="text-xl">
                     {log.details?.toLowerCase().includes('checkout') ? '📤' :
                      log.details?.toLowerCase().includes('checkin') ? '📥' :
@@ -461,14 +461,14 @@ function AdminDashboard({ onNavigate }) {
                      log.details?.toLowerCase().includes('create') ? '➕' : '📋'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-800 dark:text-gray-200 text-sm truncate">
+                    <div className="font-medium text-slate-800 dark:text-slate-100 text-sm truncate">
                       {log.username || 'Unknown User'}
                     </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                    <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
                       {log.details || 'No details available'}
                     </div>
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
                     {new Date(log.created_at).toLocaleDateString('en-US', { 
                       month: 'short', 
                       day: 'numeric',
@@ -479,7 +479,7 @@ function AdminDashboard({ onNavigate }) {
                 </div>
               ))
             ) : (
-              <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+              <div className="text-center py-4 text-slate-500 dark:text-slate-400">
                 No recent activity
               </div>
             )}
@@ -487,8 +487,7 @@ function AdminDashboard({ onNavigate }) {
           <div className="mt-4">
             <button 
               onClick={() => handleNavigateToLogs()}
-              className="w-full text-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
-            >
+              className="w-full text-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
               View all logs →
             </button>
           </div>
@@ -498,48 +497,48 @@ function AdminDashboard({ onNavigate }) {
       {/* Advanced Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Stock Status Overview */}
-        <div className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">📊 Stock Status Overview</h3>
+        <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-xl p-6 border shadow-sm" : "bg-white border-slate-200 rounded-xl p-6 border shadow-sm"}>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">📊 Stock Status Overview</h3>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-400">In Stock</span>
+              <span className="text-slate-600 dark:text-slate-400">In Stock</span>
               <div className="flex items-center gap-2">
-                <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="w-20 bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                   <div 
                     className="bg-green-500 h-2 rounded-full" 
                     style={{width: `${statistics.total_items > 0 ? (statistics.in_stock / statistics.total_items) * 100 : 0}%`}}
                   ></div>
                 </div>
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200 w-8">{statistics.in_stock || 0}</span>
+                <span className="text-sm font-medium text-slate-800 dark:text-slate-100 w-8">{statistics.in_stock || 0}</span>
               </div>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-400">Low Stock</span>
+              <span className="text-slate-600 dark:text-slate-400">Low Stock</span>
               <div className="flex items-center gap-2">
-                <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="w-20 bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                   <div 
                     className="bg-yellow-500 h-2 rounded-full" 
                     style={{width: `${statistics.total_items > 0 ? (statistics.low_stock / statistics.total_items) * 100 : 0}%`}}
                   ></div>
                 </div>
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200 w-8">{statistics.low_stock || 0}</span>
+                <span className="text-sm font-medium text-slate-800 dark:text-slate-100 w-8">{statistics.low_stock || 0}</span>
               </div>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-400">Out of Stock</span>
+              <span className="text-slate-600 dark:text-slate-400">Out of Stock</span>
               <div className="flex items-center gap-2">
-                <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="w-20 bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                   <div 
                     className="bg-red-500 h-2 rounded-full" 
                     style={{width: `${statistics.total_items > 0 ? (statistics.out_of_stock / statistics.total_items) * 100 : 0}%`}}
                   ></div>
                 </div>
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200 w-8">{statistics.out_of_stock || 0}</span>
+                <span className="text-sm font-medium text-slate-800 dark:text-slate-100 w-8">{statistics.out_of_stock || 0}</span>
               </div>
             </div>
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-300/20 dark:border-gray-700/20">
-            <div className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <div className="text-sm text-slate-600 dark:text-slate-400">
               Stock Health: <span className={`font-medium ${
                 statistics.out_of_stock === 0 && statistics.low_stock <= 5 
                   ? 'text-green-600 dark:text-green-400' 
@@ -555,8 +554,8 @@ function AdminDashboard({ onNavigate }) {
         </div>
 
         {/* Recent Stock Alerts */}
-        <div className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-xl p-4 border border-white/20 dark:border-gray-700/20">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
+        <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-xl p-4 border shadow-sm" : "bg-white border-slate-200 rounded-xl p-4 border shadow-sm"}>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2">
             🕒 <span>Recent Stock Alerts</span>
           </h3>
           <div className="space-y-1.5 max-h-96 overflow-y-auto">
@@ -564,10 +563,10 @@ function AdminDashboard({ onNavigate }) {
               <div key={item.item_no} className="p-2.5 bg-red-50/50 dark:bg-red-900/20 rounded-md border border-red-200/30 dark:border-red-800/30">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-800 dark:text-gray-200 text-sm leading-tight mb-1 wrap-break-words">
+                    <div className="font-medium text-slate-800 dark:text-slate-100 text-sm leading-tight mb-1 wrap-break-words">
                       {item.item_name}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
                       <span className="flex items-center gap-1">
                         📍 {item.location || 'No location'}
                       </span>
@@ -606,35 +605,35 @@ function AdminDashboard({ onNavigate }) {
         </div>
 
         {/* Department Activity & Analytics */}
-        <div className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">📈 Analytics</h3>
+        <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-xl p-6 border shadow-sm" : "bg-white border-slate-200 rounded-xl p-6 border shadow-sm"}>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">📈 Analytics</h3>
           <div className="space-y-4">
-            <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Inventory Turnover</div>
+            <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+              <div className="text-sm text-slate-600 dark:text-slate-400">Inventory Turnover</div>
               <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
                 {statistics.total_items > 0 ? ((statistics.in_stock / statistics.total_items) * 100).toFixed(1) : 0}%
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Stock Availability</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Stock Availability</div>
             </div>
             
-            <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Restock Priority</div>
+            <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+              <div className="text-sm text-slate-600 dark:text-slate-400">Restock Priority</div>
               <div className="text-xl font-bold text-orange-600 dark:text-orange-400">
                 {analytics.lowStockItems.length}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Items Need Attention</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Items Need Attention</div>
             </div>
 
-            <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Supplier Diversity</div>
+            <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+              <div className="text-sm text-slate-600 dark:text-slate-400">Supplier Diversity</div>
               <div className="text-xl font-bold text-purple-600 dark:text-purple-400">
                 {statistics.active_suppliers || 0}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Active Suppliers</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Active Suppliers</div>
             </div>
 
-            <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Avg. Item Value</div>
+            <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+              <div className="text-sm text-slate-600 dark:text-slate-400">Avg. Item Value</div>
               <div className="text-lg font-bold text-green-600 dark:text-green-400">
                 {formatCurrency(
                   statistics.total_items > 0 && statistics.total_inventory_value > 0 
@@ -642,7 +641,7 @@ function AdminDashboard({ onNavigate }) {
                     : 0
                 )}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Per Item</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Per Item</div>
             </div>
           </div>
         </div>

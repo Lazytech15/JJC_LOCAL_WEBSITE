@@ -104,17 +104,17 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
       {/* Industrial accent line */}
       <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-blue-500/50 to-transparent"></div>
       
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-8 py-3 sm:py-4 gap-3 sm:gap-0">
+      <div className="flex items-center justify-between px-4 sm:px-8 py-2 sm:py-4 gap-2 sm:gap-4">
         {/* Logo */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
           <div className="relative">
             {/* Industrial frame around logo */}
             <div className="absolute -inset-1 border border-slate-600 rounded-lg"></div>
-            <div className="relative bg-slate-800 p-1.5 rounded-lg border border-slate-600">
+            <div className="relative bg-slate-800 p-1 sm:p-1.5 rounded-lg border border-slate-600">
               <img 
                 src="/ToolBoxlogo.png" 
                 alt="Toolbox Logo" 
-                className="w-7 h-7 object-contain"
+                className="w-6 h-6 sm:w-7 sm:h-7 object-contain"
               />
               {/* Corner bolts */}
               <div className="absolute top-0 left-0 w-1 h-1 bg-slate-500 rounded-full"></div>
@@ -123,7 +123,7 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
               <div className="absolute bottom-0 right-0 w-1 h-1 bg-slate-500 rounded-full"></div>
             </div>
           </div>
-          <div>
+          <div className="hidden sm:block">
             <div className="flex items-center gap-2">
               <span className="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-slate-100 via-white to-slate-200">
                 TOOLBOX
@@ -135,39 +135,32 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
         </div>
 
         {/* Mobile actions */}
-        <div className="absolute right-4 top-3 sm:hidden flex items-center gap-2">
-          <button
-            aria-label="Toggle menu"
-            onClick={() => setIsMobileMenuOpen(o => !o)}
-            className={`h-10 w-10 inline-flex items-center justify-center rounded-xl bg-slate-800/60 border border-slate-600 hover:bg-slate-700/70 active:scale-95 transition ${isMobileMenuOpen ? 'ring-2 ring-blue-500/40' : ''}`}
-          >
-            {isMobileMenuOpen ? <X className="w-5 h-5 text-slate-200" /> : <Menu className="w-5 h-5 text-slate-200" />}
-          </button>
+        <div className="flex items-center gap-2 sm:hidden">
           <ThemeToggle />
         </div>
 
-        {/* Search Bar */}
-        <div className="flex-1 max-w-full sm:max-w-3xl sm:mx-10 mx-0 relative order-2 sm:order-none mt-12 sm:mt-0">
+        {/* Search Bar - Compact on mobile, full on desktop */}
+        <div className="flex-1 max-w-full sm:max-w-3xl sm:mx-10 mx-2 relative">
           <div className="relative">
-            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-600 dark:text-slate-400">
-              <Search className="w-5 h-5" />
+            <div className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-slate-600 dark:text-slate-400">
+              <Search className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <Input
-              placeholder="Search products, categories, or brands..."
+              placeholder="Search products..."
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               onFocus={() => setShowSuggestions(searchQuery.length > 0)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              className="pl-12 pr-12 h-12 bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400 focus:bg-slate-800/70 rounded-xl backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/30 transition-all duration-200"
+              className="pl-9 sm:pl-12 pr-9 sm:pr-12 h-9 sm:h-12 text-sm sm:text-base bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400 focus:bg-slate-800/70 rounded-xl backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/30 transition-all duration-200"
             />
             {searchQuery && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={clearSearch}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
+                className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 h-6 w-6 sm:h-8 sm:w-8 p-0 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3 h-3 sm:w-4 sm:h-4" />
               </Button>
             )}
           </div>
@@ -195,7 +188,7 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
         </div>
 
         {/* Navigation Icons */}
-        <div className="flex items-center space-x-3 sm:space-x-4 order-1 sm:order-none">
+        <div className="flex items-center space-x-2 sm:space-x-4 shrink-0">
           <div className="hidden sm:flex items-center gap-3">
             <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-1">
               <CartStatusIndicator />
@@ -204,19 +197,19 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
           </div>
 
           {/* Navigation Buttons */}
-          <div className="flex items-center bg-white/10 backdrop-blur-sm rounded-xl p-1 gap-1">
+          <div className="flex items-center bg-white/10 backdrop-blur-sm rounded-lg sm:rounded-xl p-0.5 sm:p-1 gap-0.5 sm:gap-1">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => onViewChange("dashboard")}
-              className={`relative px-3 py-2 rounded-lg transition-all duration-200 ${
+              className={`relative px-2 sm:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg transition-all duration-200 ${
                 currentView === "dashboard" 
                   ? "bg-white/20 text-white shadow-sm" 
                   : "text-slate-300 hover:text-white hover:bg-white/10"
               }`}
             >
-              <Home className="w-5 h-5" />
-              <span className="ml-2 hidden sm:inline font-medium">Dashboard</span>
+              <Home className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="ml-1.5 sm:ml-2 hidden sm:inline font-medium text-sm">Dashboard</span>
               {currentView === "dashboard" && (
                 <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1 w-1 h-1 bg-white rounded-full"></div>
               )}
@@ -226,18 +219,18 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
               variant="ghost"
               size="sm"
               onClick={() => onViewChange("cart")}
-              className={`relative px-3 py-2 rounded-lg transition-all duration-200 ${
+              className={`relative px-2 sm:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg transition-all duration-200 ${
                 currentView === "cart" 
                   ? "bg-white/20 text-white shadow-sm" 
                   : "text-slate-300 hover:text-white hover:bg-white/10"
               }`}
             >
-              <Briefcase className="w-5 h-5" />
-              <span className="ml-2 hidden sm:inline font-medium">Cart</span>
+              <Briefcase className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="ml-1.5 sm:ml-2 hidden sm:inline font-medium text-sm">Cart</span>
               {cartItemCount > 0 && (
                 <Badge
                   variant="destructive"
-                  className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-gradient-to-br from-red-500 to-red-600 border-2 border-slate-800 shadow-lg"
+                  className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center p-0 text-[10px] sm:text-xs bg-gradient-to-br from-red-500 to-red-600 border-2 border-slate-800 shadow-lg"
                 >
                   {cartItemCount}
                 </Badge>
@@ -251,36 +244,7 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
           <div className="sm:hidden hidden" />
         </div>
       </div>
-      {/* Mobile slide-down menu */}
-      {isMobileMenuOpen && (
-        <div className="sm:hidden px-4 pb-4 animate-in slide-in-from-top duration-200">
-          <div className="bg-slate-800/80 backdrop-blur-md rounded-xl border border-slate-700 p-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs tracking-wide text-slate-400 uppercase">Navigation</span>
-              <CartStatusIndicator />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant={currentView === 'dashboard' ? 'secondary' : 'ghost'}
-                className="justify-start"
-                onClick={() => { onViewChange('dashboard'); setIsMobileMenuOpen(false) }}
-              >
-                <Home className="w-4 h-4 mr-2" /> Dashboard
-              </Button>
-              <Button
-                variant={currentView === 'cart' ? 'secondary' : 'ghost'}
-                className="justify-start"
-                onClick={() => { onViewChange('cart'); setIsMobileMenuOpen(false) }}
-              >
-                <Briefcase className="w-4 h-4 mr-2" /> Cart
-              </Button>
-            </div>
-            {searchQuery && (
-              <div className="text-xs text-slate-400">Search: <span className="text-slate-300">{searchQuery}</span></div>
-            )}
-          </div>
-        </div>
-      )}
+
     </header>
   )
 }

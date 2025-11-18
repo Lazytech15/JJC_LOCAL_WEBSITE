@@ -225,7 +225,7 @@ function SupplierManagement() {
     <div className="p-6 space-y-8">
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6">
         <div className="space-y-2">
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Supplier Management</h2>
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">Supplier Management</h2>
           <p className="text-lg text-gray-700 dark:text-gray-300">
             Manage suppliers and view their inventory items
           </p>
@@ -239,7 +239,7 @@ function SupplierManagement() {
       </div>
 
       {/* Supplier Selection */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+      <div className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-6 shadow-lg border" : "bg-white border-gray-200 rounded-2xl p-6 shadow-lg border"}>
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Select Supplier</h3>
         <div className="flex gap-4 items-end">
           <div className="flex-1">
@@ -309,7 +309,7 @@ function SupplierManagement() {
       {selectedSupplier && !loading && (
         <>
           {/* Supplier Contact Info Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-6 shadow-lg border" : "bg-white border-gray-200 rounded-2xl p-6 shadow-lg border"}>
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               📇 Supplier Information
             </h3>
@@ -363,7 +363,7 @@ function SupplierManagement() {
               )}
             </div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-6 shadow-lg border" : "bg-white border-gray-200 rounded-2xl p-6 shadow-lg border"}>
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">Supplier Summary — {selectedSupplier?.name}</h3>
             </div>
@@ -402,7 +402,7 @@ function SupplierManagement() {
 
       {/* Instructions when no supplier selected */}
       {!selectedSupplier && !loading && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-12 shadow-lg border border-gray-200 dark:border-gray-700">
+        <div className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-12 shadow-lg border" : "bg-white border-gray-200 rounded-2xl p-12 shadow-lg border"}>
           <div className="text-center">
             <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
               <span className="text-3xl">👥</span>
@@ -418,7 +418,7 @@ function SupplierManagement() {
       {/* Add/Edit Supplier Modal */}
       {isAddEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-2xl border border-gray-200 dark:border-gray-700 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl border border-gray-200 dark:border-gray-700 max-w-2xl w-full mx-2 sm:mx-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               {editingSupplier ? "Edit Supplier" : "Add New Supplier"}
             </h3>
@@ -609,7 +609,7 @@ function SupplierManagement() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="bg-linear-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 p-6 rounded-t-2xl">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 p-6 rounded-t-2xl">
               <h3 className="text-xl font-bold text-white">Supplier Details</h3>
             </div>
 
