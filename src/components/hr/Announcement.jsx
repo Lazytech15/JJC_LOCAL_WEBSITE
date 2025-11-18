@@ -3,7 +3,7 @@ import { useAuth } from "../../contexts/AuthContext"
 import apiService from "../../utils/api/api-service"
 
 function Announcement() {
-  const { user } = useAuth()
+  const { user, isDarkMode } = useAuth()
   const [loading, setLoading] = useState(false)
   const [employees, setEmployees] = useState([])
   const [departments, setDepartments] = useState([])
@@ -21,6 +21,8 @@ function Announcement() {
 
   const [searchTerm, setSearchTerm] = useState("")
   const [showEmployeeSelect, setShowEmployeeSelect] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
 
   useEffect(() => {
     fetchEmployeesAndDepartments()
@@ -119,9 +121,14 @@ function Announcement() {
         selectedEmployees: formData.selectedEmployees
       }
       
-      await apiService.announcements.createAnnouncement(announcementData)
-      
-      alert("Announcement sent successfully!")
+      if (editingId) {
+        await apiService.announcements.updateAnnouncement(editingId, announcementData)
+        alert("Announcement updated successfully!")
+        setEditingId(null)
+      } else {
+        await apiService.announcements.createAnnouncement(announcementData)
+        alert("Announcement sent successfully!")
+      }
       
       setFormData({
         title: "",
@@ -137,6 +144,54 @@ function Announcement() {
     } catch (err) {
       console.error("Error sending announcement:", err)
       alert(err.message || "Failed to send announcement")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEdit = (announcement) => {
+    setEditingId(announcement.id)
+    
+    setFormData({
+      title: announcement.title,
+      message: announcement.message,
+      recipientType: announcement.recipientType,
+      priority: announcement.priority,
+      expiryDate: announcement.expiryDate || "",
+      selectedDepartments: announcement.recipients
+        ?.filter(r => r.recipient_type === 'department')
+        .map(r => r.department_name) || [],
+      selectedEmployees: announcement.recipients
+        ?.filter(r => r.recipient_type === 'employee')
+        .map(r => r.employee_id) || []
+    })
+    
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    setFormData({
+      title: "",
+      message: "",
+      recipientType: "all",
+      selectedDepartments: [],
+      selectedEmployees: [],
+      priority: "normal",
+      expiryDate: ""
+    })
+  }
+
+  const handleDelete = async (id) => {
+    try {
+      setLoading(true)
+      await apiService.announcements.deleteAnnouncement(id)
+      alert("Announcement deleted successfully!")
+      setDeleteConfirm(null)
+      fetchAnnouncements()
+    } catch (err) {
+      console.error("Error deleting announcement:", err)
+      alert(err.message || "Failed to delete announcement")
     } finally {
       setLoading(false)
     }
@@ -169,289 +224,469 @@ function Announcement() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white/30 dark:bg-gray-800/40 backdrop-blur-md rounded-2xl p-6 border border-white/30 dark:border-gray-700/30 shadow-lg">
-        <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-6">
-          📣 Create Announcement
-        </h2>
-
-        <div className="space-y-6">
-          <div>
-            <label className="block text-gray-700 dark:text-gray-200 font-medium mb-2">
-              Announcement Title *
-            </label>
-            <input
-              type="text"
-              name="title"
-              value={formData.title}
-              onChange={handleInputChange}
-              placeholder="e.g., Company Holiday Notice"
-              className="w-full px-4 py-2 rounded-lg bg-white/50 dark:bg-gray-700/50 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-gray-100"
-            />
-          </div>
-
-          <div>
-            <label className="block text-gray-700 dark:text-gray-200 font-medium mb-2">
-              Message *
-            </label>
-            <textarea
-              name="message"
-              value={formData.message}
-              onChange={handleInputChange}
-              placeholder="Enter your announcement message..."
-              rows="5"
-              className="w-full px-4 py-2 rounded-lg bg-white/50 dark:bg-gray-700/50 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-gray-100 resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-gray-700 dark:text-gray-200 font-medium mb-2">
-              Priority
-            </label>
-            <select
-              name="priority"
-              value={formData.priority}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 rounded-lg bg-white/50 dark:bg-gray-700/50 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-gray-100"
-            >
-              <option value="normal">Normal</option>
-              <option value="important">Important</option>
-              <option value="urgent">Urgent</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-gray-700 dark:text-gray-200 font-medium mb-2">
-              Expiry Date (Optional)
-            </label>
-            <input
-              type="date"
-              name="expiryDate"
-              value={formData.expiryDate}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 rounded-lg bg-white/50 dark:bg-gray-700/50 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-gray-100"
-            />
-          </div>
-
-          <div>
-            <label className="block text-gray-700 dark:text-gray-200 font-medium mb-3">
-              Send To *
-            </label>
-            <div className="grid grid-cols-3 gap-3">
+    <div className={`min-h-screen transition-colors duration-300 ${
+      isDarkMode
+        ? "bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950"
+        : "bg-gradient-to-br from-gray-50 via-slate-50 to-stone-50"
+    }`}>
+      <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6">
+        {/* Create/Edit Announcement Form */}
+        <div className={`rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl border transition-all ${
+          isDarkMode 
+            ? "bg-gray-800/90 backdrop-blur-xl border-gray-700/50" 
+            : "bg-white/90 backdrop-blur-xl border-white/50"
+        }`}>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3 sm:gap-0">
+            <h2 className={`text-xl sm:text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+              📣 {editingId ? "Edit Announcement" : "Create Announcement"}
+            </h2>
+            {editingId && (
               <button
-                type="button"
-                onClick={() => handleRecipientTypeChange("all")}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  formData.recipientType === "all"
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
-                    : "border-gray-300 dark:border-gray-600 bg-white/30 dark:bg-gray-700/30"
+                onClick={handleCancelEdit}
+                className={`px-4 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
+                  isDarkMode
+                    ? "text-gray-300 hover:text-white hover:bg-gray-700/50"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                 }`}
               >
-                <div className="text-2xl mb-1">👥</div>
-                <div className="font-medium text-gray-800 dark:text-gray-100">All Employees</div>
-                <div className="text-sm text-gray-600 dark:text-gray-300">{employees.length} employees</div>
+                Cancel Edit
               </button>
+            )}
+          </div>
 
-              <button
-                type="button"
-                onClick={() => handleRecipientTypeChange("department")}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  formData.recipientType === "department"
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
-                    : "border-gray-300 dark:border-gray-600 bg-white/30 dark:bg-gray-700/30"
+          <div className="space-y-4 sm:space-y-6">
+            {/* Title Input */}
+            <div>
+              <label className={`block font-medium mb-2 text-sm sm:text-base ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                Announcement Title *
+              </label>
+              <input
+                type="text"
+                name="title"
+                value={formData.title}
+                onChange={handleInputChange}
+                placeholder="e.g., Company Holiday Notice"
+                className={`w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm sm:text-base ${
+                  isDarkMode
+                    ? "bg-gray-900/50 border-gray-700 text-white placeholder-gray-500"
+                    : "bg-white border-gray-200 text-gray-900 placeholder-gray-400"
                 }`}
-              >
-                <div className="text-2xl mb-1">🏢</div>
-                <div className="font-medium text-gray-800 dark:text-gray-100">By Department</div>
-                <div className="text-sm text-gray-600 dark:text-gray-300">{departments.length} departments</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleRecipientTypeChange("specific")}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  formData.recipientType === "specific"
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
-                    : "border-gray-300 dark:border-gray-600 bg-white/30 dark:bg-gray-700/30"
-                }`}
-              >
-                <div className="text-2xl mb-1">👤</div>
-                <div className="font-medium text-gray-800 dark:text-gray-100">Specific Employees</div>
-                <div className="text-sm text-gray-600 dark:text-gray-300">Select individuals</div>
-              </button>
+              />
             </div>
-          </div>
 
-          {formData.recipientType === "department" && (
-            <div className="bg-white/40 dark:bg-gray-700/40 rounded-lg p-4 border border-gray-300 dark:border-gray-600">
-              <h3 className="font-medium text-gray-800 dark:text-gray-100 mb-3">
-                Select Departments ({formData.selectedDepartments.length} selected)
-              </h3>
-              <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                {departments.length === 0 ? (
-                  <div className="col-span-2 text-center py-4 text-gray-500 dark:text-gray-400">
-                    No departments available
-                  </div>
-                ) : (
-                  departments.map((dept, index) => (
-                    <label
-                      key={index}
-                      className="flex items-center p-3 rounded-lg bg-white/50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 hover:bg-white/70 dark:hover:bg-gray-700/70 cursor-pointer transition-all"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formData.selectedDepartments.includes(dept.name)}
-                        onChange={() => handleDepartmentToggle(dept.name)}
-                        className="mr-3 w-4 h-4"
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-800 dark:text-gray-100">{dept.name}</div>
-                        <div className="text-sm text-gray-600 dark:text-gray-300">
-                          {dept.totalCount || dept.employeeCount || 0} employees
-                        </div>
-                      </div>
-                    </label>
-                  ))
-                )}
+            {/* Message Textarea */}
+            <div>
+              <label className={`block font-medium mb-2 text-sm sm:text-base ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                Message *
+              </label>
+              <textarea
+                name="message"
+                value={formData.message}
+                onChange={handleInputChange}
+                placeholder="Enter your announcement message..."
+                rows="5"
+                className={`w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none transition-all text-sm sm:text-base ${
+                  isDarkMode
+                    ? "bg-gray-900/50 border-gray-700 text-white placeholder-gray-500"
+                    : "bg-white border-gray-200 text-gray-900 placeholder-gray-400"
+                }`}
+              />
+            </div>
+
+            {/* Priority and Expiry Date - Side by Side on Desktop */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              {/* Priority Select */}
+              <div>
+                <label className={`block font-medium mb-2 text-sm sm:text-base ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                  Priority
+                </label>
+                <select
+                  name="priority"
+                  value={formData.priority}
+                  onChange={handleInputChange}
+                  className={`w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm sm:text-base ${
+                    isDarkMode
+                      ? "bg-gray-900/50 border-gray-700 text-white"
+                      : "bg-white border-gray-200 text-gray-900"
+                  }`}
+                >
+                  <option value="normal">Normal</option>
+                  <option value="important">Important</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+
+              {/* Expiry Date */}
+              <div>
+                <label className={`block font-medium mb-2 text-sm sm:text-base ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                  Expiry Date (Optional)
+                </label>
+                <input
+                  type="date"
+                  name="expiryDate"
+                  value={formData.expiryDate}
+                  onChange={handleInputChange}
+                  className={`w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm sm:text-base ${
+                    isDarkMode
+                      ? "bg-gray-900/50 border-gray-700 text-white"
+                      : "bg-white border-gray-200 text-gray-900"
+                  }`}
+                />
               </div>
             </div>
-          )}
 
-          {formData.recipientType === "specific" && (
-            <div className="bg-white/40 dark:bg-gray-700/40 rounded-lg p-4 border border-gray-300 dark:border-gray-600">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="font-medium text-gray-800 dark:text-gray-100">
-                  Select Employees ({formData.selectedEmployees.length} selected)
-                </h3>
+            {/* Recipient Type Selection */}
+            <div>
+              <label className={`block font-medium mb-3 text-sm sm:text-base ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                Send To *
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <button
                   type="button"
-                  onClick={() => setShowEmployeeSelect(!showEmployeeSelect)}
-                  className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
+                  onClick={() => handleRecipientTypeChange("all")}
+                  className={`p-3 sm:p-4 rounded-xl border-2 transition-all ${
+                    formData.recipientType === "all"
+                      ? isDarkMode
+                        ? "border-blue-500 bg-blue-500/20 shadow-lg shadow-blue-500/20"
+                        : "border-blue-500 bg-blue-50 shadow-lg shadow-blue-500/10"
+                      : isDarkMode
+                      ? "border-gray-700 bg-gray-800/50 hover:border-gray-600"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
                 >
-                  {showEmployeeSelect ? "Hide" : "Show"} List
+                  <div className="text-2xl sm:text-3xl mb-1 sm:mb-2">👥</div>
+                  <div className={`font-semibold text-sm sm:text-base ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                    All Employees
+                  </div>
+                  <div className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                    {employees.length} employees
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleRecipientTypeChange("department")}
+                  className={`p-3 sm:p-4 rounded-xl border-2 transition-all ${
+                    formData.recipientType === "department"
+                      ? isDarkMode
+                        ? "border-blue-500 bg-blue-500/20 shadow-lg shadow-blue-500/20"
+                        : "border-blue-500 bg-blue-50 shadow-lg shadow-blue-500/10"
+                      : isDarkMode
+                      ? "border-gray-700 bg-gray-800/50 hover:border-gray-600"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <div className="text-2xl sm:text-3xl mb-1 sm:mb-2">🏢</div>
+                  <div className={`font-semibold text-sm sm:text-base ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                    By Department
+                  </div>
+                  <div className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                    {departments.length} departments
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleRecipientTypeChange("specific")}
+                  className={`p-3 sm:p-4 rounded-xl border-2 transition-all ${
+                    formData.recipientType === "specific"
+                      ? isDarkMode
+                        ? "border-blue-500 bg-blue-500/20 shadow-lg shadow-blue-500/20"
+                        : "border-blue-500 bg-blue-50 shadow-lg shadow-blue-500/10"
+                      : isDarkMode
+                      ? "border-gray-700 bg-gray-800/50 hover:border-gray-600"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <div className="text-2xl sm:text-3xl mb-1 sm:mb-2">👤</div>
+                  <div className={`font-semibold text-sm sm:text-base ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                    Specific Employees
+                  </div>
+                  <div className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                    Select individuals
+                  </div>
                 </button>
               </div>
-
-              {showEmployeeSelect && (
-                <>
-                  <input
-                    type="text"
-                    placeholder="Search employees..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg bg-white/50 dark:bg-gray-700/50 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-gray-100 mb-3"
-                  />
-
-                  <div className="max-h-64 overflow-y-auto space-y-2">
-                    {filteredEmployees.length === 0 ? (
-                      <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                        No employees found
-                      </div>
-                    ) : (
-                      filteredEmployees.map((emp) => (
-                        <label
-                          key={emp.id}
-                          className="flex items-center p-3 rounded-lg bg-white/50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 hover:bg-white/70 dark:hover:bg-gray-700/70 cursor-pointer transition-all"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.selectedEmployees.includes(emp.id)}
-                            onChange={() => handleEmployeeToggle(emp.id)}
-                            className="mr-3 w-4 h-4"
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-800 dark:text-gray-100">
-                              {getEmployeeName(emp)}
-                            </div>
-                            <div className="text-sm text-gray-600 dark:text-gray-300">
-                              {emp.position || 'N/A'} - {emp.department || 'N/A'}
-                            </div>
-                          </div>
-                        </label>
-                      ))
-                    )}
-                  </div>
-                </>
-              )}
             </div>
-          )}
 
-          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-700 dark:text-gray-200 font-medium">
-                Total Recipients:
-              </span>
-              <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {getRecipientCount()}
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white font-medium py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Sending..." : "Send Announcement"}
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white/30 dark:bg-gray-800/40 backdrop-blur-md rounded-2xl p-6 border border-white/30 dark:border-gray-700/30 shadow-lg">
-        <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-6">
-          Recent Announcements
-        </h2>
-
-        <div className="space-y-3">
-          {announcements.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              No announcements yet. Create your first announcement above!
-            </div>
-          ) : (
-            announcements.map((announcement) => (
-              <div
-                key={announcement.id}
-                className="bg-white/40 dark:bg-gray-700/40 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold text-gray-800 dark:text-gray-100">
-                    {announcement.title}
-                  </h3>
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    announcement.priority === "urgent"
-                      ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
-                      : announcement.priority === "important"
-                      ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                  }`}>
-                    {announcement.priority}
-                  </span>
-                </div>
-                <p className="text-gray-600 dark:text-gray-300 text-sm mb-3">
-                  {announcement.message}
-                </p>
-                <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
-                  <span>
-                    To: {announcement.recipientType === 'all' 
-                      ? 'All Employees' 
-                      : announcement.recipientType === 'department'
-                      ? `${announcement.totalRecipients || 0} employee(s) in selected departments`
-                      : `${announcement.totalRecipients || 0} specific employee(s)`
-                    }
-                  </span>
-                  <span>{new Date(announcement.createdAt).toLocaleDateString()}</span>
-                </div>
-                {announcement.readCount !== undefined && announcement.totalRecipients && (
-                  <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      Read by {announcement.readCount} of {announcement.totalRecipients} recipients
+            {/* Department Selection */}
+            {formData.recipientType === "department" && (
+              <div className={`rounded-xl p-3 sm:p-4 border-2 ${
+                isDarkMode ? "bg-gray-800/50 border-gray-700" : "bg-gray-50 border-gray-200"
+              }`}>
+                <h3 className={`font-semibold mb-3 text-sm sm:text-base ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                  Select Departments ({formData.selectedDepartments.length} selected)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                  {departments.length === 0 ? (
+                    <div className={`col-span-2 text-center py-4 text-sm ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                      No departments available
                     </div>
-                  </div>
+                  ) : (
+                    departments.map((dept, index) => (
+                      <label
+                        key={index}
+                        className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
+                          isDarkMode
+                            ? "bg-gray-900/50 border-gray-700 hover:bg-gray-900/70"
+                            : "bg-white border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.selectedDepartments.includes(dept.name)}
+                          onChange={() => handleDepartmentToggle(dept.name)}
+                          className="mr-3 w-4 h-4 accent-blue-500 flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className={`font-medium text-sm sm:text-base truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                            {dept.name}
+                          </div>
+                          <div className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                            {dept.totalCount || dept.employeeCount || 0} employees
+                          </div>
+                        </div>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Employee Selection */}
+            {formData.recipientType === "specific" && (
+              <div className={`rounded-xl p-3 sm:p-4 border-2 ${
+                isDarkMode ? "bg-gray-800/50 border-gray-700" : "bg-gray-50 border-gray-200"
+              }`}>
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className={`font-semibold text-sm sm:text-base ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                    Select Employees ({formData.selectedEmployees.length} selected)
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowEmployeeSelect(!showEmployeeSelect)}
+                    className="text-blue-500 hover:text-blue-600 font-medium text-xs sm:text-sm transition-colors"
+                  >
+                    {showEmployeeSelect ? "Hide" : "Show"} List
+                  </button>
+                </div>
+
+                {showEmployeeSelect && (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Search employees..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className={`w-full px-3 sm:px-4 py-2 rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3 transition-all text-sm sm:text-base ${
+                        isDarkMode
+                          ? "bg-gray-900/50 border-gray-700 text-white placeholder-gray-500"
+                          : "bg-white border-gray-200 text-gray-900 placeholder-gray-400"
+                      }`}
+                    />
+
+                    <div className="max-h-64 overflow-y-auto space-y-2">
+                      {filteredEmployees.length === 0 ? (
+                        <div className={`text-center py-4 text-sm ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                          No employees found
+                        </div>
+                      ) : (
+                        filteredEmployees.map((emp) => (
+                          <label
+                            key={emp.id}
+                            className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
+                              isDarkMode
+                                ? "bg-gray-900/50 border-gray-700 hover:bg-gray-900/70"
+                                : "bg-white border-gray-200 hover:bg-gray-50"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.selectedEmployees.includes(emp.id)}
+                              onChange={() => handleEmployeeToggle(emp.id)}
+                              className="mr-3 w-4 h-4 accent-blue-500 flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className={`font-medium text-sm sm:text-base truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                                {getEmployeeName(emp)}
+                              </div>
+                              <div className={`text-xs sm:text-sm truncate ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                                {emp.position || 'N/A'} - {emp.department || 'N/A'}
+                              </div>
+                            </div>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
-            ))
-          )}
+            )}
+
+            {/* Recipient Count */}
+            <div className={`rounded-xl p-3 sm:p-4 border-2 ${
+              isDarkMode 
+                ? "bg-blue-500/10 border-blue-500/30" 
+                : "bg-blue-50 border-blue-200"
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className={`font-semibold text-sm sm:text-base ${isDarkMode ? "text-blue-300" : "text-blue-900"}`}>
+                  Total Recipients:
+                </span>
+                <span className={`text-2xl sm:text-3xl font-bold ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
+                  {getRecipientCount()}
+                </span>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30 text-sm sm:text-base"
+            >
+              {loading ? "Processing..." : editingId ? "Update Announcement" : "Send Announcement"}
+            </button>
+          </div>
+        </div>
+
+        {/* Recent Announcements */}
+        <div className={`rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl border transition-all ${
+          isDarkMode 
+            ? "bg-gray-800/90 backdrop-blur-xl border-gray-700/50" 
+            : "bg-white/90 backdrop-blur-xl border-white/50"
+        }`}>
+          <h2 className={`text-xl sm:text-2xl font-bold mb-4 sm:mb-6 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+            Recent Announcements
+          </h2>
+
+          <div className="space-y-3 sm:space-y-4">
+            {announcements.length === 0 ? (
+              <div className={`text-center py-12 text-sm sm:text-base ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                No announcements yet. Create your first announcement above!
+              </div>
+            ) : (
+              announcements.map((announcement) => (
+                <div
+                  key={announcement.id}
+                  className={`rounded-xl p-4 sm:p-5 border-2 transition-all ${
+                    isDarkMode
+                      ? "bg-gray-900/50 border-gray-700 hover:border-gray-600"
+                      : "bg-white border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-3 gap-2">
+                    <h3 className={`font-bold text-base sm:text-lg flex-1 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                      {announcement.title}
+                    </h3>
+                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                      <span className={`text-xs px-2 sm:px-3 py-1 rounded-full font-medium whitespace-nowrap ${
+                        announcement.priority === "urgent"
+                          ? isDarkMode
+                            ? "bg-red-500/20 text-red-300 border border-red-500/30"
+                            : "bg-red-100 text-red-700 border border-red-200"
+                          : announcement.priority === "important"
+                          ? isDarkMode
+                            ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
+                            : "bg-yellow-100 text-yellow-700 border border-yellow-200"
+                          : isDarkMode
+                          ? "bg-gray-700 text-gray-300 border border-gray-600"
+                          : "bg-gray-100 text-gray-700 border border-gray-200"
+                      }`}>
+                        {announcement.priority}
+                      </span>
+                      <button
+                        onClick={() => handleEdit(announcement)}
+                        className={`p-1.5 sm:p-2 rounded-lg transition-all ${
+                          isDarkMode
+                            ? "text-blue-400 hover:bg-blue-500/20"
+                            : "text-blue-600 hover:bg-blue-100"
+                        }`}
+                        title="Edit"
+                      >
+                        <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirm(announcement.id)}
+                        className={`p-1.5 sm:p-2 rounded-lg transition-all ${
+                          isDarkMode
+                            ? "text-red-400 hover:bg-red-500/20"
+                            : "text-red-600 hover:bg-red-100"
+                        }`}
+                        title="Delete"
+                      >
+                        <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className={`mb-4 leading-relaxed text-sm sm:text-base ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                    {announcement.message}
+                  </p>
+
+                  <div className={`flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                    <span className="break-words">
+                      📨 To: {announcement.recipientType === 'all' 
+                        ? 'All Employees' 
+                        : announcement.recipientType === 'department'
+                        ? `${announcement.totalRecipients || 0} employee(s) in selected departments`
+                        : `${announcement.totalRecipients || 0} specific employee(s)`
+                      }
+                    </span>
+                    <span className="whitespace-nowrap">📅 {new Date(announcement.createdAt).toLocaleDateString()}</span>
+                  </div>
+
+                  {announcement.readCount !== undefined && announcement.totalRecipients && (
+                    <div className={`mt-3 pt-3 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
+                      <div className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                        ✓ Read by {announcement.readCount} of {announcement.totalRecipients} recipients
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Delete Confirmation Modal */}
+                  {deleteConfirm === announcement.id && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                      <div className={`rounded-xl sm:rounded-2xl p-5 sm:p-6 max-w-md w-full shadow-2xl ${
+                        isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-white"
+                      }`}>
+                        <h3 className={`text-lg sm:text-xl font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                          Delete Announcement?
+                        </h3>
+                        <p className={`mb-6 text-sm sm:text-base ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                          Are you sure you want to delete <strong>"{announcement.title}"</strong>? This action cannot be undone.
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                          <button
+                            onClick={() => setDeleteConfirm(null)}
+                            className={`px-4 sm:px-5 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
+                              isDarkMode
+                                ? "text-gray-300 hover:bg-gray-700"
+                                : "text-gray-600 hover:bg-gray-100"
+                            }`}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleDelete(announcement.id)}
+                            disabled={loading}
+                            className="px-4 sm:px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-red-500/30 text-sm sm:text-base"
+                          >
+                            {loading ? "Deleting..." : "Delete"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
