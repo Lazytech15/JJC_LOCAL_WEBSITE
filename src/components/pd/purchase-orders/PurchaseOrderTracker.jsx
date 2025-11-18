@@ -652,23 +652,23 @@ function PurchaseOrderTracker() {
         {["draft", "requested", "approved", "ordered", "received", "cancelled"].map(status => {
           const count = purchaseOrders.filter(order => order.status === status).length
           return (
-            <div key={status} className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-lg p-4 border border-white/20 dark:border-gray-700/20">
-              <div className="text-2xl font-bold text-gray-800 dark:text-gray-200">{count}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">{getStatusText(status)}</div>
+            <div key={status} className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700 shadow-sm">
+              <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{count}</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">{getStatusText(status)}</div>
             </div>
           )
         })}
       </div>
 
       {/* Orders Table */}
-      <div className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-xl border border-white/20 dark:border-gray-700/20 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-white/10 dark:bg-black/20">
+            <thead className="bg-slate-50 dark:bg-slate-700">
               <tr>
                 <th 
                   onClick={() => handleSort("po_number")}
-                  className="px-4 py-3 text-left font-semibold text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-white/20 dark:hover:bg-black/30 transition-colors group"
+                  className="px-4 py-3 text-left font-semibold text-slate-800 dark:text-slate-100 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors group"
                 >
                   <div className="flex items-center gap-2">
                     <span>Order ID</span>
@@ -684,7 +684,7 @@ function PurchaseOrderTracker() {
                 </th>
                 <th 
                   onClick={() => handleSort("supplier")}
-                  className="px-4 py-3 text-left font-semibold text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-white/20 dark:hover:bg-black/30 transition-colors"
+                  className="px-4 py-3 text-left font-semibold text-slate-800 dark:text-slate-100 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
                 >
                   <div className="flex items-center gap-2">
                     <span>Supplier</span>
@@ -700,7 +700,7 @@ function PurchaseOrderTracker() {
                 </th>
                 <th 
                   onClick={() => handleSort("order_status")}
-                  className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-white/20 dark:hover:bg-black/30 transition-colors"
+                  className="px-4 py-3 text-center font-semibold text-slate-800 dark:text-slate-100 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
                 >
                   <div className="flex items-center justify-center gap-2">
                     <span>Status</span>
@@ -716,7 +716,7 @@ function PurchaseOrderTracker() {
                 </th>
                 <th 
                   onClick={() => handleSort("priority")}
-                  className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-white/20 dark:hover:bg-black/30 transition-colors"
+                  className="px-4 py-3 text-center font-semibold text-slate-800 dark:text-slate-100 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
                 >
                   <div className="flex items-center justify-center gap-2">
                     <span>Priority</span>
@@ -730,10 +730,10 @@ function PurchaseOrderTracker() {
                     </div>
                   </div>
                 </th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Items</th>
+                <th className="px-4 py-3 text-center font-semibold text-slate-800 dark:text-slate-100">Items</th>
                 <th 
                   onClick={() => handleSort("total_amount")}
-                  className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-white/20 dark:hover:bg-black/30 transition-colors"
+                  className="px-4 py-3 text-center font-semibold text-slate-800 dark:text-slate-100 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
                 >
                   <div className="flex items-center justify-center gap-2">
                     <span>Total Value</span>
@@ -749,7 +749,7 @@ function PurchaseOrderTracker() {
                 </th>
                 <th 
                   onClick={() => handleSort("po_date")}
-                  className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-white/20 dark:hover:bg-black/30 transition-colors"
+                  className="px-4 py-3 text-center font-semibold text-slate-800 dark:text-slate-100 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
                 >
                   <div className="flex items-center justify-center gap-2">
                     <span>Expected Delivery</span>
@@ -763,19 +763,19 @@ function PurchaseOrderTracker() {
                     </div>
                   </div>
                 </th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">Actions</th>
+                <th className="px-4 py-3 text-center font-semibold text-slate-800 dark:text-slate-100">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-300/20 dark:divide-gray-700/20">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
               {purchaseOrders.map((order) => (
-                <tr key={order.id} className="hover:bg-white/5 dark:hover:bg-black/10 transition-colors">
+                <tr key={order.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-gray-800 dark:text-gray-200">{order.id}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                    <div className="font-medium text-slate-800 dark:text-slate-100">{order.id}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
                       {formatDate(order.order_date)}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{order.supplier}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{order.supplier}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                       {getStatusText(order.status)}
@@ -786,13 +786,13 @@ function PurchaseOrderTracker() {
                               {order.priority?.toUpperCase()}
                             </span>
                   </td>
-                  <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 text-center text-slate-700 dark:text-slate-300">
                     {order.total_items} ({order.total_quantity} qty)
                   </td>
-                  <td className="px-4 py-3 text-center font-semibold text-gray-800 dark:text-gray-200">
+                  <td className="px-4 py-3 text-center font-semibold text-slate-800 dark:text-slate-100">
                     {formatCurrency(order.total_value)}
                   </td>
-                  <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 text-center text-slate-700 dark:text-slate-300">
                     {formatDate(order.expected_delivery_date)}
                   </td>
                   <td className="px-4 py-3 text-center">

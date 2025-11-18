@@ -360,7 +360,7 @@ function AdminDashboard({ onNavigate }) {
       {/* Purchase Order Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Purchase Orders Overview */}
-        <div className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20">
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">📋 Purchase Orders Summary</h3>
             <button
@@ -373,86 +373,86 @@ function AdminDashboard({ onNavigate }) {
           <div className="space-y-4">
             {/* Main metrics */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{purchaseOrderSummary.total_orders}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Total Orders</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Total Orders</div>
               </div>
-              <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{purchaseOrderSummary.pending_orders}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Active Orders</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Active Orders</div>
               </div>
             </div>
             
             {/* Financial overview */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
-                <div className="text-lg font-bold text-gray-700 dark:text-gray-300">{formatCurrency(purchaseOrderSummary.total_value)}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Total Value</div>
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+                <div className="text-lg font-bold text-slate-800 dark:text-slate-200">{formatCurrency(purchaseOrderSummary.total_value)}</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Total Value</div>
               </div>
-              <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className="text-lg font-bold text-orange-600 dark:text-orange-400">{formatCurrency(purchaseOrderSummary.pending_value)}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Pending Value</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Pending Value</div>
               </div>
             </div>
 
             {/* Status breakdown */}
-            <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
-              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Order Status Breakdown</div>
+            <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+              <div className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-3">Order Status Breakdown</div>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 <div className="text-center">
-                  <div className="text-lg font-bold text-gray-600 dark:text-gray-400">{purchaseOrderSummary.status_breakdown.requested}</div>
-                  <div className="text-gray-500 dark:text-gray-500">Requested</div>
+                  <div className="text-lg font-bold text-slate-700 dark:text-slate-300">{purchaseOrderSummary.status_breakdown.requested}</div>
+                  <div className="text-slate-600 dark:text-slate-400">Requested</div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{purchaseOrderSummary.status_breakdown.ordered}</div>
-                  <div className="text-gray-500 dark:text-gray-500">Ordered</div>
+                  <div className="text-slate-600 dark:text-slate-400">Ordered</div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{purchaseOrderSummary.status_breakdown.in_transit}</div>
-                  <div className="text-gray-500 dark:text-gray-500">In Transit</div>
+                  <div className="text-slate-600 dark:text-slate-400">In Transit</div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-orange-600 dark:text-orange-400">{purchaseOrderSummary.status_breakdown.ready_for_pickup}</div>
-                  <div className="text-gray-500 dark:text-gray-500">Ready</div>
+                  <div className="text-slate-600 dark:text-slate-400">Ready</div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-green-600 dark:text-green-400">{purchaseOrderSummary.status_breakdown.received}</div>
-                  <div className="text-gray-500 dark:text-gray-500">Received</div>
+                  <div className="text-slate-600 dark:text-slate-400">Received</div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-red-600 dark:text-red-400">{purchaseOrderSummary.status_breakdown.cancelled}</div>
-                  <div className="text-gray-500 dark:text-gray-500">Cancelled</div>
+                  <div className="text-slate-600 dark:text-slate-400">Cancelled</div>
                 </div>
               </div>
             </div>
 
             {/* Performance metrics */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className="text-lg font-bold text-green-600 dark:text-green-400">
                   {purchaseOrderSummary.total_orders > 0 ? 
                     Math.round((purchaseOrderSummary.completed_orders / purchaseOrderSummary.total_orders) * 100) : 0}%
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Completion Rate</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Completion Rate</div>
               </div>
-              <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
                   {formatCurrency(purchaseOrderSummary.total_orders > 0 ? 
                     purchaseOrderSummary.total_value / purchaseOrderSummary.total_orders : 0)}
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Avg Order Value</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Avg Order Value</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Employee Logs Summary */}
-        <div className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">👥 Recent Employee Activity</h3>
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">👥 Recent Employee Activity</h3>
           <div className="space-y-3">
             {employeeLogsSummary.length > 0 ? (
               employeeLogsSummary.map((log) => (
-                <div key={log.id} className="flex items-center gap-3 p-3 bg-white/10 dark:bg-black/20 rounded-lg">
+                <div key={log.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
                   <div className="text-xl">
                     {log.details?.toLowerCase().includes('checkout') ? '📤' :
                      log.details?.toLowerCase().includes('checkin') ? '📥' :
@@ -461,14 +461,14 @@ function AdminDashboard({ onNavigate }) {
                      log.details?.toLowerCase().includes('create') ? '➕' : '📋'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-800 dark:text-gray-200 text-sm truncate">
+                    <div className="font-medium text-slate-800 dark:text-slate-100 text-sm truncate">
                       {log.username || 'Unknown User'}
                     </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                    <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
                       {log.details || 'No details available'}
                     </div>
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
                     {new Date(log.created_at).toLocaleDateString('en-US', { 
                       month: 'short', 
                       day: 'numeric',
@@ -479,7 +479,7 @@ function AdminDashboard({ onNavigate }) {
                 </div>
               ))
             ) : (
-              <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+              <div className="text-center py-4 text-slate-500 dark:text-slate-400">
                 No recent activity
               </div>
             )}
@@ -487,7 +487,7 @@ function AdminDashboard({ onNavigate }) {
           <div className="mt-4">
             <button 
               onClick={() => handleNavigateToLogs()}
-              className="w-full text-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+              className="w-full text-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
             >
               View all logs →
             </button>
@@ -498,48 +498,48 @@ function AdminDashboard({ onNavigate }) {
       {/* Advanced Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Stock Status Overview */}
-        <div className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">📊 Stock Status Overview</h3>
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">📊 Stock Status Overview</h3>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-400">In Stock</span>
+              <span className="text-slate-600 dark:text-slate-400">In Stock</span>
               <div className="flex items-center gap-2">
-                <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="w-20 bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                   <div 
                     className="bg-green-500 h-2 rounded-full" 
                     style={{width: `${statistics.total_items > 0 ? (statistics.in_stock / statistics.total_items) * 100 : 0}%`}}
                   ></div>
                 </div>
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200 w-8">{statistics.in_stock || 0}</span>
+                <span className="text-sm font-medium text-slate-800 dark:text-slate-100 w-8">{statistics.in_stock || 0}</span>
               </div>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-400">Low Stock</span>
+              <span className="text-slate-600 dark:text-slate-400">Low Stock</span>
               <div className="flex items-center gap-2">
-                <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="w-20 bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                   <div 
                     className="bg-yellow-500 h-2 rounded-full" 
                     style={{width: `${statistics.total_items > 0 ? (statistics.low_stock / statistics.total_items) * 100 : 0}%`}}
                   ></div>
                 </div>
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200 w-8">{statistics.low_stock || 0}</span>
+                <span className="text-sm font-medium text-slate-800 dark:text-slate-100 w-8">{statistics.low_stock || 0}</span>
               </div>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-600 dark:text-gray-400">Out of Stock</span>
+              <span className="text-slate-600 dark:text-slate-400">Out of Stock</span>
               <div className="flex items-center gap-2">
-                <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="w-20 bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                   <div 
                     className="bg-red-500 h-2 rounded-full" 
                     style={{width: `${statistics.total_items > 0 ? (statistics.out_of_stock / statistics.total_items) * 100 : 0}%`}}
                   ></div>
                 </div>
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200 w-8">{statistics.out_of_stock || 0}</span>
+                <span className="text-sm font-medium text-slate-800 dark:text-slate-100 w-8">{statistics.out_of_stock || 0}</span>
               </div>
             </div>
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-300/20 dark:border-gray-700/20">
-            <div className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <div className="text-sm text-slate-600 dark:text-slate-400">
               Stock Health: <span className={`font-medium ${
                 statistics.out_of_stock === 0 && statistics.low_stock <= 5 
                   ? 'text-green-600 dark:text-green-400' 
@@ -555,8 +555,8 @@ function AdminDashboard({ onNavigate }) {
         </div>
 
         {/* Recent Stock Alerts */}
-        <div className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-xl p-4 border border-white/20 dark:border-gray-700/20">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 shadow-sm">
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2">
             🕒 <span>Recent Stock Alerts</span>
           </h3>
           <div className="space-y-1.5 max-h-96 overflow-y-auto">
@@ -564,10 +564,10 @@ function AdminDashboard({ onNavigate }) {
               <div key={item.item_no} className="p-2.5 bg-red-50/50 dark:bg-red-900/20 rounded-md border border-red-200/30 dark:border-red-800/30">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-800 dark:text-gray-200 text-sm leading-tight mb-1 wrap-break-words">
+                    <div className="font-medium text-slate-800 dark:text-slate-100 text-sm leading-tight mb-1 wrap-break-words">
                       {item.item_name}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
                       <span className="flex items-center gap-1">
                         📍 {item.location || 'No location'}
                       </span>
@@ -606,35 +606,35 @@ function AdminDashboard({ onNavigate }) {
         </div>
 
         {/* Department Activity & Analytics */}
-        <div className="bg-white/20 dark:bg-black/30 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">📈 Analytics</h3>
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">📈 Analytics</h3>
           <div className="space-y-4">
-            <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Inventory Turnover</div>
+            <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+              <div className="text-sm text-slate-600 dark:text-slate-400">Inventory Turnover</div>
               <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
                 {statistics.total_items > 0 ? ((statistics.in_stock / statistics.total_items) * 100).toFixed(1) : 0}%
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Stock Availability</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Stock Availability</div>
             </div>
             
-            <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Restock Priority</div>
+            <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+              <div className="text-sm text-slate-600 dark:text-slate-400">Restock Priority</div>
               <div className="text-xl font-bold text-orange-600 dark:text-orange-400">
                 {analytics.lowStockItems.length}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Items Need Attention</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Items Need Attention</div>
             </div>
 
-            <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Supplier Diversity</div>
+            <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+              <div className="text-sm text-slate-600 dark:text-slate-400">Supplier Diversity</div>
               <div className="text-xl font-bold text-purple-600 dark:text-purple-400">
                 {statistics.active_suppliers || 0}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Active Suppliers</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Active Suppliers</div>
             </div>
 
-            <div className="bg-white/10 dark:bg-black/20 rounded-lg p-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Avg. Item Value</div>
+            <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+              <div className="text-sm text-slate-600 dark:text-slate-400">Avg. Item Value</div>
               <div className="text-lg font-bold text-green-600 dark:text-green-400">
                 {formatCurrency(
                   statistics.total_items > 0 && statistics.total_inventory_value > 0 
@@ -642,7 +642,7 @@ function AdminDashboard({ onNavigate }) {
                     : 0
                 )}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Per Item</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Per Item</div>
             </div>
           </div>
         </div>

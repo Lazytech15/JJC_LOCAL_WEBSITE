@@ -422,7 +422,7 @@ function EmployeeLogs() {
   }
 
   const getActivityColor = (details) => {
-    if (!details) return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+    if (!details) return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
     const detailsLower = details.toLowerCase()
     if (detailsLower.includes("checkout")) return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
     if (detailsLower.includes("checkin")) return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
@@ -430,7 +430,7 @@ function EmployeeLogs() {
     if (detailsLower.includes("update")) return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
     if (detailsLower.includes("create")) return "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300"
     if (detailsLower.includes("delete")) return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-    return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+    return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
   }
 
   const renderDetailsContent = (log, items) => {
@@ -837,7 +837,7 @@ function EmployeeLogs() {
       <div className="max-w-7xl mx-auto space-y-4">
         
         {/* Header Section */}
-        <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-2xl shadow-lg border border-white/60 dark:border-slate-700/60 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-linear-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
@@ -883,7 +883,7 @@ function EmployeeLogs() {
         </div>
 
         {/* Search and Filter Section */}
-        <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-2xl shadow-lg border border-white/60 dark:border-slate-700/60 p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-4">
           <div className="flex flex-col lg:flex-row gap-3">
             <div className="flex-1">
               <div className="relative">
@@ -913,7 +913,7 @@ function EmployeeLogs() {
               </svg>
               <span>Filters</span>
               {hasActiveFilters && (
-                <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-bold">
+                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded-full text-xs font-bold">
                   {[searchTerm, dateFilter.dateFrom, dateFilter.dateTo, filters.hasDetails].filter(Boolean).length}
                 </span>
               )}
@@ -1035,7 +1035,7 @@ function EmployeeLogs() {
         )}
 
         {/* Logs Grid */}
-        <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-2xl shadow-lg border border-white/60 dark:border-slate-700/60 overflow-hidden">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-linear-to-r from-slate-100 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border-b-2 border-slate-200 dark:border-slate-700">
@@ -1191,13 +1191,13 @@ function EmployeeLogs() {
       {/* Detailed View Modal */}
       {showDetailedView && selectedLog && (
         <ModalPortal>
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-9999 p-4 animate-fadeIn">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-9999 p-4 animate-fadeIn">
             <div className="bg-white dark:bg-slate-900 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl max-w-5xl w-full mx-2 sm:mx-4 max-h-[90vh] overflow-hidden border border-slate-200 dark:border-slate-700 sm:border-2 animate-scaleIn">
               {/* Modal Header */}
               <div className="bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg">
+                    <div className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-2xl flex items-center justify-center shadow-lg">
                       <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
@@ -1209,7 +1209,7 @@ function EmployeeLogs() {
                   </div>
                   <button 
                     onClick={closeDetailedView} 
-                    className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-all"
+                    className="w-10 h-10 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl flex items-center justify-center transition-all"
                   >
                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1723,13 +1723,13 @@ function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
 
   return (
     <ModalPortal>
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-10000 p-4 animate-fadeIn">
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-10000 p-4 animate-fadeIn">
         <div className="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border-2 border-slate-200 dark:border-slate-700 animate-scaleIn">
           {/* Modal Header */}
           <div className="bg-linear-to-r from-amber-600 via-orange-600 to-red-600 p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg">
+                <div className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-2xl flex items-center justify-center shadow-lg">
                   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
@@ -1745,7 +1745,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
               </div>
               <button 
                 onClick={onClose} 
-                className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-all"
+                className="w-10 h-10 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl flex items-center justify-center transition-all"
               >
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
