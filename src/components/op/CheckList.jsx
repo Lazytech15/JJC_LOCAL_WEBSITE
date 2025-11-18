@@ -39,6 +39,30 @@ function Checklist({
   apiService,
   formatTime,
   loadData,
+
+  openTransferModal,
+  transferModalOpen,
+  setTransferModalOpen,
+  selectedSubphaseForTransfer,
+  selectedItemForTransfer,
+  selectedPhaseForTransfer,
+  newClient,
+  setNewClient,
+  transferQuantity,
+  setTransferQuantity,
+  transferRemarks,
+  setTransferRemarks,
+  clientItems,
+  showClientDropdown,
+  setShowClientDropdown,
+  selectedTargetItem,
+  setSelectedTargetItem,
+  selectedTargetPhase,
+  setSelectedTargetPhase,
+  selectedTargetSubphase,
+  setSelectedTargetSubphase,
+  handleTransferClient,
+  getBasePartNumber,
   // ADD THESE NEW PROPS:
   setShowEditItemModal,
   setShowEditPhaseModal,
@@ -61,21 +85,12 @@ function Checklist({
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState("name-asc")
   const [filterStatus, setFilterStatus] = useState("")
-  const [transferModalOpen, setTransferModalOpen] = useState(false)
   const [selectedSubphase, setSelectedSubphase] = useState(null)
   const [selectedItem, setSelectedItem] = useState(null)
   const [selectedPhase, setSelectedPhase] = useState(null)
-  const [newClient, setNewClient] = useState("")
-  const [transferQuantity, setTransferQuantity] = useState("")
-  const [transferRemarks, setTransferRemarks] = useState("")
-  const [clientItems, setClientItems] = useState([])
-  const [showClientDropdown, setShowClientDropdown] = useState(false)
   const [quantityModalOpen, setQuantityModalOpen] = useState(false)
   const [quantityModalData, setQuantityModalData] = useState(null)
   const [tempQuantity, setTempQuantity] = useState("")
-  const [selectedTargetItem, setSelectedTargetItem] = useState(null)
-  const [selectedTargetPhase, setSelectedTargetPhase] = useState(null)
-  const [selectedTargetSubphase, setSelectedTargetSubphase] = useState(null)
   const [, forceUpdate] = useState(0)
   const [itemCheckboxes, setItemCheckboxes] = useState({})
 
@@ -275,20 +290,6 @@ function Checklist({
     })
   }, [items])
 
-  // Load items for selected client
-  useEffect(() => {
-    if (newClient.trim() && transferModalOpen) {
-      const basePartNumber = getBasePartNumber(selectedItem?.part_number);
-      const filtered = items.filter((item) => {
-        const itemBasePartNumber = getBasePartNumber(item.part_number);
-        return item.client_name === newClient.trim() && itemBasePartNumber === basePartNumber;
-      });
-      setClientItems(filtered)
-    } else {
-      setClientItems([])
-    }
-  }, [newClient, items, selectedItem, transferModalOpen])
-
   // Filter clients for dropdown
   useEffect(() => {
     if (!Array.isArray(clients)) {
@@ -357,141 +358,6 @@ function Checklist({
       console.error("Error updating completed quantity:", error)
       alert("Failed to update completed quantity: " + error.message)
       await loadData()
-    }
-  }
-
-  const openTransferModal = (item, phase, subphase) => {
-    setSelectedItem(item)
-    setSelectedPhase(phase)
-    setSelectedSubphase(subphase)
-    setNewClient("")
-    setTransferQuantity("")
-    setTransferRemarks("")
-    setSelectedTargetItem(null)
-    setSelectedTargetPhase(null)
-    setSelectedTargetSubphase(null)
-    setTransferModalOpen(true)
-    setClientItems([])
-  }
-  const handleTransferClient = async () => {
-    if (!newClient.trim()) {
-      alert("Please enter a client name")
-      return
-    }
-
-    if (!selectedTargetItem) {
-      alert("Please select a target item")
-      return
-    }
-
-    if (!selectedTargetPhase) {
-      alert("Please select a target phase")
-      return
-    }
-
-    if (!selectedTargetSubphase) {
-      alert("Please select a target subphase")
-      return
-    }
-
-    const transferQty = Number.parseInt(transferQuantity)
-    if (!transferQty || transferQty < 1) {
-      alert("Please enter a valid transfer quantity")
-      return
-    }
-
-    const currentQty = selectedSubphase.current_completed_quantity || 0
-    if (transferQty > currentQty) {
-      alert(`Transfer quantity (${transferQty}) cannot exceed current completed quantity (${currentQty})`)
-      return
-    }
-
-    try {
-      const timestamp = new Date().toLocaleString("en-PH", {
-        timeZone: "Asia/Manila",
-      })
-
-      // Get full target item details
-      const targetItem = await apiService.operations.getItem(selectedTargetItem.part_number)
-      const targetPhase = targetItem.phases?.find((p) => p.id === Number.parseInt(selectedTargetPhase))
-      const targetSubphase = targetPhase?.subphases?.find((s) => s.id === Number.parseInt(selectedTargetSubphase))
-
-      if (!targetSubphase) {
-        alert("Could not find target subphase")
-        return
-      }
-
-      // Calculate new quantities
-      const newSourceQty = currentQty - transferQty
-      const targetCurrentQty = targetSubphase.current_completed_quantity || 0
-      const newTargetQty = targetCurrentQty + transferQty
-
-      // Optimistic update for source subphase quantity
-      updateSubphaseInState(selectedItem.part_number, selectedPhase.id, selectedSubphase.id, {
-        current_completed_quantity: newSourceQty,
-      })
-
-      // *** NEW CODE: Auto-uncheck if quantity drops below expected ***
-      if (selectedSubphase.completed == 1 && newSourceQty < selectedSubphase.expected_quantity) {
-        updateSubphaseInState(selectedItem.part_number, selectedPhase.id, selectedSubphase.id, {
-          current_completed_quantity: newSourceQty,
-          completed: 0,
-          completed_at: null,
-        })
-      }
-
-      // Optimistic update for target subphase quantity
-      updateSubphaseInState(
-        selectedTargetItem.part_number,
-        Number.parseInt(selectedTargetPhase),
-        Number.parseInt(selectedTargetSubphase),
-        { current_completed_quantity: newTargetQty },
-      )
-
-      // Close modal immediately
-      setTransferModalOpen(false)
-      setSelectedItem(null)
-      setSelectedPhase(null)
-      setSelectedSubphase(null)
-      setNewClient("")
-      setTransferQuantity("")
-      setTransferRemarks("")
-      setSelectedTargetItem(null)
-      setSelectedTargetPhase(null)
-      setSelectedTargetSubphase(null)
-
-      // Show success message
-      alert(`Successfully transferred ${transferQty} units to ${targetPhase.name} > ${targetSubphase.name}!`)
-
-      // API call to update source quantity
-      await apiService.operations.updateSubphaseCompletedQuantity(selectedSubphase.id, newSourceQty)
-
-      // *** NEW CODE: If subphase was marked complete and now quantity is insufficient, uncheck it ***
-      if (selectedSubphase.completed == 1 && newSourceQty < selectedSubphase.expected_quantity) {
-        await apiService.operations.completeSubphaseWithDuration(selectedSubphase.id, false)
-      }
-
-      // API call to update target quantity
-      await apiService.operations.updateSubphaseCompletedQuantity(targetSubphase.id, newTargetQty)
-
-      // Add remarks with transfer details
-      const transferRemark = `[${timestamp}] Transferred OUT ${transferQty} units to ${newClient} (${selectedTargetItem.part_number}) - ${targetPhase.name} > ${targetSubphase.name} | From: ${selectedPhase.name} > ${selectedSubphase.name}: ${transferRemarks.trim() || "No remarks"}`
-      const receiveRemark = `[${timestamp}] Received IN ${transferQty} units from ${selectedItem.client_name} (${selectedItem.part_number}) - ${selectedPhase.name} > ${selectedSubphase.name} | To: ${targetPhase.name} > ${targetSubphase.name}: ${transferRemarks.trim() || "No remarks"}`
-
-      await apiService.operations.updateItem(selectedItem.part_number, {
-        remarks: selectedItem.remarks ? `${selectedItem.remarks}\n${transferRemark}` : transferRemark,
-      })
-
-      await apiService.operations.updateItem(selectedTargetItem.part_number, {
-        remarks: selectedTargetItem.remarks ? `${selectedTargetItem.remarks}\n${receiveRemark}` : receiveRemark,
-      })
-
-      // Reload data in background to sync all changes
-      loadData()
-    } catch (error) {
-      console.error("Error transferring:", error)
-      alert("Failed to transfer: " + error.message)
-      await loadData() // Reload on error
     }
   }
 
@@ -1101,14 +967,6 @@ function Checklist({
     return calculatePhaseProgress(previousPhase) === 100 && previousPhase.end_time
   }
 
-  // Helper function to extract base part number (remove batch suffix)
-  const getBasePartNumber = (partNumber) => {
-    if (!partNumber) return '';
-    // Extract only the numeric part before "-BATCH-"
-    const match = partNumber.match(/^(\d+)/);
-    return match ? match[1] : partNumber;
-  };
-
   // Toggle Item Checkbox
   const toggleItemCheckbox = (partNumber) => {
     setItemCheckboxes(prev => ({
@@ -1352,334 +1210,7 @@ function Checklist({
       </div>
     </div>
 
-    {/* Transfer Modal - Mobile Optimized */}
-    {transferModalOpen && selectedItem && selectedSubphase && (
-      <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-        <div
-          className={`rounded-t-2xl sm:rounded-lg w-full sm:max-w-md sm:w-full max-h-[90vh] overflow-y-auto ${
-            isDarkMode ? "bg-gray-800" : "bg-white"
-          }`}
-        >
-          <div className="p-4 sm:p-6">
-            <h3
-              className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${
-                isDarkMode ? "text-gray-200" : "text-gray-800"
-              }`}
-            >
-              <ArrowRightLeft size={20} />
-              Transfer Subphase Quantity
-            </h3>
-
-            <div className={`mb-4 p-3 rounded-lg space-y-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
-              <div>
-                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>From Item:</p>
-                <p className={`font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>{selectedItem.name}</p>
-                <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                  Client: {selectedItem.client_name}
-                </p>
-              </div>
-              <div>
-                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Phase / Subphase:</p>
-                <p className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                  {selectedPhase.name} → {selectedSubphase.name}
-                </p>
-              </div>
-              <div>
-                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Available to Transfer:</p>
-                <p className={`font-bold ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
-                  {selectedSubphase.current_completed_quantity || 0} units
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {/* Client Selection */}
-              <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Target Client *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter client name"
-                  value={newClient}
-                  onChange={(e) => {
-                    setNewClient(e.target.value)
-                    setSelectedTargetItem(null)
-                    setSelectedTargetPhase(null)
-                    setSelectedTargetSubphase(null)
-                  }}
-                  autoFocus
-                  className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
-                    isDarkMode
-                      ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                      : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
-                  }`}
-                />
-
-                {showClientDropdown && (
-                  <div
-                    className={`absolute z-10 w-full mt-1 border rounded-lg shadow-lg max-h-48 overflow-y-auto ${
-                      isDarkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"
-                    }`}
-                  >
-                    {clients
-                      .filter(
-                        (c) => c !== selectedItem?.client_name && c.toLowerCase().includes(newClient.toLowerCase())
-                      )
-                      .map((client, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            setNewClient(client)
-                            setShowClientDropdown(false)
-                          }}
-                          className={`w-full text-left px-4 py-3 border-b transition-colors text-base ${
-                            isDarkMode
-                              ? "hover:bg-gray-600 active:bg-gray-500 border-gray-600 text-gray-200"
-                              : "hover:bg-gray-100 active:bg-gray-200 border-gray-200 text-gray-800"
-                          } last:border-b-0`}
-                        >
-                          {client}
-                        </button>
-                      ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Target Item Selection */}
-              {newClient.trim() && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Target Item *
-                    </label>
-                    {clientItems.length > 0 ? (
-                      <select
-                        value={selectedTargetItem?.part_number || ""}
-                        onChange={(e) => {
-                          const item = clientItems.find((i) => i.part_number === e.target.value)
-                          setSelectedTargetItem(item || null)
-                          setSelectedTargetPhase(null)
-                          setSelectedTargetSubphase(null)
-                        }}
-                        className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
-                          isDarkMode
-                            ? "bg-gray-700 border-gray-600 text-gray-200"
-                            : "bg-gray-100 border-gray-300 text-gray-800"
-                        }`}
-                      >
-                        <option value="">Select target item</option>
-                        {clientItems.map((item) => (
-                          <option key={item.part_number} value={item.part_number}>
-                            {item.part_number} ({item.quantity || 0} qty)
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <p
-                        className={`text-sm p-3 rounded ${
-                          isDarkMode ? "text-yellow-400 bg-yellow-500/10" : "text-yellow-600 bg-yellow-500/10"
-                        }`}
-                      >
-                        No matching items found for part number "{getBasePartNumber(selectedItem?.part_number)}" under
-                        client "{newClient}"
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Target Phase Selection */}
-                  {selectedTargetItem && selectedTargetItem.phases && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Target Phase *
-                      </label>
-                      <select
-                        value={selectedTargetPhase || ""}
-                        onChange={(e) => {
-                          setSelectedTargetPhase(e.target.value)
-                          setSelectedTargetSubphase(null)
-                        }}
-                        className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
-                          isDarkMode
-                            ? "bg-gray-700 border-gray-600 text-gray-200"
-                            : "bg-gray-100 border-gray-300 text-gray-800"
-                        }`}
-                      >
-                        <option value="">Select target phase</option>
-                        {selectedTargetItem.phases.map((phase) => (
-                          <option key={phase.id} value={phase.id}>
-                            {phase.name} ({phase.subphases?.length || 0} subphases)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Target Subphase Selection */}
-                  {selectedTargetItem && selectedTargetPhase && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Target Subphase *
-                      </label>
-                      <select
-                        value={selectedTargetSubphase || ""}
-                        onChange={(e) => {
-                          setSelectedTargetSubphase(e.target.value)
-                        }}
-                        className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
-                          isDarkMode
-                            ? "bg-gray-700 border-gray-600 text-gray-200"
-                            : "bg-gray-100 border-gray-300 text-gray-800"
-                        }`}
-                      >
-                        <option value="">Select target subphase</option>
-                        {selectedTargetItem.phases
-                          .find((p) => p.id === Number.parseInt(selectedTargetPhase))
-                          ?.subphases?.map((subphase) => (
-                            <option key={subphase.id} value={subphase.id}>
-                              {subphase.name} (Current: {subphase.current_completed_quantity || 0} / Expected:{" "}
-                              {subphase.expected_quantity})
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Show selected target info */}
-                  {selectedTargetItem && selectedTargetPhase && selectedTargetSubphase && (
-                    <div
-                      className={`p-3 rounded-lg border ${
-                        isDarkMode ? "bg-green-500/10 border-green-500/30" : "bg-green-500/10 border-green-500/30"
-                      }`}
-                    >
-                      <p className={`text-sm font-medium ${isDarkMode ? "text-green-300" : "text-green-700"}`}>
-                        ✓ Transfer destination selected
-                      </p>
-                      <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"} mt-1`}>
-                        {selectedTargetItem.phases.find((p) => p.id === Number.parseInt(selectedTargetPhase))?.name} →{" "}
-                        {
-                          selectedTargetItem.phases
-                            .find((p) => p.id === Number.parseInt(selectedTargetPhase))
-                            ?.subphases?.find((s) => s.id === Number.parseInt(selectedTargetSubphase))?.name
-                        }
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Transfer Quantity */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <Package size={16} />
-                  Quantity to Transfer *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max={selectedSubphase.current_completed_quantity || 0}
-                  value={transferQuantity}
-                  onChange={(e) => setTransferQuantity(e.target.value)}
-                  className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
-                    isDarkMode
-                      ? "bg-gray-700 border-gray-600 text-gray-200"
-                      : "bg-gray-100 border-gray-300 text-gray-800"
-                  }`}
-                />
-              </div>
-
-              {/* Transfer Remarks */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FileText size={16} />
-                  Transfer Remarks
-                </label>
-                <textarea
-                  placeholder="Enter reason for transfer..."
-                  value={transferRemarks}
-                  onChange={(e) => setTransferRemarks(e.target.value)}
-                  rows={3}
-                  className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 resize-none text-base ${
-                    isDarkMode
-                      ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                      : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
-                  }`}
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 mt-6">
-              <button
-                onClick={handleTransferClient}
-                disabled={!selectedTargetItem || !selectedTargetPhase || !selectedTargetSubphase || !transferQuantity}
-                className="flex-1 bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed text-base"
-              >
-                Transfer
-              </button>
-              <button
-                onClick={() => {
-                  setTransferModalOpen(false)
-                  setSelectedItem(null)
-                  setSelectedPhase(null)
-                  setSelectedSubphase(null)
-                  setNewClient("")
-                  setTransferQuantity("")
-                  setTransferRemarks("")
-                  setSelectedTargetItem(null)
-                  setSelectedTargetPhase(null)
-                  setSelectedTargetSubphase(null)
-                  setShowClientDropdown(false)
-                }}
-                className="flex-1 bg-gray-500 hover:bg-gray-600 active:bg-gray-700 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )}
-
-    {/* Barcode Scanner Modal - Mobile Optimized */}
-    {scanningFor && (
-      <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-        <div className={`rounded-t-2xl sm:rounded-lg w-full sm:max-w-md sm:w-full p-4 sm:p-6 ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
-          <h3 className={`text-lg sm:text-xl font-bold mb-4 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-            Scan Employee Barcode
-          </h3>
-          <input
-            type="text"
-            placeholder="Enter barcode or employee ID"
-            value={barcodeInput}
-            onChange={(e) => setBarcodeInput(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && submitBarcode()}
-            autoFocus
-            className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 mb-4 text-base ${
-              isDarkMode
-                ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
-            }`}
-          />
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={submitBarcode}
-              className="flex-1 bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
-            >
-              Submit
-            </button>
-            <button
-              onClick={() => {
-                setScanningFor(null)
-                setBarcodeInput("")
-              }}
-              className="flex-1 bg-gray-500 hover:bg-gray-600 active:bg-gray-700 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
+    
 
     {!isFiltering && items.length > 0 ? (
       <div className="space-y-6 sm:space-y-8">
@@ -2328,15 +1859,13 @@ function Checklist({
                                                         >
                                                           Update
                                                         </button>
-                                                        {subphase.current_completed_quantity > 0 && (
-                                                          <button
+                                                        <button
                                                             onClick={() => openTransferModal(item, phase, subphase)}
                                                             className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-3 py-1.5 rounded transition-colors"
                                                           >
                                                             <ArrowRightLeft size={12} />
                                                             Transfer
                                                           </button>
-                                                        )}
                                                       </>
                                                     )}
                                                 </div>
@@ -2664,16 +2193,6 @@ function Checklist({
                                                     <Package size={12} />
                                                     {subphase.current_completed_quantity || 0} / {subphase.expected_quantity}
                                                   </span>
-
-                                                  {(subphase.current_completed_quantity || 0) > 0 && (
-                                                    <button
-                                                      onClick={() => openTransferModal(item, phase, subphase)}
-                                                      className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-3 py-1 rounded transition-colors"
-                                                    >
-                                                      <ArrowRightLeft size={12} />
-                                                      Transfer
-                                                    </button>
-                                                  )}
                                                 </div>
                                               )}
 

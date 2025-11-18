@@ -18,7 +18,7 @@ import {
 const GearLoadingSpinner = lazy(() =>
   import("../../../public/LoadingGear.jsx")
 );
-import { Menu, X, ArrowUp, RefreshCw } from "lucide-react";
+import { Menu, X, ArrowUp, RefreshCw, ArrowRightLeft, Package, FileText } from "lucide-react";
 
 function OperationsDepartment() {
   const { user, logout, isDarkMode, toggleDarkMode } = useAuth();
@@ -77,6 +77,51 @@ function OperationsDepartment() {
   const [selectedSubphaseForEdit, setSelectedSubphaseForEdit] = useState(null);
   const [selectedItemsForBulk, setSelectedItemsForBulk] = useState([]);
   const [clients, setClients] = useState([]);
+
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [selectedSubphase, setSelectedSubphase] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedPhase, setSelectedPhase] = useState(null);
+  const [newClient, setNewClient] = useState("");
+  const [transferQuantity, setTransferQuantity] = useState("");
+  const [transferRemarks, setTransferRemarks] = useState("");
+  const [clientItems, setClientItems] = useState([]);
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [selectedTargetItem, setSelectedTargetItem] = useState(null);
+  const [selectedTargetPhase, setSelectedTargetPhase] = useState(null);
+  const [selectedTargetSubphase, setSelectedTargetSubphase] = useState(null);
+
+  // Load items for selected client in transfer modal
+useEffect(() => {
+  if (newClient.trim() && transferModalOpen && selectedItem) {
+    const basePartNumber = getBasePartNumber(selectedItem?.part_number);
+    const filtered = items.filter((item) => {
+      const itemBasePartNumber = getBasePartNumber(item.part_number);
+      return item.client_name === newClient.trim() && itemBasePartNumber === basePartNumber;
+    });
+    setClientItems(filtered);
+  } else {
+    setClientItems([]);
+  }
+}, [newClient, items, selectedItem, transferModalOpen]);
+
+// Filter clients for dropdown
+useEffect(() => {
+  if (!Array.isArray(clients)) {
+    setShowClientDropdown(false);
+    return;
+  }
+
+  const searchValue = newClient.trim().toLowerCase();
+  if (searchValue.length >= 1) {
+    const matches = clients.filter(
+      (client) => client.toLowerCase().includes(searchValue) && client !== selectedItem?.client_name
+    );
+    setShowClientDropdown(matches.length > 0);
+  } else {
+    setShowClientDropdown(false);
+  }
+}, [newClient, clients, selectedItem]);
 
   useEffect(() => {
     const needsPolling =
@@ -1320,14 +1365,216 @@ function OperationsDepartment() {
     }
   };
 
-  // Replace the return statement in your OperationsDepartment component with this:
+  const openTransferModal = (item, phase, subphase) => {
+  setSelectedItem(item);
+  setSelectedPhase(phase);
+  setSelectedSubphase(subphase);
+  setNewClient("");
+  setTransferQuantity("");
+  setTransferRemarks("");
+  setSelectedTargetItem(null);
+  setSelectedTargetPhase(null);
+  setSelectedTargetSubphase(null);
+  setTransferModalOpen(true);
+  setClientItems([]);
+};
+
+const handleTransferClient = async () => {
+  if (!newClient.trim()) {
+    alert("Please enter a client name");
+    return;
+  }
+
+  if (!selectedTargetItem) {
+    alert("Please select a target item");
+    return;
+  }
+
+  if (!selectedTargetPhase) {
+    alert("Please select a target phase");
+    return;
+  }
+
+  if (!selectedTargetSubphase) {
+    alert("Please select a target subphase");
+    return;
+  }
+
+  const transferQty = Number.parseInt(transferQuantity);
+  if (!transferQty || transferQty < 1) {
+    alert("Please enter a valid transfer quantity");
+    return;
+  }
+
+  const currentQty = selectedSubphase.current_completed_quantity || 0;
+  if (transferQty > currentQty) {
+    alert(`Transfer quantity (${transferQty}) cannot exceed current completed quantity (${currentQty})`);
+    return;
+  }
+
+  try {
+    const timestamp = new Date().toLocaleString("en-PH", {
+      timeZone: "Asia/Manila",
+    });
+
+    // Get full target item details
+    const targetItem = await apiService.operations.getItem(selectedTargetItem.part_number);
+    const targetPhase = targetItem.phases?.find((p) => p.id === Number.parseInt(selectedTargetPhase));
+    const targetSubphase = targetPhase?.subphases?.find((s) => s.id === Number.parseInt(selectedTargetSubphase));
+
+    if (!targetSubphase) {
+      alert("Could not find target subphase");
+      return;
+    }
+
+    // Calculate new quantities
+    const newSourceQty = currentQty - transferQty;
+    const targetCurrentQty = targetSubphase.current_completed_quantity || 0;
+    const newTargetQty = targetCurrentQty + transferQty;
+
+    // Optimistic update for source subphase quantity
+    setItems((prevItems) =>
+      prevItems.map((item) => {
+        if (item.part_number === selectedItem.part_number && item.phases) {
+          return {
+            ...item,
+            phases: item.phases.map((phase) => {
+              if (phase.id === selectedPhase.id && phase.subphases) {
+                return {
+                  ...phase,
+                  subphases: phase.subphases.map((subphase) =>
+                    subphase.id === selectedSubphase.id
+                      ? { ...subphase, current_completed_quantity: newSourceQty }
+                      : subphase
+                  ),
+                };
+              }
+              return phase;
+            }),
+          };
+        }
+        return item;
+      })
+    );
+
+    // Auto-uncheck if quantity drops below expected
+    if (selectedSubphase.completed == 1 && newSourceQty < selectedSubphase.expected_quantity) {
+      setItems((prevItems) =>
+        prevItems.map((item) => {
+          if (item.part_number === selectedItem.part_number && item.phases) {
+            return {
+              ...item,
+              phases: item.phases.map((phase) => {
+                if (phase.id === selectedPhase.id && phase.subphases) {
+                  return {
+                    ...phase,
+                    subphases: phase.subphases.map((subphase) =>
+                      subphase.id === selectedSubphase.id
+                        ? {
+                            ...subphase,
+                            current_completed_quantity: newSourceQty,
+                            completed: 0,
+                            completed_at: null,
+                          }
+                        : subphase
+                    ),
+                  };
+                }
+                return phase;
+              }),
+            };
+          }
+          return item;
+        })
+      );
+    }
+
+    // Optimistic update for target subphase quantity
+    setItems((prevItems) =>
+      prevItems.map((item) => {
+        if (item.part_number === selectedTargetItem.part_number && item.phases) {
+          return {
+            ...item,
+            phases: item.phases.map((phase) => {
+              if (phase.id === Number.parseInt(selectedTargetPhase) && phase.subphases) {
+                return {
+                  ...phase,
+                  subphases: phase.subphases.map((subphase) =>
+                    subphase.id === Number.parseInt(selectedTargetSubphase)
+                      ? { ...subphase, current_completed_quantity: newTargetQty }
+                      : subphase
+                  ),
+                };
+              }
+              return phase;
+            }),
+          };
+        }
+        return item;
+      })
+    );
+
+    // Close modal immediately
+    setTransferModalOpen(false);
+    setSelectedItem(null);
+    setSelectedPhase(null);
+    setSelectedSubphase(null);
+    setNewClient("");
+    setTransferQuantity("");
+    setTransferRemarks("");
+    setSelectedTargetItem(null);
+    setSelectedTargetPhase(null);
+    setSelectedTargetSubphase(null);
+
+    // Show success message
+    alert(`Successfully transferred ${transferQty} units to ${targetPhase.name} > ${targetSubphase.name}!`);
+
+    // API call to update source quantity
+    await apiService.operations.updateSubphaseCompletedQuantity(selectedSubphase.id, newSourceQty);
+
+    // If subphase was marked complete and now quantity is insufficient, uncheck it
+    if (selectedSubphase.completed == 1 && newSourceQty < selectedSubphase.expected_quantity) {
+      await apiService.operations.completeSubphaseWithDuration(selectedSubphase.id, false);
+    }
+
+    // API call to update target quantity
+    await apiService.operations.updateSubphaseCompletedQuantity(targetSubphase.id, newTargetQty);
+
+    // Add remarks with transfer details
+    const transferRemark = `[${timestamp}] Transferred OUT ${transferQty} units to ${newClient} (${selectedTargetItem.part_number}) - ${targetPhase.name} > ${targetSubphase.name} | From: ${selectedPhase.name} > ${selectedSubphase.name}: ${transferRemarks.trim() || "No remarks"}`;
+    const receiveRemark = `[${timestamp}] Received IN ${transferQty} units from ${selectedItem.client_name} (${selectedItem.part_number}) - ${selectedPhase.name} > ${selectedSubphase.name} | To: ${targetPhase.name} > ${targetSubphase.name}: ${transferRemarks.trim() || "No remarks"}`;
+
+    await apiService.operations.updateItem(selectedItem.part_number, {
+      remarks: selectedItem.remarks ? `${selectedItem.remarks}\n${transferRemark}` : transferRemark,
+    });
+
+    await apiService.operations.updateItem(selectedTargetItem.part_number, {
+      remarks: selectedTargetItem.remarks ? `${selectedTargetItem.remarks}\n${receiveRemark}` : receiveRemark,
+    });
+
+    // Reload data in background to sync all changes
+    loadData();
+  } catch (error) {
+    console.error("Error transferring:", error);
+    alert("Failed to transfer: " + error.message);
+    await loadData(); // Reload on error
+  }
+};
+
+  // Helper function to extract base part number (remove batch suffix)
+  const getBasePartNumber = (partNumber) => {
+    if (!partNumber) return '';
+    // Extract only the numeric part before "-BATCH-"
+    const match = partNumber.match(/^(\d+)/);
+    return match ? match[1] : partNumber;
+  };
 
 return (
   <div
     className={`min-h-screen transition-colors duration-300 ${
       isDarkMode
-        ? "bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950"
-        : "bg-gradient-to-br from-gray-50 via-slate-50 to-stone-50"
+        ? "bg-linear-to-br from-gray-950 via-gray-900 to-gray-950"
+        : "bg-linear-to-br from-gray-50 via-slate-50 to-stone-50"
     }`}
   >
     {/* Main Container - Responsive padding */}
@@ -1346,7 +1593,7 @@ return (
             {/* Title Section */}
             <div className="flex-1 min-w-0">
               <h1
-                className={`text-xl sm:text-2xl md:text-3xl font-bold break-words ${
+                className={`text-xl sm:text-2xl md:text-3xl font-bold wrap-break-word ${
                   isDarkMode ? "text-gray-100" : "text-gray-800"
                 }`}
               >
@@ -1371,7 +1618,7 @@ return (
             </div>
 
             {/* Action Buttons - Responsive */}
-            <div className="flex gap-2 flex-shrink-0 self-end sm:self-start">
+            <div className="flex gap-2 shrink-0 self-end sm:self-start">
               {/* Refresh Button */}
               <button
                 onClick={handleManualRefresh}
@@ -1630,7 +1877,7 @@ return (
                   }`}
                 >
                   <div
-                    className="bg-gradient-to-r from-blue-500 to-cyan-500 h-2.5 sm:h-3 rounded-full transition-all duration-300 relative overflow-hidden"
+                    className="bg-linear-to-r from-blue-500 to-cyan-500 h-2.5 sm:h-3 rounded-full transition-all duration-300 relative overflow-hidden"
                     style={{
                       width: `${
                         (loadingProgress.current / loadingProgress.total) * 100
@@ -1682,7 +1929,7 @@ return (
                 : "bg-red-100/80 border-red-300 text-red-700"
             }`}
           >
-            <p className="text-xs sm:text-sm md:text-base break-words font-medium">
+            <p className="text-xs sm:text-sm md:text-base wrap-break-word font-medium">
               Error: {error}
             </p>
             <button
@@ -1815,6 +2062,29 @@ return (
                   setSelectedSubphaseForEdit={setSelectedSubphaseForEdit}
                   setSelectedItemsForBulk={setSelectedItemsForBulk}
                   clients={clients}
+                  openTransferModal={openTransferModal}
+                  transferModalOpen={transferModalOpen}
+                  setTransferModalOpen={setTransferModalOpen}
+                  selectedSubphaseForTransfer={selectedSubphase}
+                  selectedItemForTransfer={selectedItem}
+                  selectedPhaseForTransfer={selectedPhase}
+                  newClient={newClient}
+                  setNewClient={setNewClient}
+                  transferQuantity={transferQuantity}
+                  setTransferQuantity={setTransferQuantity}
+                  transferRemarks={transferRemarks}
+                  setTransferRemarks={setTransferRemarks}
+                  clientItems={clientItems}
+                  showClientDropdown={showClientDropdown}
+                  setShowClientDropdown={setShowClientDropdown}
+                  selectedTargetItem={selectedTargetItem}
+                  setSelectedTargetItem={setSelectedTargetItem}
+                  selectedTargetPhase={selectedTargetPhase}
+                  setSelectedTargetPhase={setSelectedTargetPhase}
+                  selectedTargetSubphase={selectedTargetSubphase}
+                  setSelectedTargetSubphase={setSelectedTargetSubphase}
+                  handleTransferClient={handleTransferClient}
+                  getBasePartNumber={getBasePartNumber}
                 />
               )}
 
@@ -1895,7 +2165,7 @@ return (
                       tab.id === "dashboard" ||
                       tab.id === "reports")
                   }
-                  className={`flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-all duration-200 min-w-[64px] ${
+                  className={`flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-all duration-200 min-w-16 ${
                     activeTab === tab.id
                       ? isDarkMode
                         ? "text-cyan-400 bg-gray-800/60"
@@ -2027,6 +2297,336 @@ return (
           onSave={handleBulkEdit}
         />
       )}
+
+{/* Barcode Scanner Modal - Mobile Optimized */}
+    {scanningFor && (
+      <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+        <div className={`rounded-t-2xl sm:rounded-lg w-full sm:max-w-md sm:w-full p-4 sm:p-6 ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
+          <h3 className={`text-lg sm:text-xl font-bold mb-4 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+            Scan Employee Barcode
+          </h3>
+          <input
+            type="text"
+            placeholder="Enter barcode or employee ID"
+            value={barcodeInput}
+            onChange={(e) => setBarcodeInput(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && submitBarcode()}
+            autoFocus
+            className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 mb-4 text-base ${
+              isDarkMode
+                ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
+            }`}
+          />
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={submitBarcode}
+              className="flex-1 bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
+            >
+              Submit
+            </button>
+            <button
+              onClick={() => {
+                setScanningFor(null)
+                setBarcodeInput("")
+              }}
+              className="flex-1 bg-gray-500 hover:bg-gray-600 active:bg-gray-700 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+{/* Transfer Modal - Mobile Optimized */}
+    {transferModalOpen && selectedItem && selectedSubphase && (
+      <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+        <div
+          className={`rounded-t-2xl sm:rounded-lg w-full sm:max-w-md sm:w-full max-h-[90vh] overflow-y-auto ${
+            isDarkMode ? "bg-gray-800" : "bg-white"
+          }`}
+        >
+          <div className="p-4 sm:p-6">
+            <h3
+              className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${
+                isDarkMode ? "text-gray-200" : "text-gray-800"
+              }`}
+            >
+              <ArrowRightLeft size={20} />
+              Transfer Subphase Quantity
+            </h3>
+
+            <div className={`mb-4 p-3 rounded-lg space-y-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
+              <div>
+                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>From Item:</p>
+                <p className={`font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>{selectedItem.name}</p>
+                <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                  Client: {selectedItem.client_name}
+                </p>
+              </div>
+              <div>
+                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Phase / Subphase:</p>
+                <p className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                  {selectedPhase.name} → {selectedSubphase.name}
+                </p>
+              </div>
+              <div>
+                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Available to Transfer:</p>
+                <p className={`font-bold ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
+                  {selectedSubphase.current_completed_quantity || 0} units
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Client Selection */}
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Target Client *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter client name"
+                  value={newClient}
+                  onChange={(e) => {
+                    setNewClient(e.target.value)
+                    setSelectedTargetItem(null)
+                    setSelectedTargetPhase(null)
+                    setSelectedTargetSubphase(null)
+                  }}
+                  autoFocus
+                  className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
+                    isDarkMode
+                      ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                      : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
+                  }`}
+                />
+
+                {showClientDropdown && (
+                  <div
+                    className={`absolute z-10 w-full mt-1 border rounded-lg shadow-lg max-h-48 overflow-y-auto ${
+                      isDarkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"
+                    }`}
+                  >
+                    {clients
+                      .filter(
+                        (c) => c !== selectedItem?.client_name && c.toLowerCase().includes(newClient.toLowerCase())
+                      )
+                      .map((client, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setNewClient(client)
+                            setShowClientDropdown(false)
+                          }}
+                          className={`w-full text-left px-4 py-3 border-b transition-colors text-base ${
+                            isDarkMode
+                              ? "hover:bg-gray-600 active:bg-gray-500 border-gray-600 text-gray-200"
+                              : "hover:bg-gray-100 active:bg-gray-200 border-gray-200 text-gray-800"
+                          } last:border-b-0`}
+                        >
+                          {client}
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Target Item Selection */}
+              {newClient.trim() && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Target Item *
+                    </label>
+                    {clientItems.length > 0 ? (
+                      <select
+                        value={selectedTargetItem?.part_number || ""}
+                        onChange={(e) => {
+                          const item = clientItems.find((i) => i.part_number === e.target.value)
+                          setSelectedTargetItem(item || null)
+                          setSelectedTargetPhase(null)
+                          setSelectedTargetSubphase(null)
+                        }}
+                        className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
+                          isDarkMode
+                            ? "bg-gray-700 border-gray-600 text-gray-200"
+                            : "bg-gray-100 border-gray-300 text-gray-800"
+                        }`}
+                      >
+                        <option value="">Select target item</option>
+                        {clientItems.map((item) => (
+                          <option key={item.part_number} value={item.part_number}>
+                            {item.part_number} ({item.quantity || 0} qty)
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p
+                        className={`text-sm p-3 rounded ${
+                          isDarkMode ? "text-yellow-400 bg-yellow-500/10" : "text-yellow-600 bg-yellow-500/10"
+                        }`}
+                      >
+                        No matching items found for part number "{getBasePartNumber(selectedItem?.part_number)}" under
+                        client "{newClient}"
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Target Phase Selection */}
+                  {selectedTargetItem && selectedTargetItem.phases && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Target Phase *
+                      </label>
+                      <select
+                        value={selectedTargetPhase || ""}
+                        onChange={(e) => {
+                          setSelectedTargetPhase(e.target.value)
+                          setSelectedTargetSubphase(null)
+                        }}
+                        className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
+                          isDarkMode
+                            ? "bg-gray-700 border-gray-600 text-gray-200"
+                            : "bg-gray-100 border-gray-300 text-gray-800"
+                        }`}
+                      >
+                        <option value="">Select target phase</option>
+                        {selectedTargetItem.phases.map((phase) => (
+                          <option key={phase.id} value={phase.id}>
+                            {phase.name} ({phase.subphases?.length || 0} subphases)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Target Subphase Selection */}
+                  {selectedTargetItem && selectedTargetPhase && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Target Subphase *
+                      </label>
+                      <select
+                        value={selectedTargetSubphase || ""}
+                        onChange={(e) => {
+                          setSelectedTargetSubphase(e.target.value)
+                        }}
+                        className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
+                          isDarkMode
+                            ? "bg-gray-700 border-gray-600 text-gray-200"
+                            : "bg-gray-100 border-gray-300 text-gray-800"
+                        }`}
+                      >
+                        <option value="">Select target subphase</option>
+                        {selectedTargetItem.phases
+                          .find((p) => p.id === Number.parseInt(selectedTargetPhase))
+                          ?.subphases?.map((subphase) => (
+                            <option key={subphase.id} value={subphase.id}>
+                              {subphase.name} (Current: {subphase.current_completed_quantity || 0} / Expected:{" "}
+                              {subphase.expected_quantity})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Show selected target info */}
+                  {selectedTargetItem && selectedTargetPhase && selectedTargetSubphase && (
+                    <div
+                      className={`p-3 rounded-lg border ${
+                        isDarkMode ? "bg-green-500/10 border-green-500/30" : "bg-green-500/10 border-green-500/30"
+                      }`}
+                    >
+                      <p className={`text-sm font-medium ${isDarkMode ? "text-green-300" : "text-green-700"}`}>
+                        ✓ Transfer destination selected
+                      </p>
+                      <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"} mt-1`}>
+                        {selectedTargetItem.phases.find((p) => p.id === Number.parseInt(selectedTargetPhase))?.name} →{" "}
+                        {
+                          selectedTargetItem.phases
+                            .find((p) => p.id === Number.parseInt(selectedTargetPhase))
+                            ?.subphases?.find((s) => s.id === Number.parseInt(selectedTargetSubphase))?.name
+                        }
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Transfer Quantity */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <Package size={16} />
+                  Quantity to Transfer *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max={selectedSubphase.current_completed_quantity || 0}
+                  value={transferQuantity}
+                  onChange={(e) => setTransferQuantity(e.target.value)}
+                  className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
+                    isDarkMode
+                      ? "bg-gray-700 border-gray-600 text-gray-200"
+                      : "bg-gray-100 border-gray-300 text-gray-800"
+                  }`}
+                />
+              </div>
+
+              {/* Transfer Remarks */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <FileText size={16} />
+                  Transfer Remarks
+                </label>
+                <textarea
+                  placeholder="Enter reason for transfer..."
+                  value={transferRemarks}
+                  onChange={(e) => setTransferRemarks(e.target.value)}
+                  rows={3}
+                  className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 resize-none text-base ${
+                    isDarkMode
+                      ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                      : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
+                  }`}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 mt-6">
+              <button
+                onClick={handleTransferClient}
+                disabled={!selectedTargetItem || !selectedTargetPhase || !selectedTargetSubphase || !transferQuantity}
+                className="flex-1 bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed text-base"
+              >
+                Transfer
+              </button>
+              <button
+                onClick={() => {
+                  setTransferModalOpen(false)
+                  setSelectedItem(null)
+                  setSelectedPhase(null)
+                  setSelectedSubphase(null)
+                  setNewClient("")
+                  setTransferQuantity("")
+                  setTransferRemarks("")
+                  setSelectedTargetItem(null)
+                  setSelectedTargetPhase(null)
+                  setSelectedTargetSubphase(null)
+                  setShowClientDropdown(false)
+                }}
+                className="flex-1 bg-gray-500 hover:bg-gray-600 active:bg-gray-700 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+      
     </div>
   </div>
 );
