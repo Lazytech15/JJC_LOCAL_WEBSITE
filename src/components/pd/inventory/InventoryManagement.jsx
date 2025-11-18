@@ -940,7 +940,7 @@ function InventoryManagement() {
       </div>
 
       {/* Filters Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+      <div className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-6 shadow-lg border" : "bg-white border-gray-200 rounded-2xl p-6 shadow-lg border"}>
         <style>{`
           select {
             max-height: 200px !important;
@@ -1097,7 +1097,7 @@ function InventoryManagement() {
       {loading ? (
         <InventoryManagementSkeleton />
       ) : sortedItems.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-12 shadow-lg border border-gray-200 dark:border-gray-700">
+            <div className={isDarkMode ? "bg-gray-800 rounded-2xl p-12 shadow-lg border border-gray-700" : "bg-white rounded-2xl p-12 shadow-lg border border-gray-200"}>
           <div className="text-center">
             <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-6">
               <span className="text-3xl">📦</span>
@@ -1152,7 +1152,7 @@ function InventoryManagement() {
                 setSelectedItemForDetail(item)
                 setShowItemDetail(true)
               }}
-              className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-200 flex flex-col cursor-pointer"
+              className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-6 shadow-lg border hover:shadow-xl transition-all duration-200 flex flex-col cursor-pointer" : "bg-white border-gray-200 rounded-2xl p-6 shadow-lg border hover:shadow-xl transition-all duration-200 flex flex-col cursor-pointer"}
             >
               {/* Item Header */}
               <div className="flex justify-between items-start mb-4">
@@ -1331,7 +1331,7 @@ function InventoryManagement() {
       <Suspense fallback={
         <ModalPortal>
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-2xl">
+            <div className={isDarkMode ? "bg-gray-800 rounded-2xl p-8 shadow-2xl" : "bg-white rounded-2xl p-8 shadow-2xl"}>
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
               <p className="mt-4 text-gray-700 dark:text-gray-300">Loading form...</p>
             </div>
@@ -1534,7 +1534,7 @@ function InventoryManagement() {
       {showExportModal && (
         <ModalPortal>
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className={isDarkMode ? "bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6" : "bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"}>
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Export Inventory Data</h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 Choose a format to export your inventory data ({items.length} items)
@@ -1597,7 +1597,7 @@ function InventoryManagement() {
       {showImportModal && (
         <ModalPortal>
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
-            <div className="bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl w-full max-w-4xl mx-2 sm:mx-4 max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+            <div className={isDarkMode ? "bg-gray-800 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl w-full max-w-4xl mx-2 sm:mx-4 max-h-[90vh] overflow-y-auto p-4 sm:p-6" : "bg-white rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl w-full max-w-4xl mx-2 sm:mx-4 max-h-[90vh] overflow-y-auto p-4 sm:p-6"}>
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Import Inventory Data</h3>
               
               <div className="space-y-6">

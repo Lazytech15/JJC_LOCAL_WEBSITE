@@ -89,15 +89,15 @@ export const NotificationToast = ({ notification, onClose, duration = 5000 }) =>
               <span className="text-xl">👤</span>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-semibold text-slate-900 dark:text-white text-sm mb-1">
+              <div className="font-semibold text-black dark:text-white text-sm mb-1">
                 {log.username || 'Unknown User'}
               </div>
-              <div className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2">
+              <div className="text-xs text-black dark:text-slate-400 line-clamp-2">
                 {log.details || log.purpose || 'New activity logged'}
               </div>
               {log.item_no && (
                 <div className="mt-2 flex items-center gap-1 text-xs">
-                  <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded font-mono">
+                  <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-black dark:text-blue-300 rounded font-mono">
                     #{log.item_no}
                   </span>
                 </div>
@@ -191,13 +191,13 @@ export const NotificationPanel = ({ notifications, onClose, onMarkAsRead, onMark
           <div className="px-6 py-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 flex gap-2">
             <button
               onClick={onMarkAllAsRead}
-              className="px-3 py-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+              className="px-3 py-1.5 text-xs font-semibold text-black dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
             >
               Mark all as read
             </button>
             <button
               onClick={onClearAll}
-              className="px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+              className="px-3 py-1.5 text-xs font-semibold text-black dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
             >
               Clear all
             </button>
@@ -211,8 +211,8 @@ export const NotificationPanel = ({ notifications, onClose, onMarkAsRead, onMark
               <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
                 <span className="text-4xl">📭</span>
               </div>
-              <p className="text-slate-600 dark:text-slate-400 font-medium">No notifications</p>
-              <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">You're all caught up!</p>
+              <p className="text-black dark:text-slate-400 font-medium">No notifications</p>
+              <p className="text-xs text-black dark:text-slate-500 mt-1">You're all caught up!</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -231,21 +231,21 @@ export const NotificationPanel = ({ notifications, onClose, onMarkAsRead, onMark
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         {notification.critical && (
-                          <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs font-bold rounded">
+                          <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-black dark:text-red-300 text-xs font-bold rounded">
                             CRITICAL
                           </span>
                         )}
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                        <span className="text-xs text-black dark:text-slate-400">
                           {new Date(notification.timestamp).toLocaleTimeString('en-US', {
                             hour: '2-digit',
                             minute: '2-digit'
                           })}
                         </span>
                       </div>
-                      <div className="font-semibold text-sm text-slate-900 dark:text-white mb-1">
+                      <div className="font-semibold text-sm text-black dark:text-white mb-1">
                         {notification.log.username || 'Unknown User'}
                       </div>
-                      <div className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2">
+                      <div className="text-xs text-black dark:text-slate-400 line-clamp-2">
                         {notification.log.details || notification.log.purpose || 'New activity'}
                       </div>
                     </div>

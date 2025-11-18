@@ -30,6 +30,22 @@ export const exportPurchaseOrderToPDF = (poData) => {
   const pageWidth = doc.internal.pageSize.width
   const pageHeight = doc.internal.pageSize.height
   
+  const isValidDataUrlImage = (s) => {
+    return typeof s === 'string' && /^data:image\/(png|jpe?g);base64,/i.test(s.trim())
+  }
+
+  const pickImageData = (img) => {
+    const candidate = (img && typeof img === 'object' && 'data' in img) ? img.data : img
+    if (typeof candidate !== 'string') return null
+    const trimmed = candidate.trim()
+    // Some sources may include non-standard headers; only allow jpeg/png
+    if (isValidDataUrlImage(trimmed)) return trimmed
+    // If it's a data URL but unsupported (e.g., webp), skip it to avoid jsPDF UNKNOWN type
+    if (/^data:image\//i.test(trimmed) && !/^data:image\/(png|jpe?g);base64,/i.test(trimmed)) return null
+    // Not a data URL; skip
+    return null
+  }
+  
   // Engineering drawing margins (standard A4)
   const margin = 10
   const rightMargin = 10
@@ -633,7 +649,8 @@ export const exportPurchaseOrderToPDF = (poData) => {
             
             imageArray.forEach((img, idx) => {
               try {
-                const imgData = img.data || img
+                const imgData = pickImageData(img)
+                if (!imgData) throw new Error('Unsupported or invalid image data')
                 const imgProps = doc.getImageProperties(imgData)
                 const aspectRatio = imgProps.width / imgProps.height
                 
@@ -719,10 +736,9 @@ export const exportPurchaseOrderToPDF = (poData) => {
               }
               
               try {
-                const imgData = img.data || img
-                let format = 'JPEG'
-                if (imgData.includes('image/png')) format = 'PNG'
-                else if (imgData.includes('image/jpeg') || imgData.includes('image/jpg')) format = 'JPEG'
+                const imgData = pickImageData(img)
+                if (!imgData) throw new Error('Unsupported or invalid image data')
+                const format = imgData.includes('image/png') ? 'PNG' : 'JPEG'
                 
                 const imgProps = doc.getImageProperties(imgData)
                 const aspectRatio = imgProps.width / imgProps.height
@@ -822,11 +838,9 @@ export const exportPurchaseOrderToPDF = (poData) => {
               }
               
               try {
-                const imgData = img.data || img
-                let format = 'JPEG'
-                if (imgData.includes('image/png')) format = 'PNG'
-                else if (imgData.includes('image/jpeg') || imgData.includes('image/jpg')) format = 'JPEG'
-                
+                const imgData = pickImageData(img)
+                if (!imgData) throw new Error('Unsupported or invalid image data')
+                const format = imgData.includes('image/png') ? 'PNG' : 'JPEG'
                 const imgProps = doc.getImageProperties(imgData)
                 const aspectRatio = imgProps.width / imgProps.height
                 

@@ -9,6 +9,7 @@ import { useAuth } from "../../contexts/AuthContext"
 import { ReportBuilder } from "./shared/ReportBuilder"
 
 function EmployeeLogs() {
+  const { isDarkMode } = useAuth()
   const [state, setState] = useState({
     logs: [],
     loading: true,
@@ -837,7 +838,7 @@ function EmployeeLogs() {
       <div className="max-w-7xl mx-auto space-y-4">
         
         {/* Header Section */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6">
+        <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-2xl shadow-lg border p-6" : "bg-white border-slate-200 rounded-2xl shadow-lg border p-6"}>
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
@@ -883,7 +884,7 @@ function EmployeeLogs() {
         </div>
 
         {/* Search and Filter Section */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-4">
+        <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-2xl shadow-lg border p-4" : "bg-white border-slate-200 rounded-2xl shadow-lg border p-4"}>
           <div className="flex flex-col lg:flex-row gap-3">
             <div className="flex-1">
               <div className="relative">
@@ -1035,7 +1036,7 @@ function EmployeeLogs() {
         )}
 
         {/* Logs Grid */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-2xl shadow-lg border overflow-hidden" : "bg-white border-slate-200 rounded-2xl shadow-lg border overflow-hidden"}>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gradient-to-r from-slate-100 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border-b-2 border-slate-200 dark:border-slate-700">

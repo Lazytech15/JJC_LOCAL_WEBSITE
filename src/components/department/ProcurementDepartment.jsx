@@ -805,7 +805,7 @@ function ProcurementDepartment() {
           </div>
         )}
 
-          <div className={`${isDarkMode ? "bg-slate-900/90 border-slate-700/50" : "bg-white/90 border-slate-200/50"} backdrop-blur-xl rounded-lg shadow-lg border`}>
+          <div className={`${isDarkMode ? "bg-slate-900/90 border-slate-700/50" : "bg-white border-gray-200"} backdrop-blur-xl rounded-lg shadow-lg border`}>
             <div className="p-3 sm:p-4">
               <Suspense fallback={<div className={`py-6 text-center text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Loading module...</div>}>
                 {activeTab === "dashboard" && <AdminDashboard onNavigate={setActiveTab} />}

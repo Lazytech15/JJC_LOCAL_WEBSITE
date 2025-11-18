@@ -15,15 +15,15 @@ function InventoryListView({
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-700">
             <tr>
-              <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Item</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Brand</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Location</th>
-              <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Balance</th>
-              <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">ROP</th>
-              <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">MOQ</th>
-              <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Price</th>
-              <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Status</th>
-              <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Actions</th>
+              <th className="px-4 py-3 text-left font-semibold text-black dark:text-white">Item</th>
+              <th className="px-4 py-3 text-left font-semibold text-black dark:text-white">Brand</th>
+              <th className="px-4 py-3 text-left font-semibold text-black dark:text-white">Location</th>
+              <th className="px-4 py-3 text-center font-semibold text-black dark:text-white">Balance</th>
+              <th className="px-4 py-3 text-center font-semibold text-black dark:text-white">ROP</th>
+              <th className="px-4 py-3 text-center font-semibold text-black dark:text-white">MOQ</th>
+              <th className="px-4 py-3 text-center font-semibold text-black dark:text-white">Price</th>
+              <th className="px-4 py-3 text-center font-semibold text-black dark:text-white">Status</th>
+              <th className="px-4 py-3 text-center font-semibold text-black dark:text-white">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -35,20 +35,20 @@ function InventoryListView({
               >
                 <td className="px-4 py-3">
                   <div>
-                    <div className="font-medium text-gray-900 dark:text-white">{item.item_name}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">ID: {item.item_no}</div>
+                    <div className="font-medium text-black dark:text-white">{item.item_name}</div>
+                    <div className="text-xs text-black dark:text-gray-400">ID: {item.item_no}</div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{item.brand || '-'}</td>
-                <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{item.location || '-'}</td>
+                <td className="px-4 py-3 text-black dark:text-gray-300">{item.brand || '-'}</td>
+                <td className="px-4 py-3 text-black dark:text-gray-300">{item.location || '-'}</td>
                 <td className="px-4 py-3 text-center">
-                  <span className="font-semibold text-gray-900 dark:text-white">
+                  <span className="font-semibold text-black dark:text-white">
                     {item.balance || 0} {item.unit_of_measure || ''}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-300">{item.min_stock || 0}</td>
-                <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-300">{item.moq || 0}</td>
-                <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-300">
+                <td className="px-4 py-3 text-center text-black dark:text-gray-300">{item.min_stock || 0}</td>
+                <td className="px-4 py-3 text-center text-black dark:text-gray-300">{item.moq || 0}</td>
+                <td className="px-4 py-3 text-center text-black dark:text-gray-300">
                   {item.price_per_unit ? formatCurrency(item.price_per_unit) : '-'}
                 </td>
                 <td className="px-4 py-3 text-center">

@@ -239,7 +239,7 @@ function SupplierManagement() {
       </div>
 
       {/* Supplier Selection */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+      <div className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-6 shadow-lg border" : "bg-white border-gray-200 rounded-2xl p-6 shadow-lg border"}>
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Select Supplier</h3>
         <div className="flex gap-4 items-end">
           <div className="flex-1">
@@ -309,7 +309,7 @@ function SupplierManagement() {
       {selectedSupplier && !loading && (
         <>
           {/* Supplier Contact Info Card */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-6 shadow-lg border" : "bg-white border-gray-200 rounded-2xl p-6 shadow-lg border"}>
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               📇 Supplier Information
             </h3>
@@ -363,7 +363,7 @@ function SupplierManagement() {
               )}
             </div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-6 shadow-lg border" : "bg-white border-gray-200 rounded-2xl p-6 shadow-lg border"}>
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">Supplier Summary — {selectedSupplier?.name}</h3>
             </div>
@@ -402,7 +402,7 @@ function SupplierManagement() {
 
       {/* Instructions when no supplier selected */}
       {!selectedSupplier && !loading && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-12 shadow-lg border border-gray-200 dark:border-gray-700">
+        <div className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-12 shadow-lg border" : "bg-white border-gray-200 rounded-2xl p-12 shadow-lg border"}>
           <div className="text-center">
             <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
               <span className="text-3xl">👥</span>

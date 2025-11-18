@@ -652,7 +652,7 @@ function PurchaseOrderTracker() {
         {["draft", "requested", "approved", "ordered", "received", "cancelled"].map(status => {
           const count = purchaseOrders.filter(order => order.status === status).length
           return (
-            <div key={status} className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700 shadow-sm">
+            <div key={status} className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-lg p-4 border shadow-sm" : "bg-white border-slate-200 rounded-lg p-4 border shadow-sm"}>
               <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{count}</div>
               <div className="text-sm text-slate-600 dark:text-slate-400">{getStatusText(status)}</div>
             </div>
@@ -661,7 +661,7 @@ function PurchaseOrderTracker() {
       </div>
 
       {/* Orders Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+      <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-xl border overflow-hidden shadow-sm" : "bg-white border-slate-200 rounded-xl border overflow-hidden shadow-sm"}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-700">

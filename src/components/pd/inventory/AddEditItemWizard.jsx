@@ -145,7 +145,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className={`w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${className}`}
+        className={`w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-black dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${className}`}
       />
       {isOpen && filteredOptions.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
@@ -153,9 +153,9 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
             <div
               key={index}
               onClick={() => handleOptionSelect(option)}
-              className={`px-3 py-2 text-sm cursor-pointer text-gray-900 dark:text-white transition-colors ${
+              className={`px-3 py-2 text-sm cursor-pointer text-black dark:text-white transition-colors ${
                 option === '─────────' 
-                  ? 'cursor-default bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 select-none' 
+                  ? 'cursor-default bg-gray-100 dark:bg-gray-700 text-black dark:text-gray-500 select-none' 
                   : option === '+ Add New Supplier'
                   ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 font-medium'
                   : index === highlightedIndex 
@@ -167,7 +167,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
             </div>
           ))}
           {filteredOptions.length > 8 && (
-            <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 text-center border-t border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900">
+            <div className="px-3 py-2 text-xs text-black dark:text-gray-400 text-center border-t border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900">
               +{filteredOptions.length - 8} more options
             </div>
           )}
@@ -587,7 +587,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                           setErrors({})
                           setCurrentStep(step.number)
                         }}
-                        className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-semibold transition-all duration-200 ${currentStep >= step.number ? 'bg-white text-slate-800 shadow-md' : 'bg-white/10 text-white'}`}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-semibold transition-all duration-200 ${currentStep >= step.number ? 'bg-white text-black shadow-md' : 'bg-white/10 text-white'}`}
                         aria-current={currentStep === step.number}
                         aria-label={`Go to step ${step.number}: ${step.title}`}
                       >
@@ -607,8 +607,8 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
               <div className="space-y-6 max-w-3xl mx-auto">
                 <div className="text-center mb-6">
                   <div className="text-6xl mb-3">📦</div>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Basic Information</h3>
-                  <p className="text-gray-600 dark:text-gray-400 mt-2">
+                  <h3 className="text-2xl font-bold text-black dark:text-white">Basic Information</h3>
+                  <p className="text-black dark:text-gray-400 mt-2">
                     Let's start with the essential details about this item
                   </p>
                 </div>
@@ -616,14 +616,14 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                 <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 space-y-6">
                   {/* Item Name */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                       Item Name <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={wizardData.item_name}
                       onChange={(e) => setWizardData({ ...wizardData, item_name: e.target.value })}
-                      className={`w-full border ${errors.item_name ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
+                      className={`w-full border ${errors.item_name ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-black dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                       placeholder="Enter the item name"
                     />
                     {errors.item_name && (
@@ -634,7 +634,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                   {/* Brand & Type */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                         Brand
                       </label>
                       <Combobox
@@ -646,7 +646,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                         Item Type
                       </label>
                       <Combobox
@@ -660,7 +660,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
 
                   {/* Supplier - using Combobox for consistency */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Supplier</label>
+                    <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">Supplier</label>
                     <Combobox
                       value={wizardData.supplier_id === '__custom' ? (wizardData.custom_supplier || '') : (wizardData.supplier || '')}
                       onChange={(value) => {
@@ -686,7 +686,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                       placeholder="Select or type supplier"
                     />
                     {wizardData.supplier_id === '__custom' && (
-                      <p className="text-xs text-gray-500 mt-2">💡 Custom supplier will be saved with the item</p>
+                      <p className="text-xs text-black mt-2">💡 Custom supplier will be saved with the item</p>
                     )}
                   </div>
 
@@ -694,13 +694,13 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                   {wizardData.item_name && (
                     <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-700 rounded-xl p-4">
                       <div className="flex items-center gap-2 mb-2">
-                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-black dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
-                        <h4 className="font-semibold text-blue-900 dark:text-blue-200">Quick Preview</h4>
+                        <h4 className="font-semibold text-black dark:text-blue-200">Quick Preview</h4>
                       </div>
-                      <p className="text-blue-800 dark:text-blue-300 text-sm">
+                      <p className="text-black dark:text-blue-300 text-sm">
                         <strong>{wizardData.item_name}</strong>
                         {wizardData.brand && ` by ${wizardData.brand}`}
                         {wizardData.item_type && ` • ${wizardData.item_type}`}
@@ -717,8 +717,8 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
               <div className="space-y-6 max-w-3xl mx-auto">
                 <div className="text-center mb-6">
                   <div className="text-6xl mb-3">💰</div>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Stock & Pricing</h3>
-                  <p className="text-gray-600 dark:text-gray-400 mt-2">
+                  <h3 className="text-2xl font-bold text-black dark:text-white">Stock & Pricing</h3>
+                  <p className="text-black dark:text-gray-400 mt-2">
                     Set inventory levels and pricing information
                   </p>
                 </div>
@@ -728,7 +728,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {!selectedItem ? (
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                           Initial Balance <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -736,7 +736,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                           min="0"
                           value={wizardData.balance}
                           onChange={(e) => setWizardData({ ...wizardData, balance: parseInt(e.target.value) || 0 })}
-                          className={`w-full border ${errors.balance ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
+                          className={`w-full border ${errors.balance ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-black dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                           placeholder="Enter initial quantity"
                         />
                         {errors.balance && (
@@ -745,23 +745,23 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                       </div>
                     ) : (
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                           Current Balance (Read Only)
                         </label>
                         <input
                           type="text"
                           value={`${selectedItem.balance}`}
                           disabled
-                          className="w-full border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-600 dark:text-gray-400 cursor-not-allowed"
+                          className="w-full border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-black dark:text-gray-400 cursor-not-allowed"
                         />
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <p className="text-xs text-black dark:text-gray-400 mt-1">
                           Use "Stock Management" to modify inventory levels
                         </p>
                       </div>
                     )}
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                         ROP (Re-Order Point) <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -769,20 +769,20 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                         min="0"
                         value={wizardData.min_stock}
                         onChange={(e) => setWizardData({ ...wizardData, min_stock: parseInt(e.target.value) || 0 })}
-                        className={`w-full border ${errors.min_stock ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
+                        className={`w-full border ${errors.min_stock ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-black dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                         placeholder="Alert threshold"
                       />
                       {errors.min_stock && (
                         <p className="text-red-500 text-sm mt-1">{errors.min_stock}</p>
                       )}
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">System still stores this as <code>min_stock</code>.</p>
+                      <p className="text-xs text-black dark:text-gray-400 mt-1">System still stores this as <code>min_stock</code>.</p>
                     </div>
                   </div>
 
                   {/* MOQ Field */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                         MOQ (Minimum Order Quantity)
                       </label>
                       <input
@@ -790,17 +790,17 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                         min="0"
                         value={wizardData.moq}
                         onChange={(e) => setWizardData({ ...wizardData, moq: parseInt(e.target.value) || 0 })}
-                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-black dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                         placeholder="e.g., 10"
                       />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Optional. If set &gt; 0, purchase orders will enforce at least this quantity.</p>
+                      <p className="text-xs text-black dark:text-gray-400 mt-1">Optional. If set &gt; 0, purchase orders will enforce at least this quantity.</p>
                     </div>
                   </div>
 
                   {/* Unit of Measure & Price */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                         Unit of Measure
                       </label>
                       <Combobox
@@ -812,11 +812,11 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                         Price per Unit
                       </label>
                       <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-semibold">₱</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-black dark:text-gray-400 font-semibold">₱</span>
                         <input
                           type="number"
                           min="0"
@@ -826,7 +826,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                             const value = e.target.value === '' ? 0 : Number(e.target.value)
                             setWizardData({ ...wizardData, price_per_unit: value })
                           }}
-                          className={`w-full border ${errors.price_per_unit ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-lg pl-8 pr-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
+                          className={`w-full border ${errors.price_per_unit ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-800 rounded-lg pl-8 pr-3 py-2 text-sm text-black dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                           placeholder="0.00"
                         />
                       </div>
@@ -892,8 +892,8 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
               <div className="space-y-6 max-w-3xl mx-auto">
                 <div className="text-center mb-6">
                   <div className="text-6xl mb-3">📍</div>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Location & Media</h3>
-                  <p className="text-gray-600 dark:text-gray-400 mt-2">
+                  <h3 className="text-2xl font-bold text-black dark:text-white">Location & Media</h3>
+                  <p className="text-black dark:text-gray-400 mt-2">
                     Where is it stored and what does it look like?
                   </p>
                 </div>
@@ -901,7 +901,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                 <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 space-y-6">
                   {/* Location */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                       Storage Location
                     </label>
                     <Combobox
@@ -914,7 +914,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
 
                   {/* Status */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
                       Item Status
                     </label>
                     <div className="grid grid-cols-3 gap-3">
@@ -941,7 +941,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                               ? status.color === 'green' ? 'text-green-900 dark:text-green-200'
                               : status.color === 'yellow' ? 'text-yellow-900 dark:text-yellow-200'
                               : 'text-red-900 dark:text-red-200'
-                              : 'text-gray-700 dark:text-gray-300'
+                              : 'text-black dark:text-gray-300'
                           }`}>
                             {status.value}
                           </div>
@@ -960,7 +960,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
 
                   {/* Images Section */}
                   <div className="border-t-2 border-gray-200 dark:border-gray-700 pt-6">
-                    <h4 className="font-semibold text-lg text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <h4 className="font-semibold text-lg text-black dark:text-white mb-4 flex items-center gap-2">
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
@@ -980,17 +980,17 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                           />
                         ) : (
                           <div className="text-center p-4">
-                            <svg className="w-16 h-16 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-16 h-16 mx-auto text-black mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                            <span className="text-gray-500 dark:text-gray-400 text-sm">No Image</span>
+                            <span className="text-black dark:text-gray-400 text-sm">No Image</span>
                           </div>
                         )}
                       </div>
 
                       <div className="flex-1">
                         <label className="block mb-2">
-                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
+                          <span className="text-sm font-medium text-black dark:text-slate-300 mb-2 block">
                             Select or Drop Images
                           </span>
                           <div
@@ -1020,13 +1020,13 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             />
                             <div className="text-center">
-                              <svg className="w-8 h-8 mx-auto text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-8 h-8 mx-auto text-black mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                               </svg>
-                              <p className="text-sm text-slate-600 dark:text-slate-400">
+                              <p className="text-sm text-black dark:text-slate-400">
                                 Drop images here or click to select
                               </p>
-                              <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                              <p className="text-xs text-black dark:text-slate-500 mt-1">
                                 Supports JPG, PNG, GIF, WEBP, BMP (max 10MB each)
                               </p>
                             </div>
@@ -1036,7 +1036,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                         {/* Queued Images Preview */}
                         {uploadQueue.length > 0 && (
                           <div className="mt-4">
-                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            <p className="text-sm font-medium text-black dark:text-gray-300 mb-3">
                               Uploading ({uploadQueue.length})
                             </p>
                             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
@@ -1099,14 +1099,14 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                         {!selectedItem?.item_no && (
                           <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg">
                             <div className="flex items-start gap-2">
-                              <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                              <svg className="w-5 h-5 text-black dark:text-amber-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                               </svg>
                               <div>
-                                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                                <p className="text-sm font-semibold text-black dark:text-amber-300">
                                   ℹ️ New Item - Images Disabled
                                 </p>
-                                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                                <p className="text-xs text-black dark:text-amber-400 mt-1">
                                   Images will be uploaded automatically once the item is saved. Select images now and they will upload after creating the item.
                                 </p>
                               </div>
@@ -1119,7 +1119,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                     {/* Existing Images Gallery */}
                     {existingImages.length > 0 && (
                       <div className="mt-6">
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                        <p className="text-sm font-medium text-black dark:text-gray-300 mb-3">
                           Existing Images ({existingImages.length})
                         </p>
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
@@ -1150,8 +1150,8 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
               <div className="space-y-6">
                 <div className="text-center mb-6">
                   <div className="text-6xl mb-3">✓</div>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Review & Confirm</h3>
-                  <p className="text-gray-600 dark:text-gray-400 mt-2">
+                  <h3 className="text-2xl font-bold text-black dark:text-white">Review & Confirm</h3>
+                  <p className="text-black dark:text-gray-400 mt-2">
                     Please review all details before submitting
                   </p>
                 </div>
@@ -1163,9 +1163,9 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                       <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-2xl">
                         📦
                       </div>
-                      <h4 className="font-semibold text-gray-900 dark:text-white">Basic Info</h4>
+                      <h4 className="font-semibold text-black dark:text-white">Basic Info</h4>
                     </div>
-                    <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                    <div className="space-y-1 text-sm text-black dark:text-gray-300">
                       <p><strong>Name:</strong> {wizardData.item_name}</p>
                       {wizardData.brand && <p><strong>Brand:</strong> {wizardData.brand}</p>}
                       {wizardData.item_type && <p><strong>Type:</strong> {wizardData.item_type}</p>}
@@ -1179,14 +1179,14 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                       <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-2xl">
                         💰
                       </div>
-                      <h4 className="font-semibold text-gray-900 dark:text-white">Stock & Price</h4>
+                      <h4 className="font-semibold text-black dark:text-white">Stock & Price</h4>
                     </div>
-                    <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                    <div className="space-y-1 text-sm text-black dark:text-gray-300">
                       <p><strong>Balance:</strong> {wizardData.balance} {wizardData.unit_of_measure || 'units'}</p>
                       <p><strong>ROP:</strong> {wizardData.min_stock} {wizardData.unit_of_measure || 'units'}</p>
                       <p><strong>MOQ:</strong> {wizardData.moq} {wizardData.unit_of_measure || 'units'}</p>
                       <p><strong>Price:</strong> ₱{(Number(wizardData.price_per_unit) || 0).toFixed(2)}</p>
-                      <p className="font-semibold text-green-700 dark:text-green-400">
+                      <p className="font-semibold text-black dark:text-green-400">
                         <strong>Total Value:</strong> ₱{((wizardData.balance || 0) * (Number(wizardData.price_per_unit) || 0)).toFixed(2)}
                       </p>
                     </div>
@@ -1197,18 +1197,18 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                       <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-2xl">
                         📍
                       </div>
-                      <h4 className="font-semibold text-gray-900 dark:text-white">Location & Status</h4>
+                      <h4 className="font-semibold text-black dark:text-white">Location & Status</h4>
                     </div>
-                    <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                    <div className="space-y-1 text-sm text-black dark:text-gray-300">
                       <p><strong>Location:</strong> {wizardData.location || 'Not specified'}</p>
                       <p>
                         <strong>Status:</strong>{' '}
                         <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${
                           wizardData.item_status === 'In Stock'
-                            ? 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200'
+                            ? 'bg-green-200 dark:bg-green-800 text-black dark:text-green-200'
                             : wizardData.item_status === 'Low In Stock'
-                            ? 'bg-yellow-200 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-200'
-                            : 'bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200'
+                            ? 'bg-yellow-200 dark:bg-yellow-800 text-black dark:text-yellow-200'
+                            : 'bg-red-200 dark:bg-red-800 text-black dark:text-red-200'
                         }`}>
                           {wizardData.item_status}
                         </span>
@@ -1221,53 +1221,53 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                 {/* Full Details Table */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
                   <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
-                    <h4 className="font-bold text-lg text-gray-900 dark:text-white">Complete Item Details</h4>
+                    <h4 className="font-bold text-lg text-black dark:text-white">Complete Item Details</h4>
                   </div>
                   <div className="p-6 space-y-3 text-sm">
                     <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Item Name:</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{wizardData.item_name}</span>
+                        <span className="text-black dark:text-gray-400">Item Name:</span>
+                        <span className="font-semibold text-black dark:text-white">{wizardData.item_name}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Brand:</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{wizardData.brand || 'N/A'}</span>
+                        <span className="text-black dark:text-gray-400">Brand:</span>
+                        <span className="font-semibold text-black dark:text-white">{wizardData.brand || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Item Type:</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{wizardData.item_type || 'N/A'}</span>
+                        <span className="text-black dark:text-gray-400">Item Type:</span>
+                        <span className="font-semibold text-black dark:text-white">{wizardData.item_type || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Supplier:</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{wizardData.supplier_id === '__custom' ? (wizardData.custom_supplier || 'N/A') : (wizardData.supplier || 'N/A')}</span>
+                        <span className="text-black dark:text-gray-400">Supplier:</span>
+                        <span className="font-semibold text-black dark:text-white">{wizardData.supplier_id === '__custom' ? (wizardData.custom_supplier || 'N/A') : (wizardData.supplier || 'N/A')}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Balance:</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{wizardData.balance}</span>
+                        <span className="text-black dark:text-gray-400">Balance:</span>
+                        <span className="font-semibold text-black dark:text-white">{wizardData.balance}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">ROP:</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{wizardData.min_stock}</span>
+                        <span className="text-black dark:text-gray-400">ROP:</span>
+                        <span className="font-semibold text-black dark:text-white">{wizardData.min_stock}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">MOQ:</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{wizardData.moq}</span>
+                        <span className="text-black dark:text-gray-400">MOQ:</span>
+                        <span className="font-semibold text-black dark:text-white">{wizardData.moq}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Unit of Measure:</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{wizardData.unit_of_measure || 'N/A'}</span>
+                        <span className="text-black dark:text-gray-400">Unit of Measure:</span>
+                        <span className="font-semibold text-black dark:text-white">{wizardData.unit_of_measure || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Price per Unit:</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">₱{(Number(wizardData.price_per_unit) || 0).toFixed(2)}</span>
+                        <span className="text-black dark:text-gray-400">Price per Unit:</span>
+                        <span className="font-semibold text-black dark:text-white">₱{(Number(wizardData.price_per_unit) || 0).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Location:</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{wizardData.location || 'N/A'}</span>
+                        <span className="text-black dark:text-gray-400">Location:</span>
+                        <span className="font-semibold text-black dark:text-white">{wizardData.location || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Status:</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">{wizardData.item_status}</span>
+                        <span className="text-black dark:text-gray-400">Status:</span>
+                        <span className="font-semibold text-black dark:text-white">{wizardData.item_status}</span>
                       </div>
                     </div>
                   </div>
@@ -1276,7 +1276,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                 {/* Images Preview */}
                 {existingImages.length > 0 && (
                   <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Attached Images ({existingImages.length})</h4>
+                    <h4 className="font-semibold text-black dark:text-white mb-3">Attached Images ({existingImages.length})</h4>
                     <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
                       {existingImages.map((img) => (
                         <img key={img.filename} src={img.url} alt={img.filename} className="w-full h-20 object-cover rounded-lg border border-gray-300 dark:border-gray-600" />
@@ -1295,13 +1295,13 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                 if (currentStep > 1) handlePrevious()
                 else handleClose()
               }}
-              className="px-6 py-2.5 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors font-medium"
+              className="px-6 py-2.5 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 text-black dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors font-medium"
             >
               {currentStep === 1 ? 'Cancel' : 'Previous'}
             </button>
 
             <div className="flex items-center gap-2">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-black dark:text-gray-400">
                 Step {currentStep} of {steps.length}
               </div>
             </div>

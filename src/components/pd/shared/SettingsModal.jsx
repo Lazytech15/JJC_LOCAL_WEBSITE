@@ -114,19 +114,19 @@ export default function SettingsModal({ isOpen, onClose, user }) {
         }`}>
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg ${isDarkMode ? "bg-slate-800" : "bg-slate-100"}`}>
-              <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
-            <h2 className={`text-xl font-bold ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+            <h2 className={`text-xl font-bold ${isDarkMode ? "text-white" : "text-black"}`}>
               Settings
             </h2>
           </div>
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${
-              isDarkMode ? "hover:bg-slate-800 text-slate-400" : "hover:bg-slate-100 text-slate-600"
+              isDarkMode ? "hover:bg-slate-800 text-black" : "hover:bg-slate-100 text-black"
             }`}
           >
             <X className="w-5 h-5" />
@@ -171,7 +171,7 @@ export default function SettingsModal({ isOpen, onClose, user }) {
           {activeTab === "appearance" && (
             <div className="space-y-6">
               <div>
-                <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+                <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-white" : "text-black"}`}>
                   Theme Preferences
                 </h3>
                 <div className={`p-4 rounded-lg border ${
@@ -181,16 +181,16 @@ export default function SettingsModal({ isOpen, onClose, user }) {
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${isDarkMode ? "bg-slate-700" : "bg-white"}`}>
                         {isDarkMode ? (
-                          <Moon className="w-5 h-5 text-blue-400" />
+                          <Moon className="w-5 h-5 text-black" />
                         ) : (
-                          <Sun className="w-5 h-5 text-amber-500" />
+                          <Sun className="w-5 h-5 text-black" />
                         )}
                       </div>
                       <div>
-                        <p className={`font-medium ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+                        <p className={`font-medium ${isDarkMode ? "text-white" : "text-black"}`}>
                           {isDarkMode ? "Dark Mode" : "Light Mode"}
                         </p>
-                        <p className={`text-sm ${isDarkMode ? "text-slate-400" : "text-slate-600"}`}>
+                        <p className={`text-sm ${isDarkMode ? "text-slate-400" : "text-black"}`}>
                           {isDarkMode ? "Currently using dark theme" : "Currently using light theme"}
                         </p>
                       </div>
@@ -217,15 +217,15 @@ export default function SettingsModal({ isOpen, onClose, user }) {
           {activeTab === "security" && (
             <div className="space-y-6">
               <div>
-                <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+                <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-white" : "text-black"}`}>
                   Change Password
                 </h3>
 
                 {passwordError && (
                   <div className={`mb-4 p-4 rounded-lg border ${
                     isDarkMode 
-                      ? "bg-red-900/20 border-red-800 text-red-400" 
-                      : "bg-red-50 border-red-200 text-red-700"
+                      ? "bg-red-900/20 border-red-800 text-black" 
+                      : "bg-red-50 border-red-200 text-black"
                   }`}>
                     <p className="text-sm">{passwordError}</p>
                   </div>
@@ -234,8 +234,8 @@ export default function SettingsModal({ isOpen, onClose, user }) {
                 {passwordSuccess && (
                   <div className={`mb-4 p-4 rounded-lg border ${
                     isDarkMode 
-                      ? "bg-green-900/20 border-green-800 text-green-400" 
-                      : "bg-green-50 border-green-200 text-green-700"
+                      ? "bg-green-900/20 border-green-800 text-black" 
+                      : "bg-green-50 border-green-200 text-black"
                   }`}>
                     <p className="text-sm">{passwordSuccess}</p>
                   </div>
@@ -244,7 +244,7 @@ export default function SettingsModal({ isOpen, onClose, user }) {
                 <div className="space-y-4">
                   <div>
                     <label className={`block text-sm font-medium mb-2 ${
-                      isDarkMode ? "text-slate-300" : "text-slate-700"
+                      isDarkMode ? "text-slate-300" : "text-black"
                     }`}>
                       Current Password
                     </label>
@@ -257,14 +257,14 @@ export default function SettingsModal({ isOpen, onClose, user }) {
                         className={`w-full px-4 py-3 pr-10 rounded-lg border transition-colors ${
                           isDarkMode 
                             ? "bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-amber-500" 
-                            : "bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-amber-500"
+                            : "bg-white border-slate-300 text-black placeholder-slate-400 focus:border-amber-500"
                         } focus:outline-none focus:ring-2 focus:ring-amber-500/20`}
                       />
                       <button
                         type="button"
                         onClick={() => togglePasswordVisibility('current')}
                         className={`absolute right-3 top-1/2 -translate-y-1/2 ${
-                          isDarkMode ? "text-slate-400 hover:text-slate-300" : "text-slate-500 hover:text-slate-700"
+                          isDarkMode ? "text-slate-400 hover:text-slate-300" : "text-slate-500 hover:text-black"
                         }`}
                       >
                         {showPasswords.current ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -274,7 +274,7 @@ export default function SettingsModal({ isOpen, onClose, user }) {
 
                   <div>
                     <label className={`block text-sm font-medium mb-2 ${
-                      isDarkMode ? "text-slate-300" : "text-slate-700"
+                      isDarkMode ? "text-slate-300" : "text-black"
                     }`}>
                       New Password
                     </label>
@@ -287,14 +287,14 @@ export default function SettingsModal({ isOpen, onClose, user }) {
                         className={`w-full px-4 py-3 pr-10 rounded-lg border transition-colors ${
                           isDarkMode 
                             ? "bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-amber-500" 
-                            : "bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-amber-500"
+                            : "bg-white border-slate-300 text-black placeholder-slate-400 focus:border-amber-500"
                         } focus:outline-none focus:ring-2 focus:ring-amber-500/20`}
                       />
                       <button
                         type="button"
                         onClick={() => togglePasswordVisibility('new')}
                         className={`absolute right-3 top-1/2 -translate-y-1/2 ${
-                          isDarkMode ? "text-slate-400 hover:text-slate-300" : "text-slate-500 hover:text-slate-700"
+                          isDarkMode ? "text-slate-400 hover:text-slate-300" : "text-slate-500 hover:text-black"
                         }`}
                       >
                         {showPasswords.new ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -304,7 +304,7 @@ export default function SettingsModal({ isOpen, onClose, user }) {
 
                   <div>
                     <label className={`block text-sm font-medium mb-2 ${
-                      isDarkMode ? "text-slate-300" : "text-slate-700"
+                      isDarkMode ? "text-slate-300" : "text-black"
                     }`}>
                       Confirm New Password
                     </label>
@@ -317,14 +317,14 @@ export default function SettingsModal({ isOpen, onClose, user }) {
                         className={`w-full px-4 py-3 pr-10 rounded-lg border transition-colors ${
                           isDarkMode 
                             ? "bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-amber-500" 
-                            : "bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-amber-500"
+                            : "bg-white border-slate-300 text-black placeholder-slate-400 focus:border-amber-500"
                         } focus:outline-none focus:ring-2 focus:ring-amber-500/20`}
                       />
                       <button
                         type="button"
                         onClick={() => togglePasswordVisibility('confirm')}
                         className={`absolute right-3 top-1/2 -translate-y-1/2 ${
-                          isDarkMode ? "text-slate-400 hover:text-slate-300" : "text-slate-500 hover:text-slate-700"
+                          isDarkMode ? "text-slate-400 hover:text-slate-300" : "text-slate-500 hover:text-black"
                         }`}
                       >
                         {showPasswords.confirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}

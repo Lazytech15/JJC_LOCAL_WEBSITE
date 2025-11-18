@@ -205,10 +205,10 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 w-full max-w-md">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Generate Barcode</h3>
+          <h3 className="text-xl font-bold text-black dark:text-white">Generate Barcode</h3>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+            className="text-black hover:text-black dark:text-black dark:hover:text-gray-200 transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -219,13 +219,13 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
         <div className="text-center space-y-4">
           {/* Item Information */}
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-            <h4 className="font-semibold text-gray-900 dark:text-white mb-2">{item?.item_name}</h4>
-            <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+            <h4 className="font-semibold text-black dark:text-white mb-2">{item?.item_name}</h4>
+            <div className="text-sm text-black dark:text-gray-400 space-y-1">
               <div>Brand: {item?.brand || 'N/A'}</div>
               <div>Type: {item?.item_type || 'N/A'}</div>
               <div>Location: {item?.location || 'N/A'}</div>
               <div>Item #: {item?.item_no}</div>
-              <div className="font-bold text-blue-600 dark:text-blue-400">
+              <div className="font-bold text-black dark:text-blue-400">
                 Barcode ID: {item ? generateBarcodeId(item.item_no) : 'N/A'}
               </div>
             </div>
@@ -233,24 +233,24 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
 
           {/* Barcode Format Selection */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Barcode Format:</label>
+            <label className="text-sm font-medium text-black dark:text-gray-300">Barcode Format:</label>
             <div className="flex gap-2 justify-center flex-wrap">
               <button
                 onClick={() => generateTestBarcode('code128')}
-                className="px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-md transition-colors"
+                className="px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-black rounded-md transition-colors"
               >
                 Code 128
               </button>
               <button
                 onClick={() => generateTestBarcode('code39')}
-                className="px-3 py-1 text-xs bg-green-100 hover:bg-green-200 text-green-800 rounded-md transition-colors"
+                className="px-3 py-1 text-xs bg-green-100 hover:bg-green-200 text-black rounded-md transition-colors"
               >
                 Code 39
               </button>
               {item?.item_no?.toString().length === 12 && (
                 <button
                   onClick={() => generateTestBarcode('ean13')}
-                  className="px-3 py-1 text-xs bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-md transition-colors"
+                  className="px-3 py-1 text-xs bg-purple-100 hover:bg-purple-200 text-black rounded-md transition-colors"
                 >
                   EAN-13
                 </button>
@@ -258,7 +258,7 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
               {item?.item_no?.toString().length === 11 && (
                 <button
                   onClick={() => generateTestBarcode('upca')}
-                  className="px-3 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-md transition-colors"
+                  className="px-3 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-black rounded-md transition-colors"
                 >
                   UPC-A
                 </button>
@@ -275,7 +275,7 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
             />
           </div>
 
-          <div className="text-xs text-gray-500 dark:text-gray-400">
+          <div className="text-xs text-black dark:text-gray-400">
             High-quality CODE-128 barcode in ITM format - Compatible with all standard scanners
           </div>
         </div>
@@ -296,7 +296,7 @@ function BarcodeGenerator({ item, isOpen, onClose }) {
           </button>
           <button
             onClick={onClose}
-            className="px-4 py-2 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
+            className="px-4 py-2 border-2 border-gray-300 dark:border-gray-600 text-black dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
           >
             Close
           </button>

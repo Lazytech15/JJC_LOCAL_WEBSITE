@@ -316,11 +316,11 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
                       ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-lg scale-110'
                       : step > s.num
                         ? 'bg-green-500 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                        : 'bg-slate-200 dark:bg-slate-700 text-black dark:text-slate-400'
                   }`}>
                     {step > s.num ? '✓' : s.num}
                   </div>
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{s.label}</span>
+                  <span className="text-xs font-semibold text-black dark:text-slate-300">{s.label}</span>
                 </div>
               </React.Fragment>
             ))}
@@ -332,44 +332,44 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
           {step === 1 && (
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-bold text-slate-900 dark:text-white mb-2">
+                <label className="block text-sm font-bold text-black dark:text-white mb-2">
                   Report Title
                 </label>
                 <input
                   type="text"
                   value={reportConfig.title}
                   onChange={(e) => updateConfig('title', e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-black dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 dark:text-white mb-2">
+                  <label className="block text-sm font-bold text-black dark:text-white mb-2">
                     Date From
                   </label>
                   <input
                     type="date"
                     value={reportConfig.dateFrom}
                     onChange={(e) => updateConfig('dateFrom', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                    className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-black dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-900 dark:text-white mb-2">
+                  <label className="block text-sm font-bold text-black dark:text-white mb-2">
                     Date To
                   </label>
                   <input
                     type="date"
                     value={reportConfig.dateTo}
                     onChange={(e) => updateConfig('dateTo', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                    className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-black dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-900 dark:text-white mb-3">
+                <label className="block text-sm font-bold text-black dark:text-white mb-3">
                   Include in Report
                 </label>
                 <div className="space-y-2">
@@ -383,22 +383,22 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
                         type="checkbox"
                         checked={reportConfig[option.key]}
                         onChange={(e) => updateConfig(option.key, e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-purple-600 focus:ring-purple-500"
+                        className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-black focus:ring-purple-500"
                       />
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{option.label}</span>
+                      <span className="text-sm font-medium text-black dark:text-slate-300">{option.label}</span>
                     </label>
                   ))}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-900 dark:text-white mb-2">
+                <label className="block text-sm font-bold text-black dark:text-white mb-2">
                   Export Format
                 </label>
                 <select
                   value={reportConfig.format}
                   onChange={(e) => updateConfig('format', e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-black dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                 >
                   <option value="pdf">PDF Document</option>
                   <option value="csv">CSV Spreadsheet</option>
@@ -406,13 +406,13 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-900 dark:text-white mb-2">
+                <label className="block text-sm font-bold text-black dark:text-white mb-2">
                   Schedule (Optional)
                 </label>
                 <select
                   value={reportConfig.schedule}
                   onChange={(e) => updateConfig('schedule', e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-black dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                 >
                   <option value="none">One-time Report</option>
                   <option value="daily">Daily</option>
@@ -422,7 +422,7 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-900 dark:text-white mb-2">
+                <label className="block text-sm font-bold text-black dark:text-white mb-2">
                   Email To (Optional)
                 </label>
                 <input
@@ -430,9 +430,9 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
                   value={reportConfig.emailTo}
                   onChange={(e) => updateConfig('emailTo', e.target.value)}
                   placeholder="email@example.com, user2@example.com"
-                  className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 text-black dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                 />
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-xs text-black dark:text-slate-400 mt-1">
                   Separate multiple emails with commas. Leave empty to only download.
                 </p>
               </div>
@@ -442,8 +442,8 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
           {step === 2 && (
             <div className="space-y-4">
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
-                <h4 className="font-bold text-blue-900 dark:text-blue-100 mb-2">Report Preview</h4>
-                <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                <h4 className="font-bold text-black dark:text-blue-100 mb-2">Report Preview</h4>
+                <div className="text-sm text-black dark:text-blue-300 space-y-1">
                   <p><strong>Title:</strong> {reportConfig.title}</p>
                   <p><strong>Period:</strong> {reportConfig.dateFrom && reportConfig.dateTo ? `${reportConfig.dateFrom} to ${reportConfig.dateTo}` : 'All Time'}</p>
                   <p><strong>Format:</strong> {reportConfig.format.toUpperCase()}</p>
@@ -453,17 +453,17 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
 
               {logs.length > 0 ? (
                 <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
-                  <div className="bg-slate-50 dark:bg-slate-800/50 px-4 py-2 font-semibold text-sm text-slate-700 dark:text-slate-300">
+                  <div className="bg-slate-50 dark:bg-slate-800/50 px-4 py-2 font-semibold text-sm text-black dark:text-slate-300">
                     Sample Data (First 5 records)
                   </div>
                   <div className="divide-y divide-slate-200 dark:divide-slate-700">
                     {logs.slice(0, 5).map((log, idx) => (
                       <div key={idx} className="px-4 py-3 text-sm">
                         <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-900 dark:text-white">{log.username || 'N/A'}</span>
-                          <span className="text-xs text-slate-500 dark:text-slate-400">{log.log_date} {log.log_time}</span>
+                          <span className="font-semibold text-black dark:text-white">{log.username || 'N/A'}</span>
+                          <span className="text-xs text-black dark:text-slate-400">{log.log_date} {log.log_time}</span>
                         </div>
-                        <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-1">
+                        <div className="text-xs text-black dark:text-slate-400 mt-1 line-clamp-1">
                           {log.details || log.purpose || 'No details'}
                         </div>
                       </div>
@@ -471,7 +471,7 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                <div className="text-center py-8 text-black dark:text-slate-400">
                   No data available for the selected period
                 </div>
               )}
@@ -481,12 +481,12 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
           {step === 3 && (
             <div className="text-center py-8">
               <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-10 h-10 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-10 h-10 text-black dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h4 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Ready to Generate!</h4>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
+              <h4 className="text-xl font-bold text-black dark:text-white mb-2">Ready to Generate!</h4>
+              <p className="text-sm text-black dark:text-slate-400">
                 Click "Generate Report" to create and download your report.
               </p>
             </div>
@@ -499,14 +499,14 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
             {step > 1 && (
               <button 
                 onClick={() => setStep(step - 1)}
-                className="px-6 py-3 bg-white dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-all font-semibold shadow-md hover:shadow-lg"
+                className="px-6 py-3 bg-white dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 text-black dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-all font-semibold shadow-md hover:shadow-lg"
               >
                 Back
               </button>
             )}
             <button 
               onClick={onClose}
-              className="px-6 py-3 bg-white dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-all font-semibold shadow-md hover:shadow-lg"
+              className="px-6 py-3 bg-white dark:bg-slate-700 border-2 border-slate-300 dark:border-slate-600 text-black dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-all font-semibold shadow-md hover:shadow-lg"
             >
               Cancel
             </button>

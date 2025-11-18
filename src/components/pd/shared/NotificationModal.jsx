@@ -35,12 +35,12 @@ export default function NotificationModal({ notification, isOpen, onClose, onMar
               <h2 className="text-lg sm:text-xl font-bold text-white break-words">
                 {notification.title}
               </h2>
-              <p className="text-slate-400 text-sm mt-1">{notification.time}</p>
+              <p className="text-black text-sm mt-1">{notification.time}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg transition-colors hover:bg-slate-800 text-slate-400 shrink-0 ml-2"
+            className="p-2 rounded-lg transition-colors hover:bg-slate-800 text-black shrink-0 ml-2"
           >
             <X className="w-5 h-5" />
           </button>
@@ -59,7 +59,7 @@ export default function NotificationModal({ notification, isOpen, onClose, onMar
         <div className="flex justify-end gap-3 p-6 border-t border-slate-700 bg-slate-900/50">
           <button
             onClick={handleDismiss}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-red-600/50 text-red-400 hover:bg-red-600/10 hover:border-red-600 transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-red-600/50 text-black hover:bg-red-600/10 hover:border-red-600 transition-colors"
           >
             <Trash2 className="w-4 h-4" />
             Dismiss
