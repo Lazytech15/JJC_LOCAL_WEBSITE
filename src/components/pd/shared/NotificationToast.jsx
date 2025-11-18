@@ -53,8 +53,8 @@ export const NotificationToast = ({ notification, onClose, duration = 5000 }) =>
         {/* Header */}
         <div className={`px-4 py-3 flex items-center justify-between ${
           critical 
-            ? 'bg-linear-to-r from-red-500 to-rose-600' 
-            : 'bg-linear-to-r from-blue-500 to-indigo-600'
+            ? 'bg-gradient-to-r from-red-500 to-rose-600' 
+            : 'bg-gradient-to-r from-blue-500 to-indigo-600'
         }`}>
           <div className="flex items-center gap-2">
             <span className="text-2xl">
@@ -85,7 +85,7 @@ export const NotificationToast = ({ notification, onClose, duration = 5000 }) =>
         {/* Content */}
         <div className="p-4">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-linear-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center shrink-0">
               <span className="text-xl">👤</span>
             </div>
             <div className="flex-1 min-w-0">
@@ -111,8 +111,8 @@ export const NotificationToast = ({ notification, onClose, duration = 5000 }) =>
           <div 
             className={`h-full ${
               critical 
-                ? 'bg-linear-to-r from-red-500 to-rose-600' 
-                : 'bg-linear-to-r from-blue-500 to-indigo-600'
+                ? 'bg-gradient-to-r from-red-500 to-rose-600' 
+                : 'bg-gradient-to-r from-blue-500 to-indigo-600'
             }`}
             style={{
               animation: `shrink ${duration}ms linear forwards`
@@ -142,7 +142,7 @@ export const NotificationBadge = ({ count, onClick }) => {
   return (
     <button
       onClick={onClick}
-      className="relative w-10 h-10 bg-linear-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center"
+      className="relative w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center"
       title={`${count} unread notification${count > 1 ? 's' : ''}`}
     >
       <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,7 +169,7 @@ export const NotificationPanel = ({ notifications, onClose, onMarkAsRead, onMark
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-linear-to-r from-blue-500 to-indigo-600 p-6 flex items-center justify-between rounded-t-3xl">
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 flex items-center justify-between rounded-t-3xl">
           <div>
             <h3 className="text-white font-bold text-xl">Notifications</h3>
             <p className="text-blue-100 text-sm mt-0.5">
@@ -276,3 +276,4 @@ export const NotificationPanel = ({ notifications, onClose, onMarkAsRead, onMark
     document.body
   )
 }
+

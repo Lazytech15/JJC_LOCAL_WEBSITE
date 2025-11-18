@@ -569,9 +569,9 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
     return (
       <ModalPortal>
   <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-1000">
-          <div className="bg-linear-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl w-full max-w-5xl mx-2 sm:mx-4 max-h-[95vh] overflow-hidden flex flex-col border border-slate-200 dark:border-slate-700 sm:border-2">
+          <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl w-full max-w-5xl mx-2 sm:mx-4 max-h-[95vh] overflow-hidden flex flex-col border border-slate-200 dark:border-slate-700 sm:border-2">
             {/* Enhanced Header with Industrial Theme */}
-            <div className="bg-linear-to-r from-slate-800 via-zinc-800 to-slate-800 dark:from-slate-900 dark:via-zinc-900 dark:to-slate-900 p-4 sm:p-6 text-white relative overflow-hidden">
+            <div className="bg-gradient-to-r from-slate-800 via-zinc-800 to-slate-800 dark:from-slate-900 dark:via-zinc-900 dark:to-slate-900 p-4 sm:p-6 text-white relative overflow-hidden">
               {/* Clickable step breadcrumbs */}
               <div className="max-w-3xl mx-auto mb-4">
                 <div className="flex items-center gap-3">
@@ -613,7 +613,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                   </p>
                 </div>
 
-                <div className="bg-linear-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 space-y-6">
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 space-y-6">
                   {/* Item Name */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -723,7 +723,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                   </p>
                 </div>
 
-                <div className="bg-linear-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 space-y-6">
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 space-y-6">
                   {/* Balance, ROP & MOQ */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {!selectedItem ? (
@@ -898,7 +898,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                   </p>
                 </div>
 
-                <div className="bg-linear-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 space-y-6">
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 space-y-6">
                   {/* Location */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -1158,7 +1158,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
 
                 {/* Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-linear-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-xl p-5 border border-blue-200 dark:border-blue-700">
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-xl p-5 border border-blue-200 dark:border-blue-700">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-2xl">
                         📦
@@ -1174,7 +1174,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                     </div>
                   </div>
 
-                  <div className="bg-linear-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 rounded-xl p-5 border border-green-200 dark:border-green-700">
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 rounded-xl p-5 border border-green-200 dark:border-green-700">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-2xl">
                         💰
@@ -1192,7 +1192,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                     </div>
                   </div>
 
-                  <div className="bg-linear-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 rounded-xl p-5 border border-purple-200 dark:border-purple-700">
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 rounded-xl p-5 border border-purple-200 dark:border-purple-700">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-2xl">
                         📍
@@ -1220,7 +1220,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
 
                 {/* Full Details Table */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                  <div className="bg-linear-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
                     <h4 className="font-bold text-lg text-gray-900 dark:text-white">Complete Item Details</h4>
                   </div>
                   <div className="p-6 space-y-3 text-sm">
@@ -1315,7 +1315,7 @@ function Combobox({ value, onChange, options, placeholder, className = "" }) {
                 (currentStep === 1 && !canProceedFromStep1) ||
                 (currentStep === 2 && !canProceedFromStep2)
               }
-              className="px-8 py-2.5 bg-linear-to-r from-zinc-600 to-gray-700 hover:from-zinc-700 hover:to-gray-800 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg transition-all font-semibold shadow-lg disabled:shadow-none disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-8 py-2.5 bg-gradient-to-r from-zinc-600 to-gray-700 hover:from-zinc-700 hover:to-gray-800 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg transition-all font-semibold shadow-lg disabled:shadow-none disabled:cursor-not-allowed flex items-center gap-2"
             >
               {currentStep === 4 ? (
                 <>

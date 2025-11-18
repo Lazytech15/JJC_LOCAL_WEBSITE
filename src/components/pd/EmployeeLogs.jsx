@@ -467,7 +467,7 @@ function EmployeeLogs() {
 
           <div className="grid gap-3">
             {items.map((it) => (
-              <div key={it.item_no || Math.random()} className="bg-linear-to-r from-slate-50 to-purple-50 dark:from-slate-900/50 dark:to-purple-900/20 rounded-xl p-4 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow">
+              <div key={it.item_no || Math.random()} className="bg-gradient-to-r from-slate-50 to-purple-50 dark:from-slate-900/50 dark:to-purple-900/20 rounded-xl p-4 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
@@ -833,14 +833,14 @@ function EmployeeLogs() {
   // This render is included by returning the component from the main function's JSX
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 p-4">
       <div className="max-w-7xl mx-auto space-y-4">
         
         {/* Header Section */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 p-6">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-linear-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
@@ -855,7 +855,7 @@ function EmployeeLogs() {
               <button 
                 onClick={fetchEmployeeLogs} 
                 disabled={loading}
-                className="px-4 py-2.5 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -864,13 +864,13 @@ function EmployeeLogs() {
               </button>
               <button 
                 onClick={() => exportLogs('csv')} 
-                className="px-4 py-2.5 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg font-medium"
+                className="px-4 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg font-medium"
               >
                 Export CSV
               </button>
               <button 
                 onClick={() => setState(prev => ({ ...prev, showReportBuilder: true }))}
-                className="px-4 py-2.5 bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium"
+                className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -904,7 +904,7 @@ function EmployeeLogs() {
               onClick={toggleFilters}
               className={`px-5 py-3 rounded-xl transition-all font-semibold flex items-center gap-2 ${
                 showFilters 
-                  ? 'bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-lg' 
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' 
                   : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
               }`}
             >
@@ -922,7 +922,7 @@ function EmployeeLogs() {
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="px-5 py-3 bg-linear-to-r from-red-100 to-rose-100 dark:from-red-900/30 dark:to-rose-900/30 text-red-700 dark:text-red-300 rounded-xl hover:from-red-200 hover:to-rose-200 dark:hover:from-red-900/50 dark:hover:to-rose-900/50 transition-all font-semibold flex items-center gap-2"
+                className="px-5 py-3 bg-gradient-to-r from-red-100 to-rose-100 dark:from-red-900/30 dark:to-rose-900/30 text-red-700 dark:text-red-300 rounded-xl hover:from-red-200 hover:to-rose-200 dark:hover:from-red-900/50 dark:hover:to-rose-900/50 transition-all font-semibold flex items-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -996,7 +996,7 @@ function EmployeeLogs() {
 
         {/* Error Display */}
         {error && (
-          <div className="bg-linear-to-r from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border-l-4 border-red-500 rounded-2xl p-4 shadow-lg">
+          <div className="bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border-l-4 border-red-500 rounded-2xl p-4 shadow-lg">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center shrink-0">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1013,10 +1013,10 @@ function EmployeeLogs() {
 
         {/* Bulk Actions Bar */}
         {selectedLogs.length > 0 && (
-          <div className="bg-linear-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-purple-900/20 border-l-4 border-blue-600 rounded-2xl p-4 shadow-lg">
+          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-purple-900/20 border-l-4 border-blue-600 rounded-2xl p-4 shadow-lg">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-linear-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
                   <span className="text-white font-bold text-lg">{selectedLogs.length}</span>
                 </div>
                 <div>
@@ -1025,10 +1025,10 @@ function EmployeeLogs() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => handleBulkAction('markReviewed')} className="px-4 py-2 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">✓ Mark Reviewed</button>
-                <button onClick={() => handleBulkAction('archive')} className="px-4 py-2 bg-linear-to-r from-yellow-600 to-amber-600 hover:from-yellow-700 hover:to-amber-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">📦 Archive</button>
-                <button onClick={() => handleBulkAction('export')} className="px-4 py-2 bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">📤 Export</button>
-                <button onClick={() => handleBulkAction('delete')} className="px-4 py-2 bg-linear-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">🗑️ Delete</button>
+                <button onClick={() => handleBulkAction('markReviewed')} className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">✓ Mark Reviewed</button>
+                <button onClick={() => handleBulkAction('archive')} className="px-4 py-2 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-700 hover:to-amber-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">📦 Archive</button>
+                <button onClick={() => handleBulkAction('export')} className="px-4 py-2 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">📤 Export</button>
+                <button onClick={() => handleBulkAction('delete')} className="px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">🗑️ Delete</button>
               </div>
             </div>
           </div>
@@ -1038,7 +1038,7 @@ function EmployeeLogs() {
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-linear-to-r from-slate-100 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border-b-2 border-slate-200 dark:border-slate-700">
+              <thead className="bg-gradient-to-r from-slate-100 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border-b-2 border-slate-200 dark:border-slate-700">
                 <tr>
                   <th className="px-4 py-4 text-left w-12">
                     <input
@@ -1059,7 +1059,7 @@ function EmployeeLogs() {
                   <tr>
                     <td colSpan="5" className="px-6 py-16 text-center">
                       <div className="flex flex-col items-center gap-4">
-                        <div className="w-20 h-20 bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-full flex items-center justify-center shadow-lg">
+                        <div className="w-20 h-20 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-full flex items-center justify-center shadow-lg">
                           <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
@@ -1094,7 +1094,7 @@ function EmployeeLogs() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center text-white font-bold shadow-md bg-linear-to-br from-blue-500 to-indigo-500">
+                          <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center text-white font-bold shadow-md bg-gradient-to-br from-blue-500 to-indigo-500">
                             {state.logProfileMap && state.logProfileMap[log.id] ? (
                               <img src={state.logProfileMap[log.id]} alt={log.username || 'profile'} className="w-full h-full object-cover" />
                             ) : (
@@ -1137,7 +1137,7 @@ function EmployeeLogs() {
             <div className="p-4 text-center border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
               <button
                 onClick={() => setState(prev => ({ ...prev, visibleCount: Math.min(prev.visibleCount + 20, logs.length) }))}
-                className="px-6 py-3 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg font-semibold"
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg font-semibold"
               >
                 Load More ({Math.min(20, logs.length - visibleCount)} more)
               </button>
@@ -1166,7 +1166,7 @@ function EmployeeLogs() {
                     disabled={loading}
                     className={`w-12 h-12 rounded-xl transition-all font-bold shadow-md text-sm ${
                       currentPage === pageNum
-                        ? "bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-110"
+                        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-110"
                         : "bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
@@ -1194,7 +1194,7 @@ function EmployeeLogs() {
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-9999 p-4 animate-fadeIn">
             <div className="bg-white dark:bg-slate-900 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl max-w-5xl w-full mx-2 sm:mx-4 max-h-[90vh] overflow-hidden border border-slate-200 dark:border-slate-700 sm:border-2 animate-scaleIn">
               {/* Modal Header */}
-              <div className="bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 p-6">
+              <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-2xl flex items-center justify-center shadow-lg">
@@ -1229,9 +1229,9 @@ function EmployeeLogs() {
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Employee Card */}
                     <div className="col-span-1">
-                      <div className="bg-linear-to-br from-slate-50 to-blue-50 dark:from-slate-800 dark:to-slate-700 rounded-2xl p-6 border-2 border-slate-200 dark:border-slate-600 shadow-lg">
+                      <div className="bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-800 dark:to-slate-700 rounded-2xl p-6 border-2 border-slate-200 dark:border-slate-600 shadow-lg">
                         <div className="flex flex-col items-center text-center">
-                          <div className="w-28 h-28 rounded-full bg-linear-to-br from-blue-500 to-indigo-500 overflow-hidden shadow-xl ring-4 ring-white dark:ring-slate-800">
+                          <div className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 overflow-hidden shadow-xl ring-4 ring-white dark:ring-slate-800">
                             {employeeDetails && employeeDetails.profilePicture ? (
                               <img src={employeeDetails.profilePicture} alt={employeeDetails.fullName} className="w-full h-full object-cover" />
                             ) : (
@@ -1355,7 +1355,7 @@ function EmployeeLogs() {
               <div className="bg-slate-50 dark:bg-slate-800 p-6 flex justify-end gap-3 border-t-2 border-slate-200 dark:border-slate-700">
                 <button 
                   onClick={closeDetailedView} 
-                  className="px-6 py-3 bg-linear-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg"
+                  className="px-6 py-3 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg"
                 >
                   Close
                 </button>
@@ -1534,10 +1534,10 @@ function AuditViewer({ logId }) {
         return (
           <div key={audit.id} className="bg-white dark:bg-slate-800 rounded-xl border-2 border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition-shadow">
             {/* Audit Header */}
-            <div className="bg-linear-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-4 border-b border-slate-200 dark:border-slate-700">
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-4 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3 flex-1">
-                  <div className="w-10 h-10 bg-linear-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center shadow-md shrink-0">
+                  <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center shadow-md shrink-0">
                     <span className="text-white font-bold text-sm">#{audits.length - index}</span>
                   </div>
                   <div className="flex-1">
@@ -1726,7 +1726,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
       <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-10000 p-4 animate-fadeIn">
         <div className="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border-2 border-slate-200 dark:border-slate-700 animate-scaleIn">
           {/* Modal Header */}
-          <div className="bg-linear-to-r from-amber-600 via-orange-600 to-red-600 p-6">
+          <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-2xl flex items-center justify-center shadow-lg">
@@ -1760,7 +1760,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-all ${
                   step === 1 
-                    ? 'bg-linear-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
+                    ? 'bg-gradient-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
                     : step > 1 
                       ? 'bg-green-500 text-white' 
                       : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
@@ -1782,7 +1782,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-all ${
                   step === 2 
-                    ? 'bg-linear-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
+                    ? 'bg-gradient-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
                     : step > 2 
                       ? 'bg-green-500 text-white' 
                       : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
@@ -1804,7 +1804,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-all ${
                   step === 3 
-                    ? 'bg-linear-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
+                    ? 'bg-gradient-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
                     : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
                 }`}>
                   3
@@ -2060,7 +2060,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
                 <button 
                   onClick={() => setStep(step + 1)}
                   disabled={(step === 1 && !canProceedStep1) || (step === 2 && !canProceedStep2)}
-                  className="px-6 py-3 bg-linear-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-6 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <span>Continue</span>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2071,7 +2071,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
                 <button 
                   onClick={doSave}
                   disabled={!canProceedStep3 || saving}
-                  className="px-6 py-3 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {saving ? (
                     <>

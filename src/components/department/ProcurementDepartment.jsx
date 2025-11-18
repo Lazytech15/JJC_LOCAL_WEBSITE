@@ -299,7 +299,7 @@ function ProcurementDepartment() {
 
   return (
     <ToastProvider>
-      <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? "bg-slate-950" : "bg-slate-50"}`}>
+      <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? "dark bg-slate-950" : "bg-slate-50"}`}>
       {/* Industrial Background Pattern */}
       <div className={`fixed inset-0 pointer-events-none ${isDarkMode ? "opacity-[0.03]" : "opacity-[0.02]"}`}>
         <div className="absolute inset-0" style={{
@@ -683,7 +683,7 @@ function ProcurementDepartment() {
               relative mx-auto max-w-[1600px] px-4
               transition-shadow duration-150 ease-in-out
               ${isScrolled ? 'rounded-full shadow-xl border-2' : 'rounded-xl shadow-lg border'}
-              ${isDarkMode ? "bg-slate-900 border-slate-700/60" : "bg-slate-900 border-slate-800/60"}
+              ${isDarkMode ? "bg-slate-900 border-slate-700/60" : "bg-white border-slate-200"}
             `}>
             <div
               className={`flex overflow-x-auto scrollbar-thin ${isDarkMode ? "scrollbar-thumb-slate-600" : "scrollbar-thumb-slate-300"} scrollbar-track-transparent justify-center w-full transition-transform duration-150 ${isScrolled ? 'px-3 py-2' : 'px-4 py-3'}`}
@@ -704,10 +704,10 @@ function ProcurementDepartment() {
                       : 'px-4 sm:px-6 py-3 sm:py-4 text-sm sm:text-base rounded-xl mx-1 min-h-[48px] sm:min-h-[56px]'
                     }
                     ${activeTab === tab.key
-                      ? `text-white bg-linear-to-r from-${tab.color}-500 to-${tab.color}-600 shadow-lg shadow-${tab.color}-500/30 transform scale-105 ${keyboardNavigated ? 'ring-2 ring-white/50 animate-pulse' : ''}`
+                      ? `text-white bg-gradient-to-r from-${tab.color}-500 to-${tab.color}-600 shadow-lg shadow-${tab.color}-500/30 transform scale-105 ${keyboardNavigated ? 'ring-2 ring-white/50 animate-pulse' : ''}`
                       : isDarkMode 
                         ? `text-slate-400 bg-transparent hover:bg-slate-800/30 hover:text-slate-200 active:bg-slate-700/50`
-                        : `text-slate-600 bg-transparent hover:bg-slate-50/50 hover:text-slate-800 active:bg-slate-100/70`
+                        : `text-slate-700 bg-transparent hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200`
                     }
                   `}
                   aria-label={`${tab.label} - ${tab.description}`}
@@ -715,7 +715,7 @@ function ProcurementDepartment() {
                 >
                   {/* Active tab glow effect */}
                   {activeTab === tab.key && (
-                    <div className={`absolute inset-0 bg-linear-to-r from-${tab.color}-400/20 to-${tab.color}-600/20 rounded-full blur-xl -z-10`}></div>
+                    <div className={`absolute inset-0 bg-gradient-to-r from-${tab.color}-400/20 to-${tab.color}-600/20 rounded-full blur-xl -z-10`}></div>
                   )}
                   
                   <span className={`
@@ -807,7 +807,7 @@ function ProcurementDepartment() {
 
           <div className={`${isDarkMode ? "bg-slate-900/90 border-slate-700/50" : "bg-white/90 border-slate-200/50"} backdrop-blur-xl rounded-lg shadow-lg border`}>
             <div className="p-3 sm:p-4">
-              <Suspense fallback={<div className="py-6 text-center text-sm text-gray-600">Loading module...</div>}>
+              <Suspense fallback={<div className={`py-6 text-center text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Loading module...</div>}>
                 {activeTab === "dashboard" && <AdminDashboard onNavigate={setActiveTab} />}
                 {activeTab === "inventory" && <InventoryManagement />}
                 {activeTab === "orders" && <PurchaseOrderTracker />}

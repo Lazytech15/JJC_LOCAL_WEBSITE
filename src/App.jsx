@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { AuthProvider, useAuth } from "./contexts/AuthContext"
-import { lazy, Suspense } from "react"
+import { lazy, Suspense, useEffect } from "react"
 // Lazy-load heavier top-level components to improve initial load
 const DepartmentSelector = lazy(() => import("./components/DepartmentSelector"))
 const LoginForm = lazy(() => import("./components/LoginForm"))
@@ -40,6 +40,16 @@ function App() {
 
 function AppContent() {
   const { isDarkMode, isLoading } = useAuth()
+
+  // Ensure Tailwind dark mode class is applied at the document root
+  useEffect(() => {
+    const root = document.documentElement
+    if (isDarkMode) {
+      root.classList.add('dark')
+    } else {
+      root.classList.remove('dark')
+    }
+  }, [isDarkMode])
 
   // Show loading screen while checking authentication
   if (isLoading) {
@@ -92,7 +102,7 @@ function RoutesWrapper() {
     <div
       className={`min-h-screen transition-all duration-300 ${
         isDarkMode
-          ? "bg-slate-900 text-gray-100"
+          ? "dark bg-slate-900 text-gray-100"
           : "bg-slate-50 text-gray-900"
       }`}
     >

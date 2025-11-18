@@ -919,7 +919,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
         <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl w-full max-w-6xl mx-2 sm:mx-4 max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 text-white">
               <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold">{editingOrder ? 'Edit Purchase Order' : 'Create Purchase Order'}</h2>
@@ -2448,7 +2448,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-100 p-4">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
               {/* Header */}
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-linear-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-750">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-750">
                 <div>
                   <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                     <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2551,3 +2551,4 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 }
 
 export default CreatePurchaseOrderWizard
+

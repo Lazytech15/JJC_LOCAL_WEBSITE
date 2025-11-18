@@ -276,7 +276,7 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
     <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-9999 p-4 animate-fadeIn">
       <div className="bg-white dark:bg-slate-900 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl max-w-4xl w-full mx-2 sm:mx-4 max-h-[90vh] overflow-hidden border border-slate-200 dark:border-slate-700 sm:border-2 animate-scaleIn">
         {/* Header */}
-        <div className="bg-linear-to-r from-purple-600 via-violet-600 to-indigo-600 p-6">
+        <div className="bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg">
@@ -313,7 +313,7 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
                 <div className="flex items-center gap-2">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm transition-all ${
                     step === s.num
-                      ? 'bg-linear-to-br from-purple-600 to-indigo-600 text-white shadow-lg scale-110'
+                      ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-lg scale-110'
                       : step > s.num
                         ? 'bg-green-500 text-white'
                         : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
@@ -517,7 +517,7 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
               <button 
                 onClick={() => setStep(step + 1)}
                 disabled={step === 1 && !reportConfig.title}
-                className="px-6 py-3 bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Continue
               </button>
@@ -525,7 +525,7 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
               <button 
                 onClick={handleGenerate}
                 disabled={generating || logs.length === 0}
-                className="px-6 py-3 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {generating ? (
                   <>
@@ -549,3 +549,4 @@ export const ReportBuilder = ({ isOpen, onClose, logs = [] }) => {
     document.body
   )
 }
+
