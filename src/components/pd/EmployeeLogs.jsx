@@ -6,10 +6,12 @@ import { getStoredToken } from "../../utils/auth"
 import { ModalPortal } from "./shared"
 import { EmployeeLogsSkeleton } from "../skeletons/ProcurementSkeletons"
 import { useAuth } from "../../contexts/AuthContext"
+import { themeFor } from "../../utils/theme/themeClasses"
 import { ReportBuilder } from "./shared/ReportBuilder"
 
 function EmployeeLogs() {
   const { isDarkMode } = useAuth()
+  const t = themeFor(isDarkMode)
   const [state, setState] = useState({
     logs: [],
     loading: true,
@@ -472,10 +474,10 @@ function EmployeeLogs() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
-                      <span className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded">#{it.item_no}</span>
-                      <div className="font-bold text-slate-900 dark:text-white">{it.item_name || 'Unknown item'}</div>
-                    </div>
-                    <div className="text-sm text-slate-600 dark:text-slate-400">
+                            <span className={`text-xs font-mono ${t.smallMuted} ${t.chipMutedBg} px-2 py-0.5 rounded`}>#{it.item_no}</span>
+                            <div className={`font-bold ${t.title}`}>{it.item_name || 'Unknown item'}</div>
+                          </div>
+                          <div className={`text-sm ${t.smallMuted}`}>
                       {it.brand && <span className="font-medium">{it.brand}</span>}
                       {it.location && <span className="ml-2">• {it.location}</span>}
                       {it.category && <span className="ml-2">• {it.category}</span>}
@@ -499,7 +501,7 @@ function EmployeeLogs() {
 
           {detailsText !== '' && !hasCheckoutText && (
             <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
-              <div className="text-sm text-slate-700 dark:text-slate-300">{detailsText}</div>
+              <div className={`text-sm ${t.muted}`}>{detailsText}</div>
             </div>
           )}
         </div>
@@ -507,7 +509,7 @@ function EmployeeLogs() {
     }
 
     return (
-      <div className="text-sm text-slate-700 dark:text-slate-300">{log.details || 'No details available'}</div>
+      <div className={`text-sm ${t.muted}`}>{log.details || 'No details available'}</div>
     )
   }
 
