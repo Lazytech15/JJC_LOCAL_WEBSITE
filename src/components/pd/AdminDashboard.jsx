@@ -452,7 +452,11 @@ function AdminDashboard({ onNavigate }) {
           <div className="space-y-3">
             {employeeLogsSummary.length > 0 ? (
               employeeLogsSummary.map((log) => (
-                <div key={log.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <div
+                  key={log.id}
+                  tabIndex={0}
+                  className={`${isDarkMode ? "bg-slate-700/50 hover:bg-slate-600/50 border border-slate-600" : "bg-white/80 hover:bg-slate-100 border border-slate-200"} flex items-center gap-3 p-3 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                >
                   <div className="text-xl">
                     {log.details?.toLowerCase().includes('checkout') ? '📤' :
                      log.details?.toLowerCase().includes('checkin') ? '📥' :

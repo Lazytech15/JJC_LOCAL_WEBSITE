@@ -940,7 +940,9 @@ function InventoryManagement() {
       </div>
 
       {/* Filters Section */}
-      <div className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-6 shadow-lg border" : "bg-white border-gray-200 rounded-2xl p-6 shadow-lg border"}>
+      <div className={`rounded-2xl p-6 shadow-lg border ${
+        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-300"
+      }`}>
         <style>{`
           select {
             max-height: 200px !important;
@@ -954,17 +956,17 @@ function InventoryManagement() {
           }
         `}</style>
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Filter & Search</h3>
+          <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>Filter & Search</h3>
           <button
             onClick={() => {
-              setFilters({
-                search: "",
-                item_status: "",
-                location: "",
-              })
+              setFilters({ search: "", item_status: "", location: "" })
               setSortBy("")
             }}
-            className="text-sm bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+            className={`text-sm px-4 py-2 rounded-lg transition-colors font-medium ${
+              isDarkMode
+                ? "bg-gray-700 hover:bg-gray-600 text-white border border-gray-600"
+                : "bg-gray-100 hover:bg-gray-200 text-gray-900 border-2 border-gray-300"
+            }`}
           >
             Clear All
           </button>
@@ -1145,93 +1147,116 @@ function InventoryManagement() {
           {/* Items Display */}
           {viewMode === 'grid' ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {sortedItems.slice(0, visibleCount).map((item) => (
-            <div
-              key={item.item_no}
-              onClick={() => {
-                setSelectedItemForDetail(item)
-                setShowItemDetail(true)
-              }}
-              className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-6 shadow-lg border hover:shadow-xl transition-all duration-200 flex flex-col cursor-pointer" : "bg-white border-gray-200 rounded-2xl p-6 shadow-lg border hover:shadow-xl transition-all duration-200 flex flex-col cursor-pointer"}
-            >
-              {/* Item Header */}
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex-1">
-                  <h4 className="font-bold text-xl text-gray-900 dark:text-white mb-1">{item.item_name}</h4>
-                  <p className="text-gray-600 dark:text-gray-400 font-medium">{item.brand}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">ID: {item.item_no}</p>
+          {sortedItems.slice(0, visibleCount).map((item) => {
+            const theme = {
+              card: isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300 shadow-lg',
+              cardHover: isDarkMode ? 'hover:border-gray-600' : 'hover:border-gray-400 hover:shadow-2xl',
+              title: isDarkMode ? 'text-white' : 'text-gray-900',
+              subtitle: isDarkMode ? 'text-gray-400' : 'text-gray-600',
+              label: isDarkMode ? 'text-gray-300' : 'text-gray-700',
+              value: isDarkMode ? 'text-white' : 'text-gray-900',
+              detailBox: isDarkMode ? 'bg-gray-700/50' : 'bg-gray-100 border border-gray-200',
+              priceBox: isDarkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border border-blue-200',
+              priceLabel: isDarkMode ? 'text-blue-300' : 'text-blue-700',
+              priceValue: isDarkMode ? 'text-blue-200' : 'text-blue-900',
+            };
+
+            return (
+              <div
+                key={item.item_no}
+                onClick={() => {
+                  setSelectedItemForDetail(item)
+                  setShowItemDetail(true)
+                }}
+                className={`rounded-2xl p-6 border transition-all duration-200 flex flex-col cursor-pointer ${theme.card} ${theme.cardHover}`}
+              >
+                {/* Header */}
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1">
+                    <h4 className={`font-bold text-xl mb-1 ${theme.title}`}>
+                      {item.item_name}
+                    </h4>
+                    <p className={`font-medium ${theme.subtitle}`}>
+                      {item.brand}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      ID: {item.item_no}
+                    </p>
+                  </div>
+                  {(() => {
+                    const bal = Number(item.balance) || 0
+                    const min = Number(item.min_stock) || 0
+                    const status = bal === 0 ? "Out Of Stock" : (min > 0 && bal < min ? "Low In Stock" : "In Stock")
+                    const color = status === "Out Of Stock" ? "bg-red-500" : status === "Low In Stock" ? "bg-yellow-500" : "bg-green-500"
+                    return (
+                      <span 
+                        className={`inline-block w-3.5 h-3.5 rounded-full ${color}`} 
+                        title={status} 
+                        aria-label={status} 
+                      />
+                    )
+                  })()}
                 </div>
-                {(() => {
-                  const bal = Number(item.balance) || 0
-                  const min = Number(item.min_stock) || 0
-                  const status = bal === 0 ? "Out Of Stock" : (min > 0 && bal < min ? "Low In Stock" : "In Stock")
-                  const color = status === "Out Of Stock" ? "bg-red-500" : status === "Low In Stock" ? "bg-yellow-400" : "bg-green-500"
-                  return (
-                    <span className={`inline-block w-3.5 h-3.5 rounded-full ${color}`} title={status} aria-label={status} />
-                  )
-                })()}
+
+                {/* Details Grid */}
+                <div className="space-y-3 mb-6 flex-1">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className={`rounded-lg p-3 ${theme.detailBox}`}>
+                      <span className={`font-bold block text-xs mb-1 ${theme.label}`}>Type</span>
+                      <span className={`text-sm ${theme.value}`}>{item.item_type}</span>
+                    </div>
+                    <div className={`rounded-lg p-3 ${theme.detailBox}`}>
+                      <span className={`font-bold block text-xs mb-1 ${theme.label}`}>Location</span>
+                      <span className={`text-sm ${theme.value}`}>{item.location}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className={`rounded-lg p-3 ${theme.detailBox}`}>
+                      <span className={`font-bold block text-xs mb-1 ${theme.label}`}>Balance</span>
+                      <span className={`text-lg font-bold ${theme.value}`}>{item.balance}</span>
+                    </div>
+                    <div className={`rounded-lg p-3 ${theme.detailBox}`}>
+                      <span className={`font-bold block text-xs mb-1 ${theme.label}`}>Min Stock</span>
+                      <span className={`text-lg font-bold ${theme.value}`}>{item.min_stock}</span>
+                    </div>
+                  </div>
+
+                  <div className={`rounded-lg p-3 flex items-center justify-between ${theme.priceBox}`}>
+                    <div>
+                      <span className={`font-bold block text-xs mb-1 ${theme.priceLabel}`}>Price per Unit</span>
+                      <span className={`text-lg font-bold ${theme.priceValue}`}>{formatCurrency(item.price_per_unit)}</span>
+                    </div>
+                    <div className="ml-4">
+                      <QRCodeSmall itemNo={item.item_no} size={2} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleStockManagement(item)
+                    }}
+                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
+                  >
+                    Stock
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteItem(item.item_no)
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
+                  >
+                    Del
+                  </button>
+                </div>
               </div>
-
-              {/* Item Details */}
-              <div className="space-y-3 mb-6 flex-1">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                    <span className="font-bold text-gray-700 dark:text-gray-300 block">Type</span>
-                    <span className="text-gray-900 dark:text-white">{item.item_type}</span>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                    <span className="font-bold text-gray-700 dark:text-gray-300 block">Location</span>
-                    <span className="text-gray-900 dark:text-white">{item.location}</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                    <span className="font-bold text-gray-700 dark:text-gray-300 block">Balance</span>
-                    <span className="text-gray-900 dark:text-white font-bold">
-                      {item.balance}
-                    </span>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                    <span className="font-bold text-gray-700 dark:text-gray-300 block">Min Stock</span>
-                    <span className="text-gray-900 dark:text-white font-bold">{item.min_stock}</span>
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 flex items-center justify-between">
-                  <div>
-                    <span className="font-bold text-blue-700 dark:text-blue-300 block text-sm">Price per Unit</span>
-                    <span className="text-blue-900 dark:text-blue-200 font-bold text-lg">{formatCurrency(item.price_per_unit)}</span>
-                  </div>
-                  <div className="ml-4">
-                    <QRCodeSmall itemNo={item.item_no} size={2} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleStockManagement(item)
-                  }}
-                  className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
-                >
-                  Stock
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDeleteItem(item.item_no)
-                  }}
-                  className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
-                >
-                  Del
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
           {sortedItems.length > visibleCount && (
             <div className="col-span-full flex justify-center">
               <button
@@ -1263,7 +1288,7 @@ function InventoryManagement() {
       {/* Modals */}
       {showStockInsert && selectedItem && (
         <ModalPortal>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`fixed inset-0 flex items-center justify-center p-4 z-50 ${isDarkMode ? 'bg-black/50' : 'bg-black/30'} backdrop-blur-sm`}>
             <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl p-6 w-full max-w-md">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Insert Stock - {selectedItem.item_name}</h3>
@@ -1330,7 +1355,7 @@ function InventoryManagement() {
       {/* Item Form Modal - Now using Wizard with lazy loading! */}
       <Suspense fallback={
         <ModalPortal>
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className={`fixed inset-0 flex items-center justify-center z-50 backdrop-blur-sm ${isDarkMode ? 'bg-black/50' : 'bg-black/30'}`}>
             <div className={isDarkMode ? "bg-gray-800 rounded-2xl p-8 shadow-2xl" : "bg-white rounded-2xl p-8 shadow-2xl"}>
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
               <p className="mt-4 text-gray-700 dark:text-gray-300">Loading form...</p>
@@ -1358,7 +1383,7 @@ function InventoryManagement() {
       {/* Stock Manager Modal */}
       {showStockManager && selectedItem && (
         <ModalPortal>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`fixed inset-0 flex items-center justify-center p-4 z-50 ${isDarkMode ? 'bg-black/50' : 'bg-black/30'} backdrop-blur-sm`}>
             <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl p-6 w-full max-w-md">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">

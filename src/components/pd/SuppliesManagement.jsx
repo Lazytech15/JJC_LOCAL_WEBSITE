@@ -251,7 +251,8 @@ function SupplierManagement() {
                 // Fetch concise metrics instead of full item list
                 fetchSupplierMetrics(supplier?.id)
               }}
-              className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+              className={`w-full rounded-xl px-4 py-3 text-sm font-medium transition
+                ${isDarkMode ? "bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" : "bg-slate-50 border border-slate-300 text-slate-800 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"}`}
               disabled={loading}
             >
               <option value="">Select a supplier...</option>

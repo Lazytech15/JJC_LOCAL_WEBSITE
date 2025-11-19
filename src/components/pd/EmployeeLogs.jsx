@@ -834,14 +834,14 @@ function EmployeeLogs() {
   // This render is included by returning the component from the main function's JSX
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 p-4">
+  <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 p-4">
       <div className="max-w-7xl mx-auto space-y-4">
         
         {/* Header Section */}
         <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-2xl shadow-lg border p-6" : "bg-white border-slate-200 rounded-2xl shadow-lg border p-6"}>
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+              <div className="w-14 h-14 bg-linear-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
@@ -856,7 +856,7 @@ function EmployeeLogs() {
               <button 
                 onClick={fetchEmployeeLogs} 
                 disabled={loading}
-                className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -865,13 +865,13 @@ function EmployeeLogs() {
               </button>
               <button 
                 onClick={() => exportLogs('csv')} 
-                className="px-4 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg font-medium"
+                className="px-4 py-2.5 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg font-medium"
               >
                 Export CSV
               </button>
               <button 
                 onClick={() => setState(prev => ({ ...prev, showReportBuilder: true }))}
-                className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium"
+                className="px-4 py-2.5 bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -905,7 +905,7 @@ function EmployeeLogs() {
               onClick={toggleFilters}
               className={`px-5 py-3 rounded-xl transition-all font-semibold flex items-center gap-2 ${
                 showFilters 
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' 
+                  ? 'bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-lg' 
                   : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
               }`}
             >
@@ -923,7 +923,7 @@ function EmployeeLogs() {
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="px-5 py-3 bg-gradient-to-r from-red-100 to-rose-100 dark:from-red-900/30 dark:to-rose-900/30 text-red-700 dark:text-red-300 rounded-xl hover:from-red-200 hover:to-rose-200 dark:hover:from-red-900/50 dark:hover:to-rose-900/50 transition-all font-semibold flex items-center gap-2"
+                className="px-5 py-3 bg-linear-to-r from-red-100 to-rose-100 dark:from-red-900/30 dark:to-rose-900/30 text-red-700 dark:text-red-300 rounded-xl hover:from-red-200 hover:to-rose-200 dark:hover:from-red-900/50 dark:hover:to-rose-900/50 transition-all font-semibold flex items-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -997,7 +997,7 @@ function EmployeeLogs() {
 
         {/* Error Display */}
         {error && (
-          <div className="bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border-l-4 border-red-500 rounded-2xl p-4 shadow-lg">
+          <div className="bg-linear-to-r from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border-l-4 border-red-500 rounded-2xl p-4 shadow-lg">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center shrink-0">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1014,10 +1014,10 @@ function EmployeeLogs() {
 
         {/* Bulk Actions Bar */}
         {selectedLogs.length > 0 && (
-          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-purple-900/20 border-l-4 border-blue-600 rounded-2xl p-4 shadow-lg">
+          <div className="bg-linear-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-purple-900/20 border-l-4 border-blue-600 rounded-2xl p-4 shadow-lg">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                <div className="w-12 h-12 bg-linear-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
                   <span className="text-white font-bold text-lg">{selectedLogs.length}</span>
                 </div>
                 <div>
@@ -1026,10 +1026,10 @@ function EmployeeLogs() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => handleBulkAction('markReviewed')} className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">✓ Mark Reviewed</button>
-                <button onClick={() => handleBulkAction('archive')} className="px-4 py-2 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-700 hover:to-amber-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">📦 Archive</button>
-                <button onClick={() => handleBulkAction('export')} className="px-4 py-2 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">📤 Export</button>
-                <button onClick={() => handleBulkAction('delete')} className="px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">🗑️ Delete</button>
+                <button onClick={() => handleBulkAction('markReviewed')} className="px-4 py-2 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">✓ Mark Reviewed</button>
+                <button onClick={() => handleBulkAction('archive')} className="px-4 py-2 bg-linear-to-r from-yellow-600 to-amber-600 hover:from-yellow-700 hover:to-amber-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">📦 Archive</button>
+                <button onClick={() => handleBulkAction('export')} className="px-4 py-2 bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">📤 Export</button>
+                <button onClick={() => handleBulkAction('delete')} className="px-4 py-2 bg-linear-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-lg transition-all shadow-md font-semibold text-sm">🗑️ Delete</button>
               </div>
             </div>
           </div>
@@ -1039,7 +1039,7 @@ function EmployeeLogs() {
         <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-2xl shadow-lg border overflow-hidden" : "bg-white border-slate-200 rounded-2xl shadow-lg border overflow-hidden"}>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gradient-to-r from-slate-100 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border-b-2 border-slate-200 dark:border-slate-700">
+              <thead className="bg-linear-to-r from-slate-100 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border-b-2 border-slate-200 dark:border-slate-700">
                 <tr>
                   <th className="px-4 py-4 text-left w-12">
                     <input
@@ -1060,7 +1060,7 @@ function EmployeeLogs() {
                   <tr>
                     <td colSpan="5" className="px-6 py-16 text-center">
                       <div className="flex flex-col items-center gap-4">
-                        <div className="w-20 h-20 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-full flex items-center justify-center shadow-lg">
+                        <div className="w-20 h-20 bg-linear-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-full flex items-center justify-center shadow-lg">
                           <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
@@ -1073,11 +1073,12 @@ function EmployeeLogs() {
                     </td>
                   </tr>
                 ) : (
-                  logs.slice(0, visibleCount).map((log) => (
-                    <tr 
-                      key={log.id} 
-                      onClick={() => openDetailedView(log)} 
-                      className="hover:bg-blue-50/50 dark:hover:bg-slate-700/50 transition-all duration-200 cursor-pointer group"
+                  logs.slice(0, visibleCount).map((log, idx) => (
+                    <tr
+                      key={log.id}
+                      tabIndex={0}
+                      onClick={() => openDetailedView(log)}
+                      className={`${isDarkMode ? (idx % 2 === 0 ? "bg-slate-800" : "bg-slate-700/60") : (idx % 2 === 0 ? "bg-white" : "bg-slate-50")} hover:bg-blue-50/70 dark:hover:bg-slate-600/60 transition-all duration-200 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     >
                       <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                         <input 
@@ -1095,7 +1096,7 @@ function EmployeeLogs() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center text-white font-bold shadow-md bg-gradient-to-br from-blue-500 to-indigo-500">
+                          <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center text-white font-bold shadow-md bg-linear-to-br from-blue-500 to-indigo-500">
                             {state.logProfileMap && state.logProfileMap[log.id] ? (
                               <img src={state.logProfileMap[log.id]} alt={log.username || 'profile'} className="w-full h-full object-cover" />
                             ) : (
@@ -1122,7 +1123,7 @@ function EmployeeLogs() {
                         </div>
                       </td>
                       <td className="px-6 py-4 max-w-md">
-                        <div className="text-sm text-slate-700 dark:text-slate-300 truncate group-hover:text-clip">
+                        <div className="text-sm text-slate-800 dark:text-slate-300 truncate group-hover:text-clip">
                           {log.details || <span className="text-slate-400 italic">No details</span>}
                         </div>
                       </td>
@@ -1138,7 +1139,7 @@ function EmployeeLogs() {
             <div className="p-4 text-center border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
               <button
                 onClick={() => setState(prev => ({ ...prev, visibleCount: Math.min(prev.visibleCount + 20, logs.length) }))}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg font-semibold"
+                className="px-6 py-3 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg font-semibold"
               >
                 Load More ({Math.min(20, logs.length - visibleCount)} more)
               </button>
@@ -1167,7 +1168,7 @@ function EmployeeLogs() {
                     disabled={loading}
                     className={`w-12 h-12 rounded-xl transition-all font-bold shadow-md text-sm ${
                       currentPage === pageNum
-                        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-110"
+                        ? "bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-110"
                         : "bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
@@ -1195,7 +1196,7 @@ function EmployeeLogs() {
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-9999 p-4 animate-fadeIn">
             <div className="bg-white dark:bg-slate-900 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl max-w-5xl w-full mx-2 sm:mx-4 max-h-[90vh] overflow-hidden border border-slate-200 dark:border-slate-700 sm:border-2 animate-scaleIn">
               {/* Modal Header */}
-              <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6">
+              <div className="bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-2xl flex items-center justify-center shadow-lg">

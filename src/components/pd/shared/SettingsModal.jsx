@@ -97,17 +97,14 @@ export default function SettingsModal({ isOpen, onClose, user }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className={`relative w-full max-w-2xl mx-2 sm:mx-4 max-h-[90vh] overflow-hidden rounded-lg sm:rounded-xl shadow-2xl ${
-        isDarkMode ? "bg-slate-900 border border-slate-700" : "bg-white border border-slate-200"
-      }`}>
+    <div className={`fixed inset-0 z-10000 flex items-center justify-center p-4 ${isDarkMode ? 'bg-black/50' : 'bg-black/30'} backdrop-blur-sm`}
+         onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`relative w-full max-w-2xl mx-2 sm:mx-4 max-h-[90vh] overflow-hidden rounded-lg sm:rounded-xl shadow-2xl border backdrop-blur-md ${
+          isDarkMode ? "bg-slate-900/95 border-slate-700" : "bg-white border-slate-200"
+        }`}
+      >
         {/* Header */}
         <div className={`flex items-center justify-between p-6 border-b ${
           isDarkMode ? "border-slate-700" : "border-slate-200"
@@ -126,7 +123,7 @@ export default function SettingsModal({ isOpen, onClose, user }) {
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${
-              isDarkMode ? "hover:bg-slate-800 text-black" : "hover:bg-slate-100 text-black"
+              isDarkMode ? "hover:bg-slate-800 text-slate-300" : "hover:bg-slate-100 text-gray-600"
             }`}
           >
             <X className="w-5 h-5" />
