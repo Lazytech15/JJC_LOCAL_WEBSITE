@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { Home, Bell, User, Clock, BarChart3, Moon, Sun, ArrowLeft, Loader2 } from "lucide-react"
@@ -20,6 +18,7 @@ import Announcements from "./DashboardComponents/Announcements"
 import TimeAttendance from "./DashboardComponents/TimeAttendance"
 import Performance from "./DashboardComponents/Performance"
 import Profile from "./DashboardComponents/Profile"
+import { StatusWarningModal, StatusWarningBanner } from "../ui/StatusIndicator"
 
 // Centralized department routes and normalization
 const DEPARTMENT_BASE_URL = import.meta.env.VITE_DEPT_BASE_URL || (typeof window !== "undefined" ? window.location.origin : "")
@@ -76,6 +75,8 @@ export default function EmployeeDashboard() {
   const [profileImage, setProfileImage] = useState(null)
 
   const profileMenuRef = useRef(null)
+
+  const [showStatusModal, setShowStatusModal] = useState(true)
 
   const navigate = useNavigate()
   const { employee, employeeLogout, isDarkMode, toggleDarkMode } = useAuth()
@@ -153,16 +154,26 @@ export default function EmployeeDashboard() {
         }
 
         let foundEmployee = null
-        try {
-          const res = await apiService.employees.getEmployees({ limit: 1000 })
-          if (res?.employees) {
-            foundEmployee = res.employees.find(e =>
-              e.id === uid || e.employee_uid === uid || e.uid === uid
-            )
+          try {
+            // Fetch current employee data (bypasses status filter)
+            const res = await apiService.employees.getCurrentEmployeeData(uid)
+            if (res?.success && res?.employee) {
+              foundEmployee = res.employee
+              console.log("[v0] Found current employee:", foundEmployee)
+            } else {
+              // Fallback to old method if new method fails
+              const fallbackRes = await apiService.employees.getEmployees({ 
+                employeeUid: uid,
+                includeAllStatuses: 'true',
+                limit: 1 
+              })
+              if (fallbackRes?.employees?.[0]) {
+                foundEmployee = fallbackRes.employees[0]
+              }
+            }
+          } catch (err) {
+            console.error("Fetch employee failed:", err)
           }
-        } catch (err) {
-          console.error("Fetch employee failed:", err)
-        }
 
         if (!foundEmployee) {
           foundEmployee = {
@@ -377,6 +388,11 @@ export default function EmployeeDashboard() {
 
       {/* Error Banner */}
       {error && <div className="bg-red-500 text-white px-4 py-3 text-center text-sm">{error}</div>}
+
+      <StatusWarningBanner 
+        status={employeeData?.status} 
+        isDarkMode={isDarkMode}
+      />
 
       {/* Top Header */}
       <header
@@ -697,6 +713,14 @@ export default function EmployeeDashboard() {
           })}
         </div>
       </nav>
+      {showStatusModal && employeeData?.status && 
+        employeeData.status.toLowerCase() !== 'active' && (
+          <StatusWarningModal
+            status={employeeData?.status}
+            isDarkMode={isDarkMode}
+            onClose={() => setShowStatusModal(false)}
+          />
+        )}
     </div>
   )
 }

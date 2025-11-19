@@ -941,60 +941,52 @@ export class ProfileService extends BaseAPIService {
     this.landingImageCache.delete('landing_images_list')
   }
 
-  /**
-   * Clear all landing images from cache
-   */
-  clearLandingImageCache() {
-    this.landingImageCache.forEach((cached, key) => {
-      if (cached.url && cached.url.startsWith('blob:')) {
-        try {
-          URL.revokeObjectURL(cached.url)
-        } catch (error) {
-          console.warn('Failed to revoke blob URL:', error)
-        }
-      }
-    })
-    this.landingImageCache.clear()
-    console.log('[ProfileService] Cleared all landing image cache')
-  }
+  // In profile-service.js
 
-  /**
-   * Clear gallery image from cache
-   */
-  clearGalleryImageFromCache(filename) {
-    if (this.galleryImageCache.has(filename)) {
-      const cached = this.galleryImageCache.get(filename)
-      if (cached.url && cached.url.startsWith('blob:')) {
-        try {
-          URL.revokeObjectURL(cached.url)
-          console.log(`[ProfileService] Revoked blob URL for gallery image: ${filename}`)
-        } catch (error) {
-          console.warn('Failed to revoke blob URL:', error)
-        }
+clearLandingImageCache() {
+  this.landingImageCache.forEach((cached, key) => {
+    if (cached.url && cached.url.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(cached.url)
+      } catch (error) {
+        console.warn('Failed to revoke blob URL:', error)
       }
-      this.galleryImageCache.delete(filename)
     }
-    
-    // Also clear the list cache
-    this.galleryImageCache.delete('gallery_images_list')
-  }
+  })
+  this.landingImageCache.clear()
+  console.log('[ProfileService] Cleared all landing image cache')
+  
+  // Clear service worker cache
+  this.clearServiceWorkerImageCache('landing')
+}
 
-  /**
-   * Clear all gallery images from cache
-   */
-  clearGalleryImageCache() {
-    this.galleryImageCache.forEach((cached, key) => {
-      if (cached.url && cached.url.startsWith('blob:')) {
-        try {
-          URL.revokeObjectURL(cached.url)
-        } catch (error) {
-          console.warn('Failed to revoke blob URL:', error)
-        }
+clearGalleryImageCache() {
+  this.galleryImageCache.forEach((cached, key) => {
+    if (cached.url && cached.url.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(cached.url)
+      } catch (error) {
+        console.warn('Failed to revoke blob URL:', error)
       }
+    }
+  })
+  this.galleryImageCache.clear()
+  console.log('[ProfileService] Cleared all gallery image cache')
+  
+  // Clear service worker cache
+  this.clearServiceWorkerImageCache('gallery')
+}
+
+// Add this new method to ProfileService
+clearServiceWorkerImageCache(type) {
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'CLEAR_SPECIFIC_IMAGE_CACHE',
+      imageType: type // 'landing' or 'gallery'
     })
-    this.galleryImageCache.clear()
-    console.log('[ProfileService] Cleared all gallery image cache')
+    console.log(`[ProfileService] Sent message to clear ${type} cache in service worker`)
   }
+}
 
   /**
    * Clear all caches (profiles, landing, gallery)
@@ -1068,4 +1060,66 @@ export class ProfileService extends BaseAPIService {
     })
     this.profileCache.clear()
   }
+
+  /**
+ * Get landing images directly (no cache, returns base64 data)
+ */
+async getLandingImagesDirect() {
+  try {
+    const response = await fetch(`${this.baseURL}/api/profile/landing/direct`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${getStoredToken()}`,
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      },
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    return {
+      success: true,
+      data: data.data
+    }
+
+  } catch (error) {
+    console.error("Landing images direct fetch error:", error)
+    return { success: false, error: error.message, data: { images: [], count: 0 } }
+  }
+}
+
+/**
+ * Get gallery images directly (no cache, returns base64 data)
+ */
+async getGalleryImagesDirect() {
+  try {
+    const response = await fetch(`${this.baseURL}/api/profile/gallery/direct`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${getStoredToken()}`,
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      },
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    return {
+      success: true,
+      data: data.data
+    }
+
+  } catch (error) {
+    console.error("Gallery images direct fetch error:", error)
+    return { success: false, error: error.message, data: { images: [], count: 0 } }
+  }
+}
 }
