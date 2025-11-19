@@ -27,6 +27,7 @@ export function themeFor(isDarkMode) {
     // Small helpers
     iconMuted: isDarkMode ? 'text-slate-300' : 'text-slate-700',
     statNumber: isDarkMode ? 'text-white' : 'text-slate-900',
-    chipMutedBg: isDarkMode ? 'dark:bg-slate-700/40' : 'bg-slate-100'
+    // Muted chip background: return the actual bg class for each mode (don't include the `dark:` variant here)
+    chipMutedBg: isDarkMode ? 'bg-slate-700/40' : 'bg-slate-100'
   }
 }

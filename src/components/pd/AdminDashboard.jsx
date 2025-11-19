@@ -381,11 +381,11 @@ function AdminDashboard({ onNavigate }) {
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className={`text-2xl font-bold ${t.accent.blue}`}>{purchaseOrderSummary.total_orders}</div>
-                <div className={`text-sm ${t.label} dark:text-slate-400`}>Total Orders</div>
+                <div className={`text-sm ${t.label}`}>Total Orders</div>
               </div>
               <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className={`text-2xl font-bold ${t.accent.orange}`}>{purchaseOrderSummary.pending_orders}</div>
-                <div className={`text-sm ${t.label} dark:text-slate-400`}>Active Orders</div>
+                <div className={`text-sm ${t.label}`}>Active Orders</div>
               </div>
             </div>
             
@@ -393,11 +393,11 @@ function AdminDashboard({ onNavigate }) {
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className={`text-lg font-bold ${t.statNumber}`}>{formatCurrency(purchaseOrderSummary.total_value)}</div>
-                <div className={`text-sm ${t.label} dark:text-slate-400`}>Total Value</div>
+                <div className={`text-sm ${t.label}`}>Total Value</div>
               </div>
               <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className={`text-lg font-bold ${t.accent.orange}`}>{formatCurrency(purchaseOrderSummary.pending_value)}</div>
-                <div className={`text-sm ${t.label} dark:text-slate-400`}>Pending Value</div>
+                <div className={`text-sm ${t.label}`}>Pending Value</div>
               </div>
             </div>
 
@@ -406,28 +406,28 @@ function AdminDashboard({ onNavigate }) {
               <div className={`text-sm font-medium ${t.header} mb-3`}>Order Status Breakdown</div>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 <div className="text-center">
-                  <div className={`text-lg font-bold ${t.statNumber} dark:text-slate-300`}>{purchaseOrderSummary.status_breakdown.requested}</div>
-                  <div className={` ${t.label} dark:text-slate-400`}>Requested</div>
+                  <div className={`text-lg font-bold ${t.statNumber}`}>{purchaseOrderSummary.status_breakdown.requested}</div>
+                  <div className={`${t.label}`}>Requested</div>
                 </div>
                 <div className="text-center">
                   <div className={`text-lg font-bold ${t.accent.blue}`}>{purchaseOrderSummary.status_breakdown.ordered}</div>
-                  <div className={` ${t.label} dark:text-slate-400`}>Ordered</div>
+                  <div className={`${t.label}`}>Ordered</div>
                 </div>
                 <div className="text-center">
-                  <div className={`text-lg font-bold ${t.accent.amber} dark:text-yellow-400`}>{purchaseOrderSummary.status_breakdown.in_transit}</div>
-                  <div className={` ${t.label} dark:text-slate-400`}>In Transit</div>
+                  <div className={`text-lg font-bold ${t.accent.amber}`}>{purchaseOrderSummary.status_breakdown.in_transit}</div>
+                  <div className={`${t.label}`}>In Transit</div>
                 </div>
                 <div className="text-center">
                   <div className={`text-lg font-bold ${t.accent.orange}`}>{purchaseOrderSummary.status_breakdown.ready_for_pickup}</div>
-                  <div className={` ${t.label} dark:text-slate-400`}>Ready</div>
+                  <div className={`${t.label}`}>Ready</div>
                 </div>
                 <div className="text-center">
                   <div className={`text-lg font-bold ${t.accent.green}`}>{purchaseOrderSummary.status_breakdown.received}</div>
-                  <div className={` ${t.label} dark:text-slate-400`}>Received</div>
+                  <div className={`${t.label}`}>Received</div>
                 </div>
                 <div className="text-center">
                   <div className={`text-lg font-bold ${t.accent.red}`}>{purchaseOrderSummary.status_breakdown.cancelled}</div>
-                  <div className={` ${t.label} dark:text-slate-400`}>Cancelled</div>
+                  <div className={`${t.label}`}>Cancelled</div>
                 </div>
               </div>
             </div>
@@ -439,14 +439,14 @@ function AdminDashboard({ onNavigate }) {
                   {purchaseOrderSummary.total_orders > 0 ? 
                     Math.round((purchaseOrderSummary.completed_orders / purchaseOrderSummary.total_orders) * 100) : 0}%
                 </div>
-                <div className={`text-sm ${t.label} dark:text-slate-400`}>Completion Rate</div>
+                <div className={`text-sm ${t.label}`}>Completion Rate</div>
               </div>
               <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
                 <div className={`text-lg font-bold ${t.accent.purple}`}>
                   {formatCurrency(purchaseOrderSummary.total_orders > 0 ? 
                     purchaseOrderSummary.total_value / purchaseOrderSummary.total_orders : 0)}
                 </div>
-                <div className={`text-sm ${t.label} dark:text-slate-400`}>Avg Order Value</div>
+                <div className={`text-sm ${t.label}`}>Avg Order Value</div>
               </div>
             </div>
           </div>
@@ -478,7 +478,7 @@ function AdminDashboard({ onNavigate }) {
                       {log.details || 'No details available'}
                     </div>
                   </div>
-                  <div className={`text-xs ${t.smallMuted} dark:text-slate-400`}>
+                  <div className={`text-xs ${t.smallMuted}`}>
                     {new Date(log.created_at).toLocaleDateString('en-US', { 
                       month: 'short', 
                       day: 'numeric',
@@ -511,7 +511,7 @@ function AdminDashboard({ onNavigate }) {
           <h3 className={`text-lg font-semibold ${t.header} mb-4`}>📊 Stock Status Overview</h3>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className={`${t.label} dark:text-slate-400`}>In Stock</span>
+              <span className={`${t.label}`}>In Stock</span>
               <div className="flex items-center gap-2">
                 <div className="w-20 bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                   <div 
@@ -523,7 +523,7 @@ function AdminDashboard({ onNavigate }) {
               </div>
             </div>
             <div className="flex justify-between items-center">
-              <span className={`${t.label} dark:text-slate-400`}>Low Stock</span>
+              <span className={`${t.label}`}>Low Stock</span>
               <div className="flex items-center gap-2">
                 <div className="w-20 bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                   <div 
@@ -535,7 +535,7 @@ function AdminDashboard({ onNavigate }) {
               </div>
             </div>
             <div className="flex justify-between items-center">
-              <span className={`${t.label} dark:text-slate-400`}>Out of Stock</span>
+              <span className={`${t.label}`}>Out of Stock</span>
               <div className="flex items-center gap-2">
                 <div className="w-20 bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                   <div 
@@ -548,7 +548,7 @@ function AdminDashboard({ onNavigate }) {
             </div>
           </div>
           <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-            <div className={`text-sm ${t.label} dark:text-slate-400`}>
+            <div className={`text-sm ${t.label}`}>
               Stock Health: <span className={`font-medium ${
                 statistics.out_of_stock === 0 && statistics.low_stock <= 5 
                   ? `${t.accent.green}` 
@@ -576,7 +576,7 @@ function AdminDashboard({ onNavigate }) {
                     <div className={`font-medium ${t.title} text-sm leading-tight mb-1 wrap-break-words`}>
                       {item.item_name}
                     </div>
-                    <div className={`flex items-center gap-3 text-xs ${t.muted} dark:text-slate-400`}>
+                    <div className={`flex items-center gap-3 text-xs ${t.muted}`}>
                       <span className="flex items-center gap-1">
                         📍 {item.location || 'No location'}
                       </span>
@@ -594,8 +594,8 @@ function AdminDashboard({ onNavigate }) {
                       </div>
                       <div className={`text-xs font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${
                         (item.balance || 0) === 0 
-                          ? `bg-red-100 ${t.accent.red} dark:bg-red-900/40 dark:text-red-300` 
-                          : `bg-orange-100 ${t.accent.orange} dark:bg-orange-900/40 dark:text-orange-300`
+                          ? `bg-red-100 ${t.accent.red} dark:bg-red-900/40` 
+                          : `bg-orange-100 ${t.accent.orange} dark:bg-orange-900/40`
                       }`}>
                         {(item.balance || 0) === 0 ? 'OUT' : 'LOW'}
                       </div>
@@ -619,31 +619,31 @@ function AdminDashboard({ onNavigate }) {
           <h3 className={`text-lg font-semibold ${t.header} mb-4`}>📈 Analytics</h3>
           <div className="space-y-4">
             <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
-              <div className={`text-sm ${t.label} dark:text-slate-400`}>Inventory Turnover</div>
+              <div className={`text-sm ${t.label}`}>Inventory Turnover</div>
               <div className={`text-xl font-bold ${t.accent.blue}`}>
                 {statistics.total_items > 0 ? ((statistics.in_stock / statistics.total_items) * 100).toFixed(1) : 0}%
               </div>
-              <div className={`text-xs ${t.muted} dark:text-slate-400`}>Stock Availability</div>
+              <div className={`text-xs ${t.muted}`}>Stock Availability</div>
             </div>
             
             <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
-              <div className={`text-sm ${t.label} dark:text-slate-400`}>Restock Priority</div>
+              <div className={`text-sm ${t.label}`}>Restock Priority</div>
               <div className={`text-xl font-bold ${t.accent.orange}`}>
                 {analytics.lowStockItems.length}
               </div>
-              <div className={`text-xs ${t.muted} dark:text-slate-400`}>Items Need Attention</div>
+              <div className={`text-xs ${t.muted}`}>Items Need Attention</div>
             </div>
 
             <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
-              <div className={`text-sm ${t.label} dark:text-slate-400`}>Supplier Diversity</div>
+              <div className={`text-sm ${t.label}`}>Supplier Diversity</div>
               <div className={`text-xl font-bold ${t.accent.purple}`}>
                 {statistics.active_suppliers || 0}
               </div>
-              <div className={`text-xs ${t.muted} dark:text-slate-400`}>Active Suppliers</div>
+              <div className={`text-xs ${t.muted}`}>Active Suppliers</div>
             </div>
 
             <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
-              <div className={`text-sm ${t.label} dark:text-slate-400`}>Avg. Item Value</div>
+              <div className={`text-sm ${t.label}`}>Avg. Item Value</div>
               <div className={`text-lg font-bold ${t.accent.green}`}>
                 {formatCurrency(
                   statistics.total_items > 0 && statistics.total_inventory_value > 0 
@@ -651,7 +651,7 @@ function AdminDashboard({ onNavigate }) {
                     : 0
                 )}
               </div>
-              <div className={`text-xs ${t.muted} dark:text-slate-400`}>Per Item</div>
+              <div className={`text-xs ${t.muted}`}>Per Item</div>
             </div>
           </div>
         </div>
