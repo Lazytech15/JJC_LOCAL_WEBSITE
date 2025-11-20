@@ -822,7 +822,7 @@ function EmployeeLogs() {
 
   const handleEditCheckoutItems = (log, items) => {
     // Open a new edit wizard specifically for checkout item quantities
-    setEditTargetLog({...log, items: items}) // Pass items with the log
+    setEditTargetLog({...log, items: items}) // Pass items
     setIsEditWizardOpen(true)
   }
 
@@ -837,11 +837,11 @@ function EmployeeLogs() {
   // This render is included by returning the component from the main function's JSX
 
   return (
-  <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 p-4">
+  <div className={`min-h-screen ${t.pageBg} p-4`}>
       <div className="max-w-7xl mx-auto space-y-4">
         
         {/* Header Section */}
-        <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-2xl shadow-lg border p-6" : "bg-white border-slate-200 rounded-2xl shadow-lg border p-6"}>
+        <div className={`${t.cardBg} ${t.cardBorder} rounded-2xl shadow-lg border p-6`}>
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-linear-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
@@ -887,7 +887,7 @@ function EmployeeLogs() {
         </div>
 
         {/* Search and Filter Section */}
-        <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-2xl shadow-lg border p-4" : "bg-white border-slate-200 rounded-2xl shadow-lg border p-4"}>
+        <div className={`${t.cardBg} ${t.cardBorder} rounded-2xl shadow-lg border p-4`}>
           <div className="flex flex-col lg:flex-row gap-3">
             <div className="flex-1">
               <div className="relative">
@@ -899,7 +899,7 @@ function EmployeeLogs() {
                   value={searchTerm}
                   onChange={handleSearch}
                   placeholder="Search by name, ID number, or barcode..."
-                  className={`w-full pl-12 pr-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 ${t.title} placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
+                  className={`w-full pl-12 pr-4 py-3 border ${t.inputBorder} rounded-xl ${t.inputBg} ${t.title}`}
                 />
               </div>
             </div>
@@ -1042,7 +1042,7 @@ function EmployeeLogs() {
         <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-2xl shadow-lg border overflow-hidden" : "bg-white border-slate-200 rounded-2xl shadow-lg border overflow-hidden"}>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-linear-to-r from-slate-100 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border-b-2 border-slate-200 dark:border-slate-700">
+              <thead className={`${isDarkMode ? t.tableHeaderBg : 'bg-slate-100'} ${t.header}`}>
                 <tr>
                   <th className="px-4 py-4 text-left w-12">
                     <input
@@ -1081,7 +1081,7 @@ function EmployeeLogs() {
                       key={log.id}
                       tabIndex={0}
                       onClick={() => openDetailedView(log)}
-                      className={`${isDarkMode ? (idx % 2 === 0 ? "bg-slate-800" : "bg-slate-700/60") : (idx % 2 === 0 ? "bg-white" : "bg-slate-50")} hover:bg-blue-50/70 dark:hover:bg-slate-600/60 transition-all duration-200 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      className={`${idx % 2 === 0 ? t.rowEven : t.rowOdd} ${t.rowHover}`}
                     >
                       <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                         <input 
@@ -1107,13 +1107,13 @@ function EmployeeLogs() {
                             )}
                           </div>
                           <div>
-                            <div className={`font-semibold ${t.title} text-slate-900 dark:text-slate-100`}>{log.username || 'N/A'}</div>
+                            <div className={`font-semibold ${t.title}`}>{log.username || 'N/A'}</div>
                             <div className="flex items-center gap-2 text-xs mt-0.5">
                               {log.id_number && (
-                                <span className={`px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded font-mono ${t.smallMuted}`}>ID: {log.id_number}</span>
+                                <span className={`px-2 py-0.5 bg-slate-100 ${t.smallMuted} rounded font-mono`}>ID: {log.id_number}</span>
                               )}
                               {log.id_barcode && (
-                                <span className={`px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded font-mono ${t.smallMuted}`}>BC: {log.id_barcode}</span>
+                                <span className={`px-2 py-0.5 bg-slate-100 ${t.smallMuted} rounded font-mono`}>BC: {log.id_barcode}</span>
                               )}
                             </div>
                           </div>
@@ -1121,13 +1121,13 @@ function EmployeeLogs() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm">
-                          <div className={`font-semibold ${t.title} text-slate-900 dark:text-slate-100`}>{formatDateTime(log.log_date, log.log_time)}</div>
+                          <div className={`font-semibold ${t.title}`}>{formatDateTime(log.log_date, log.log_time)}</div>
                           <div className={`text-xs mt-0.5 ${t.smallMuted} text-slate-900 dark:text-slate-300`}>Created: {new Date(log.created_at).toLocaleString()}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 max-w-md">
-                        <div className={`text-sm ${t.muted} text-slate-900 dark:text-slate-300 truncate group-hover:text-clip`}>
-                          {log.details || <span className={`italic ${t.smallMuted} text-slate-900 dark:text-slate-300`}>No details</span>}
+                        <div className={`text-sm ${t.muted} truncate group-hover:text-clip`}>
+                          {log.details || <span className={`italic ${t.smallMuted}`}>No details</span>}
                         </div>
                       </td>
                     </tr>
@@ -1197,7 +1197,7 @@ function EmployeeLogs() {
       {showDetailedView && selectedLog && (
         <ModalPortal>
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-9999 p-4 animate-fadeIn">
-            <div className="bg-white dark:bg-slate-900 rounded-lg sm:rounded-xl lg:rounded-2xl shadow-2xl max-w-5xl w-full mx-2 sm:mx-4 max-h-[90vh] overflow-hidden border border-slate-200 dark:border-slate-700 sm:border-2 animate-scaleIn">
+            <div className={`${t.modalBg} ${t.modalBorder} rounded-lg border-2`}>
               {/* Modal Header */}
               <div className="bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 p-6">
                 <div className="flex items-center justify-between">
@@ -1208,8 +1208,12 @@ function EmployeeLogs() {
                       </svg>
                     </div>
                     <div>
-                      <h3 className="text-white font-bold text-2xl">Activity Log Details</h3>
-                      <p className="text-blue-100 text-sm mt-1">Log ID: #{selectedLog.id}</p>
+                      <h3 className="text-white font-bold text-2xl">
+                        Activity Log Details
+                      </h3>
+                      <p className="text-blue-100 text-sm mt-1">
+                        Log ID: #{selectedLog.id}
+                      </p>
                     </div>
                   </div>
                   <button 
@@ -1236,7 +1240,7 @@ function EmployeeLogs() {
                     <div className="col-span-1">
                       <div className="bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-800 dark:to-slate-700 rounded-2xl p-6 border-2 border-slate-200 dark:border-slate-600 shadow-lg">
                         <div className="flex flex-col items-center text-center">
-                          <div className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 overflow-hidden shadow-xl ring-4 ring-white dark:ring-slate-800">
+                          <div className="w-28 h-28 rounded-full bg-linear-to-br from-blue-500 to-indigo-500 overflow-hidden shadow-xl ring-4 ring-white dark:ring-slate-800">
                             {employeeDetails && employeeDetails.profilePicture ? (
                               <img src={employeeDetails.profilePicture} alt={employeeDetails.fullName} className="w-full h-full object-cover" />
                             ) : (
@@ -1265,7 +1269,7 @@ function EmployeeLogs() {
                               {/* Checkout quantity editing is available via "Edit Checkout Items" button */}
                             </div>
                             <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
-                              <div className={`text-xs uppercase font-semibold ${t.smallMuted}`}>Barcode</div>
+                              <div className={`text-xs uppercase font-semibold ${t.label} mb-2`}>Barcode</div>
                               <div className={`font-mono font-semibold mt-1 ${t.title}`}>
                                 {employeeDetails?.id_barcode || selectedLog.id_barcode || '—'}
                               </div>
@@ -1303,7 +1307,7 @@ function EmployeeLogs() {
 
                     {/* Log Details */}
                     <div className="col-span-2 space-y-4">
-                      <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border-2 border-slate-200 dark:border-slate-700 shadow-lg">
+                      <div className={`${t.sectionBg} rounded-2xl p-6 border-2 ${t.sectionBorder}`}>
                         <div className="flex items-center gap-3 mb-4">
                           <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${getActivityColor(selectedLog.details)}`}>
                             {getActivityIcon(selectedLog.details)}
@@ -1320,7 +1324,7 @@ function EmployeeLogs() {
                             <div className={`font-mono font-bold mt-1 ${t.title}`}>#{selectedLog.id}</div>
                           </div>
                           <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3">
-                            <div className={`text-xs uppercase font-semibold ${t.smallMuted}`}>Created At</div>
+                            <div className={`text-xs uppercase font-semibold ${t.label} mb-2`}>Created At</div>
                             <div className={`font-medium mt-1 text-sm ${t.label}`}>{new Date(selectedLog.created_at).toLocaleString()}</div>
                           </div>
                           <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 col-span-2">
@@ -1357,7 +1361,7 @@ function EmployeeLogs() {
               </div>
 
               {/* Modal Footer */}
-              <div className="bg-slate-50 dark:bg-slate-800 p-6 flex justify-end gap-3 border-t-2 border-slate-200 dark:border-slate-700">
+              <div className={`${t.sectionBgAlt} p-6 flex justify-end gap-3 border-t-2 border-slate-200 dark:border-slate-700`}>
                 <button 
                   onClick={closeDetailedView} 
                   className="px-6 py-3 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white rounded-xl transition-all font-semibold shadow-md hover:shadow-lg"
@@ -1402,6 +1406,7 @@ function EmployeeLogs() {
         isOpen={showReportBuilder}
         onClose={() => setState(prev => ({ ...prev, showReportBuilder: false }))}
         logs={logs}
+
       />
 
     </div>
@@ -1412,6 +1417,9 @@ function EmployeeLogs() {
 
 // AuditViewer: displays audit records for a selected log
 function AuditViewer({ logId }) {
+  const { isDarkMode } = useAuth();
+  const t = themeFor(isDarkMode);
+
   const [audits, setAudits] = useState(null)
   const [loading, setLoading] = useState(false)
   const [expandedAudits, setExpandedAudits] = useState({})
@@ -1471,8 +1479,8 @@ function AuditViewer({ logId }) {
       <div className="space-y-3">
         {Object.entries(changes).map(([field, change]) => {
           const fieldInfo = fieldLabels[field] || { label: field, icon: '📋' }
-          const oldValue = change.old !== undefined ? change.old : (original && original[field])
-          const newValue = change.new !== undefined ? change.new : (newData && newData[field])
+          const oldValue = change.old !== undefined ? change.old : (original && original[field]);
+          const newValue = change.new !== undefined ? change.new : (newData && newData[field]);
           
           return (
             <div key={field} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
@@ -1539,7 +1547,7 @@ function AuditViewer({ logId }) {
         return (
           <div key={audit.id} className="bg-white dark:bg-slate-800 rounded-xl border-2 border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition-shadow">
             {/* Audit Header */}
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-4 border-b border-slate-200 dark:border-slate-700">
+            <div className="bg-linear-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-4 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3 flex-1">
                   <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center shadow-md shrink-0">
@@ -1555,7 +1563,7 @@ function AuditViewer({ logId }) {
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                       <div className="flex items-center gap-1">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 012 2z" />
                         </svg>
                         <span>{formattedDate} at {formattedTime}</span>
                       </div>
@@ -1736,7 +1744,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-2xl flex items-center justify-center shadow-lg">
                   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
                 <div>
@@ -1765,7 +1773,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-all ${
                   step === 1 
-                    ? 'bg-gradient-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
+                    ? 'bg-linear-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
                     : step > 1 
                       ? 'bg-green-500 text-white' 
                       : `bg-slate-200 dark:bg-slate-700 ${t.smallMuted}`
@@ -1787,7 +1795,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-all ${
                   step === 2 
-                    ? 'bg-gradient-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
+                    ? 'bg-linear-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
                     : step > 2 
                       ? 'bg-green-500 text-white' 
                       : `bg-slate-200 dark:bg-slate-700 ${t.smallMuted}`
@@ -1809,7 +1817,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-all ${
                   step === 3 
-                    ? 'bg-gradient-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
+                    ? 'bg-linear-to-br from-amber-600 to-orange-600 text-white shadow-lg scale-110' 
                     : `bg-slate-200 dark:bg-slate-700 ${t.smallMuted}`
                 }`}>
                   3
@@ -1853,7 +1861,7 @@ function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className={`text-lg font-bold ${t.accent.blue}`}>
+                            <div className={`text-lg font-bold ${t.accent.green}`}>
                               Qty: {item.quantity || 1}
                             </div>
                             <div className={`text-xs ${t.smallMuted}`}>checked out</div>
