@@ -177,4 +177,51 @@ async getEmployees(params = {}, options = {}) {
     const queryParams = new URLSearchParams(params).toString()
     return this.request(`/api/employees/validate?${queryParams}`)
   }
+
+  /**
+ * Get current logged-in employee data (bypasses status filter)
+ * @param {number|string} uid - Employee UID
+ * @returns {Promise} Employee data
+ */
+async getCurrentEmployeeData(uid) {
+  try {
+    const queryParams = new URLSearchParams({
+      employeeUid: uid,
+      includeAllStatuses: 'true',
+      limit: 1
+    });
+
+    const url = `${this.baseURL}/api/employees?${queryParams.toString()}`;
+    
+    console.log('[EmployeeService] Fetching current employee data:', url);
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    return {
+      success: true,
+      employee: data.employees?.[0] || null,
+    };
+
+  } catch (error) {
+    console.error("Error fetching current employee:", error);
+    return {
+      success: false,
+      error: error.message,
+      employee: null,
+    };
+  }
+}
 }

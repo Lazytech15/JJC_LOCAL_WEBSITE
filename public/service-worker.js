@@ -432,6 +432,8 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(clients.openWindow(event.notification.data))
 })
 
+// In service-worker.js, update the message event listener
+
 self.addEventListener("message", (event) => {
   // Clear specific cache
   if (event.data && event.data.type === "CLEAR_CACHE") {
@@ -454,6 +456,35 @@ self.addEventListener("message", (event) => {
         console.log("[Service Worker] All image caches cleared")
       })
     )
+  }
+  
+  // NEW: Clear specific image type cache (landing or gallery)
+  if (event.data && event.data.type === "CLEAR_SPECIFIC_IMAGE_CACHE") {
+    const imageType = event.data.imageType
+    let cacheName = null
+    
+    if (imageType === 'landing') {
+      cacheName = LANDING_CACHE
+    } else if (imageType === 'gallery') {
+      cacheName = GALLERY_CACHE
+    }
+    
+    if (cacheName) {
+      event.waitUntil(
+        caches.delete(cacheName).then(() => {
+          console.log(`[Service Worker] Cleared ${imageType} image cache: ${cacheName}`)
+          // Notify all clients that cache was cleared
+          return self.clients.matchAll().then(clients => {
+            clients.forEach(client => {
+              client.postMessage({
+                type: 'CACHE_CLEARED',
+                imageType: imageType
+              })
+            })
+          })
+        })
+      )
+    }
   }
   
   // Clear specific profile
@@ -483,7 +514,6 @@ self.addEventListener("message", (event) => {
     const urls = event.data.urls || []
     event.waitUntil(prefetchImages(urls))
   }
-
 })
 
 // Prefetch images only when requested
