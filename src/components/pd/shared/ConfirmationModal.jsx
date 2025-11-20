@@ -1,4 +1,5 @@
 import { memo } from "react"
+import { useAuth } from "../../../contexts/AuthContext"
 import ModalPortal from "./ModalPortal"
 
 function ConfirmationModal({ 
@@ -11,6 +12,8 @@ function ConfirmationModal({
   cancelText = "Cancel",
   type = "warning" // warning, danger, info
 }) {
+  // Hooks must run unconditionally
+  const { isDarkMode } = useAuth()
   if (!isOpen) return null
 
   const getTypeStyles = () => {
@@ -57,7 +60,7 @@ function ConfirmationModal({
 
   return (
     <ModalPortal>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-fadeIn">
+      <div className={`fixed inset-0 flex items-center justify-center z-9999 p-4 animate-fadeIn backdrop-blur-sm ${isDarkMode ? 'bg-black/50' : 'bg-black/30'}`}>
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl max-w-md w-full border-2 border-slate-300 dark:border-slate-700 overflow-hidden animate-scaleIn">
           {/* Header */}
           <div className={`${styles.headerBg} p-4 flex items-center justify-center`}>

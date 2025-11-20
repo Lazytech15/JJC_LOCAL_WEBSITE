@@ -1,5 +1,6 @@
 import { useState, useEffect, lazy, Suspense, useRef } from "react"
 import { useAuth } from "../../../contexts/AuthContext"
+import { themeFor } from "../../../utils/theme/themeClasses"
 import apiService from "../../../utils/api/api-service"
 import ModalPortal from "../shared/ModalPortal"
 import QRCodeSmall from "../barcode/QRCodeSmall"
@@ -25,6 +26,7 @@ const AddEditItemWizard = lazy(() => import('./AddEditItemWizard'))
 
 function InventoryManagement() {
   const { isDarkMode } = useAuth()
+  const t = themeFor(isDarkMode)
   const { success, error: showError, warning } = useToast()
   // Inventory Management States
   const [items, setItems] = useState([])
@@ -307,7 +309,7 @@ function InventoryManagement() {
       case "In Stock":
         return "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800"
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800"
+        return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-slate-800 dark:border-gray-800"
     }
   }
 
@@ -779,8 +781,8 @@ function InventoryManagement() {
               </svg>
             </div>
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100">Inventory Management</h2>
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <h2 className={`text-xl sm:text-2xl font-bold ${t.header}`}>Inventory Management</h2>
+              <p className={`text-xs ${t.muted}`}>
                 Metal works, parts & supplies tracking
               </p>
             </div>
@@ -856,17 +858,17 @@ function InventoryManagement() {
           </div>
           <div className="relative">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="font-bold text-slate-700 dark:text-slate-300 text-xs uppercase tracking-wide">
+              <h3 className={`font-bold ${t.label} text-xs uppercase tracking-wide`}>
                 Total Items
               </h3>
-              <div className="w-7 h-7 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center">
-                <svg className="w-4 h-4 text-slate-600 dark:text-slate-300" fill="currentColor" viewBox="0 0 24 24">
+              <div className={`w-7 h-7 ${t.chipMutedBg} rounded-lg flex items-center justify-center`}>
+                <svg className={`w-4 h-4 ${t.iconMuted}`} fill="currentColor" viewBox="0 0 24 24">
                   <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
                 </svg>
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{statistics.server_total_items ?? statistics.total_items ?? 0}</p>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">In system</p>
+            <p className={`text-2xl sm:text-3xl font-bold ${t.statNumber}`}>{statistics.server_total_items ?? statistics.total_items ?? 0}</p>
+            <p className={`text-xs ${t.smallMuted} mt-0.5`}>In system</p>
           </div>
         </div>
 
@@ -878,19 +880,19 @@ function InventoryManagement() {
           </div>
           <div className="relative">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="font-bold text-green-700 dark:text-green-300 text-xs uppercase tracking-wide">
+              <h3 className={`font-bold ${t.label} text-xs uppercase tracking-wide`}>
                 In Stock
               </h3>
-              <div className="w-7 h-7 bg-green-200 dark:bg-green-800/50 rounded-lg flex items-center justify-center">
-                <svg className="w-4 h-4 text-green-600 dark:text-green-300" fill="currentColor" viewBox="0 0 24 24">
+              <div className={`w-7 h-7 ${t.chipMutedBg} rounded-lg flex items-center justify-center`}>
+                <svg className={`w-4 h-4 ${t.accent.green}`} fill="currentColor" viewBox="0 0 24 24">
                   <path d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
                 </svg>
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-green-700 dark:text-green-400">
+            <p className={`text-2xl sm:text-3xl font-bold ${t.statNumber}`}>
               {statistics.in_stock || 0}
             </p>
-            <p className="text-xs text-green-600 dark:text-green-400/80 mt-0.5">Available items</p>
+            <p className={`text-xs ${t.smallMuted} mt-0.5`}>Available items</p>
           </div>
         </div>
 
@@ -902,17 +904,17 @@ function InventoryManagement() {
           </div>
           <div className="relative">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="font-bold text-amber-700 dark:text-amber-300 text-xs uppercase tracking-wide">
+              <h3 className={`font-bold ${t.label} text-xs uppercase tracking-wide`}>
                 Low Stock
               </h3>
-              <div className="w-7 h-7 bg-amber-200 dark:bg-amber-800/50 rounded-lg flex items-center justify-center">
-                <svg className="w-4 h-4 text-amber-600 dark:text-amber-300" fill="currentColor" viewBox="0 0 24 24">
+              <div className={`w-7 h-7 ${t.chipMutedBg} rounded-lg flex items-center justify-center`}>
+                <svg className={`w-4 h-4 ${t.accent.amber}`} fill="currentColor" viewBox="0 0 24 24">
                   <path d="M13,14H11V10H13M13,18H11V16H13M1,21H23L12,2L1,21Z" />
                 </svg>
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-amber-700 dark:text-amber-400">{statistics.low_stock || 0}</p>
-            <p className="text-xs text-amber-600 dark:text-amber-400/80 mt-0.5">Needs restocking</p>
+            <p className={`text-2xl sm:text-3xl font-bold ${t.statNumber}`}>{statistics.low_stock || 0}</p>
+            <p className={`text-xs ${t.smallMuted} mt-0.5`}>Needs restocking</p>
           </div>
         </div>
 
@@ -924,23 +926,25 @@ function InventoryManagement() {
           </div>
           <div className="relative">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="font-bold text-red-700 dark:text-red-300 text-xs uppercase tracking-wide">
+              <h3 className={`font-bold ${t.label} text-xs uppercase tracking-wide`}>
                 Out of Stock
               </h3>
-              <div className="w-7 h-7 bg-red-200 dark:bg-red-800/50 rounded-lg flex items-center justify-center">
-                <svg className="w-4 h-4 text-red-600 dark:text-red-300" fill="currentColor" viewBox="0 0 24 24">
+              <div className={`w-7 h-7 ${t.chipMutedBg} rounded-lg flex items-center justify-center`}>
+                <svg className={`w-4 h-4 ${t.accent.red}`} fill="currentColor" viewBox="0 0 24 24">
                   <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" />
                 </svg>
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-red-700 dark:text-red-400">{statistics.out_of_stock || 0}</p>
-            <p className="text-xs text-red-600 dark:text-red-400/80 mt-0.5">Urgent action needed</p>
+            <p className={`text-2xl sm:text-3xl font-bold ${t.statNumber}`}>{statistics.out_of_stock || 0}</p>
+            <p className={`text-xs ${t.smallMuted} mt-0.5`}>Urgent action needed</p>
           </div>
         </div>
       </div>
 
       {/* Filters Section */}
-      <div className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-6 shadow-lg border" : "bg-white border-gray-200 rounded-2xl p-6 shadow-lg border"}>
+      <div className={`rounded-2xl p-6 shadow-lg border ${
+        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-300"
+      }`}>
         <style>{`
           select {
             max-height: 200px !important;
@@ -954,17 +958,17 @@ function InventoryManagement() {
           }
         `}</style>
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Filter & Search</h3>
+          <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>Filter & Search</h3>
           <button
             onClick={() => {
-              setFilters({
-                search: "",
-                item_status: "",
-                location: "",
-              })
+              setFilters({ search: "", item_status: "", location: "" })
               setSortBy("")
             }}
-            className="text-sm bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+            className={`text-sm px-4 py-2 rounded-lg transition-colors font-medium ${
+              isDarkMode
+                ? "bg-gray-700 hover:bg-gray-600 text-white border border-gray-600"
+                : "bg-gray-100 hover:bg-gray-200 text-gray-900 border-2 border-gray-300"
+            }`}
           >
             Clear All
           </button>
@@ -1059,7 +1063,7 @@ function InventoryManagement() {
         {/* Show active filters */}
         {(filters.search || filters.item_status || filters.location || sortBy) && (
           <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 font-medium">Active filters & sorting:</p>
+            <p className="text-sm text-gray-600 dark:text-slate-800 mb-3 font-medium">Active filters & sorting:</p>
             <div className="flex flex-wrap gap-3">
               {filters.search && (
                 <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-3 py-2 rounded-lg text-sm font-medium shadow-sm border border-blue-200 dark:border-blue-800">
@@ -1103,7 +1107,7 @@ function InventoryManagement() {
               <span className="text-3xl">📦</span>
             </div>
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Items Found</h3>
-            <p className="text-gray-600 dark:text-gray-400 text-lg">
+            <p className="text-gray-600 dark:text-slate-800 text-lg">
               Add your first item to get started with inventory management.
             </p>
           </div>
@@ -1120,7 +1124,7 @@ function InventoryManagement() {
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                     viewMode === 'grid'
                       ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      : 'text-gray-600 dark:text-slate-800 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
                   📱 Grid
@@ -1130,14 +1134,14 @@ function InventoryManagement() {
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                     viewMode === 'list'
                       ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      : 'text-gray-600 dark:text-slate-800 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
                   📋 List
                 </button>
               </div>
             </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
+            <div className="text-sm text-gray-600 dark:text-slate-800">
               {sortedItems.length} items • Showing {Math.min(visibleCount, sortedItems.length)} of {sortedItems.length}
             </div>
           </div>
@@ -1145,93 +1149,116 @@ function InventoryManagement() {
           {/* Items Display */}
           {viewMode === 'grid' ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {sortedItems.slice(0, visibleCount).map((item) => (
-            <div
-              key={item.item_no}
-              onClick={() => {
-                setSelectedItemForDetail(item)
-                setShowItemDetail(true)
-              }}
-              className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-6 shadow-lg border hover:shadow-xl transition-all duration-200 flex flex-col cursor-pointer" : "bg-white border-gray-200 rounded-2xl p-6 shadow-lg border hover:shadow-xl transition-all duration-200 flex flex-col cursor-pointer"}
-            >
-              {/* Item Header */}
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex-1">
-                  <h4 className="font-bold text-xl text-gray-900 dark:text-white mb-1">{item.item_name}</h4>
-                  <p className="text-gray-600 dark:text-gray-400 font-medium">{item.brand}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">ID: {item.item_no}</p>
+          {sortedItems.slice(0, visibleCount).map((item) => {
+            const theme = {
+              card: isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300 shadow-lg',
+              cardHover: isDarkMode ? 'hover:border-gray-600' : 'hover:border-gray-400 hover:shadow-2xl',
+              title: isDarkMode ? 'text-white' : 'text-gray-900',
+              subtitle: isDarkMode ? 'text-gray-400' : 'text-gray-600',
+              label: isDarkMode ? 'text-gray-300' : 'text-gray-700',
+              value: isDarkMode ? 'text-white' : 'text-gray-900',
+              detailBox: isDarkMode ? 'bg-gray-700/50' : 'bg-gray-100 border border-gray-200',
+              priceBox: isDarkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border border-blue-200',
+              priceLabel: isDarkMode ? 'text-blue-300' : 'text-blue-700',
+              priceValue: isDarkMode ? 'text-blue-200' : 'text-blue-900',
+            };
+
+            return (
+              <div
+                key={item.item_no}
+                onClick={() => {
+                  setSelectedItemForDetail(item)
+                  setShowItemDetail(true)
+                }}
+                className={`rounded-2xl p-6 border transition-all duration-200 flex flex-col cursor-pointer ${theme.card} ${theme.cardHover}`}
+              >
+                {/* Header */}
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1">
+                    <h4 className={`font-bold text-xl mb-1 ${theme.title}`}>
+                      {item.item_name}
+                    </h4>
+                    <p className={`font-medium ${theme.subtitle}`}>
+                      {item.brand}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      ID: {item.item_no}
+                    </p>
+                  </div>
+                  {(() => {
+                    const bal = Number(item.balance) || 0
+                    const min = Number(item.min_stock) || 0
+                    const status = bal === 0 ? "Out Of Stock" : (min > 0 && bal < min ? "Low In Stock" : "In Stock")
+                    const color = status === "Out Of Stock" ? "bg-red-500" : status === "Low In Stock" ? "bg-yellow-500" : "bg-green-500"
+                    return (
+                      <span 
+                        className={`inline-block w-3.5 h-3.5 rounded-full ${color}`} 
+                        title={status} 
+                        aria-label={status} 
+                      />
+                    )
+                  })()}
                 </div>
-                {(() => {
-                  const bal = Number(item.balance) || 0
-                  const min = Number(item.min_stock) || 0
-                  const status = bal === 0 ? "Out Of Stock" : (min > 0 && bal < min ? "Low In Stock" : "In Stock")
-                  const color = status === "Out Of Stock" ? "bg-red-500" : status === "Low In Stock" ? "bg-yellow-400" : "bg-green-500"
-                  return (
-                    <span className={`inline-block w-3.5 h-3.5 rounded-full ${color}`} title={status} aria-label={status} />
-                  )
-                })()}
+
+                {/* Details Grid */}
+                <div className="space-y-3 mb-6 flex-1">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className={`rounded-lg p-3 ${theme.detailBox}`}>
+                      <span className={`font-bold block text-xs mb-1 ${theme.label}`}>Type</span>
+                      <span className={`text-sm ${theme.value}`}>{item.item_type}</span>
+                    </div>
+                    <div className={`rounded-lg p-3 ${theme.detailBox}`}>
+                      <span className={`font-bold block text-xs mb-1 ${theme.label}`}>Location</span>
+                      <span className={`text-sm ${theme.value}`}>{item.location}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className={`rounded-lg p-3 ${theme.detailBox}`}>
+                      <span className={`font-bold block text-xs mb-1 ${theme.label}`}>Balance</span>
+                      <span className={`text-lg font-bold ${theme.value}`}>{item.balance}</span>
+                    </div>
+                    <div className={`rounded-lg p-3 ${theme.detailBox}`}>
+                      <span className={`font-bold block text-xs mb-1 ${theme.label}`}>Min Stock</span>
+                      <span className={`text-lg font-bold ${theme.value}`}>{item.min_stock}</span>
+                    </div>
+                  </div>
+
+                  <div className={`rounded-lg p-3 flex items-center justify-between ${theme.priceBox}`}>
+                    <div>
+                      <span className={`font-bold block text-xs mb-1 ${theme.priceLabel}`}>Price per Unit</span>
+                      <span className={`text-lg font-bold ${theme.priceValue}`}>{formatCurrency(item.price_per_unit)}</span>
+                    </div>
+                    <div className="ml-4">
+                      <QRCodeSmall itemNo={item.item_no} size={2} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleStockManagement(item)
+                    }}
+                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
+                  >
+                    Stock
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteItem(item.item_no)
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
+                  >
+                    Del
+                  </button>
+                </div>
               </div>
-
-              {/* Item Details */}
-              <div className="space-y-3 mb-6 flex-1">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                    <span className="font-bold text-gray-700 dark:text-gray-300 block">Type</span>
-                    <span className="text-gray-900 dark:text-white">{item.item_type}</span>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                    <span className="font-bold text-gray-700 dark:text-gray-300 block">Location</span>
-                    <span className="text-gray-900 dark:text-white">{item.location}</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                    <span className="font-bold text-gray-700 dark:text-gray-300 block">Balance</span>
-                    <span className="text-gray-900 dark:text-white font-bold">
-                      {item.balance}
-                    </span>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                    <span className="font-bold text-gray-700 dark:text-gray-300 block">Min Stock</span>
-                    <span className="text-gray-900 dark:text-white font-bold">{item.min_stock}</span>
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 flex items-center justify-between">
-                  <div>
-                    <span className="font-bold text-blue-700 dark:text-blue-300 block text-sm">Price per Unit</span>
-                    <span className="text-blue-900 dark:text-blue-200 font-bold text-lg">{formatCurrency(item.price_per_unit)}</span>
-                  </div>
-                  <div className="ml-4">
-                    <QRCodeSmall itemNo={item.item_no} size={2} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleStockManagement(item)
-                  }}
-                  className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
-                >
-                  Stock
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDeleteItem(item.item_no)
-                  }}
-                  className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-all duration-200 text-sm font-semibold flex items-center justify-center gap-1 shadow-md hover:shadow-lg"
-                >
-                  Del
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
           {sortedItems.length > visibleCount && (
             <div className="col-span-full flex justify-center">
               <button
@@ -1263,7 +1290,7 @@ function InventoryManagement() {
       {/* Modals */}
       {showStockInsert && selectedItem && (
         <ModalPortal>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`fixed inset-0 flex items-center justify-center p-4 z-50 ${isDarkMode ? 'bg-black/50' : 'bg-black/30'} backdrop-blur-sm`}>
             <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl p-6 w-full max-w-md">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Insert Stock - {selectedItem.item_name}</h3>
@@ -1273,7 +1300,7 @@ function InventoryManagement() {
                     setSelectedItem(null)
                     setStockInsertData({ quantity: 0, reason: "" })
                   }}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="text-gray-500 hover:text-gray-700 dark:text-slate-800 dark:hover:text-gray-200"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1283,7 +1310,7 @@ function InventoryManagement() {
 
               <div className="space-y-4">
                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Current Balance</p>
+                  <p className="text-sm text-gray-600 dark:text-slate-800 mb-1">Current Balance</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">{selectedItem.balance}</p>
                 </div>
 
@@ -1330,7 +1357,7 @@ function InventoryManagement() {
       {/* Item Form Modal - Now using Wizard with lazy loading! */}
       <Suspense fallback={
         <ModalPortal>
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className={`fixed inset-0 flex items-center justify-center z-50 backdrop-blur-sm ${isDarkMode ? 'bg-black/50' : 'bg-black/30'}`}>
             <div className={isDarkMode ? "bg-gray-800 rounded-2xl p-8 shadow-2xl" : "bg-white rounded-2xl p-8 shadow-2xl"}>
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
               <p className="mt-4 text-gray-700 dark:text-gray-300">Loading form...</p>
@@ -1358,7 +1385,7 @@ function InventoryManagement() {
       {/* Stock Manager Modal */}
       {showStockManager && selectedItem && (
         <ModalPortal>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className={`fixed inset-0 flex items-center justify-center p-4 z-50 ${isDarkMode ? 'bg-black/50' : 'bg-black/30'} backdrop-blur-sm`}>
             <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl shadow-xl p-6 w-full max-w-md">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">
@@ -1370,7 +1397,7 @@ function InventoryManagement() {
                     setSelectedItem(null)
                     setStockManagerData({ stock_in: 0, stock_out: 0, reason: "", current_balance: 0 })
                   }}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="text-gray-500 hover:text-gray-700 dark:text-slate-800 dark:hover:text-gray-200"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1381,7 +1408,7 @@ function InventoryManagement() {
               <div className="space-y-4">
                 <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Current Balance</span>
+                    <span className="text-sm font-medium text-gray-600 dark:text-slate-800">Current Balance</span>
                     <span className="text-2xl font-bold text-gray-800 dark:text-gray-200">
                       {selectedItem.balance || 0} {selectedItem.unit_of_measure || ''}
                     </span>
@@ -1536,7 +1563,7 @@ function InventoryManagement() {
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[1000]">
             <div className={isDarkMode ? "bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6" : "bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"}>
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Export Inventory Data</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
+              <p className="text-gray-600 dark:text-slate-800 mb-6">
                 Choose a format to export your inventory data ({items.length} items)
               </p>
 
@@ -1655,7 +1682,7 @@ function InventoryManagement() {
                   </div>
                   
                   {/* Mode Description */}
-                  <div className="mt-3 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                  <div className="mt-3 text-sm text-gray-600 dark:text-slate-800 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
                     {importMode === 'add' && (
                       <p>✅ All imported items will be added as <strong>new items</strong>. Existing items remain unchanged.</p>
                     )}
@@ -1685,7 +1712,7 @@ function InventoryManagement() {
                 {importLoading && (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600 dark:text-gray-400">Processing file...</p>
+                    <p className="text-gray-600 dark:text-slate-800">Processing file...</p>
                   </div>
                 )}
 
@@ -1739,7 +1766,7 @@ function InventoryManagement() {
                           ))}
                           {importPreview.length > 10 && (
                             <tr>
-                              <td colSpan="4" className="px-4 py-2 text-center text-gray-500 dark:text-gray-400 italic">
+                              <td colSpan="4" className="px-4 py-2 text-center text-gray-500 dark:text-slate-800 italic">
                                 ...and {importPreview.length - 10} more items
                               </td>
                             </tr>
