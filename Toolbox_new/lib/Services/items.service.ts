@@ -191,9 +191,10 @@ export class ItemsService {
 
         try {
           // If the item just reached zero balance, notify Procurement admins
-          if (result.new_balance === 0) {
+          if (Number(result.new_balance) === 0) {
             // Find original item data from input array
             const original = items.find(i => (i.item_no || i.id) === result.item_id)
+            console.log('[ItemsService] Detected zero balance for', result.item_id, 'original:', original)
             await this.sendOutOfStockAnnouncement(original || { id: result.item_id, item_name: original?.item_name || original?.name || String(result.item_id) }, result)
           }
         } catch (announceErr) {
@@ -229,6 +230,7 @@ export class ItemsService {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           mode: 'cors',
+          credentials: 'include',
           signal: AbortSignal.timeout(10000),
         })
 
@@ -273,10 +275,12 @@ export class ItemsService {
       }
 
       try {
+        console.log('[ItemsService] Posting announcement payload:', announcementPayload)
         const resp = await fetch(`${this.config.baseUrl}/api/announcements`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           mode: 'cors',
+          credentials: 'include',
           body: JSON.stringify(announcementPayload),
           signal: AbortSignal.timeout(10000),
         })
