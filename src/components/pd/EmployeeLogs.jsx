@@ -909,7 +909,7 @@ function EmployeeLogs() {
               className={`px-5 py-3 rounded-xl transition-all font-semibold flex items-center gap-2 ${
                 showFilters 
                   ? 'bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-lg' 
-                  : `bg-slate-100 dark:bg-slate-700 ${t.label} hover:bg-slate-200 dark:hover:bg-slate-600`
+                  : `bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600`
               }`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -962,10 +962,9 @@ function EmployeeLogs() {
 
               <div className="flex flex-wrap items-center gap-3">
                 <span className={`text-sm font-semibold ${t.label}`}>Quick Select:</span>
-                <button onClick={() => setTimeRange('today')} className={`px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 ${t.label} rounded-lg transition-all font-medium`}>Today</button>
-                <button onClick={() => setTimeRange('week')} className={`px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 ${t.label} rounded-lg transition-all font-medium`}>Last 7 Days</button>
-                <button onClick={() => setTimeRange('month')} className={`px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 ${t.label} rounded-lg transition-all font-medium`}>Last 30 Days</button>
-                
+                <button onClick={() => setTimeRange('today')} className="px-4 py-2 bg-slate-600 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-all font-medium">Today</button>
+                <button onClick={() => setTimeRange('week')} className="px-4 py-2 bg-slate-600 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-all font-medium">Last 7 Days</button>
+                <button onClick={() => setTimeRange('month')} className="px-4 py-2 bg-slate-600 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-all font-medium">Last 30 Days</button>                
                 <div className="ml-auto">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1156,7 +1155,7 @@ function EmployeeLogs() {
             <button
               onClick={() => setState(prev => ({ ...prev, currentPage: Math.max(prev.currentPage - 1, 1) }))}
               disabled={currentPage === 1 || loading}
-              className={`px-5 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl ${t.label} hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-md hover:shadow-lg`}
+              className={`px-5 py-3 bg-slate-200 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-md hover:shadow-lg`}
             >
               ← Previous
             </button>
@@ -1172,7 +1171,7 @@ function EmployeeLogs() {
                     className={`w-12 h-12 rounded-xl transition-all font-bold shadow-md text-sm ${
                       currentPage === pageNum
               ? "bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-110"
-                : `bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 ${t.label} hover:bg-slate-50 dark:hover:bg-slate-700`
+                : `bg-slate-100 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700`
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {pageNum}
@@ -1184,7 +1183,7 @@ function EmployeeLogs() {
             <button
               onClick={() => setState(prev => ({ ...prev, currentPage: Math.min(prev.currentPage + 1, totalPages) }))}
               disabled={currentPage === totalPages || loading}
-              className={`px-5 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl ${t.label} hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-md hover:shadow-lg`}
+              className={`px-5 py-3 bg-slate-200 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-md hover:shadow-lg`}
             >
               Next →
             </button>
