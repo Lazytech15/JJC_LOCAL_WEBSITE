@@ -27,7 +27,7 @@ export default function Announcements({ isDarkMode }) {
         }
 
         const payload = verifyToken(token)
-        const uid = payload?.userId
+        const uid = payload?.userId || payload?.id || payload?.uid
 
         if (!uid) {
           setError("Invalid session")

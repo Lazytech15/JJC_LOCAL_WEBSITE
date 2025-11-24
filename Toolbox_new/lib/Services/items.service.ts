@@ -183,10 +183,21 @@ export class ItemsService {
       
       console.log(`[ItemsService] Individual update results: ${successfulUpdates.length} successful, ${failedUpdates.length} failed`)
       
-      // Log successful updates
-      successfulUpdates.forEach(result => {
+      // Log successful updates and create announcements for out-of-stock items
+      successfulUpdates.forEach(async (result) => {
         if (result.success && result.previous_balance !== undefined) {
           console.log(`[ItemsService] Item ${result.item_id}: ${result.previous_balance} → ${result.new_balance}`)
+        }
+
+        try {
+          // If the item just reached zero balance, notify Procurement admins
+          if (result.new_balance === 0) {
+            // Find original item data from input array
+            const original = items.find(i => (i.item_no || i.id) === result.item_id)
+            await this.sendOutOfStockAnnouncement(original || { id: result.item_id, item_name: original?.item_name || original?.name || String(result.item_id) }, result)
+          }
+        } catch (announceErr) {
+          console.warn('[ItemsService] Failed to send out-of-stock announcement for', result.item_id, announceErr)
         }
       })
       
@@ -200,6 +211,93 @@ export class ItemsService {
     } catch (error) {
       console.error("[ItemsService] Failed to commit item changes:", error)
       throw error
+    }
+  }
+
+  /**
+   * Send an announcement when an item reaches zero balance
+   */
+  private async sendOutOfStockAnnouncement(originalItem: any, result: any): Promise<void> {
+    try {
+      const itemName = originalItem?.item_name || originalItem?.name || String(originalItem?.id || originalItem?.item_no || 'Unknown')
+      const itemId = originalItem?.id || originalItem?.item_no || result.item_id
+
+      // Attempt to fetch employees and find Procurement admins
+      let adminEmployeeIds: number[] = []
+      try {
+        const empResp = await fetch(`${this.config.baseUrl}${API_ENDPOINTS.employees}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          mode: 'cors',
+          signal: AbortSignal.timeout(10000),
+        })
+
+        if (empResp.ok) {
+          const empData = await empResp.json()
+          let employees: any[] = []
+          if (Array.isArray(empData)) employees = empData
+          else if (empData && empData.success && Array.isArray(empData.employees)) employees = empData.employees
+          else if (empData && empData.success && Array.isArray(empData.data)) employees = empData.data
+
+          // Strictly require department === 'Procurement' and access_level === 'admin'
+          const procurementAdmins = employees.filter(e => {
+            const dept = (e.department || '').toString().trim().toLowerCase()
+            const access = (e.access_level || '').toString().trim().toLowerCase()
+            return dept === 'procurement' && access === 'admin'
+          })
+
+          adminEmployeeIds = procurementAdmins.map(a => a.id).filter(Boolean)
+        }
+      } catch (err) {
+        console.warn('[ItemsService] Failed to fetch employees for announcement:', err)
+      }
+
+      // Build announcement payload
+      const title = `Out of stock: ${itemName}`
+      const message = `Item ${itemName} (ID ${itemId}) has just run out of stock. Previous: ${result.previous_balance}, Current: ${result.new_balance}. Please restock as needed.`
+
+      // Only send announcement when there are Procurement admins
+      if (!adminEmployeeIds || adminEmployeeIds.length === 0) {
+        console.log('[ItemsService] No Procurement admins (access_level=admin) found — skipping announcement for', itemId)
+        return
+      }
+
+      const announcementPayload: any = {
+        title,
+        message,
+        priority: 'urgent',
+        expiryDate: null,
+        createdBy: 'toolbox system',
+        recipientType: 'specific',
+        selectedEmployees: adminEmployeeIds
+      }
+
+      try {
+        const resp = await fetch(`${this.config.baseUrl}/api/announcements`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          mode: 'cors',
+          body: JSON.stringify(announcementPayload),
+          signal: AbortSignal.timeout(10000),
+        })
+
+        if (resp.ok) {
+          const data = await resp.json().catch(() => ({}))
+          if (data && data.success) {
+            console.log('[ItemsService] Sent out-of-stock announcement for', itemId)
+          } else {
+            console.warn('[ItemsService] Announcement API returned unexpected response', data)
+          }
+        } else {
+          const txt = await resp.text().catch(() => '')
+          console.warn('[ItemsService] Failed to post announcement:', resp.status, txt)
+        }
+      } catch (err) {
+        console.warn('[ItemsService] Error posting announcement:', err)
+      }
+
+    } catch (err) {
+      console.warn('[ItemsService] sendOutOfStockAnnouncement error:', err)
     }
   }
 
