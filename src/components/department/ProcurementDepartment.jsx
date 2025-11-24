@@ -757,48 +757,25 @@ function ProcurementDepartment() {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-                <div className={`${isDarkMode ? "bg-slate-700/50 border-slate-600/30" : "bg-gray-100 border-gray-300"} rounded-lg p-3 sm:p-4 border`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <svg className={`w-4 h-4 ${isDarkMode ? "text-blue-400" : "text-blue-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
-                    <span className={`text-xs sm:text-sm ${isDarkMode ? "text-slate-300" : "text-gray-700"}`}>Total Items</span>
-                  </div>
-                  <p className={`text-xl sm:text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>1,247</p>
-                  <p className={`text-xs ${isDarkMode ? "text-green-400" : "text-green-500"}`}>+12% from last month</p>
+                <div className="bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-900/50 rounded-lg p-3 sm:p-4 shadow-md border border-slate-300 dark:border-slate-700">
+                  <h3 className="font-bold text-slate-700 dark:text-slate-300 text-xs uppercase">TOTAL ITEMS</h3>
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">1,247</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">+12% from last month</p>
                 </div>
-
-                <div className={`${isDarkMode ? "bg-slate-700/50 border-slate-600/30" : "bg-gray-100 border-gray-300"} rounded-lg p-3 sm:p-4 border`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <svg className={`w-4 h-4 ${isDarkMode ? "text-green-400" : "text-green-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className={`text-xs sm:text-sm ${isDarkMode ? "text-slate-300" : "text-gray-700"}`}>In Stock</span>
-                  </div>
-                  <p className={`text-xl sm:text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>892</p>
-                  <p className={`text-xs ${isDarkMode ? "text-green-400" : "text-green-500"}`}>71% of total</p>
+                <div className="bg-linear-to-br from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-800/20 rounded-lg p-3 sm:p-4 shadow-md border border-green-300 dark:border-green-800">
+                  <h3 className="font-bold text-green-700 dark:text-green-300 text-xs uppercase">IN STOCK</h3>
+                  <p className="text-xl sm:text-2xl font-bold text-green-700 dark:text-green-400">892</p>
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">71% of total</p>
                 </div>
-
-                <div className={`${isDarkMode ? "bg-slate-700/50 border-slate-600/30" : "bg-gray-100 border-gray-300"} rounded-lg p-3 sm:p-4 border`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <svg className={`w-4 h-4 ${isDarkMode ? "text-yellow-400" : "text-yellow-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                    <span className={`text-xs sm:text-sm ${isDarkMode ? "text-slate-300" : "text-gray-700"}`}>Low Stock</span>
-                  </div>
-                  <p className={`text-xl sm:text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>23</p>
-                  <p className={`text-xs ${isDarkMode ? "text-yellow-400" : "text-yellow-500"}`}>Requires attention</p>
+                <div className="bg-linear-to-br from-amber-50 to-yellow-100 dark:from-amber-900/20 dark:to-yellow-800/20 rounded-lg p-3 sm:p-4 shadow-md border border-amber-300 dark:border-amber-800">
+                  <h3 className="font-bold text-amber-700 dark:text-amber-300 text-xs uppercase">LOW STOCK</h3>
+                  <p className="text-xl sm:text-2xl font-bold text-amber-700 dark:text-amber-400">23</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">Requires attention</p>
                 </div>
-
-                <div className={`${isDarkMode ? "bg-slate-700/50 border-slate-600/30" : "bg-gray-100 border-gray-300"} rounded-lg p-3 sm:p-4 border`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <svg className={`w-4 h-4 ${isDarkMode ? "text-purple-400" : "text-purple-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                    <span className={`text-xs sm:text-sm ${isDarkMode ? "text-slate-300" : "text-gray-700"}`}>Active POs</span>
-                  </div>
-                  <p className={`text-xl sm:text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>15</p>
-                  <p className={`text-xs ${isDarkMode ? "text-blue-400" : "text-blue-500"}`}>$127K total value</p>
+                <div className="bg-linear-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-lg p-3 sm:p-4 shadow-md border border-purple-300 dark:border-purple-800">
+                  <h3 className="font-bold text-purple-700 dark:text-purple-300 text-xs uppercase">ACTIVE POS</h3>
+                  <p className="text-xl sm:text-2xl font-bold text-purple-700 dark:text-purple-400">15</p>
+                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-0.5">$127K total value</p>
                 </div>
               </div>
             </div>
@@ -895,6 +872,7 @@ function ProcurementDepartment() {
             dismissNotification(id)
             setSelectedNotification(null)
           }}
+          isDarkMode={isDarkMode}
         />
       </Suspense>
     </ToastProvider>

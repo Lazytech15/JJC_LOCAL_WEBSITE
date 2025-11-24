@@ -173,3 +173,31 @@ mark {
   font-family: 'YourFontName', sans-serif;
 } */
 
+/* Light/Dark theme CSS variable overrides and accessibility helpers */
+body:not(.dark) .force-light-text {
+  color: #1f2937 !important;
+}
+body:not(.dark) .force-light-bg {
+  background-color: #ffffff !important;
+}
+body:not(.dark) select option {
+  background-color: #ffffff;
+  color: #000000;
+}
+body:not(.dark) {
+  --text-primary: #1f2937;
+  --text-secondary: #4b5563;
+  --text-tertiary: #6b7280;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --border-primary: #e5e7eb;
+}
+body.dark {
+  --text-primary: #ffffff;
+  --text-secondary: #9ca3af;
+  --text-tertiary: #6b7280;
+  --bg-primary: #1f2937;
+  --bg-secondary: #111827;
+  --border-primary: #374151;
+}
+

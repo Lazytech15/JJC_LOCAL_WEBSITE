@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react"
 import { useAuth } from "../../contexts/AuthContext"
+import { themeFor } from "../../utils/theme/themeClasses"
 import apiService from "../../utils/api/api-service"
 import { useToast } from "./shared/ToastNotification"
 import { SupplierManagementSkeleton } from "../skeletons/ProcurementSkeletons"
 
 function SupplierManagement() {
   const { isDarkMode } = useAuth()
+  const t = themeFor(isDarkMode)
   const {  error: showError, success: showSuccess } = useToast()
   // Supplier Management States
   const [selectedSupplier, setSelectedSupplier] = useState(null)
@@ -225,8 +227,8 @@ function SupplierManagement() {
     <div className="p-6 space-y-8">
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6">
         <div className="space-y-2">
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">Supplier Management</h2>
-          <p className="text-lg text-gray-700 dark:text-gray-300">
+          <h2 className={`text-xl sm:text-2xl lg:text-3xl font-bold ${t.header}`}>Supplier Management</h2>
+          <p className={`text-lg ${t.muted}`}>
             Manage suppliers and view their inventory items
           </p>
         </div>
@@ -240,7 +242,7 @@ function SupplierManagement() {
 
       {/* Supplier Selection */}
       <div className={isDarkMode ? "bg-gray-800 border-gray-700 rounded-2xl p-6 shadow-lg border" : "bg-white border-gray-200 rounded-2xl p-6 shadow-lg border"}>
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Select Supplier</h3>
+  <h3 className={`text-lg font-bold ${t.title} mb-4`}>Select Supplier</h3>
         <div className="flex gap-4 items-end">
           <div className="flex-1">
               <select
@@ -251,7 +253,8 @@ function SupplierManagement() {
                 // Fetch concise metrics instead of full item list
                 fetchSupplierMetrics(supplier?.id)
               }}
-              className="w-full border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+              className={`w-full rounded-xl px-4 py-3 text-sm font-medium transition
+                ${isDarkMode ? "bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" : "bg-slate-50 border border-slate-300 text-slate-800 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"}`}
               disabled={loading}
             >
               <option value="">Select a supplier...</option>

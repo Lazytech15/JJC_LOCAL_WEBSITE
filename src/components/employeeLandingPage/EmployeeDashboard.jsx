@@ -568,16 +568,18 @@ export default function EmployeeDashboard() {
                         <User className="w-4 h-4" />
                         <span className="text-sm font-medium">View Profile</span>
                       </button>
-                      <button
-                        onClick={() => {
-                          setShowProfileMenu(false)
-                          navigate("/jjctoolbox")
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
-                          }`}
-                      >
-                        <span className="text-sm font-medium">Go To Toolbox</span>
-                      </button>
+                      { (employeeData?.access_level === 'admin' || employee?.access_level === 'admin') && (
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false)
+                            navigate("/jjctoolbox")
+                          }}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
+                            }`}
+                        >
+                          <span className="text-sm font-medium">Go To Toolbox</span>
+                        </button>
+                      )}
                       
                       {/* Department Access - Only for admins with department assignment */}
                       {deptRoute && (employeeData?.access_level === 'admin' || employee?.access_level === 'admin') && (

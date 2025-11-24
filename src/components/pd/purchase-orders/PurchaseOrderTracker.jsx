@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useAuth } from "../../../contexts/AuthContext"
+import { themeFor } from "../../../utils/theme/themeClasses"
 import apiService from "../../../utils/api/api-service"
 import { ModalPortal, useToast } from "../shared"
 import CreatePurchaseOrderWizard from "./CreatePurchaseOrderWizard"
@@ -13,6 +14,7 @@ import { ProcurementEventHandler } from "../../../utils/api/websocket/handlers/p
 
 function PurchaseOrderTracker() {
   const { isDarkMode } = useAuth()
+  const t = themeFor(isDarkMode)
   const { success, error: showError } = useToast()
   const [purchaseOrders, setPurchaseOrders] = useState([])
   const [loading, setLoading] = useState(true)
@@ -51,9 +53,7 @@ function PurchaseOrderTracker() {
   const handlersRegistered = useRef(false)
   const unsubscribers = useRef([])
 
-  useEffect(() => {
-    fetchPurchaseOrders()
-    fetchRestockItems()
+  const initializeRealtime = useCallback(() => {
     // Initialize realtime subscriptions for procurement updates (once)
     if (!handlersRegistered.current) {
       // Register procurement handlers (they emit generic procurement:refresh events)
@@ -82,14 +82,19 @@ function PurchaseOrderTracker() {
       handlersRegistered.current = true
     }
 
+  }, [])
+
+  useEffect(() => {
+    fetchPurchaseOrders()
+    fetchRestockItems()
+    initializeRealtime()
     return () => {
-      // Clean up listeners on unmount
       if (unsubscribers.current.length) {
         unsubscribers.current.forEach((fn) => { try { fn && fn() } catch(_){} })
         unsubscribers.current = []
       }
     }
-  }, [])
+  }, [initializeRealtime])
 
   const fetchPurchaseOrders = async () => {
     try {
@@ -620,20 +625,53 @@ function PurchaseOrderTracker() {
   if (loading) {
     return <PurchaseOrderTrackerSkeleton />
   }
+  // Status theme mappings (light/dark) for improved readability & consistency with Inventory cards
+  const statusTheme = {
+    draft: {
+      light: "from-slate-50 to-slate-100 border-slate-200 text-slate-800",
+      dark: "from-slate-700 to-slate-800 border-slate-600 text-slate-100",
+      icon: "📄"
+    },
+    requested: {
+      light: "from-blue-50 to-indigo-50 border-blue-200 text-blue-700",
+      dark: "from-blue-700 to-indigo-700 border-blue-600 text-blue-100",
+      icon: "📤"
+    },
+    approved: {
+      light: "from-green-50 to-emerald-50 border-emerald-200 text-emerald-700",
+      dark: "from-emerald-700 to-green-700 border-green-600 text-green-100",
+      icon: "✅"
+    },
+    ordered: {
+      light: "from-purple-50 to-violet-50 border-violet-200 text-violet-700",
+      dark: "from-violet-700 to-purple-700 border-violet-600 text-violet-100",
+      icon: "📦"
+    },
+    received: {
+      light: "from-emerald-50 to-green-50 border-emerald-200 text-green-700",
+      dark: "from-green-700 to-emerald-700 border-emerald-600 text-emerald-100",
+      icon: "✔️"
+    },
+    cancelled: {
+      light: "from-rose-50 to-red-50 border-rose-200 text-rose-700",
+      dark: "from-red-800 to-rose-800 border-red-700 text-red-100",
+      icon: "❌"
+    }
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 dark:text-gray-200">Purchase Order Tracker</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Track procurement orders from request to delivery
-          </p>
+          <h2 className={`text-lg sm:text-xl lg:text-2xl font-bold ${t.header}`}>Purchase Order Tracker</h2>
+          <p className={`text-sm ${t.muted} mt-1`}>Track procurement orders from request to delivery</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            {purchaseOrders.length} active orders
+            <div className={`text-sm ${t.muted}`}>
+              {purchaseOrders.length} active orders
+            </div>
           </div>
           <button
             onClick={handleCreateOrder}
@@ -647,14 +685,29 @@ function PurchaseOrderTracker() {
         </div>
       </div>
 
-      {/* Status Overview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {["draft", "requested", "approved", "ordered", "received", "cancelled"].map(status => {
-          const count = purchaseOrders.filter(order => order.status === status).length
+      {/* Status Overview (enhanced for light theme readability) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {[
+          "draft",
+          "requested",
+          "approved",
+          "ordered",
+          "received",
+          "cancelled",
+        ].map((status) => {
+          const theme = statusTheme[status]
+          const count = purchaseOrders.filter((order) => order.status === status).length
+          const classes = `relative rounded-xl p-4 border shadow-sm bg-linear-to-br transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 group ${isDarkMode ? theme.dark : theme.light}`
+
           return (
-            <div key={status} className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-lg p-4 border shadow-sm" : "bg-white border-slate-200 rounded-lg p-4 border shadow-sm"}>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">{count}</div>
-              <div className="text-sm text-slate-600 dark:text-slate-400">{getStatusText(status)}</div>
+            <div key={status} tabIndex={0} className={classes}>
+              <div className="flex items-start justify-between">
+                <div className={`text-2xl font-bold ${t.statNumber}`}>{count}</div>
+                <span className="text-xl opacity-60 group-hover:opacity-80 transition">{theme.icon}</span>
+              </div>
+              <div className="mt-1 text-sm font-medium tracking-wide">
+                <div className={`text-xs ${t.smallMuted}`}>{getStatusText(status)}</div>
+              </div>
             </div>
           )
         })}
@@ -853,7 +906,7 @@ function PurchaseOrderTracker() {
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-1000">
             <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl shadow-2xl w-full max-w-5xl mx-2 sm:mx-4 max-h-[90vh] overflow-hidden flex flex-col">
               {/* Header with Gradient */}
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
+              <div className="bg-linear-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
                 <div>
                   <h3 className="text-2xl font-bold text-white">Purchase Order Details</h3>
                   <p className="text-blue-100 text-sm mt-1">{selectedOrder.id}</p>
@@ -875,25 +928,23 @@ function PurchaseOrderTracker() {
                 <div className="space-y-6">
                   {/* Order Information Section */}
                   <div className="bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg p-6 shadow-sm">
-                    <h4 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+                    <h4 className={`text-lg font-bold ${t.title} mb-4 flex items-center gap-2`}>
                       <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       Order Information
                     </h4>
-                    
+
                     {/* Draft Order Notice */}
                     {selectedOrder.status === 'draft' && (
                       <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
                         <div className="flex items-start gap-3">
-                          <svg className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                           </svg>
                           <div className="flex-1">
-                            <h5 className="font-semibold text-amber-800 dark:text-amber-200 mb-1">Draft Purchase Order</h5>
-                            <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
-                              This is a draft purchase order and has not been officially submitted. It won't affect inventory or appear in official reports until converted to "Requested" status.
-                            </p>
+                            <h5 className={`font-semibold ${t.accent.amber} mb-1`}>Draft Purchase Order</h5>
+                            <p className={`text-sm ${t.accent.amber} mb-3`}>This is a draft purchase order and has not been officially submitted. It won't affect inventory or appear in official reports until converted to "Requested" status.</p>
                             <button
                               onClick={handleConvertDraftToRequested}
                               className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
@@ -907,11 +958,11 @@ function PurchaseOrderTracker() {
                         </div>
                       </div>
                     )}
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-1">
                         <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Supplier</label>
-                        <div className="text-gray-900 dark:text-gray-100 font-semibold text-lg">{selectedOrder.supplier}</div>
+                        <div className={`font-semibold text-lg ${t.title}`}>{selectedOrder.supplier}</div>
                       </div>
                       <div className="space-y-1">
                         <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Status</label>
@@ -927,15 +978,15 @@ function PurchaseOrderTracker() {
                       </div>
                       <div className="space-y-1">
                         <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Order Date</label>
-                        <div className="text-gray-800 dark:text-gray-200 font-medium">{formatDate(selectedOrder.order_date)}</div>
+                        <div className={`${t.muted} font-medium`}>{formatDate(selectedOrder.order_date)}</div>
                       </div>
                       <div className="space-y-1">
                         <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Expected Delivery</label>
-                        <div className="text-gray-800 dark:text-gray-200 font-medium">{formatDate(selectedOrder.expected_delivery_date)}</div>
+                        <div className={`${t.muted} font-medium`}>{formatDate(selectedOrder.expected_delivery_date)}</div>
                       </div>
                       <div className="space-y-1">
                         <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Total Value</label>
-                        <div className="text-blue-600 dark:text-blue-400 font-bold text-xl">{formatCurrency(selectedOrder.total_value)}</div>
+                        <div className={`font-bold text-xl ${t.accent.blue}`}>{formatCurrency(selectedOrder.total_value)}</div>
                       </div>
                     </div>
                   </div>
@@ -951,7 +1002,7 @@ function PurchaseOrderTracker() {
                     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
-                          <thead className="bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700">
+                          <thead className="bg-linear-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700">
                             <tr>
                               <th className="px-4 py-3 text-left font-bold text-gray-700 dark:text-gray-200 border-b-2 border-gray-300 dark:border-gray-600">Item</th>
                               <th className="px-4 py-3 text-center font-bold text-gray-700 dark:text-gray-200 border-b-2 border-gray-300 dark:border-gray-600">Quantity</th>
@@ -986,7 +1037,7 @@ function PurchaseOrderTracker() {
                               </tr>
                             ))}
                             {/* Total Row */}
-                            <tr className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 font-bold">
+                            <tr className="bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 font-bold">
                               <td colSpan="3" className="px-4 py-3 text-right text-gray-900 dark:text-gray-100 uppercase text-sm">
                                 Total Amount:
                               </td>
@@ -1058,7 +1109,7 @@ function PurchaseOrderTracker() {
                 <button
                   onClick={handleUpdateStatus}
                   disabled={!statusUpdate.new_status}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span className="flex items-center justify-center gap-2">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
