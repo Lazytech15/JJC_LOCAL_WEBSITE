@@ -82,10 +82,15 @@ export class AnnouncementService extends BaseAPIService {
   }
 
   /**
-   * Get announcement statistics
-   * @returns {Promise} Statistics data
+   * Dismiss announcement for employee
+   * @param {number|string} announcementId - Announcement ID
+   * @param {number|string} employeeId - Employee ID
+   * @returns {Promise} Success confirmation
    */
-  async getAnnouncementStats() {
-    return this.request("/api/announcements/stats")
+  async dismissAnnouncement(announcementId, employeeId) {
+    return this.request("/api/announcements/dismiss", {
+      method: "POST",
+      body: JSON.stringify({ announcementId, employeeId }),
+    })
   }
 }

@@ -75,6 +75,18 @@ function ProcurementDepartment() {
     return apiService.profiles.getProfileUrlByUid(user.id)
   }
 
+  // Normalize UID extraction from token payloads or auth user
+  const resolveUid = (payload, fallbackUser) => {
+    if (!payload && !fallbackUser) return null
+    // Accept common possible keys used across the app
+    const candidates = [payload?.userId, payload?.id, payload?.employeeId, payload?.uid]
+    for (const c of candidates) {
+      if (c) return c
+    }
+    if (fallbackUser?.id) return fallbackUser.id
+    return null
+  }
+
   // Load user profile data
   const loadUserProfile = async () => {
     if (!user?.id) return
@@ -111,13 +123,7 @@ function ProcurementDepartment() {
 
       const payload = verifyToken(token)
       console.log("Token payload:", payload)
-      let uid = payload?.userId
-
-      // Fallback to user.id from auth context if token doesn't have userId
-      if (!uid && user?.id) {
-        console.log("Using user.id from auth context as fallback:", user.id)
-        uid = user.id
-      }
+      const uid = resolveUid(payload, user)
 
       if (!uid) {
         console.error("No user ID found in token or auth context")
@@ -167,12 +173,7 @@ function ProcurementDepartment() {
       if (!token) return
 
       const payload = verifyToken(token)
-      let uid = payload?.userId
-
-      // Fallback to user.id from auth context if token doesn't have userId
-      if (!uid && user?.id) {
-        uid = user.id
-      }
+      const uid = resolveUid(payload, user)
 
       if (!uid) return
 
@@ -197,12 +198,7 @@ function ProcurementDepartment() {
       if (!token) return
 
       const payload = verifyToken(token)
-      let uid = payload?.userId
-
-      // Fallback to user.id from auth context if token doesn't have userId
-      if (!uid && user?.id) {
-        uid = user.id
-      }
+      const uid = resolveUid(payload, user)
 
       if (!uid) return
 
@@ -263,10 +259,10 @@ function ProcurementDepartment() {
     loadUserProfile()
   }, [user])
 
-  // Load notifications on mount
+  // Load notifications on mount and whenever `user` changes (auth may initialize later)
   useEffect(() => {
     loadNotifications()
-  }, [])
+  }, [user])
 
   // Close profile menu when clicking outside
   useEffect(() => {
