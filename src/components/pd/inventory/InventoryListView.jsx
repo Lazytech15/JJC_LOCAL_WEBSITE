@@ -12,8 +12,8 @@ function InventoryListView({
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-700">
+        <table className="w-full text-sm bg-white dark:bg-gray-800">
+          <thead className="bg-white dark:bg-gray-700">
             <tr>
               <th className="px-4 py-3 text-left font-semibold text-black dark:text-white">Item</th>
               <th className="px-4 py-3 text-left font-semibold text-black dark:text-white">Brand</th>
@@ -26,12 +26,18 @@ function InventoryListView({
               <th className="px-4 py-3 text-center font-semibold text-black dark:text-white">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {items.slice(0, visibleCount).map((item) => (
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            {items.slice(0, visibleCount).map((item, idx) => (
               <tr
                 key={item.item_no}
                 onClick={() => onItemClick(item)}
-                className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
+                className={
+                  `transition-colors cursor-pointer ` +
+                  (idx % 2 === 0
+                    ? 'bg-white dark:bg-slate-800'
+                    : 'bg-gray-50 dark:bg-gray-900') +
+                  ' hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                }
               >
                 <td className="px-4 py-3">
                   <div>

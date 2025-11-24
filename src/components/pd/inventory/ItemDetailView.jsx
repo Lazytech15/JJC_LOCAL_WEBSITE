@@ -76,13 +76,9 @@ export function ItemDetailView({ item, onAddToCart, onBack, onEdit }) {
   }
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-PH", {
-      style: "currency",
-      currency: "PHP",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount)
-  }
+    if (isNaN(amount)) return '-';
+    return `₱${Number(amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
 
   const status = deriveStatus(item)
 
