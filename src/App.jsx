@@ -1,15 +1,17 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { AuthProvider, useAuth } from "./contexts/AuthContext"
 import { lazy, Suspense, useEffect } from "react"
+import { registerAdminServiceWorker } from "../public/registerAdminServiceWorker"
+
 // Lazy-load heavier top-level components to improve initial load
 const DepartmentSelector = lazy(() => import("./components/DepartmentSelector"))
 const LoginForm = lazy(() => import("./components/LoginForm"))
 const PWAInstallPrompt = lazy(() => import("../public/PWAInstallPrompt"))
 const PWAStatusIndicator = lazy(() => import("../public/PWAStatusIndicator"))
-const GearLoadingSpinner  = lazy(() => import("../public/LoadingGear"))
+const GearLoadingSpinner = lazy(() => import("../public/LoadingGear"))
 import { ProcurementDepartmentSkeleton } from "./components/skeletons/ProcurementSkeletons"
 import './index.css'
-//addedsomething here
+
 // Lazy load department components for better performance
 const HRDepartment = lazy(() => import("./components/department/HRDepartment"))
 const OperationsDepartment = lazy(() => import("./components/department/OperationsDepartment"))
@@ -31,6 +33,11 @@ function LoadingFallback() {
 }
 
 function App() {
+  useEffect(() => {
+    // Register the admin service worker
+    registerAdminServiceWorker()
+  }, [])
+
   return (
     <AuthProvider>
       <AppContent />
@@ -159,9 +166,9 @@ function RoutesWrapper() {
             path="/jjcewgsaccess/procurement"
             element={
               <AdminProtectedRoute department="Procurement">
-                    <Suspense fallback={<ProcurementDepartmentSkeleton />}>
-                      <ProcurementDepartment />
-                    </Suspense>
+                <Suspense fallback={<ProcurementDepartmentSkeleton />}>
+                  <ProcurementDepartment />
+                </Suspense>
               </AdminProtectedRoute>
             }
           />
@@ -184,12 +191,10 @@ function RoutesWrapper() {
 
 // Protected route for employees
 function EmployeeProtectedRoute({ children }) {
-  const { isEmployeeAuthenticated, isLoading } = useAuth()
+  const { isEmployeeAuthenticated, isLoading, isDarkMode } = useAuth()
 
   if (isLoading) {
-    return (
-      <GearLoadingSpinner isDarkMode={isDarkMode} />
-    )
+    return <GearLoadingSpinner isDarkMode={isDarkMode} />
   }
 
   if (!isEmployeeAuthenticated) {
@@ -201,16 +206,13 @@ function EmployeeProtectedRoute({ children }) {
 
 // Protected route for admin/department users
 function AdminProtectedRoute({ children, department, requireSuperAdmin = false }) {
-  const { isAuthenticated, selectedDepartment, isSuperAdmin, isLoading } = useAuth()
+  const { isAuthenticated, selectedDepartment, isSuperAdmin, isLoading, isDarkMode } = useAuth()
 
   if (isLoading) {
-    return (
-      <GearLoadingSpinner isDarkMode={isDarkMode}/>
-    )
+    return <GearLoadingSpinner isDarkMode={isDarkMode} />
   }
 
   if (!isAuthenticated) {
-    // Map department names to URL slugs for login redirect
     const slugMap = {
       "Human Resources": "hr",
       "Operations": "operations",
