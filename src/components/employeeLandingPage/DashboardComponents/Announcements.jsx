@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, Badge, Button } from "../../ui/UiComponents"
-import { Loader2, AlertCircle, Check, ChevronDown, ChevronUp } from "lucide-react"
+import { Loader2, AlertCircle, Check, ChevronDown, ChevronUp, Download, FileText } from "lucide-react"
 import apiService from "../../../utils/api/api-service"
 import { getStoredToken, verifyToken } from "../../../utils/auth"
 
@@ -40,22 +40,34 @@ export default function Announcements({ isDarkMode }) {
         // Fetch announcements for the employee
         const response = await apiService.announcements.getEmployeeAnnouncements(uid)
         
+        console.log("📢 Employee announcements response:", response)
+        console.log("📋 Raw data:", response.data)
+        
         if (response?.data) {
-          const formattedAnnouncements = response.data.map((ann) => ({
-            id: ann.id,
-            title: ann.title || ann.message || "Announcement",
-            description: ann.description || ann.content || "",
-            time: new Date(ann.created_at || ann.date).toLocaleDateString(),
-            read: ann.is_read || ann.read || false,
-            priority: ann.priority || "normal",
-            fullData: ann,
-          }))
+          const formattedAnnouncements = response.data.map((ann) => {
+            console.log("📋 Processing announcement:", ann.id, ann.title)
+            console.log("📎 Attachments found:", ann.attachments)
+            
+            return {
+              id: ann.id,
+              title: ann.title || ann.message || "Announcement",
+              description: ann.description || ann.content || ann.message || "",
+              time: new Date(ann.created_at || ann.date).toLocaleDateString(),
+              read: ann.is_read || ann.read || false,
+              priority: ann.priority || "normal",
+              attachments: ann.attachments || [], // Get attachments from API response
+              fullData: ann,
+            }
+          })
+          
+          console.log("✅ Formatted announcements:", formattedAnnouncements)
+          console.log("✅ First announcement attachments:", formattedAnnouncements[0]?.attachments)
           setAnnouncements(formattedAnnouncements)
         } else {
           setAnnouncements([])
         }
       } catch (err) {
-        console.error("Error fetching announcements:", err)
+        console.error("❌ Error fetching announcements:", err)
         setError("Failed to load announcements")
         setAnnouncements([])
       } finally {
@@ -65,6 +77,25 @@ export default function Announcements({ isDarkMode }) {
 
     fetchAnnouncementsData()
   }, [])
+
+  const handleDownloadAttachment = async (announcementId, filename) => {
+    try {
+      console.log(`📥 Downloading: ${filename} from announcement ${announcementId}`)
+      const blob = await apiService.announcements.getAnnouncementAttachment(announcementId, filename)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      console.log("✅ Download successful")
+    } catch (error) {
+      console.error('❌ Error downloading attachment:', error)
+      alert('Failed to download attachment: ' + error.message)
+    }
+  }
 
   const handleMarkAsRead = async (announcementId) => {
     if (!employeeId) return
@@ -105,15 +136,23 @@ export default function Announcements({ isDarkMode }) {
 
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
-      case "high":
+      case "urgent":
         return "bg-red-500"
-      case "medium":
+      case "important":
         return "bg-amber-500"
-      case "low":
+      case "normal":
         return "bg-emerald-500"
       default:
         return "bg-zinc-500"
     }
+  }
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
   if (loading) {
@@ -136,7 +175,7 @@ export default function Announcements({ isDarkMode }) {
           Announcements
         </h2>
         <div className={`p-4 sm:p-6 rounded-xl border flex items-center gap-3 ${isDarkMode ? "bg-red-500/10 border-red-500/30 text-red-400" : "bg-red-50 border-red-200 text-red-600"}`}>
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <AlertCircle className="w-5 h-5 shrink-0" />
           <p className="text-sm font-medium">{error}</p>
         </div>
       </div>
@@ -166,6 +205,10 @@ export default function Announcements({ isDarkMode }) {
         <div className="space-y-3 sm:space-y-4">
           {announcements.map((announcement) => {
             const isExpanded = expandedIds.has(announcement.id)
+            const hasAttachments = announcement.attachments && announcement.attachments.length > 0
+            
+            console.log(`🔍 Rendering announcement ${announcement.id}, hasAttachments:`, hasAttachments, announcement.attachments)
+            
             return (
               <Card key={announcement.id} className="overflow-hidden">
                 <CardContent className="p-4 sm:p-6">
@@ -174,23 +217,23 @@ export default function Announcements({ isDarkMode }) {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-2">
-                          <p className={`font-semibold text-base sm:text-lg break-words ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                          <p className={`font-semibold text-base sm:text-lg wrap-break-word ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                             {announcement.title}
                           </p>
                           {!announcement.read && (
-                            <Badge variant="destructive" className="flex-shrink-0 text-xs">
+                            <Badge variant="destructive" className="shrink-0 text-xs">
                               New
                             </Badge>
                           )}
                         </div>
                         {announcement.priority && announcement.priority !== "normal" && (
-                          <Badge className={`text-xs flex-shrink-0 ${getPriorityColor(announcement.priority)} text-white`}>
+                          <Badge className={`text-xs shrink-0 ${getPriorityColor(announcement.priority)} text-white`}>
                             {announcement.priority}
                           </Badge>
                         )}
                       </div>
                       {!announcement.read && (
-                        <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 bg-red-500`}></div>
+                        <div className={`w-2 h-2 rounded-full shrink-0 mt-1 bg-red-500`}></div>
                       )}
                     </div>
 
@@ -200,6 +243,42 @@ export default function Announcements({ isDarkMode }) {
                         <p className={isExpanded ? "whitespace-pre-wrap" : "line-clamp-2"}>
                           {announcement.description}
                         </p>
+                      </div>
+                    )}
+
+                    {/* Attachments Section */}
+                    {hasAttachments && (
+                      <div className={`mt-3 pt-3 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
+                        <p className={`text-xs font-medium mb-2 flex items-center gap-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                          <FileText className="w-4 h-4" />
+                          Attachments ({announcement.attachments.length})
+                        </p>
+                        <div className="space-y-2">
+                          {announcement.attachments.map((attachment, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => handleDownloadAttachment(announcement.id, attachment.filename)}
+                              className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all text-left ${
+                                isDarkMode
+                                  ? "bg-gray-800/50 border-gray-700 hover:bg-gray-800 hover:border-gray-600"
+                                  : "bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <FileText className={`w-5 h-5 shrink-0 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`} />
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm font-medium truncate ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+                                    {attachment.original_name || attachment.filename}
+                                  </p>
+                                  <p className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+                                    {formatFileSize(attachment.file_size)}
+                                  </p>
+                                </div>
+                              </div>
+                              <Download className={`w-4 h-4 shrink-0 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
 
@@ -216,7 +295,7 @@ export default function Announcements({ isDarkMode }) {
                             variant={isDarkMode ? "ghost" : "ghost"}
                             size="sm"
                             onClick={() => toggleExpand(announcement.id, announcement.read)}
-                            className="flex-shrink-0"
+                            className="shrink-0"
                           >
                             {isExpanded ? (
                               <>
@@ -239,7 +318,7 @@ export default function Announcements({ isDarkMode }) {
                             size="sm"
                             onClick={() => handleMarkAsRead(announcement.id)}
                             disabled={markingAsRead === announcement.id}
-                            className="flex-shrink-0"
+                            className="shrink-0"
                           >
                             {markingAsRead === announcement.id ? (
                               <>

@@ -25,6 +25,24 @@ const CORE_ASSETS = [
   "/index.html"
 ]
 
+// Helper function to fetch with timeout - DEFINED AT TOP LEVEL
+async function fetchWithTimeout(request, timeout = 10000) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
+  
+  try {
+    const response = await fetch(request, { 
+      signal: controller.signal,
+      cache: 'no-cache'
+    })
+    clearTimeout(timeoutId)
+    return response
+  } catch (error) {
+    clearTimeout(timeoutId)
+    throw error
+  }
+}
+
 // Install event - cache only core assets
 self.addEventListener("install", (event) => {
   console.log("[Service Worker] Installing...")
@@ -82,24 +100,6 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(fetch(request))
     return
   }
-
-// Helper function to fetch with timeout
-async function fetchWithTimeout(request, timeout = 10000) {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
-  
-  try {
-    const response = await fetch(request, { 
-      signal: controller.signal,
-      cache: 'no-cache'
-    })
-    clearTimeout(timeoutId)
-    return response
-  } catch (error) {
-    clearTimeout(timeoutId)
-    throw error
-  }
-}
 
   // Landing page images - Cache First with Network Fallback (no cache = direct network)
   if (url.pathname.includes("/api/profile/landing/")) {
@@ -196,14 +196,7 @@ async function cacheFirstWithNetworkFallback(request, cacheName, maxAge) {
   console.log(`[Service Worker] 🌐 No valid cache, fetching from network:`, request.url)
   
   try {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
-    
-    const response = await fetch(request, { 
-      signal: controller.signal,
-      cache: 'no-cache'
-    })
-    clearTimeout(timeoutId)
+    const response = await fetchWithTimeout(request, 10000)
     
     if (response.ok && response.status === 200) {
       console.log(`[Service Worker] ✅ Network fetch successful, caching:`, request.url)
@@ -251,8 +244,7 @@ async function cacheFirstWithNetworkFallback(request, cacheName, maxAge) {
   }
 }
 
-// ==================== NEW: Network-Only Handler for Operations ====================
-
+// Network-Only Handler for Operations
 async function networkOnlyForOperations(request) {
   try {
     console.log('[Service Worker] 🌐 Fetching from network:', request.url)
@@ -286,24 +278,6 @@ async function networkOnlyForOperations(request) {
         }
       }
     )
-  }
-}
-
-// Keep fetchWithTimeout helper
-async function fetchWithTimeout(request, timeout = 10000) {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
-  
-  try {
-    const response = await fetch(request, { 
-      signal: controller.signal,
-      cache: 'no-cache'
-    })
-    clearTimeout(timeoutId)
-    return response
-  } catch (error) {
-    clearTimeout(timeoutId)
-    throw error
   }
 }
 
@@ -432,8 +406,7 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(clients.openWindow(event.notification.data))
 })
 
-// In service-worker.js, update the message event listener
-
+// Message event listener
 self.addEventListener("message", (event) => {
   // Clear specific cache
   if (event.data && event.data.type === "CLEAR_CACHE") {
@@ -458,7 +431,7 @@ self.addEventListener("message", (event) => {
     )
   }
   
-  // NEW: Clear specific image type cache (landing or gallery)
+  // Clear specific image type cache (landing or gallery)
   if (event.data && event.data.type === "CLEAR_SPECIFIC_IMAGE_CACHE") {
     const imageType = event.data.imageType
     let cacheName = null

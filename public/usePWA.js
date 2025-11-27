@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 
 export const usePWA = () => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const location = useLocation();
 
   useEffect(() => {
     // Check if running as PWA
@@ -17,9 +19,12 @@ export const usePWA = () => {
 
     // Listen for beforeinstallprompt
     const handleBeforeInstallPrompt = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setIsInstallable(true);
+      // Only capture prompt if on admin routes
+      if (location.pathname.startsWith('/jjcewgsaccess')) {
+        e.preventDefault();
+        setDeferredPrompt(e);
+        setIsInstallable(true);
+      }
     };
 
     // Listen for app installed
@@ -44,7 +49,7 @@ export const usePWA = () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [location.pathname]);
 
   const installPWA = async () => {
     if (!deferredPrompt) return false;
@@ -73,7 +78,7 @@ export const usePWA = () => {
   const clearAllProfileCache = () => {
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({
-        type: 'CLEAR_PROFILE_CACHE'
+        type: 'CLEAR_ALL_CACHES'
       });
     }
   };

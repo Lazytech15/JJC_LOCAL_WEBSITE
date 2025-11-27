@@ -1,12 +1,22 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { usePWA } from './usePWA';
 import { X, Download } from 'lucide-react';
 
 export const PWAInstallPrompt = () => {
   const { isInstallable, installPWA } = usePWA();
   const [showPrompt, setShowPrompt] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
+    // Only show prompt if user is on /jjcewgsaccess route (or any sub-route)
+    const isOnJjcewgsRoute = location.pathname.startsWith('/jjcewgsaccess');
+    
+    if (!isOnJjcewgsRoute) {
+      setShowPrompt(false);
+      return;
+    }
+
     // Check if user has dismissed the prompt before
     const dismissed = localStorage.getItem('pwa-install-dismissed');
     const dismissedTime = localStorage.getItem('pwa-install-dismissed-time');
@@ -25,7 +35,7 @@ export const PWAInstallPrompt = () => {
       const timer = setTimeout(() => setShowPrompt(true), 3000);
       return () => clearTimeout(timer);
     }
-  }, [isInstallable]);
+  }, [isInstallable, location.pathname]);
 
   const handleInstall = async () => {
     const installed = await installPWA();

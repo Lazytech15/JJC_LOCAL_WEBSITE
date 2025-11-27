@@ -8,6 +8,8 @@ function Announcement() {
   const [employees, setEmployees] = useState([])
   const [departments, setDepartments] = useState([])
   const [announcements, setAnnouncements] = useState([])
+  const [attachments, setAttachments] = useState([])
+  const [uploadingFiles, setUploadingFiles] = useState(false)
   
   const [formData, setFormData] = useState({
     title: "",
@@ -90,64 +92,177 @@ function Announcement() {
     })
   }
 
-  const handleSubmit = async () => {
-    if (!formData.title || !formData.message) {
-      alert("Please fill in title and message")
+  // Add this handler function
+const handleFileSelect = (e) => {
+  const files = Array.from(e.target.files)
+  
+  // Validate files
+  const validFiles = []
+  const errors = []
+  
+  files.forEach(file => {
+    // Check file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      errors.push(`${file.name}: File too large (max 10MB)`)
       return
     }
-
-    if (formData.recipientType === "department" && formData.selectedDepartments.length === 0) {
-      alert("Please select at least one department")
+    
+    // Check file type
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'application/zip'
+    ]
+    
+    if (!allowedTypes.includes(file.type)) {
+      errors.push(`${file.name}: Invalid file type`)
       return
     }
-
-    if (formData.recipientType === "specific" && formData.selectedEmployees.length === 0) {
-      alert("Please select at least one employee")
-      return
-    }
-
-    setLoading(true)
-    try {
-      const userId = user?.uid || user?.id || 1
-      
-      const announcementData = {
-        title: formData.title,
-        message: formData.message,
-        recipientType: formData.recipientType,
-        priority: formData.priority,
-        expiryDate: formData.expiryDate || null,
-        createdBy: userId,
-        selectedDepartments: formData.selectedDepartments,
-        selectedEmployees: formData.selectedEmployees
-      }
-      
-      if (editingId) {
-        await apiService.announcements.updateAnnouncement(editingId, announcementData)
-        alert("Announcement updated successfully!")
-        setEditingId(null)
-      } else {
-        await apiService.announcements.createAnnouncement(announcementData)
-        alert("Announcement sent successfully!")
-      }
-      
-      setFormData({
-        title: "",
-        message: "",
-        recipientType: "all",
-        selectedDepartments: [],
-        selectedEmployees: [],
-        priority: "normal",
-        expiryDate: ""
-      })
-      
-      fetchAnnouncements()
-    } catch (err) {
-      console.error("Error sending announcement:", err)
-      alert(err.message || "Failed to send announcement")
-    } finally {
-      setLoading(false)
-    }
+    
+    validFiles.push(file)
+  })
+  
+  if (errors.length > 0) {
+    alert('Some files were not added:\n' + errors.join('\n'))
   }
+  
+  setAttachments(prev => [...prev, ...validFiles])
+}
+
+const removeAttachment = (index) => {
+  setAttachments(prev => prev.filter((_, i) => i !== index))
+}
+
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+const handleSubmit = async () => {
+  if (!formData.title || !formData.message) {
+    alert("Please fill in title and message")
+    return
+  }
+
+  if (formData.recipientType === "department" && formData.selectedDepartments.length === 0) {
+    alert("Please select at least one department")
+    return
+  }
+
+  if (formData.recipientType === "specific" && formData.selectedEmployees.length === 0) {
+    alert("Please select at least one employee")
+    return
+  }
+
+  setLoading(true)
+  try {
+    const userId = user?.uid || user?.id || 1
+    
+    const announcementData = {
+      title: formData.title,
+      message: formData.message,
+      recipientType: formData.recipientType,
+      priority: formData.priority,
+      expiryDate: formData.expiryDate || null,
+      createdBy: userId,
+      selectedDepartments: formData.selectedDepartments,
+      selectedEmployees: formData.selectedEmployees
+    }
+    
+    console.log("📢 Creating announcement with data:", announcementData)
+    
+    let announcementId
+    
+    if (editingId) {
+      const updateResult = await apiService.announcements.updateAnnouncement(editingId, announcementData)
+      announcementId = editingId
+      console.log("✅ Announcement updated, ID:", announcementId)
+    } else {
+      const result = await apiService.announcements.createAnnouncement(announcementData)
+      console.log("📋 Create announcement result:", result)
+      
+      // Try different possible locations for the ID
+      announcementId = result?.data?.id || result?.id || result?.data?.announcement?.id
+      
+      console.log("✅ Announcement created, ID:", announcementId)
+    }
+    
+    // Verify we have an announcement ID
+    if (!announcementId) {
+      console.error("❌ No announcement ID received from server!")
+      console.error("Server response was:", result)
+      throw new Error("Server did not return an announcement ID")
+    }
+    
+    // Upload attachments if any
+    if (attachments.length > 0) {
+      console.log(`📎 Uploading ${attachments.length} attachments for announcement ${announcementId}`)
+      console.log("📎 Attachments to upload:", attachments.map(f => ({
+        name: f.name,
+        size: f.size,
+        type: f.type
+      })))
+      
+      setUploadingFiles(true)
+      try {
+        const uploadResult = await apiService.announcements.uploadAnnouncementAttachments(
+          announcementId, 
+          attachments
+        )
+        console.log("✅ Attachments uploaded successfully:", uploadResult)
+        alert(editingId ? "Announcement and attachments updated successfully!" : "Announcement and attachments created successfully!")
+      } catch (err) {
+        console.error("❌ Error uploading attachments:", err)
+        console.error("Error details:", {
+          message: err.message,
+          response: err.response,
+          stack: err.stack
+        })
+        alert("Announcement created but attachments failed to upload: " + (err.message || "Unknown error"))
+      } finally {
+        setUploadingFiles(false)
+      }
+    } else {
+      console.log("ℹ️ No attachments to upload")
+      alert(editingId ? "Announcement updated successfully!" : "Announcement created successfully!")
+    }
+    
+    // Reset form
+    setFormData({
+      title: "",
+      message: "",
+      recipientType: "all",
+      selectedDepartments: [],
+      selectedEmployees: [],
+      priority: "normal",
+      expiryDate: ""
+    })
+    setAttachments([])
+    setEditingId(null)
+    
+    fetchAnnouncements()
+  } catch (err) {
+    console.error("❌ Error in handleSubmit:", err)
+    console.error("Error details:", {
+      message: err.message,
+      response: err.response,
+      stack: err.stack
+    })
+    alert(err.message || "Failed to send announcement")
+  } finally {
+    setLoading(false)
+  }
+}
 
   const handleEdit = (announcement) => {
     setEditingId(announcement.id)
@@ -226,8 +341,8 @@ function Announcement() {
   return (
     <div className={`min-h-screen transition-colors duration-300 ${
       isDarkMode
-        ? "bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950"
-        : "bg-gradient-to-br from-gray-50 via-slate-50 to-stone-50"
+        ? "bg-linear-to-br from-gray-950 via-gray-900 to-gray-950"
+        : "bg-linear-to-br from-gray-50 via-slate-50 to-stone-50"
     }`}>
       <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6">
         {/* Create/Edit Announcement Form */}
@@ -335,6 +450,90 @@ function Announcement() {
               </div>
             </div>
 
+            {/* File Attachments */}
+<div>
+  <label className={`block font-medium mb-2 text-sm sm:text-base ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+    Attachments (Optional)
+  </label>
+  
+  <div className={`border-2 border-dashed rounded-xl p-4 transition-all ${
+    isDarkMode 
+      ? "border-gray-700 bg-gray-900/50 hover:border-gray-600" 
+      : "border-gray-300 bg-gray-50 hover:border-gray-400"
+  }`}>
+    <input
+      type="file"
+      id="file-upload"
+      multiple
+      accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.zip"
+      onChange={handleFileSelect}
+      className="hidden"
+    />
+    
+    <label
+      htmlFor="file-upload"
+      className="cursor-pointer flex flex-col items-center justify-center py-4"
+    >
+      <svg className={`w-10 h-10 mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+      </svg>
+      <span className={`text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+        Click to upload files
+      </span>
+      <span className={`text-xs mt-1 ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+        PDF, DOC, XLS, Images, ZIP (max 10MB each)
+      </span>
+    </label>
+    
+    {attachments.length > 0 && (
+      <div className="mt-4 space-y-2">
+        <p className={`text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+          {attachments.length} file(s) selected
+        </p>
+        {attachments.map((file, index) => (
+          <div
+            key={index}
+            className={`flex items-center justify-between p-3 rounded-lg ${
+              isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"
+            }`}
+          >
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <svg className={`w-5 h-5 shrink-0 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                  {file.name}
+                </p>
+                <p className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+                  {formatFileSize(file.size)}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => removeAttachment(index)}
+              className={`p-2 rounded-lg transition-all shrink-0 ${
+                isDarkMode
+                  ? "text-red-400 hover:bg-red-500/20"
+                  : "text-red-600 hover:bg-red-50"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+  
+  <p className={`text-xs mt-2 ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+    💡 Tip: You can attach documents, images, or files to support your announcement
+  </p>
+</div>
+
             {/* Recipient Type Selection */}
             <div>
               <label className={`block font-medium mb-3 text-sm sm:text-base ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
@@ -436,7 +635,7 @@ function Announcement() {
                           type="checkbox"
                           checked={formData.selectedDepartments.includes(dept.name)}
                           onChange={() => handleDepartmentToggle(dept.name)}
-                          className="mr-3 w-4 h-4 accent-blue-500 flex-shrink-0"
+                          className="mr-3 w-4 h-4 accent-blue-500 shrink-0"
                         />
                         <div className="flex-1 min-w-0">
                           <div className={`font-medium text-sm sm:text-base truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}>
@@ -504,7 +703,7 @@ function Announcement() {
                               type="checkbox"
                               checked={formData.selectedEmployees.includes(emp.id)}
                               onChange={() => handleEmployeeToggle(emp.id)}
-                              className="mr-3 w-4 h-4 accent-blue-500 flex-shrink-0"
+                              className="mr-3 w-4 h-4 accent-blue-500 shrink-0"
                             />
                             <div className="flex-1 min-w-0">
                               <div className={`font-medium text-sm sm:text-base truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}>
@@ -544,7 +743,7 @@ function Announcement() {
               type="button"
               onClick={handleSubmit}
               disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30 text-sm sm:text-base"
+              className="w-full `bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30 text-sm sm:text-base"
             >
               {loading ? "Processing..." : editingId ? "Update Announcement" : "Send Announcement"}
             </button>
@@ -580,7 +779,7 @@ function Announcement() {
                     <h3 className={`font-bold text-base sm:text-lg flex-1 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
                       {announcement.title}
                     </h3>
-                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-1 sm:gap-2 fshrink-0">
                       <span className={`text-xs px-2 sm:px-3 py-1 rounded-full font-medium whitespace-nowrap ${
                         announcement.priority === "urgent"
                           ? isDarkMode
@@ -629,8 +828,28 @@ function Announcement() {
                     {announcement.message}
                   </p>
 
+                  {announcement.attachments && announcement.attachments.length > 0 && (
+                    <div className={`mt-3 pt-3 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
+                      <p className={`text-xs font-medium mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                        📎 {announcement.attachments.length} attachment(s)
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {announcement.attachments.map((att, idx) => (
+                          <span
+                            key={idx}
+                            className={`text-xs px-2 py-1 rounded ${
+                              isDarkMode ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {att.original_name || att.filename}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className={`flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                    <span className="break-words">
+                    <span className="wrap-break-word">
                       📨 To: {announcement.recipientType === 'all' 
                         ? 'All Employees' 
                         : announcement.recipientType === 'department'

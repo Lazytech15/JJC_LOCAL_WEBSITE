@@ -3,7 +3,6 @@
 // ============================================================================
 import { BaseAPIService } from "../core/base-api.js"
 import { getStoredToken } from "../../auth.js"
-
 export class DocumentService extends BaseAPIService {
   constructor() {
     super()
@@ -44,7 +43,7 @@ export class DocumentService extends BaseAPIService {
 
       const cache = await caches.open(this.documentCacheName)
       const response = await cache.match(key)
-      
+
       if (response) {
         console.log(`[DocumentService] Retrieved from SW cache: ${key}`)
         return response
@@ -64,11 +63,11 @@ export class DocumentService extends BaseAPIService {
       if (!('caches' in window)) return false
 
       const cache = await caches.open(this.documentCacheName)
-      
+
       // Clone response before caching
       const responseToCache = response.clone()
       await cache.put(key, responseToCache)
-      
+
       console.log(`[DocumentService] Cached in SW: ${key}`)
       return true
     } catch (error) {
@@ -86,7 +85,7 @@ export class DocumentService extends BaseAPIService {
 
       const cache = await caches.open(this.documentCacheName)
       const documentUrl = `${this.baseURL}/api/document/${employeeId}/${filename}`
-      
+
       const deleted = await cache.delete(documentUrl)
       if (deleted) {
         console.log(`[DocumentService] Cleared from SW cache: ${documentUrl}`)
@@ -107,7 +106,7 @@ export class DocumentService extends BaseAPIService {
 
       const cache = await caches.open(this.documentCacheName)
       const requests = await cache.keys()
-      
+
       let deletedCount = 0
       for (const request of requests) {
         if (request.url.includes(`/api/document/${employeeId}`)) {
@@ -115,7 +114,7 @@ export class DocumentService extends BaseAPIService {
           deletedCount++
         }
       }
-      
+
       if (deletedCount > 0) {
         console.log(`[DocumentService] Cleared ${deletedCount} documents from SW cache for employee ${employeeId}`)
       }
@@ -156,7 +155,7 @@ export class DocumentService extends BaseAPIService {
   async getEmployeeDocuments(employeeId) {
     const cacheKey = `employee_${employeeId}`
     const apiUrl = `/api/document/${employeeId}`
-    
+
     if (this.documentCache.has(cacheKey)) {
       console.log(`[DocumentService] Using memory cache for employee ${employeeId}`)
       return this.documentCache.get(cacheKey)
@@ -164,7 +163,7 @@ export class DocumentService extends BaseAPIService {
 
     try {
       console.log(`[DocumentService] Fetching documents for employee ${employeeId}`)
-      
+
       // Try to get from service worker cache first
       const swCached = await this.getFromSWCache(apiUrl)
       if (swCached) {
@@ -189,15 +188,15 @@ export class DocumentService extends BaseAPIService {
           success: true,
           data: result.data
         }
-        
+
         this.documentCache.set(cacheKey, formattedResult)
-        
+
         // Cache in service worker as well
         const response = new Response(JSON.stringify(formattedResult), {
           headers: { 'Content-Type': 'application/json' }
         })
         await this.saveToSWCache(apiUrl, response)
-        
+
         return formattedResult
       }
 
@@ -205,7 +204,7 @@ export class DocumentService extends BaseAPIService {
 
     } catch (error) {
       console.error(`[DocumentService] Error fetching documents for employee ${employeeId}:`, error)
-      
+
       // Try to return cached version on error
       const swCached = await this.getFromSWCache(apiUrl)
       if (swCached) {
@@ -231,7 +230,7 @@ export class DocumentService extends BaseAPIService {
    */
   async uploadDocuments(employeeId, files) {
     const fileArray = Array.isArray(files) ? files : [files]
-    
+
     for (const file of fileArray) {
       this.validateDocumentFile(file)
     }
@@ -257,22 +256,23 @@ export class DocumentService extends BaseAPIService {
     await this.clearEmployeeDocumentsFromSWCache(employeeId)
     this.clearEmployeeFromCache(employeeId)
     this.clearBulkCache()
-    
+
     return result
   }
 
   /**
-   * Get a specific document file
-   * @param {number} employeeId - Employee ID
-   * @param {string} filename - Document filename
-   * @returns {Promise<Blob>} Document blob
-   */
+  * Get a specific document file
+  * @param {number} employeeId - Employee ID
+  * @param {string} filename - Document filename
+  * @returns {Promise<Blob>} Document blob
+  */
   async getDocument(employeeId, filename) {
     try {
       console.log(`[DocumentService] Fetching document: ${filename} for employee ${employeeId}`)
-      
-      const documentUrl = `${this.baseURL}/api/document/${employeeId}/${filename}`
-      
+
+      const token = getStoredToken()
+      const documentUrl = `${this.baseURL}/api/document/${employeeId}/${encodeURIComponent(filename)}?token=${encodeURIComponent(token)}`
+
       // Try service worker cache first
       const swCached = await this.getFromSWCache(documentUrl)
       if (swCached) {
@@ -282,13 +282,16 @@ export class DocumentService extends BaseAPIService {
 
       const response = await fetch(documentUrl, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${getStoredToken()}`,
-        },
+        credentials: 'include'
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
+        let errorData
+        try {
+          errorData = await response.json()
+        } catch {
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` }
+        }
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
@@ -303,32 +306,55 @@ export class DocumentService extends BaseAPIService {
     }
   }
 
-  /**
-   * Download a specific document with proper download headers
-   * @param {number} employeeId - Employee ID
-   * @param {string} filename - Document filename
-   * @returns {Promise<Blob>} Document blob for download
-   */
+ 
+/**
+  * Download a specific document with proper download headers
+  * @param {number} employeeId - Employee ID
+  * @param {string} filename - Document filename
+  * @returns {Promise<Blob>} Document blob for download
+  */
   async downloadDocument(employeeId, filename) {
     try {
       console.log(`[DocumentService] Downloading document: ${filename} for employee ${employeeId}`)
-      
-      const documentUrl = `${this.baseURL}/api/document/${employeeId}/${filename}`
+
+      const token = getStoredToken()
+
+      if (!token) {
+        throw new Error("Authentication token not found. Please log in again.")
+      }
+
+      // Use query parameters instead of headers to avoid CORS preflight
+      const documentUrl = `${this.baseURL}/api/document/${employeeId}/${encodeURIComponent(filename)}?download=true&token=${encodeURIComponent(token)}`
 
       const response = await fetch(documentUrl, {
         method: "GET",
+        credentials: 'include',
         headers: {
-          Authorization: `Bearer ${getStoredToken()}`,
-          'X-Download': 'true', // Header to indicate download request
-        },
+          'Accept': 'application/octet-stream'
+        }
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
+        let errorData
+        try {
+          errorData = await response.json()
+        } catch {
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` }
+        }
+        throw new Error(errorData.error || errorData.message || `Failed to download: ${response.statusText}`)
       }
 
-      // Don't cache downloads in service worker to avoid bloat
+      // Verify we received a valid response
+      const contentType = response.headers.get('content-type')
+      if (contentType && contentType.includes('application/json')) {
+        // If we got JSON back, it might be an error
+        const jsonResponse = await response.json()
+        if (!jsonResponse.success) {
+          throw new Error(jsonResponse.error || 'Download failed')
+        }
+      }
+
+      // Return the blob for download
       return await response.blob()
 
     } catch (error) {
@@ -345,7 +371,7 @@ export class DocumentService extends BaseAPIService {
    */
   async deleteDocument(employeeId, filename) {
     console.log(`[DocumentService] Deleting document: ${filename} for employee ${employeeId}`)
-    
+
     const result = await this.request(`/api/document/${employeeId}/${filename}`, {
       method: "DELETE",
       headers: {
@@ -357,7 +383,7 @@ export class DocumentService extends BaseAPIService {
     await this.clearDocumentFromSWCache(employeeId, filename)
     this.clearEmployeeFromCache(employeeId)
     this.clearBulkCache()
-    
+
     return result
   }
 
@@ -368,7 +394,7 @@ export class DocumentService extends BaseAPIService {
    */
   async deleteAllEmployeeDocuments(employeeId) {
     console.log(`[DocumentService] Deleting all documents for employee ${employeeId}`)
-    
+
     const result = await this.request(`/api/document/${employeeId}`, {
       method: "DELETE",
       headers: {
@@ -380,7 +406,7 @@ export class DocumentService extends BaseAPIService {
     await this.clearEmployeeDocumentsFromSWCache(employeeId)
     this.clearEmployeeFromCache(employeeId)
     this.clearBulkCache()
-    
+
     return result
   }
 
@@ -412,7 +438,7 @@ export class DocumentService extends BaseAPIService {
 
     const cacheKey = `bulk_${queryParams.toString()}`
     const apiUrl = `/api/document/bulk?${queryParams}`
-    
+
     if (this.documentCache.has(cacheKey)) {
       return this.documentCache.get(cacheKey)
     }
@@ -434,13 +460,13 @@ export class DocumentService extends BaseAPIService {
       })
 
       this.documentCache.set(cacheKey, result)
-      
+
       // Cache in service worker
       const response = new Response(JSON.stringify(result), {
         headers: { 'Content-Type': 'application/json' }
       })
       await this.saveToSWCache(apiUrl, response)
-      
+
       return result
 
     } catch (error) {
@@ -456,7 +482,7 @@ export class DocumentService extends BaseAPIService {
   async getSimpleEmployeeDocumentStatus() {
     const cacheKey = 'bulk_simple'
     const apiUrl = '/api/document/bulk/simple'
-    
+
     if (this.documentCache.has(cacheKey)) {
       return this.documentCache.get(cacheKey)
     }
@@ -478,13 +504,13 @@ export class DocumentService extends BaseAPIService {
       })
 
       this.documentCache.set(cacheKey, result)
-      
+
       // Cache in service worker
       const response = new Response(JSON.stringify(result), {
         headers: { 'Content-Type': 'application/json' }
       })
       await this.saveToSWCache(apiUrl, response)
-      
+
       return result
 
     } catch (error) {
@@ -515,7 +541,7 @@ export class DocumentService extends BaseAPIService {
 
     try {
       const downloadUrl = `${this.baseURL}/api/document/bulk/download?${queryParams}`
-      
+
       // Don't use cache for downloads, always get fresh
       const response = await fetch(downloadUrl, {
         method: "GET",
@@ -556,7 +582,7 @@ export class DocumentService extends BaseAPIService {
 
     try {
       const downloadUrl = `${this.baseURL}/api/document/bulk/download`
-      
+
       // Don't use cache for downloads, always get fresh
       const response = await fetch(downloadUrl, {
         method: "POST",
@@ -596,7 +622,7 @@ export class DocumentService extends BaseAPIService {
   async getDocumentStatistics() {
     const cacheKey = 'stats_overview'
     const apiUrl = '/api/document/stats/overview'
-    
+
     if (this.documentCache.has(cacheKey)) {
       return this.documentCache.get(cacheKey)
     }
@@ -618,7 +644,7 @@ export class DocumentService extends BaseAPIService {
       })
 
       this.documentCache.set(cacheKey, result)
-      
+
       // Cache in service worker
       const response = new Response(JSON.stringify(result), {
         headers: { 'Content-Type': 'application/json' }
@@ -629,7 +655,7 @@ export class DocumentService extends BaseAPIService {
       setTimeout(() => {
         this.documentCache.delete(cacheKey)
       }, 5 * 60 * 1000)
-      
+
       return result
 
     } catch (error) {
@@ -697,10 +723,11 @@ export class DocumentService extends BaseAPIService {
    * Get document download URL
    * @param {number} employeeId - Employee ID
    * @param {string} filename - Document filename
-   * @returns {string} Document download URL
+   * @returns {string} Document download URL with download flag
    */
   getDocumentDownloadUrl(employeeId, filename) {
-    return `${this.baseURL}/api/document/${employeeId}/${filename}/download`
+    const token = getStoredToken()
+    return `${this.baseURL}/api/document/${employeeId}/${encodeURIComponent(filename)}?download=true&token=${encodeURIComponent(token)}`
   }
 
   /**
@@ -710,11 +737,11 @@ export class DocumentService extends BaseAPIService {
    */
   formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes'
-    
+
     const k = 1024
     const sizes = ['Bytes', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
@@ -777,15 +804,33 @@ export class DocumentService extends BaseAPIService {
    * @param {Blob} blob - File blob
    * @param {string} filename - Filename for download
    */
+  /**
+   * Helper method to download blob with proper filename
+   * @param {Blob} blob - File blob
+   * @param {string} filename - Filename for download
+   */
   downloadBlob(blob, filename) {
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    try {
+      const url = URL.createObjectURL(blob)
+      const link = window.document.createElement('a')
+      link.href = url
+      link.download = filename
+      link.style.display = 'none'
+      
+      window.document.body.appendChild(link)
+      link.click()
+      
+      // Cleanup
+      window.document.body.removeChild(link)
+      
+      // Revoke the object URL after a short delay to ensure download started
+      setTimeout(() => {
+        URL.revokeObjectURL(url)
+      }, 100)
+    } catch (error) {
+      console.error('[DocumentService] Error in downloadBlob:', error)
+      throw new Error('Failed to download file')
+    }
   }
 
   /**

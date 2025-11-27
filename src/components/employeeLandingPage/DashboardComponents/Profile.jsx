@@ -1,6 +1,9 @@
 import { useState } from "react"
 import { ArrowLeft, FileText, Download, Mail, Phone, MapPin, Calendar, Users, Briefcase, Lock, X, Eye, EyeOff } from "lucide-react"
 import apiService from "../../../utils/api/api-service"
+import DigitalID from "./DigitalID"
+import logo from "../../../assets/companyLogo.jpg"
+import IDBackground from "../../../assets/DigitalIDBackground.png"
 
 // UI Components
 const Button = ({ children, variant = "default", size = "default", onClick, disabled, className = "", ...props }) => {
@@ -55,6 +58,7 @@ const AvatarFallback = ({ children, className = "" }) => (
 // Main Profile Component
 export default function Profile({ employee, employeeData, handleLogout, profileData, profileImage, documentData, isDarkMode }) {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
+  const [isDigitalIDModalOpen, setIsDigitalIDModalOpen] = useState(false)
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -86,20 +90,30 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
 
   const handleDownload = async (doc) => {
     try {
-      const downloadUrl = doc.url.startsWith('http') ? doc.url : `${window.location.origin}${doc.url}`
-      const response = await fetch(downloadUrl)
-      const blob = await response.blob()
+      // Get employee ID from the employee data
+      const employeeId = fullEmployee?.uid || fullEmployee?.id
+
+      if (!employeeId) {
+        throw new Error("Employee ID not found")
+      }
+
+      // Use the document service to download the document
+      const blob = await apiService.document.downloadDocument(employeeId, doc.filename)
+      
+      // Create a download link
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
       a.download = doc.filename
       document.body.appendChild(a)
       a.click()
+      
+      // Cleanup
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
     } catch (error) {
       console.error('Download failed:', error)
-      alert('Failed to download document')
+      alert(`Failed to download document: ${error.message}`)
     }
   }
 
@@ -180,18 +194,32 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
     }))
   }
 
+  const handleCloseDigitalID = () => {
+    setIsDigitalIDModalOpen(false)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className={`text-3xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>My Profile</h2>
-        <Button
-          variant="outline"
-          onClick={() => setIsPasswordModalOpen(true)}
-          className={`${isDarkMode ? "border-zinc-700 text-zinc-300 hover:bg-zinc-800" : ""}`}
-        >
-          <Lock className="w-4 h-4 mr-2" />
-          Change Password
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsDigitalIDModalOpen(true)}
+            className={`${isDarkMode ? "border-zinc-700 text-zinc-300 hover:bg-zinc-800"  : ""}`}
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            View Digital ID
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setIsPasswordModalOpen(true)}
+            className={`${isDarkMode ? "border-zinc-700 text-zinc-300 hover:bg-zinc-800" : ""}`}
+          >
+            <Lock className="w-4 h-4 mr-2" />
+            Change Password
+          </Button>
+        </div>
       </div>
 
       {/* Profile Header Card */}
@@ -465,6 +493,17 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
           )}
         </CardContent>
       </Card>
+
+      {/* Digital ID Modal */}
+      {isDigitalIDModalOpen && (
+        <DigitalID 
+          employee={employeeData} 
+          profileImage={profileImage}
+          companyLogo={logo}
+          backgroundImage={IDBackground}
+          onClose={handleCloseDigitalID}
+        />
+      )}
 
       {/* Change Password Modal */}
       {isPasswordModalOpen && (

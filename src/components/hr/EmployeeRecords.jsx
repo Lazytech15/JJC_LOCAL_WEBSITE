@@ -485,54 +485,39 @@ function EmployeeRecords() {
 
       setLoadingDocuments(true);
 
-      // Method 1: Using the document service
-      try {
-        const blob = await apiService.document.downloadDocument(
-          selectedEmployee.id,
-          document.filename
-        );
+      const token = getStoredToken();
+      const baseURL = apiService.document.baseURL || window.location.origin;
+      const url = `${baseURL}/api/document/${selectedEmployee.id}/${encodeURIComponent(document.filename)}?download=true`;
 
-        const downloadFilename = document.originalName || document.filename;
-        apiService.document.downloadBlob(blob, downloadFilename);
+      console.log("[EmployeeRecords] Downloading from:", url);
 
-        console.log("[EmployeeRecords] Document downloaded successfully:", downloadFilename);
-        return;
-      } catch (serviceError) {
-        console.warn("[EmployeeRecords] Service download failed, trying direct method:", serviceError);
-
-        // Method 2: Direct fetch as fallback
-        const token = getStoredToken();
-        const baseURL = apiService.document.baseURL || window.location.origin;
-        const url = `${baseURL}/api/document/${selectedEmployee.id}/${document.filename}/download`;
-
-        console.log("[EmployeeRecords] Attempting direct download from:", url);
-
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`Download failed: HTTP ${response.status}`);
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
+      });
 
-        const blob = await response.blob();
-        const downloadFilename = document.originalName || document.filename;
-
-        // Create download link
-        const downloadUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = downloadFilename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(downloadUrl);
-
-        console.log("[EmployeeRecords] Document downloaded successfully via direct method");
+      if (!response.ok) {
+        throw new Error(`Download failed: HTTP ${response.status}`);
       }
+
+      const blob = await response.blob();
+      const downloadFilename = document.originalName || document.filename;
+
+      // Create download link
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = downloadFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 100);
+
+      console.log("[EmployeeRecords] Document downloaded successfully:", downloadFilename);
 
     } catch (err) {
       console.error("[EmployeeRecords] Download error:", err);

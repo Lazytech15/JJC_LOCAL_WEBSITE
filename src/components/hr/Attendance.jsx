@@ -1615,9 +1615,20 @@ function Attendance() {
     return types[clockType] || clockType;
   };
 
+
 const formatTime = (timeString) => {
   if (!timeString) return "-";
   try {
+    // Check if it's already in HH:MM:SS format (time only)
+    if (/^\d{2}:\d{2}:\d{2}$/.test(timeString)) {
+      const [hours, minutes] = timeString.split(':');
+      const hour24 = parseInt(hours, 10);
+      const hour12 = hour24 % 12 || 12;
+      const period = hour24 >= 12 ? 'PM' : 'AM';
+      return `${hour12.toString().padStart(2, '0')}:${minutes} ${period}`;
+    }
+    
+    // Handle datetime strings
     const dateStr = timeString.includes(' ') ? timeString.replace(' ', 'T') : timeString;
     const time = new Date(dateStr);
     
@@ -1888,7 +1899,8 @@ const formatTime = (timeString) => {
                       <div className="text-center">
                         <div className="text-3xl mb-2">🌙</div>
                         <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
-                          {(parseFloat(employeeStats.total_overtime_hours) || 0)}
+                          {/* {(parseFloat(employeeStats.total_overtime_hours) || 0)} */}
+                          {employeeStats.total_overtime_hours}
                           h
                         </div>
                         <div className="text-sm font-medium text-orange-600 dark:text-orange-400">
