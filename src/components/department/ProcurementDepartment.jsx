@@ -1,7 +1,9 @@
 import { useAuth } from "../../contexts/AuthContext"
-import { useState, useEffect, lazy, Suspense } from "react"
+import { useState, useEffect, lazy, Suspense, useCallback } from "react"
 import apiService from "../../utils/api/api-service"
 import { getStoredToken, verifyToken } from "../../utils/auth"
+import { useRealtimeEvents } from "../../hooks/useRealtime"
+import { playStockAlertSound, preloadDefaultSounds } from "../../utils/notificationSound"
 
 // Lazy-load heavy procurement sub-components directly to avoid importing the whole barrel
 const AdminDashboard = lazy(() => import("../pd/AdminDashboard"))
@@ -31,6 +33,45 @@ function ProcurementDepartment() {
   const [showBackToTop, setShowBackToTop] = useState(false)
   const [notificationsLoading, setNotificationsLoading] = useState(false)
   const [notificationsError, setNotificationsError] = useState(null)
+
+  // Real-time event handler for announcements and stock alerts
+  const handleAnnouncementEvent = useCallback((data) => {
+    console.log('🔔 Real-time announcement event received:', data)
+    
+    // Determine priority from the event data
+    const priority = data?.priority || 'medium'
+    
+    // Play notification sound based on priority
+    console.log('🔊 Attempting to play sound for announcement, priority:', priority)
+    playStockAlertSound(priority)
+    
+    // Refresh notifications to show the new alert
+    loadNotifications()
+  }, [user])
+
+  // Handler for stock alerts specifically
+  const handleStockAlert = useCallback((data) => {
+    console.log('🚨 Stock alert received:', data)
+    
+    // Determine priority from the event data
+    const priority = data?.priority || 'urgent'
+    
+    // Play notification sound based on priority
+    console.log('🔊 Attempting to play sound for stock alert, priority:', priority)
+    playStockAlertSound(priority)
+    
+    // Refresh notifications to show the new alert
+    loadNotifications()
+  }, [])
+
+  // Subscribe to real-time announcement events
+  useRealtimeEvents({
+    'announcement_created': handleAnnouncementEvent,
+    'announcement_updated': () => loadNotifications(),
+    'announcement_deleted': () => loadNotifications(),
+    'stock_alert_created': handleStockAlert
+  }, [handleAnnouncementEvent, handleStockAlert])
+
   // Keyboard navigation for tabs
   const tabs = [
     { key: "dashboard", label: "Dashboard", icon: "📊", color: "amber", description: "Overview & Analytics" },
@@ -263,6 +304,11 @@ function ProcurementDepartment() {
   useEffect(() => {
     loadNotifications()
   }, [user])
+
+  // Preload notification sounds on mount
+  useEffect(() => {
+    preloadDefaultSounds()
+  }, [])
 
   // Close profile menu when clicking outside
   useEffect(() => {

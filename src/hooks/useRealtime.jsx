@@ -3,7 +3,7 @@
 // React hooks for subscribing to real-time events
 // ============================================================================
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { pollingManager } from '../utils/api/websocket/polling-manager.js'
+import { pollingManager } from '../utils/api/websocket/polling-manager.jsx'
 
 /**
  * Hook to subscribe to a single real-time event

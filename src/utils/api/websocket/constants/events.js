@@ -71,6 +71,14 @@ export const SOCKET_EVENTS = {
     PO_RECEIVED: 'po_received',
   },
 
+  // Announcement events (Auto stock alerts & general announcements)
+  ANNOUNCEMENT: {
+    CREATED: 'announcement_created',
+    UPDATED: 'announcement_updated',
+    DELETED: 'announcement_deleted',
+    STOCK_ALERT: 'stock_alert_created',
+  },
+
   // Recruitment events (if you have them)
   RECRUITMENT: {
     CREATED: 'recruitment:created',
@@ -123,6 +131,7 @@ export const EVENT_CATEGORIES = {
   DAILY_SUMMARY: Object.values(SOCKET_EVENTS.DAILY_SUMMARY),
   INVENTORY: Object.values(SOCKET_EVENTS.INVENTORY),
   PROCUREMENT: Object.values(SOCKET_EVENTS.PROCUREMENT),
+  ANNOUNCEMENT: Object.values(SOCKET_EVENTS.ANNOUNCEMENT),
   OPERATIONS: Object.values(SOCKET_EVENTS.OPERATIONS),
 }
 
