@@ -513,7 +513,7 @@ function EmployeeRecords() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       // Clean up
       setTimeout(() => URL.revokeObjectURL(downloadUrl), 100);
 
@@ -1202,16 +1202,16 @@ function EmployeeRecords() {
                           setDocumentPreviewUrl(url);
                         }}
                         className={`p-3 text-left rounded-lg border transition-all ${isActive
-                            ? "bg-blue-100 dark:bg-blue-900/40 border-blue-400 dark:border-blue-600 ring-2 ring-blue-500"
-                            : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
+                          ? "bg-blue-100 dark:bg-blue-900/40 border-blue-400 dark:border-blue-600 ring-2 ring-blue-500"
+                          : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
                           }`}
                       >
                         <div className="flex items-center gap-2">
                           {getFileIcon(doc.filename)}
                           <div className="flex-1 min-w-0">
                             <p className={`text-xs truncate ${isActive
-                                ? "text-blue-800 dark:text-blue-200 font-medium"
-                                : "text-gray-800 dark:text-gray-100"
+                              ? "text-blue-800 dark:text-blue-200 font-medium"
+                              : "text-gray-800 dark:text-gray-100"
                               }`}>
                               {doc.originalName || doc.filename}
                             </p>
@@ -1412,10 +1412,10 @@ function EmployeeRecords() {
       {/* Header with Statistics */}
       <div className="flex justify-between items-start">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+          <h2 className={`text-2xl font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
             👥 Employee Records
           </h2>
-          <div className="flex gap-4 mt-2 text-sm text-gray-600 dark:text-gray-300">
+          <div className={`flex gap-4 mt-2 text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
             <span>Total: {statistics.totalEmployees || 0}</span>
             <span>Active: {statistics.activeEmployees || 0}</span>
             <span>New Hires (30d): {statistics.newHiresLast30Days || 0}</span>
@@ -1424,29 +1424,40 @@ function EmployeeRecords() {
         </div>
         <button
           onClick={fetchEmployees}
-          className="bg-slate-600 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+          className={`${isDarkMode
+              ? "bg-slate-700 hover:bg-slate-600"
+              : "bg-slate-600 hover:bg-slate-700"
+            } text-white px-4 py-2 rounded-lg transition-colors duration-200`}
         >
           Refresh
         </button>
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white/20 dark:bg-gray-800/40 backdrop-blur-md rounded-2xl p-4 border border-white/30 dark:border-gray-700/30">
+      <div className={`${isDarkMode ? "bg-gray-800/40 border-gray-700/30" : "bg-white/20 border-white/30"
+        } backdrop-blur-md rounded-2xl p-4 border`}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Simple Search Input - No Autocomplete */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
+            <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isDarkMode ? "text-gray-500" : "text-gray-400"
+              }`} />
             <input
               type="text"
               placeholder="Search employees..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-10 py-2 rounded-lg bg-white/20 dark:bg-gray-800/60 backdrop-blur-sm border border-white/30 dark:border-gray-700/40 text-gray-800 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              className={`w-full pl-10 pr-10 py-2 rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
+                  ? "bg-gray-800/60 border-gray-700/40 text-gray-100 placeholder-gray-400"
+                  : "bg-white/20 border-white/30 text-gray-800 placeholder-gray-500"
+                }`}
             />
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm("")}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isDarkMode
+                    ? "text-gray-400 hover:text-gray-300"
+                    : "text-gray-400 hover:text-gray-600"
+                  }`}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1457,7 +1468,10 @@ function EmployeeRecords() {
           <select
             value={filterDepartment}
             onChange={(e) => setFilterDepartment(e.target.value)}
-            className="px-4 py-2 rounded-lg bg-white/20 dark:bg-gray-800/60 backdrop-blur-sm border border-white/30 dark:border-gray-700/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
+            className={`px-4 py-2 rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
+                ? "bg-gray-800/60 border-gray-700/40 text-gray-100"
+                : "bg-white/20 border-white/30 text-gray-800"
+              }`}
           >
             <option value="">All Departments</option>
             {departments.map((dept) => (
@@ -1471,7 +1485,10 @@ function EmployeeRecords() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 rounded-lg bg-white/20 dark:bg-gray-800/60 backdrop-blur-sm border border-white/30 dark:border-gray-700/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
+            className={`px-4 py-2 rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
+                ? "bg-gray-800/60 border-gray-700/40 text-gray-100"
+                : "bg-white/20 border-white/30 text-gray-800"
+              }`}
           >
             <option value="">All Status</option>
             <option value="Active">Active</option>
@@ -1484,7 +1501,10 @@ function EmployeeRecords() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-4 py-2 rounded-lg bg-white/20 dark:bg-gray-800/60 backdrop-blur-sm border border-white/30 dark:border-gray-700/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
+            className={`px-4 py-2 rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
+                ? "bg-gray-800/60 border-gray-700/40 text-gray-100"
+                : "bg-white/20 border-white/30 text-gray-800"
+              }`}
           >
             <option value="hire_date">Hire Date</option>
             <option value="last_name">Last Name</option>
@@ -1498,7 +1518,10 @@ function EmployeeRecords() {
           <select
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value)}
-            className="px-4 py-2 rounded-lg bg-white/20 dark:bg-gray-800/60 backdrop-blur-sm border border-white/30 dark:border-gray-700/40 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-slate-500"
+            className={`px-4 py-2 rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
+                ? "bg-gray-800/60 border-gray-700/40 text-gray-100"
+                : "bg-white/20 border-white/30 text-gray-800"
+              }`}
           >
             <option value="DESC">Descending</option>
             <option value="ASC">Ascending</option>
@@ -1508,11 +1531,17 @@ function EmployeeRecords() {
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-100/80 dark:bg-red-900/30 backdrop-blur-sm border border-red-300 dark:border-red-700/50 rounded-lg p-4">
-          <p className="text-red-700 dark:text-red-300">Error: {error}</p>
+        <div className={`backdrop-blur-sm border rounded-lg p-4 ${isDarkMode
+            ? "bg-red-900/30 border-red-700/50"
+            : "bg-red-100/80 border-red-300"
+          }`}>
+          <p className={isDarkMode ? "text-red-300" : "text-red-700"}>Error: {error}</p>
           <button
             onClick={() => setError(null)}
-            className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+            className={`mt-2 text-sm underline ${isDarkMode
+                ? "text-red-400 hover:text-red-200"
+                : "text-red-600 hover:text-red-800"
+              }`}
           >
             Dismiss
           </button>
@@ -1522,19 +1551,23 @@ function EmployeeRecords() {
       {/* Employee Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Employee List */}
-        <div className="bg-white/20 dark:bg-gray-800/40 backdrop-blur-md rounded-2xl p-6 border border-white/30 dark:border-gray-700/30 shadow-lg">
+        <div className={`backdrop-blur-md rounded-2xl p-6 border shadow-lg ${isDarkMode
+            ? "bg-gray-800/40 border-gray-700/30"
+            : "bg-white/20 border-white/30"
+          }`}>
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+            <h3 className={`text-lg font-semibold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
               Employees ({employees.length} of {pagination.total})
             </h3>
             <div className="flex items-center gap-3">
               {searchLoading && (
-                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <div className={`flex items-center gap-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"
+                  }`}>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Updating...</span>
                 </div>
               )}
-              <div className="text-sm text-gray-600 dark:text-gray-300">
+              <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
                 Page {pagination.currentPage} of{" "}
                 {Math.ceil(pagination.total / pagination.limit)}
               </div>
@@ -1544,10 +1577,13 @@ function EmployeeRecords() {
           {/* Show overlay when loading search results */}
           <div className="relative">
             {searchLoading && (
-              <div className="absolute inset-0 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm z-10 rounded-lg flex items-center justify-center">
-                <div className="flex items-center gap-2 bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-lg">
-                  <Loader2 className="w-5 h-5 animate-spin text-slate-600 dark:text-slate-400" />
-                  <span className="text-gray-700 dark:text-gray-300">Loading...</span>
+              <div className={`absolute inset-0 backdrop-blur-sm z-10 rounded-lg flex items-center justify-center ${isDarkMode ? "bg-gray-800/50" : "bg-white/50"
+                }`}>
+                <div className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg ${isDarkMode ? "bg-gray-800" : "bg-white"
+                  }`}>
+                  <Loader2 className={`w-5 h-5 animate-spin ${isDarkMode ? "text-slate-400" : "text-slate-600"
+                    }`} />
+                  <span className={isDarkMode ? "text-gray-300" : "text-gray-700"}>Loading...</span>
                 </div>
               </div>
             )}
@@ -1558,13 +1594,18 @@ function EmployeeRecords() {
                   key={employee.id}
                   onClick={() => setSelectedEmployee(employee)}
                   className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${selectedEmployee?.id === employee.id
-                    ? "bg-white/40 dark:bg-gray-700/60 border-slate-300 dark:border-slate-500"
-                    : "bg-white/20 dark:bg-gray-700/30 border-white/20 dark:border-gray-600/30 hover:bg-white/30 dark:hover:bg-gray-700/50"
+                      ? isDarkMode
+                        ? "bg-gray-700/60 border-slate-500"
+                        : "bg-white/40 border-slate-300"
+                      : isDarkMode
+                        ? "bg-gray-700/30 border-gray-600/30 hover:bg-gray-700/50"
+                        : "bg-white/20 border-white/20 hover:bg-white/30"
                     }`}
                 >
                   <div className="flex items-center gap-3">
                     {/* Profile Picture in List */}
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
+                    <div className={`w-10 h-10 rounded-full overflow-hidden flex-shrink-0 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                      }`}>
                       {getProfilePictureUrl(employee) ? (
                         <img
                           src={getProfilePictureUrl(employee)}
@@ -1577,8 +1618,8 @@ function EmployeeRecords() {
                         />
                       ) : null}
                       <div
-                        className={`w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500 ${getProfilePictureUrl(employee) ? "hidden" : "flex"
-                          }`}
+                        className={`w-full h-full flex items-center justify-center ${isDarkMode ? "text-gray-500" : "text-gray-400"
+                          } ${getProfilePictureUrl(employee) ? "hidden" : "flex"}`}
                       >
                         👤
                       </div>
@@ -1587,7 +1628,7 @@ function EmployeeRecords() {
                     <div className="flex-1">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h4 className="font-medium text-gray-800 dark:text-gray-100">
+                          <h4 className={`font-medium ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
                             {employee.fullName}
                             {employee.isNewHire && (
                               <span className="ml-2 text-xs bg-green-500 text-white px-2 py-1 rounded">
@@ -1595,22 +1636,28 @@ function EmployeeRecords() {
                               </span>
                             )}
                           </h4>
-                          <p className="text-sm text-gray-600 dark:text-gray-300">
+                          <p className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
                             {employee.position}
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                          <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                             {employee.department}
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                          <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                             ID: {employee.idNumber}
                           </p>
                         </div>
                         <span
                           className={`px-2 py-1 rounded-full text-xs ${employee.status === "Active"
-                            ? "bg-green-100/80 dark:bg-green-900/40 text-green-700 dark:text-green-300"
-                            : employee.status === "On Leave"
-                              ? "bg-yellow-100/80 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
-                              : "bg-red-100/80 dark:bg-red-900/40 text-red-700 dark:text-red-300"
+                              ? isDarkMode
+                                ? "bg-green-900/40 text-green-300"
+                                : "bg-green-100/80 text-green-700"
+                              : employee.status === "On Leave"
+                                ? isDarkMode
+                                  ? "bg-yellow-900/40 text-yellow-300"
+                                  : "bg-yellow-100/80 text-yellow-700"
+                                : isDarkMode
+                                  ? "bg-red-900/40 text-red-300"
+                                  : "bg-red-100/80 text-red-700"
                             }`}
                         >
                           {employee.status}
@@ -1626,11 +1673,11 @@ function EmployeeRecords() {
             {!searchLoading && employees.length === 0 && (
               <div className="text-center py-8">
                 <div className="text-4xl mb-2">🔍</div>
-                <p className="text-gray-500 dark:text-gray-400">
+                <p className={isDarkMode ? "text-gray-400" : "text-gray-500"}>
                   No employees found
                 </p>
                 {searchTerm && (
-                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                  <p className={`text-sm mt-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
                     Try adjusting your search criteria
                   </p>
                 )}
@@ -1642,11 +1689,14 @@ function EmployeeRecords() {
             <button
               onClick={() => handlePageChange(pagination.currentPage - 1)}
               disabled={pagination.currentPage === 1 || searchLoading}
-              className="px-3 py-1 rounded bg-slate-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              className={`px-3 py-1 rounded text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity ${isDarkMode
+                  ? "bg-slate-700 hover:bg-slate-600"
+                  : "bg-slate-600 hover:bg-slate-700"
+                }`}
             >
               Previous
             </button>
-            <span className="px-3 py-1 text-gray-700 dark:text-gray-300">
+            <span className={`px-3 py-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               {pagination.currentPage} /{" "}
               {Math.ceil(pagination.total / pagination.limit)}
             </span>
@@ -1656,7 +1706,10 @@ function EmployeeRecords() {
                 pagination.currentPage >= Math.ceil(pagination.total / pagination.limit) ||
                 searchLoading
               }
-              className="px-3 py-1 rounded bg-slate-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              className={`px-3 py-1 rounded text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity ${isDarkMode
+                  ? "bg-slate-700 hover:bg-slate-600"
+                  : "bg-slate-600 hover:bg-slate-700"
+                }`}
             >
               Next
             </button>
@@ -1664,15 +1717,20 @@ function EmployeeRecords() {
         </div>
 
         {/* Employee Details */}
-        <div className="bg-white/20 dark:bg-gray-800/40 backdrop-blur-md rounded-2xl p-6 border border-white/30 dark:border-gray-700/30 shadow-lg">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
+        <div className={`backdrop-blur-md rounded-2xl p-6 border shadow-lg ${isDarkMode
+            ? "bg-gray-800/40 border-gray-700/30"
+            : "bg-white/20 border-white/30"
+          }`}>
+          <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
             Employee Details
           </h3>
           {selectedEmployee ? (
             <div className="space-y-4 max-h-96 overflow-y-auto">
-              <div className="text-center pb-4 border-b border-white/30 dark:border-gray-600/30">
+              <div className={`text-center pb-4 border-b ${isDarkMode ? "border-gray-600/30" : "border-white/30"
+                }`}>
                 {/* Profile Picture Display */}
-                <div className="w-24 h-24 mx-auto mb-3 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
+                <div className={`w-24 h-24 mx-auto mb-3 rounded-full overflow-hidden ${isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                  }`}>
                   {getProfilePictureUrl(selectedEmployee) ? (
                     <img
                       src={getProfilePictureUrl(selectedEmployee)}
@@ -1685,39 +1743,42 @@ function EmployeeRecords() {
                     />
                   ) : null}
                   <div
-                    className={`w-full h-full flex items-center justify-center text-4xl text-gray-400 dark:text-gray-500 ${getProfilePictureUrl(selectedEmployee) ? "hidden" : "flex"
-                      }`}
+                    className={`w-full h-full flex items-center justify-center text-4xl ${isDarkMode ? "text-gray-500" : "text-gray-400"
+                      } ${getProfilePictureUrl(selectedEmployee) ? "hidden" : "flex"}`}
                   >
                     👤
                   </div>
                 </div>
 
-                <h4 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                <h4 className={`text-xl font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
                   {selectedEmployee.fullName}
                 </h4>
-                <p className="text-gray-600 dark:text-gray-300">
+                <p className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
                   {selectedEmployee.position}
                 </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                   {selectedEmployee.department}
                 </p>
 
                 {/* Documents Display */}
                 {loadingDocuments ? (
                   <div className="mt-3">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                       Loading documents...
                     </p>
                   </div>
                 ) : employeeDocuments && employeeDocuments.length > 0 ? (
                   <div className="mt-3">
                     <div className="flex justify-between items-center mb-2">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <p className={`text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
                         Documents ({employeeDocuments.length}):
                       </p>
                       <button
                         onClick={openDocumentViewer}
-                        className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded flex items-center gap-1"
+                        className={`text-xs text-white px-2 py-1 rounded flex items-center gap-1 ${isDarkMode
+                            ? "bg-blue-700 hover:bg-blue-600"
+                            : "bg-blue-600 hover:bg-blue-700"
+                          }`}
                       >
                         <Eye className="w-3 h-3" />
                         View All
@@ -1727,16 +1788,17 @@ function EmployeeRecords() {
                       {employeeDocuments.map((doc, index) => (
                         <div
                           key={index}
-                          className="flex items-center justify-between bg-gray-100 dark:bg-gray-700 rounded p-2"
+                          className={`flex items-center justify-between rounded p-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-100"
+                            }`}
                         >
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             {getFileIcon(doc.filename)}
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs text-gray-700 dark:text-gray-300 truncate">
+                              <p className={`text-xs truncate ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
                                 {doc.originalName || doc.filename}
                               </p>
                               {doc.size && (
-                                <p className="text-xs text-gray-500">
+                                <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                                   {apiService.document.formatFileSize(doc.size)}
                                 </p>
                               )}
@@ -1748,7 +1810,10 @@ function EmployeeRecords() {
                                 e.stopPropagation();
                                 downloadDocument(doc);
                               }}
-                              className="p-1 text-green-600 hover:bg-green-100 dark:hover:bg-green-900 rounded"
+                              className={`p-1 rounded ${isDarkMode
+                                  ? "text-green-400 hover:bg-green-900/40"
+                                  : "text-green-600 hover:bg-green-100"
+                                }`}
                               title="Download document"
                             >
                               <Download className="w-3 h-3" />
@@ -1760,7 +1825,7 @@ function EmployeeRecords() {
                   </div>
                 ) : (
                   <div className="mt-3">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                       No documents uploaded
                     </p>
                   </div>
@@ -1769,113 +1834,130 @@ function EmployeeRecords() {
 
               <div className="grid grid-cols-1 gap-3">
                 {/* Personal Information */}
-                <div className="border-b border-white/20 dark:border-gray-600/20 pb-3">
-                  <h5 className="font-medium text-gray-700 dark:text-gray-200 mb-2">
+                <div className={`border-b pb-3 ${isDarkMode ? "border-gray-600/20" : "border-white/20"}`}>
+                  <h5 className={`font-medium mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                     Personal Information
                   </h5>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                      <label className={`text-xs font-medium block ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}>
                         Age
                       </label>
-                      <p className="text-gray-800 dark:text-gray-100">
+                      <p className={isDarkMode ? "text-gray-100" : "text-gray-800"}>
                         {selectedEmployee.age || "N/A"}
                       </p>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                      <label className={`text-xs font-medium block ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}>
                         Birth Date
                       </label>
-                      <p className="text-gray-800 dark:text-gray-100">
+                      <p className={isDarkMode ? "text-gray-100" : "text-gray-800"}>
                         {formatDate(selectedEmployee.birthDate)}
                       </p>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                      <label className={`text-xs font-medium block ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}>
                         Civil Status
                       </label>
-                      <p className="text-gray-800 dark:text-gray-100">
+                      <p className={isDarkMode ? "text-gray-100" : "text-gray-800"}>
                         {selectedEmployee.civilStatus || "N/A"}
                       </p>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                      <label className={`text-xs font-medium block ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}>
                         Contact
                       </label>
-                      <p className="text-gray-800 dark:text-gray-100">
+                      <p className={isDarkMode ? "text-gray-100" : "text-gray-800"}>
                         {formatPhoneNumber(selectedEmployee.contactNumber)}
                       </p>
                     </div>
                   </div>
                   <div className="mt-2">
-                    <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                    <label className={`text-xs font-medium block ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}>
                       Email
                     </label>
-                    <p className="text-gray-800 dark:text-gray-100">
+                    <p className={isDarkMode ? "text-gray-100" : "text-gray-800"}>
                       {selectedEmployee.email || "N/A"}
                     </p>
                   </div>
                   <div className="mt-2">
-                    <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                    <label className={`text-xs font-medium block ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}>
                       Address
                     </label>
-                    <p className="text-gray-800 dark:text-gray-100 text-sm">
+                    <p className={`text-sm ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
                       {selectedEmployee.address || "N/A"}
                     </p>
                   </div>
                 </div>
 
                 {/* Employment Information */}
-                <div className="border-b border-white/20 dark:border-gray-600/20 pb-3">
-                  <h5 className="font-medium text-gray-700 dark:text-gray-200 mb-2">
+                <div className={`border-b pb-3 ${isDarkMode ? "border-gray-600/20" : "border-white/20"}`}>
+                  <h5 className={`font-medium mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                     Employment Information
                   </h5>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                      <label className={`text-xs font-medium block ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}>
                         Hire Date
                       </label>
-                      <p className="text-gray-800 dark:text-gray-100">
+                      <p className={isDarkMode ? "text-gray-100" : "text-gray-800"}>
                         {formatDate(selectedEmployee.hireDate)}
                       </p>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                      <label className={`text-xs font-medium block ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}>
                         Employee ID
                       </label>
-                      <p className="text-gray-800 dark:text-gray-100">
+                      <p className={isDarkMode ? "text-gray-100" : "text-gray-800"}>
                         {selectedEmployee.idNumber || "N/A"}
                       </p>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                      <label className={`text-xs font-medium block ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}>
                         Status
                       </label>
                       <span
                         className={`inline-block px-2 py-1 rounded-full text-xs ${selectedEmployee.status === "Active"
-                          ? "bg-green-100/80 dark:bg-green-900/40 text-green-700 dark:text-green-300"
-                          : selectedEmployee.status === "On Leave"
-                            ? "bg-yellow-100/80 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
-                            : "bg-red-100/80 dark:bg-red-900/40 text-red-700 dark:text-red-300"
+                            ? isDarkMode
+                              ? "bg-green-900/40 text-green-300"
+                              : "bg-green-100/80 text-green-700"
+                            : selectedEmployee.status === "On Leave"
+                              ? isDarkMode
+                                ? "bg-yellow-900/40 text-yellow-300"
+                                : "bg-yellow-100/80 text-yellow-700"
+                              : isDarkMode
+                                ? "bg-red-900/40 text-red-300"
+                                : "bg-red-100/80 text-red-700"
                           }`}
                       >
                         {selectedEmployee.status}
                       </span>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                      <label className={`text-xs font-medium block ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}>
                         Salary
                       </label>
-                      <p className="text-gray-800 dark:text-gray-100 font-medium">
+                      <p className={`font-medium ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
                         {selectedEmployee.salary || "N/A"}
                       </p>
                     </div>
                   </div>
                   <div className="mt-2">
-                    <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block">
+                    <label className={`text-xs font-medium block ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}>
                       ID Barcode
                     </label>
-                    <p className="text-gray-800 dark:text-gray-100 font-mono text-xs">
+                    <p className={`font-mono text-xs ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
                       {selectedEmployee.idBarcode || "N/A"}
                     </p>
                   </div>
@@ -1883,39 +1965,43 @@ function EmployeeRecords() {
 
                 {/* Government IDs */}
                 <div className="pb-3">
-                  <h5 className="font-medium text-gray-700 dark:text-gray-200 mb-2">
+                  <h5 className={`font-medium mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                     Government IDs & Numbers
                   </h5>
                   <div className="grid grid-cols-1 gap-2 text-sm">
                     <div className="flex justify-between">
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                      <label className={`text-xs font-medium ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}>
                         TIN Number:
                       </label>
-                      <p className="text-gray-800 dark:text-gray-100 font-mono">
+                      <p className={`font-mono ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
                         {selectedEmployee.tinNumber || "N/A"}
                       </p>
                     </div>
                     <div className="flex justify-between">
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                      <label className={`text-xs font-medium ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}>
                         SSS Number:
                       </label>
-                      <p className="text-gray-800 dark:text-gray-100 font-mono">
+                      <p className={`font-mono ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
                         {selectedEmployee.sssNumber || "N/A"}
                       </p>
                     </div>
                     <div className="flex justify-between">
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                      <label className={`text-xs font-medium ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}>
                         Pag-IBIG Number:
                       </label>
-                      <p className="text-gray-800 dark:text-gray-100 font-mono">
+                      <p className={`font-mono ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
                         {selectedEmployee.pagibigNumber || "N/A"}
                       </p>
                     </div>
                     <div className="flex justify-between">
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                      <label className={`text-xs font-medium ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}>
                         PhilHealth Number:
                       </label>
-                      <p className="text-gray-800 dark:text-gray-100 font-mono">
+                      <p className={`font-mono ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
                         {selectedEmployee.philhealthNumber || "N/A"}
                       </p>
                     </div>
@@ -1923,16 +2009,23 @@ function EmployeeRecords() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-white/30 dark:border-gray-600/30">
+              <div className={`flex gap-3 pt-4 border-t ${isDarkMode ? "border-gray-600/30" : "border-white/30"
+                }`}>
                 <button
                   onClick={() => handleEditEmployee(selectedEmployee)}
-                  className="flex-1 bg-slate-600 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white py-2 rounded-lg transition-colors duration-200 text-sm"
+                  className={`flex-1 text-white py-2 rounded-lg transition-colors duration-200 text-sm ${isDarkMode
+                      ? "bg-slate-700 hover:bg-slate-600"
+                      : "bg-slate-600 hover:bg-slate-700"
+                    }`}
                 >
                   Edit Employee
                 </button>
                 <button
                   onClick={() => handleDeleteClick(selectedEmployee)}
-                  className="flex-1 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white py-2 rounded-lg transition-colors duration-200 text-sm"
+                  className={`flex-1 text-white py-2 rounded-lg transition-colors duration-200 text-sm ${isDarkMode
+                      ? "bg-red-700 hover:bg-red-600"
+                      : "bg-red-600 hover:bg-red-700"
+                    }`}
                 >
                   Delete Employee
                 </button>
@@ -1941,7 +2034,7 @@ function EmployeeRecords() {
           ) : (
             <div className="text-center py-8">
               <div className="text-6xl mb-4">👤</div>
-              <p className="text-gray-500 dark:text-gray-400">
+              <p className={isDarkMode ? "text-gray-400" : "text-gray-500"}>
                 Select an employee to view detailed information
               </p>
             </div>
@@ -1956,754 +2049,905 @@ function EmployeeRecords() {
         </div>
       )}
 
-      {/* <div className="fixed inset-0 bg-gray-30 bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50 p-4"></div> make content blur */}
-
       {/* Edit Employee Modal */}
-      {
-        isEditModalOpen && editingEmployee && (
-          <div className="fixed inset-0 bg-gray-30 bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-4xl w-full max-h-[93vh] overflow-hidden shadow-2xl">
-              <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
-                  Edit Employee
-                </h2>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setIsChangePasswordOpen(true)}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 shadow-sm"
-                    title="Change employee password"
-                  >
-                    <Lock size={18} />
-                    <span className="font-medium">Change Password</span>
-                  </button>
-                  <button
-                    onClick={() => setIsEditModalOpen(false)}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  >
-                    <X size={20} className="text-gray-500 dark:text-gray-400" />
-                  </button>
-                </div>
+      {isEditModalOpen && editingEmployee && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`rounded-2xl max-w-4xl w-full max-h-[93vh] overflow-hidden shadow-2xl ${isDarkMode ? "bg-gray-800" : "bg-white"
+            }`}>
+            <div className={`flex justify-between items-center p-6 border-b ${isDarkMode ? "border-gray-700" : "border-gray-200"
+              }`}>
+              <h2 className={`text-xl font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+                Edit Employee
+              </h2>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsChangePasswordOpen(true)}
+                  className={`px-4 py-2 text-white rounded-lg transition-colors flex items-center gap-2 shadow-sm ${isDarkMode
+                      ? "bg-blue-700 hover:bg-blue-600"
+                      : "bg-blue-600 hover:bg-blue-700"
+                    }`}
+                  title="Change employee password"
+                >
+                  <Lock size={18} />
+                  <span className="font-medium">Change Password</span>
+                </button>
+                <button
+                  onClick={() => setIsEditModalOpen(false)}
+                  className={`p-2 rounded-lg transition-colors ${isDarkMode
+                      ? "hover:bg-gray-700"
+                      : "hover:bg-gray-100"
+                    }`}
+                >
+                  <X size={20} className={isDarkMode ? "text-gray-400" : "text-gray-500"} />
+                </button>
               </div>
+            </div>
 
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-                <form className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="md:col-span-2 space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
-                      File Uploads
-                    </h3>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <form className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2 space-y-4">
+                  <h3 className={`text-lg font-semibold border-b pb-2 ${isDarkMode
+                      ? "text-gray-100 border-gray-700"
+                      : "text-gray-800 border-gray-200"
+                    }`}>
+                    File Uploads
+                  </h3>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Profile Picture Upload */}
-                      <div className="space-y-3">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Profile Picture
-                        </label>
-                        <div className="flex items-center space-x-4">
-                          {profilePreview && (
-                            <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
-                              <img
-                                src={profilePreview}
-                                alt="Profile preview"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          )}
-                          <div className="flex-1">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={handleProfilePictureChange}
-                              disabled={isSaving || uploadingFiles}
-                              className="w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-slate-600 file:text-white hover:file:bg-slate-700 file:cursor-pointer"
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Profile Picture Upload */}
+                    <div className="space-y-3">
+                      <label className={`block text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Profile Picture
+                      </label>
+                      <div className="flex items-center space-x-4">
+                        {profilePreview && (
+                          <div className={`w-16 h-16 rounded-full overflow-hidden ${isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                            }`}>
+                            <img
+                              src={profilePreview}
+                              alt="Profile preview"
+                              className="w-full h-full object-cover"
                             />
-                            {selectedProfileFile && (
-                              <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                                📁 {selectedProfileFile.name} selected (will
-                                upload when saved)
-                              </p>
-                            )}
                           </div>
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Select new profile picture (max 10MB,
-                          jpg/png/gif/webp/bmp). File will be uploaded when you
-                          save changes.
-                        </p>
-                      </div>
-
-                      {/* Document Upload */}
-                      <div className="space-y-3">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Add New Documents
-                        </label>
-                        <div className="space-y-2">
+                        )}
+                        <div className="flex-1">
                           <input
                             type="file"
-                            accept=".pdf,.doc,.docx,.txt,.csv,.rtf,.xls,.xlsx,.ppt,.pptx,image/*,.zip,.rar"
-                            multiple
-                            onChange={handleDocumentChange}
+                            accept="image/*"
+                            onChange={handleProfilePictureChange}
                             disabled={isSaving || uploadingFiles}
-                            className="w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-slate-600 file:text-white hover:file:bg-slate-700 file:cursor-pointer"
+                            className={`w-full px-3 py-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:text-white file:cursor-pointer ${isDarkMode
+                                ? "text-gray-400 file:bg-slate-700 hover:file:bg-slate-600"
+                                : "text-gray-600 file:bg-slate-600 hover:file:bg-slate-700"
+                              }`}
                           />
+                          {selectedProfileFile && (
+                            <p className={`text-xs mt-1 ${isDarkMode ? "text-green-400" : "text-green-600"
+                              }`}>
+                              📁 {selectedProfileFile.name} selected (will
+                              upload when saved)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                        Select new profile picture (max 10MB,
+                        jpg/png/gif/webp/bmp). File will be uploaded when you
+                        save changes.
+                      </p>
+                    </div>
 
-                          {/* Show selected files to upload */}
-                          {selectedDocumentFiles.length > 0 && (
-                            <div className="space-y-1">
-                              <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                                Files to upload ({selectedDocumentFiles.length}):
-                              </p>
-                              {selectedDocumentFiles.map((file, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 p-2 rounded"
+                    {/* Document Upload */}
+                    <div className="space-y-3">
+                      <label className={`block text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Add New Documents
+                      </label>
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          accept=".pdf,.doc,.docx,.txt,.csv,.rtf,.xls,.xlsx,.ppt,.pptx,image/*,.zip,.rar"
+                          multiple
+                          onChange={handleDocumentChange}
+                          disabled={isSaving || uploadingFiles}
+                          className={`w-full px-3 py-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:text-white file:cursor-pointer ${isDarkMode
+                              ? "text-gray-400 file:bg-slate-700 hover:file:bg-slate-600"
+                              : "text-gray-600 file:bg-slate-600 hover:file:bg-slate-700"
+                            }`}
+                        />
+
+                        {/* Show selected files to upload */}
+                        {selectedDocumentFiles.length > 0 && (
+                          <div className="space-y-1">
+                            <p className={`text-xs font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                              }`}>
+                              Files to upload ({selectedDocumentFiles.length}):
+                            </p>
+                            {selectedDocumentFiles.map((file, index) => (
+                              <div
+                                key={index}
+                                className={`flex items-center justify-between p-2 rounded ${isDarkMode ? "bg-green-900/20" : "bg-green-50"
+                                  }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {getFileIcon(file.name)}
+                                  <span className={`text-xs ${isDarkMode ? "text-green-300" : "text-green-700"
+                                    }`}>
+                                    {file.name}
+                                  </span>
+                                  <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"
+                                    }`}>
+                                    (
+                                    {apiService.document.formatFileSize(
+                                      file.size
+                                    )}
+                                    )
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeSelectedDocument(index)}
+                                  className={isDarkMode ? "text-red-400 hover:text-red-300" : "text-red-500 hover:text-red-700"}
                                 >
-                                  <div className="flex items-center gap-2">
-                                    {getFileIcon(file.name)}
-                                    <span className="text-xs text-green-700 dark:text-green-300">
-                                      {file.name}
-                                    </span>
-                                    <span className="text-xs text-gray-500">
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Show existing documents */}
+                        {employeeDocuments && employeeDocuments.length > 0 && (
+                          <div className="space-y-1">
+                            <p className={`text-xs font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                              }`}>
+                              Current documents ({employeeDocuments.length}):
+                            </p>
+                            {employeeDocuments.map((doc, index) => (
+                              <div
+                                key={index}
+                                className={`flex items-center justify-between p-2 rounded ${isDarkMode ? "bg-gray-700/50" : "bg-gray-50"
+                                  }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {getFileIcon(doc.filename)}
+                                  <span className={`text-xs ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                                    }`}>
+                                    {doc.originalName || doc.filename}
+                                  </span>
+                                  {doc.size && (
+                                    <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"
+                                      }`}>
                                       (
                                       {apiService.document.formatFileSize(
-                                        file.size
+                                        doc.size
                                       )}
                                       )
                                     </span>
-                                  </div>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1">
                                   <button
                                     type="button"
-                                    onClick={() => removeSelectedDocument(index)}
-                                    className="text-red-500 hover:text-red-700"
+                                    onClick={() =>
+                                      window.open(
+                                        getDocumentUrl(
+                                          editingEmployee.id,
+                                          doc.filename
+                                        ),
+                                        "_blank"
+                                      )
+                                    }
+                                    className={isDarkMode ? "text-blue-400 hover:text-blue-300" : "text-blue-500 hover:text-blue-700"}
+                                    title="View document"
                                   >
-                                    <X size={14} />
+                                    <Eye size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteDocument(doc)}
+                                    className={isDarkMode ? "text-red-400 hover:text-red-300" : "text-red-500 hover:text-red-700"}
+                                    title="Remove document"
+                                    disabled={loadingDocuments}
+                                  >
+                                    <Trash2 size={14} />
                                   </button>
                                 </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Show existing documents */}
-                          {employeeDocuments && employeeDocuments.length > 0 && (
-                            <div className="space-y-1">
-                              <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                                Current documents ({employeeDocuments.length}):
-                              </p>
-                              {employeeDocuments.map((doc, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 p-2 rounded"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    {getFileIcon(doc.filename)}
-                                    <span className="text-xs text-gray-700 dark:text-gray-300">
-                                      {doc.originalName || doc.filename}
-                                    </span>
-                                    {doc.size && (
-                                      <span className="text-xs text-gray-500">
-                                        (
-                                        {apiService.document.formatFileSize(
-                                          doc.size
-                                        )}
-                                        )
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        window.open(
-                                          getDocumentUrl(
-                                            editingEmployee.id,
-                                            doc.filename
-                                          ),
-                                          "_blank"
-                                        )
-                                      }
-                                      className="text-blue-500 hover:text-blue-700"
-                                      title="View document"
-                                    >
-                                      <Eye size={14} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => deleteDocument(doc)}
-                                      className="text-red-500 hover:text-red-700"
-                                      title="Remove document"
-                                      disabled={loadingDocuments}
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Select multiple documents (max 50MB each). Files will be
-                          uploaded when you save changes.
-                        </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
+                      <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                        Select multiple documents (max 50MB each). Files will be
+                        uploaded when you save changes.
+                      </p>
                     </div>
                   </div>
+                </div>
 
-                  {/* Personal Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
-                      Personal Information
-                    </h3>
+                {/* Personal Information */}
+                <div className="space-y-4">
+                  <h3 className={`text-lg font-semibold border-b pb-2 ${isDarkMode
+                      ? "text-gray-100 border-gray-700"
+                      : "text-gray-800 border-gray-200"
+                    }`}>
+                    Personal Information
+                  </h3>
 
-                    <div className="grid grid-cols-1 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          First Name
-                        </label>
-                        <input
-                          type="text"
-                          value={editingEmployee.firstName || ""}
-                          onChange={(e) =>
-                            handleInputChange("firstName", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Middle Name
-                        </label>
-                        <input
-                          type="text"
-                          value={editingEmployee.middleName || ""}
-                          onChange={(e) =>
-                            handleInputChange("middleName", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Last Name
-                        </label>
-                        <input
-                          type="text"
-                          value={editingEmployee.lastName || ""}
-                          onChange={(e) =>
-                            handleInputChange("lastName", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Age
-                          </label>
-                          <input
-                            type="number"
-                            value={editingEmployee.age || ""}
-                            onChange={(e) =>
-                              handleInputChange("age", e.target.value)
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Birth Date
-                          </label>
-                          <input
-                            type="date"
-                            value={editingEmployee.birthDate || ""}
-                            onChange={(e) =>
-                              handleInputChange("birthDate", e.target.value)
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Civil Status
-                        </label>
-                        <select
-                          value={editingEmployee.civilStatus || ""}
-                          onChange={(e) =>
-                            handleInputChange("civilStatus", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                        >
-                          <option value="">Select Status</option>
-                          <option value="Single">Single</option>
-                          <option value="Married">Married</option>
-                          <option value="Divorced">Divorced</option>
-                          <option value="Widowed">Widowed</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Contact Number
-                        </label>
-                        <input
-                          type="tel"
-                          value={editingEmployee.contactNumber || ""}
-                          onChange={(e) =>
-                            handleInputChange("contactNumber", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                          placeholder="+639123456789"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          value={editingEmployee.email || ""}
-                          onChange={(e) =>
-                            handleInputChange("email", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                        />
-                      </div>
-
-                      <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Username
-                    </label>
-                    <input
-                      type="text"
-                      value={editingEmployee.username || ""}
-                      onChange={(e) =>
-                        handleInputChange("username", e.target.value)
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Access Level
-                    </label>
-                    <select
-                      value={editingEmployee.accessLevel || ""}
-                      onChange={(e) =>
-                        handleInputChange("accessLevel", e.target.value)
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                    >
-                      <option value="">Select Access Level</option>
-                      <option value="Admin">Admin</option>
-                      <option value="Manager">Manager</option>
-                      <option value="Employee">Employee</option>
-                      <option value="Viewer">Viewer</option>
-                    </select>
-                  </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Address
-                        </label>
-                        <textarea
-                          value={editingEmployee.address || ""}
-                          onChange={(e) =>
-                            handleInputChange("address", e.target.value)
-                          }
-                          rows="3"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                        />
-                      </div>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        First Name
+                      </label>
+                      <input
+                        type="text"
+                        value={editingEmployee.firstName || ""}
+                        onChange={(e) =>
+                          handleInputChange("firstName", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                      />
                     </div>
-                  </div>
 
-                  {/* Employment Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
-                      Employment Information
-                    </h3>
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Middle Name
+                      </label>
+                      <input
+                        type="text"
+                        value={editingEmployee.middleName || ""}
+                        onChange={(e) =>
+                          handleInputChange("middleName", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                      />
+                    </div>
 
-                    <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Last Name
+                      </label>
+                      <input
+                        type="text"
+                        value={editingEmployee.lastName || ""}
+                        onChange={(e) =>
+                          handleInputChange("lastName", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Position
+                        <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                          }`}>
+                          Age
                         </label>
                         <input
-                          type="text"
-                          value={editingEmployee.position || ""}
+                          type="number"
+                          value={editingEmployee.age || ""}
                           onChange={(e) =>
-                            handleInputChange("position", e.target.value)
+                            handleInputChange("age", e.target.value)
                           }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                              ? "border-gray-600 bg-gray-700 text-gray-100"
+                              : "border-gray-300 bg-white text-gray-900"
+                            }`}
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Department
-                        </label>
-                        <input
-                          type="text"
-                          value={editingEmployee.department || ""}
-                          onChange={(e) =>
-                            handleInputChange("department", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Hire Date
+                        <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                          }`}>
+                          Birth Date
                         </label>
                         <input
                           type="date"
-                          value={editingEmployee.hireDate || ""}
+                          value={editingEmployee.birthDate || ""}
                           onChange={(e) =>
-                            handleInputChange("hireDate", e.target.value)
+                            handleInputChange("birthDate", e.target.value)
                           }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Employee ID
-                        </label>
-                        <input
-                          type="text"
-                          value={editingEmployee.idNumber || ""}
-                          onChange={(e) =>
-                            handleInputChange("idNumber", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Status
-                        </label>
-                        <select
-                          value={editingEmployee.status || ""}
-                          onChange={(e) =>
-                            handleInputChange("status", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                        >
-                          <option value="">Select Status</option>
-                          <option value="Active">Active</option>
-                          <option value="Inactive">Inactive</option>
-                          <option value="On Leave">On Leave</option>
-                          <option value="Terminated">Terminated</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Salary
-                        </label>
-                        <input
-                          type="text"
-                          value={editingEmployee.salary || ""}
-                          onChange={(e) =>
-                            handleInputChange("salary", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                          placeholder="₱25,000"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          ID Barcode
-                        </label>
-                        <input
-                          type="text"
-                          value={editingEmployee.idBarcode || ""}
-                          onChange={(e) =>
-                            handleInputChange("idBarcode", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                              ? "border-gray-600 bg-gray-700 text-gray-100"
+                              : "border-gray-300 bg-white text-gray-900"
+                            }`}
                         />
                       </div>
                     </div>
 
-                    {/* Government IDs */}
-                    <div className="mt-6">
-                      <h4 className="text-md font-medium text-gray-800 dark:text-gray-100 mb-3 border-b border-gray-200 dark:border-gray-700 pb-1">
-                        Government IDs & Numbers
-                      </h4>
-                      <div className="grid grid-cols-1 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            TIN Number
-                          </label>
-                          <input
-                            type="text"
-                            value={editingEmployee.tinNumber || ""}
-                            onChange={(e) =>
-                              handleInputChange("tinNumber", e.target.value)
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
-                          />
-                        </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Civil Status
+                      </label>
+                      <select
+                        value={editingEmployee.civilStatus || ""}
+                        onChange={(e) =>
+                          handleInputChange("civilStatus", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                      >
+                        <option value="">Select Status</option>
+                        <option value="Single">Single</option>
+                        <option value="Married">Married</option>
+                        <option value="Divorced">Divorced</option>
+                        <option value="Widowed">Widowed</option>
+                      </select>
+                    </div>
 
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            SSS Number
-                          </label>
-                          <input
-                            type="text"
-                            value={editingEmployee.sssNumber || ""}
-                            onChange={(e) =>
-                              handleInputChange("sssNumber", e.target.value)
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
-                          />
-                        </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Contact Number
+                      </label>
+                      <input
+                        type="tel"
+                        value={editingEmployee.contactNumber || ""}
+                        onChange={(e) =>
+                          handleInputChange("contactNumber", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                        placeholder="+639123456789"
+                      />
+                    </div>
 
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Pag-IBIG Number
-                          </label>
-                          <input
-                            type="text"
-                            value={editingEmployee.pagibigNumber || ""}
-                            onChange={(e) =>
-                              handleInputChange("pagibigNumber", e.target.value)
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
-                          />
-                        </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        value={editingEmployee.email || ""}
+                        onChange={(e) =>
+                          handleInputChange("email", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                      />
+                    </div>
 
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            PhilHealth Number
-                          </label>
-                          <input
-                            type="text"
-                            value={editingEmployee.philhealthNumber || ""}
-                            onChange={(e) =>
-                              handleInputChange(
-                                "philhealthNumber",
-                                e.target.value
-                              )
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
-                          />
-                        </div>
-                      </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Username
+                      </label>
+                      <input
+                        type="text"
+                        value={editingEmployee.username || ""}
+                        onChange={(e) =>
+                          handleInputChange("username", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Access Level
+                      </label>
+                      <select
+                        value={editingEmployee.accessLevel || ""}
+                        onChange={(e) =>
+                          handleInputChange("accessLevel", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                      >
+                        <option value="">Select Access Level</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Manager">Manager</option>
+                        <option value="Employee">Employee</option>
+                        <option value="Viewer">Viewer</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Address
+                      </label>
+                      <textarea
+                        value={editingEmployee.address || ""}
+                        onChange={(e) =>
+                          handleInputChange("address", e.target.value)
+                        }
+                        rows="3"
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                      />
                     </div>
                   </div>
-                </form>
-              </div>
-
-              <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-                <button
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200"
-                  disabled={isSaving}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveEmployee}
-                  disabled={isSaving || uploadingFiles}
-                  className="px-6 py-2 bg-slate-600 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSaving
-                    ? uploadingFiles
-                      ? "Uploading files..."
-                      : "Saving..."
-                    : "Save Changes"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      }
-
-      {isChangePasswordOpen && editingEmployee && (
-        <div className="fixed inset-0 bg-gray-90 bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full shadow-2xl">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-2 mb-2">
-                <Lock size={20} className="text-blue-600" />
-                <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">
-                  Change Password
-                </h2>
-              </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                For: {editingEmployee.fullName}
-              </p>
-            </div>
-
-            <div className="p-6 space-y-4">
-              {passwordError && (
-                <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg p-3">
-                  <p className="text-sm text-red-700 dark:text-red-300">{passwordError}</p>
                 </div>
-              )}
 
-              {passwordSuccess && (
-                <div className="bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-lg p-3">
-                  <p className="text-sm text-green-700 dark:text-green-300">{passwordSuccess}</p>
-                </div>
-              )}
+                {/* Employment Information */}
+                <div className="space-y-4">
+                  <h3 className={`text-lg font-semibold border-b pb-2 ${isDarkMode
+                      ? "text-gray-100 border-gray-700"
+                      : "text-gray-800 border-gray-200"
+                    }`}>
+                    Employment Information
+                  </h3>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  New Password
-                </label>
-                <input
-                  type="password"
-                  value={passwordForm.newPassword}
-                  onChange={(e) =>
-                    setPasswordForm({
-                      ...passwordForm,
-                      newPassword: e.target.value,
-                    })
-                  }
-                  placeholder="Minimum 8 characters"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-              </div>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Position
+                      </label>
+                      <input
+                        type="text"
+                        value={editingEmployee.position || ""}
+                        onChange={(e) =>
+                          handleInputChange("position", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                      />
+                    </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Confirm Password
-                </label>
-                <input
-                  type="password"
-                  value={passwordForm.confirmPassword}
-                  onChange={(e) =>
-                    setPasswordForm({
-                      ...passwordForm,
-                      confirmPassword: e.target.value,
-                    })
-                  }
-                  placeholder="Re-enter password"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-              </div>
-            </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Department
+                      </label>
+                      <input
+                        type="text"
+                        value={editingEmployee.department || ""}
+                        onChange={(e) =>
+                          handleInputChange("department", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                      />
+                    </div>
 
-            <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-              <button
-                onClick={() => {
-                  setIsChangePasswordOpen(false);
-                  setPasswordForm({ newPassword: "", confirmPassword: "" });
-                  setPasswordError("");
-                  setPasswordSuccess("");
-                }}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                disabled={isSaving}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleChangePassword}
-                disabled={isSaving}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSaving ? "Updating..." : "Update Password"}
-              </button>
-            </div>
-          </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Hire Date
+                      </label>
+                      <input
+                        type="date"
+                        value={editingEmployee.hireDate || ""}
+                        onChange={(e) =>
+                          handleInputChange("hireDate", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Employee ID
+                      </label>
+                      <input
+                        type="text"
+                        value={editingEmployee.idNumber || ""}
+                        onChange={(e) =>
+                          handleInputChange("idNumber", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Status
+                      </label>
+                      <select
+                        value={editingEmployee.status || ""}
+                        onChange={(e) =>
+                          handleInputChange("status", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                      >
+                        <option value="">Select Status</option>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="On Leave">On Leave</option>
+                        <option value="Terminated">Terminated</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        Salary
+                      </label>
+                      <input
+                        type="text"
+                        value={editingEmployee.salary || ""}
+                        onChange={(e) =>
+                          handleInputChange("salary", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                        placeholder="₱25,000"
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        }`}>
+                        ID Barcode
+                      </label>
+                      <input
+                        type="text"
+                        value={editingEmployee.idBarcode || ""}
+                        onChange={(e) =>
+                          handleInputChange("idBarcode", e.target.value)
+                        }
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent font-mono text-sm ${isDarkMode
+                            ? "border-gray-600 bg-gray-700 text-gray-100"
+                            : "border-gray-300 bg-white text-gray-900"
+                          }`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Government IDs */}
+                  <div className="mt-6">
+                    <h4 className={`text-md font-medium mb-3 border-b pb-1 ${isDarkMode
+                        ? "text-gray-100 border-gray-700"
+                        : "text-gray-800 border-gray-200"
+                      }`}>
+                      Government IDs & Numbers
+                    </h4>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                          }`}>
+                          TIN Number
+                        </label>
+                        <input
+                          type="text"
+                          value={editingEmployee.tinNumber || ""}
+                          onChange={(e) =>
+                            handleInputChange("tinNumber", e.target.value)
+                          }
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent font-mono text-sm ${isDarkMode
+                              ? "border-gray-600 bg-gray-700 text-gray-100"
+                              : "border-gray-300 bg-white text-gray-900"
+                            }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                          }`}>
+                          SSS Number
+                        </label>
+                        <input
+                          type="text"
+                          value={editingEmployee.sssNumber || ""}
+                          onChange={(e) =>
+                            handleInputChange("sssNumber", e.target.value)
+                          }
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent font-mono text-sm ${isDarkMode
+                              ? "border-gray-600 bg-gray-700 text-gray-100"
+                              : "border-gray-300 bg-white text-gray-900"
+                            }`}
+                        />
+                      </div>
+
+                      <div>
+  <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+    Pag-IBIG Number
+  </label>
+  <input
+    type="text"
+    value={editingEmployee.pagibigNumber || ""}
+    onChange={(e) =>
+      handleInputChange("pagibigNumber", e.target.value)
+    }
+    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent font-mono text-sm ${isDarkMode
+        ? "border-gray-600 bg-gray-700 text-gray-100"
+        : "border-gray-300 bg-white text-gray-900"
+      }`}
+  />
+</div>
+
+<div>
+  <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+    PhilHealth Number
+  </label>
+  <input
+    type="text"
+    value={editingEmployee.philhealthNumber || ""}
+    onChange={(e) =>
+      handleInputChange(
+        "philhealthNumber",
+        e.target.value
+      )
+    }
+    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent font-mono text-sm ${isDarkMode
+        ? "border-gray-600 bg-gray-700 text-gray-100"
+        : "border-gray-300 bg-white text-gray-900"
+      }`}
+  />
+</div>
+</div>
+</div>
+</div>
+</form>
+</div>
+
+<div className={`flex justify-end gap-3 p-6 border-t ${isDarkMode ? "border-gray-700 bg-gray-700/50" : "border-gray-200 bg-gray-50"}`}>
+  <button
+    onClick={() => setIsEditModalOpen(false)}
+    className={`px-6 py-2 border rounded-lg transition-colors duration-200 ${isDarkMode 
+        ? "border-gray-600 text-gray-300 hover:bg-gray-600" 
+        : "border-gray-300 text-gray-700 hover:bg-gray-100"
+      }`}
+    disabled={isSaving}
+  >
+    Cancel
+  </button>
+  <button
+    onClick={handleSaveEmployee}
+    disabled={isSaving || uploadingFiles}
+    className={`px-6 py-2 text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode
+        ? "bg-slate-700 hover:bg-slate-600"
+        : "bg-slate-600 hover:bg-slate-700"
+      }`}
+  >
+    {isSaving
+      ? uploadingFiles
+        ? "Uploading files..."
+        : "Saving..."
+      : "Save Changes"}
+  </button>
+</div>
+</div>
+</div>
+)
+}
+
+{isChangePasswordOpen && editingEmployee && (
+<div className="fixed inset-0 bg-gray-90 bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+  <div className={`rounded-2xl max-w-md w-full shadow-2xl ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
+    <div className={`p-6 border-b ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
+      <div className="flex items-center gap-2 mb-2">
+        <Lock size={20} className="text-blue-600" />
+        <h2 className={`text-lg font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+          Change Password
+        </h2>
+      </div>
+      <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+        For: {editingEmployee.fullName}
+      </p>
+    </div>
+
+    <div className="p-6 space-y-4">
+      {passwordError && (
+        <div className={`border rounded-lg p-3 ${isDarkMode 
+            ? "bg-red-900/30 border-red-700" 
+            : "bg-red-100 border-red-300"
+          }`}>
+          <p className={`text-sm ${isDarkMode ? "text-red-300" : "text-red-700"}`}>{passwordError}</p>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {
-        isDeleteModalOpen && deleteEmployee && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full shadow-2xl">
-              <div className="p-6">
-                <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 dark:bg-red-900/40 rounded-full">
-                  <svg
-                    className="w-6 h-6 text-red-600 dark:text-red-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                    />
-                  </svg>
-                </div>
+      {passwordSuccess && (
+        <div className={`border rounded-lg p-3 ${isDarkMode 
+            ? "bg-green-900/30 border-green-700" 
+            : "bg-green-100 border-green-300"
+          }`}>
+          <p className={`text-sm ${isDarkMode ? "text-green-300" : "text-green-700"}`}>{passwordSuccess}</p>
+        </div>
+      )}
 
-                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 text-center mb-2">
-                  Delete Employee Record
-                </h2>
+      <div>
+        <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+          New Password
+        </label>
+        <input
+          type="password"
+          value={passwordForm.newPassword}
+          onChange={(e) =>
+            setPasswordForm({
+              ...passwordForm,
+              newPassword: e.target.value,
+            })
+          }
+          placeholder="Minimum 8 characters"
+          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isDarkMode
+              ? "border-gray-600 bg-gray-700 text-gray-100"
+              : "border-gray-300 bg-white text-gray-900"
+            }`}
+        />
+      </div>
 
-                <p className="text-gray-600 dark:text-gray-300 text-center mb-6">
-                  Are you sure you want to delete{" "}
-                  <strong>{deleteEmployee.fullName}</strong>? This action cannot
-                  be undone and will permanently remove all employee data.
-                </p>
+      <div>
+        <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+          Confirm Password
+        </label>
+        <input
+          type="password"
+          value={passwordForm.confirmPassword}
+          onChange={(e) =>
+            setPasswordForm({
+              ...passwordForm,
+              confirmPassword: e.target.value,
+            })
+          }
+          placeholder="Re-enter password"
+          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isDarkMode
+              ? "border-gray-600 bg-gray-700 text-gray-100"
+              : "border-gray-300 bg-white text-gray-900"
+            }`}
+        />
+      </div>
+    </div>
 
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
-                  <div className="flex items-center">
-                    <svg
-                      className="w-5 h-5 text-red-500 dark:text-red-400 mr-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <div className="text-sm text-red-700 dark:text-red-300">
-                      <p className="font-medium">
-                        Warning: This action is irreversible
-                      </p>
-                      <p>Employee ID: {deleteEmployee.idNumber}</p>
-                      <p>Department: {deleteEmployee.department}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+    <div className={`flex justify-end gap-3 p-6 border-t ${isDarkMode ? "border-gray-700 bg-gray-700/50" : "border-gray-200 bg-gray-50"}`}>
+      <button
+        onClick={() => {
+          setIsChangePasswordOpen(false);
+          setPasswordForm({ newPassword: "", confirmPassword: "" });
+          setPasswordError("");
+          setPasswordSuccess("");
+        }}
+        className={`px-4 py-2 border rounded-lg transition-colors ${isDarkMode
+            ? "border-gray-600 text-gray-300 hover:bg-gray-600"
+            : "border-gray-300 text-gray-700 hover:bg-gray-100"
+          }`}
+        disabled={isSaving}
+      >
+        Cancel
+      </button>
+      <button
+        onClick={handleChangePassword}
+        disabled={isSaving}
+        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {isSaving ? "Updating..." : "Update Password"}
+      </button>
+    </div>
+  </div>
+</div>
+)}
 
-              <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-                <button
-                  onClick={() => {
-                    setIsDeleteModalOpen(false);
-                    setDeleteEmployee(null);
-                  }}
-                  className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200"
-                  disabled={isSaving}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  disabled={isSaving}
-                  className="px-6 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSaving ? "Deleting..." : "Delete Employee"}
-                </button>
-              </div>
+{/* Delete Confirmation Modal */}
+{
+isDeleteModalOpen && deleteEmployee && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className={`rounded-2xl max-w-md w-full shadow-2xl ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
+      <div className="p-6">
+        <div className={`flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full ${isDarkMode ? "bg-red-900/40" : "bg-red-100"}`}>
+          <svg
+            className={`w-6 h-6 ${isDarkMode ? "text-red-400" : "text-red-600"}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+            />
+          </svg>
+        </div>
+
+        <h2 className={`text-xl font-bold text-center mb-2 ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
+          Delete Employee Record
+        </h2>
+
+        <p className={`text-center mb-6 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+          Are you sure you want to delete{" "}
+          <strong>{deleteEmployee.fullName}</strong>? This action cannot
+          be undone and will permanently remove all employee data.
+        </p>
+
+        <div className={`border rounded-lg p-4 mb-6 ${isDarkMode 
+            ? "bg-red-900/20 border-red-800" 
+            : "bg-red-50 border-red-200"
+          }`}>
+          <div className="flex items-center">
+            <svg
+              className={`w-5 h-5 mr-2 ${isDarkMode ? "text-red-400" : "text-red-500"}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <div className={`text-sm ${isDarkMode ? "text-red-300" : "text-red-700"}`}>
+              <p className="font-medium">
+                Warning: This action is irreversible
+              </p>
+              <p>Employee ID: {deleteEmployee.idNumber}</p>
+              <p>Department: {deleteEmployee.department}</p>
             </div>
           </div>
-        )
-      }
+        </div>
+      </div>
+
+      <div className={`flex justify-end gap-3 p-6 border-t ${isDarkMode ? "border-gray-700 bg-gray-700/50" : "border-gray-200 bg-gray-50"}`}>
+        <button
+          onClick={() => {
+            setIsDeleteModalOpen(false);
+            setDeleteEmployee(null);
+          }}
+          className={`px-6 py-2 border rounded-lg transition-colors duration-200 ${isDarkMode
+              ? "border-gray-600 text-gray-300 hover:bg-gray-600"
+              : "border-gray-300 text-gray-700 hover:bg-gray-100"
+            }`}
+          disabled={isSaving}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={confirmDelete}
+          disabled={isSaving}
+          className={`px-6 py-2 text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode
+              ? "bg-red-700 hover:bg-red-600"
+              : "bg-red-600 hover:bg-red-700"
+            }`}
+        >
+          {isSaving ? "Deleting..." : "Delete Employee"}
+        </button>
+      </div>
     </div>
-  );
+  </div>
+)
+}
+</div>
+);
 }
 
 export default EmployeeRecords;

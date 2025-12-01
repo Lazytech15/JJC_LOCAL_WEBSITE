@@ -123,6 +123,50 @@ const [isSearching, setIsSearching] = useState(false)
     }
   }, [itemName, itemNameHasFocus, isTemplateSelected])
 
+  // Auto-compute phase expected_hours from subphases
+useEffect(() => {
+  setPhases(prevPhases => {
+    return prevPhases.map(phase => {
+      // Calculate total minutes from all subphases
+      const totalMinutes = phase.subphases.reduce((sum, sub) => {
+        return sum + (parseFloat(sub.expectedDuration) || 0)
+      }, 0)
+      
+      // Convert minutes to hours (rounded to 2 decimals)
+      const calculatedHours = (totalMinutes / 60).toFixed(2)
+      
+      // Only update if different from current value to avoid infinite loops
+      if (phase.expected_hours !== calculatedHours && totalMinutes > 0) {
+        return {
+          ...phase,
+          expected_hours: calculatedHours
+        }
+      }
+      
+      return phase
+    })
+  })
+}, [phases.map(p => 
+  p.subphases.map(s => s.expectedDuration).join(',')
+).join('|')])
+
+// Auto-compute item expected_completion_hours from phases
+useEffect(() => {
+  const totalPhaseHours = phases.reduce((sum, phase) => {
+    return sum + (parseFloat(phase.expected_hours) || 0)
+  }, 0)
+  
+  // Only update if we have phases and the total is different
+  if (phases.length > 0 && totalPhaseHours > 0) {
+    const calculatedHours = totalPhaseHours.toFixed(2)
+    
+    // Only update if different to avoid infinite loops
+    if (expectedCompletionHours !== calculatedHours) {
+      setExpectedCompletionHours(calculatedHours)
+    }
+  }
+}, [phases.map(p => p.expected_hours).join(',')])
+
   const searchItemsFromAPI = async (searchTerm, page = 1) => {
     setIsSearching(true)
     try {
@@ -253,31 +297,6 @@ const [isSearching, setIsSearching] = useState(false)
   }
 
   const updatePhase = (phaseId, field, value) => {
-    // ✅ Validate phase expected_hours against item expected_completion_hours
-    if (field === 'expected_hours' && expectedCompletionHours) {
-      const newHours = Number.parseFloat(value) || 0
-      const itemHours = Number.parseFloat(expectedCompletionHours)
-
-      // Calculate total from other phases (excluding current one)
-      const otherPhasesTotal = phases
-        .filter(p => p.id !== phaseId)
-        .reduce((sum, p) => sum + (Number.parseFloat(p.expected_hours) || 0), 0)
-
-      const totalIfUpdated = otherPhasesTotal + newHours
-
-      if (totalIfUpdated > itemHours) {
-        const remainingHours = itemHours - otherPhasesTotal
-        alert(
-          `Cannot exceed item expected completion time!\n\n` +
-          `Item Expected: ${itemHours} hours\n` +
-          `Other Phases Total: ${otherPhasesTotal.toFixed(2)} hours\n` +
-          `Remaining: ${remainingHours.toFixed(2)} hours\n\n` +
-          `You can allocate up to ${remainingHours.toFixed(2)} hours for this phase.`
-        )
-        return // ✅ Don't update if it would exceed
-      }
-    }
-
     setPhases(phases.map((phase) => (phase.id === phaseId ? { ...phase, [field]: value } : phase)))
   }
   const removePhase = (phaseId) => {
@@ -549,32 +568,39 @@ try {
     return total
   }
 
-  // Convert hours to minutes
-  const hoursToMinutes = (hours) => {
-    return Number.parseFloat(hours) * 60
-  }
-
   // Convert minutes to hours for display
   const minutesToHours = (minutes) => {
     return (Number.parseFloat(minutes) / 60).toFixed(2)
   }
 
   // Check if phase has remaining duration available
-  const getPhaseRemainingDuration = (phase) => {
-    if (!phase.expected_hours) return null
 
-    const phaseMinutes = hoursToMinutes(phase.expected_hours)
-    const allocatedMinutes = getTotalSubphaseDurationForPhase(phase)
-    const remaining = phaseMinutes - allocatedMinutes
+const getPhaseRemainingDuration = (phase) => {
+  if (!phase.expected_hours) return null
 
-    return {
-      totalMinutes: phaseMinutes,
-      allocatedMinutes: allocatedMinutes,
-      remainingMinutes: remaining,
-      remainingHours: minutesToHours(remaining),
-      isOverAllocated: remaining < 0
-    }
+  // Convert phase hours to minutes with proper rounding
+  const phaseMinutes = Math.round(parseFloat(phase.expected_hours) * 60)
+  
+  // Calculate total allocated minutes from subphases
+  const allocatedMinutes = getTotalSubphaseDurationForPhase(phase)
+  
+  // Calculate remaining with proper rounding
+  const remaining = phaseMinutes - allocatedMinutes
+
+  return {
+    totalMinutes: phaseMinutes,
+    allocatedMinutes: allocatedMinutes,
+    remainingMinutes: remaining,
+    remainingHours: minutesToHours(remaining),
+    // Only consider over-allocated if truly exceeds (not just rounding difference)
+    isOverAllocated: remaining < -0.5 // Allow 0.5 minute tolerance for rounding
   }
+}
+
+// Also update the hoursToMinutes helper function for consistency
+const hoursToMinutes = (hours) => {
+  return Math.round(parseFloat(hours) * 60)
+}
 
   const getTotalPhaseHours = () => {
     return phases.reduce((sum, phase) => {
@@ -720,7 +746,7 @@ return (
 
         {/* Expected Completion Time */}
         <div>
-          <label className={`block text-sm font-medium mb-1 flex flex-wrap items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+          <label className={` text-sm font-medium mb-1 flex flex-wrap items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
             <Clock size={16} />
             <span>Expected Completion Time (Hours)</span>
             <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
@@ -734,7 +760,7 @@ return (
               min="0"
               placeholder="e.g., 24 hours or 1 day"
               value={expectedCompletionHours}
-              onChange={(e) => setExpectedCompletionHours(e.target.value)}
+              readOnly
               disabled={submitting}
               className={`flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${
                 isDarkMode
@@ -742,16 +768,7 @@ return (
                   : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
               }`}
             />
-            {expectedCompletionHours && phases.length > 0 && (
-              <button
-                onClick={handleDistributeDuration}
-                disabled={submitting}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 text-sm sm:text-base w-full sm:w-auto"
-                title="Distribute hours equally across all phases"
-              >
-                Distribute
-              </button>
-            )}
+            
           </div>
           {expectedCompletionHours && (
             <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
@@ -1003,7 +1020,7 @@ return (
 
         {/* Client Name with Dropdown */}
         <div className="relative" ref={clientDropdownRef}>
-          <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+          <label className={` text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
             <User size={16} />
             Client Name *
           </label>
@@ -1047,7 +1064,7 @@ return (
 
         {/* Priority */}
         <div>
-          <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+          <label className={` text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
             <Flag size={16} />
             Priority *
           </label>
@@ -1072,7 +1089,7 @@ return (
 
         {/* Batch Quantity */}
         <div>
-          <label className={`block text-sm font-medium mb-1 flex flex-wrap items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+          <label className={` text-sm font-medium mb-1 flex flex-wrap items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
             <Package size={16} />
             <span>Batch Quantity *</span>
             <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>(Items in this batch)</span>
@@ -1249,14 +1266,14 @@ return (
                     min="0"
                     placeholder="Expected hrs"
                     value={phase.expected_hours || ""}
-                    onChange={(e) => updatePhase(phase.id, "expected_hours", e.target.value)}
+                    readOnly
                     disabled={submitting}
                     className={`w-full sm:w-32 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 transition-all text-sm sm:text-base ${
                       isDarkMode
                         ? "bg-gray-800/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
                         : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
                     }`}
-                    title="Expected hours for this phase"
+                    title="Auto-calculated from subphases (read-only)"
                   />
 
                   <button
@@ -1274,64 +1291,75 @@ return (
 
               {/* Phase Duration Allocation - PLACED AFTER INPUT ROW */}
               {phase.expected_hours && (
-                <div
-                  className={`mb-3 p-3 rounded text-xs ${
-                    getPhaseRemainingDuration(phase)?.isOverAllocated
-                      ? isDarkMode
-                        ? "bg-red-500/10 border border-red-500/30 text-red-300"
-                        : "bg-red-500/10 border border-red-500/30 text-red-700"
-                      : isDarkMode
-                      ? "bg-purple-500/10 border border-purple-500/30 text-purple-300"
-                      : "bg-purple-500/10 border border-purple-500/30 text-purple-700"
-                  }`}
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-2">
-                    <span className="font-medium text-sm">Phase Duration Allocation</span>
-                    <span className="font-bold text-sm sm:text-base">
-                      {getTotalSubphaseDurationForPhase(phase).toFixed(0)} / {hoursToMinutes(phase.expected_hours).toFixed(0)} min
-                    </span>
-                  </div>
+  <div
+    className={`mb-3 p-3 rounded text-xs ${
+      (() => {
+        const stats = getPhaseRemainingDuration(phase)
+        return stats?.isOverAllocated
+          ? isDarkMode
+            ? "bg-red-500/10 border border-red-500/30 text-red-300"
+            : "bg-red-500/10 border border-red-500/30 text-red-700"
+          : isDarkMode
+          ? "bg-purple-500/10 border border-purple-500/30 text-purple-300"
+          : "bg-purple-500/10 border border-purple-500/30 text-purple-700"
+      })()
+    }`}
+  >
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-2">
+      <span className="font-medium text-sm">Phase Duration Allocation</span>
+      <span className="font-bold text-sm sm:text-base">
+        {Math.round(getTotalSubphaseDurationForPhase(phase))} / {Math.round(hoursToMinutes(phase.expected_hours))} min
+      </span>
+    </div>
 
-                  {(() => {
-                    const stats = getPhaseRemainingDuration(phase)
-                    return (
-                      <>
-                        <div className={`w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
-                          <div
-                            className={`h-2 rounded-full transition-all duration-300 ${
-                              stats.isOverAllocated ? "bg-red-500" : "bg-purple-500"
-                            }`}
-                            style={{
-                              width: `${Math.min(100, (stats.allocatedMinutes / stats.totalMinutes) * 100)}%`,
-                            }}
-                          ></div>
-                        </div>
+    {(() => {
+      const stats = getPhaseRemainingDuration(phase)
+      if (!stats) return null
+      
+      return (
+        <>
+          <div className={`w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
+            <div
+              className={`h-2 rounded-full transition-all duration-300 ${
+                stats.isOverAllocated ? "bg-red-500" : "bg-purple-500"
+              }`}
+              style={{
+                width: `${Math.min(100, (stats.allocatedMinutes / stats.totalMinutes) * 100)}%`,
+              }}
+            ></div>
+          </div>
 
-                        <div className="mt-2 space-y-1">
-                          {stats.isOverAllocated ? (
-                            <div className="flex items-start sm:items-center gap-2">
-                              <AlertTriangle size={14} className="flex-shrink-0 mt-0.5 sm:mt-0" />
-                              <span className="font-medium text-xs sm:text-sm break-words">
-                                Over-allocated by {Math.abs(stats.remainingMinutes).toFixed(0)} min ({Math.abs(stats.remainingHours)}h)
-                              </span>
-                            </div>
-                          ) : stats.remainingMinutes > 0 ? (
-                            <div className="text-xs sm:text-sm">
-                              Remaining: <span className="font-semibold">{stats.remainingMinutes.toFixed(0)} min</span> (
-                              {stats.remainingHours}h)
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <CheckCircle size={14} className="flex-shrink-0" />
-                              <span className="text-xs sm:text-sm font-medium">Fully allocated</span>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )
-                  })()}
-                </div>
-              )}
+          <div className="mt-2 space-y-1">
+            {stats.isOverAllocated ? (
+              <div className="flex items-start sm:items-center gap-2">
+                <AlertTriangle size={14} className="flex-shrink-0 mt-0.5 sm:mt-0" />
+                <span className="font-medium text-xs sm:text-sm break-words">
+                  Over-allocated by {Math.round(Math.abs(stats.remainingMinutes))} min ({Math.abs(parseFloat(stats.remainingHours)).toFixed(2)}h)
+                </span>
+              </div>
+            ) : Math.abs(stats.remainingMinutes) < 0.5 ? (
+              // When difference is less than 0.5 minutes, consider it fully allocated
+              <div className="flex items-center gap-2">
+                <CheckCircle size={14} className="flex-shrink-0" />
+                <span className="text-xs sm:text-sm font-medium">Fully allocated</span>
+              </div>
+            ) : stats.remainingMinutes > 0 ? (
+              <div className="text-xs sm:text-sm">
+                Remaining: <span className="font-semibold">{Math.round(stats.remainingMinutes)} min</span> (
+                {parseFloat(stats.remainingHours).toFixed(2)}h)
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <CheckCircle size={14} className="flex-shrink-0" />
+                <span className="text-xs sm:text-sm font-medium">Fully allocated</span>
+              </div>
+            )}
+          </div>
+        </>
+      )
+    })()}
+  </div>
+)}
 
               {/* Subphases Section */}
               <div className="ml-0 sm:ml-4 space-y-2">

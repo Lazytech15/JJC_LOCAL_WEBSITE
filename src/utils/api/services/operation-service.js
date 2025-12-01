@@ -478,26 +478,26 @@ async getItemsSortedByDate(page = 1, limit = 20, filters = {}, newestFirst = tru
   // ==================== ACTION METHODS ====================
 
   /**
-   * Mark subphase as completed with time duration
-   * @param {number|string} subphaseId - Subphase ID
-   * @param {boolean} completed - Completion status
-   * @param {number} timeDuration - Duration in seconds (integer)
-   * @returns {Promise} Success confirmation
-   */
-  async completeSubphaseWithDuration(
-    subphaseId,
-    completed = true,
-    timeDuration = null
-  ) {
-    return this.request("/api/operations/complete-subphase", {
-      method: "POST",
-      body: JSON.stringify({
-        subphase_id: subphaseId,
-        completed,
-        time_duration: timeDuration,
-      }),
-    });
-  }
+ * Mark subphase as completed with time duration
+ * @param {number|string} subphaseId - Subphase ID
+ * @param {boolean} completed - Completion status
+ * @param {number} timeDuration - Duration in MINUTES (integer)
+ * @returns {Promise} Success confirmation
+ */
+async completeSubphaseWithDuration(
+  subphaseId,
+  completed = true,
+  timeDuration = null
+) {
+  return this.request("/api/operations/complete-subphase", {
+    method: "POST",
+    body: JSON.stringify({
+      subphase_id: subphaseId,
+      completed,
+      time_duration: timeDuration, // Now in MINUTES
+    }),
+  });
+}
 
   /**
    * Assign employee to subphase

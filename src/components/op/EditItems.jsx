@@ -447,7 +447,7 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
             <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
               }`}>
               <Clock size={16} />
-              Expected Duration (hours)
+              Expected Duration (Minutes)
             </label>
             <input
               type="number"
@@ -724,7 +724,7 @@ function AddSubphaseModal({ item, phase, onClose, onSave, isDarkMode, batchQty =
             <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
               }`}>
               <Clock size={16} />
-              Expected Duration (hours)
+              Expected Duration (Minutes)
             </label>
             <input
               type="number"
