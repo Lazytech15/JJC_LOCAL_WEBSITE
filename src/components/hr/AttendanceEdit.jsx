@@ -123,10 +123,10 @@ function AttendanceEdit({ onClose }) {
   }, []);
 
   // Refetch when filters change
-useEffect(() => {
-  fetchAttendanceRecords();
-}, [filters.date, filters.startDate, filters.endDate, filters.useRange, 
-    filters.employee_uid, filters.clock_type, filters.limit]);
+  useEffect(() => {
+    fetchAttendanceRecords();
+  }, [filters.date, filters.startDate, filters.endDate, filters.useRange,
+  filters.employee_uid, filters.clock_type, filters.limit]);
 
   const fetchAttendanceRecords = async () => {
     try {
@@ -139,7 +139,7 @@ useEffect(() => {
 
       if (filters.employee_uid) params.employee_uid = filters.employee_uid;
       if (filters.clock_type) params.clock_type = filters.clock_type;
-      
+
       // Date filtering
       if (filters.useRange && filters.startDate && filters.endDate) {
         params.start_date = filters.startDate;
@@ -170,7 +170,22 @@ useEffect(() => {
       setLoadingEmployees(true);
       const result = await apiService.employees.getEmployees({ limit: 1000 });
       if (result.success) {
-        setEmployees(result.employees || []);
+        // Sort employees alphabetically by last name, then first name
+        const sortedEmployees = (result.employees || []).sort((a, b) => {
+          const lastNameA = (a.lastName || a.last_name || '').toLowerCase();
+          const lastNameB = (b.lastName || b.last_name || '').toLowerCase();
+
+          if (lastNameA !== lastNameB) {
+            return lastNameA.localeCompare(lastNameB);
+          }
+
+          // If last names are the same, sort by first name
+          const firstNameA = (a.firstName || a.first_name || '').toLowerCase();
+          const firstNameB = (b.firstName || b.first_name || '').toLowerCase();
+          return firstNameA.localeCompare(firstNameB);
+        });
+
+        setEmployees(sortedEmployees);
       }
     } catch (err) {
       console.error("Error fetching employees:", err);
@@ -178,7 +193,6 @@ useEffect(() => {
       setLoadingEmployees(false);
     }
   };
-
   const calculateStats = (records) => {
     const newStats = {
       total_records: records.length,
@@ -263,7 +277,7 @@ useEffect(() => {
     }
   };
 
-const openEditModal = (record) => {
+  const openEditModal = (record) => {
     setEditingRecord(record);
     setEditForm({
       clock_type: record.clock_type,
@@ -607,20 +621,19 @@ const openEditModal = (record) => {
           {/* Connection Status */}
           <div className="flex items-center gap-3 px-4 py-2 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl border border-white/30 dark:border-gray-700/30">
             <div
-              className={`w-3 h-3 rounded-full ${
-                connectionStatus === "connected"
-                  ? "bg-emerald-500 shadow-lg shadow-emerald-500/50"
-                  : connectionStatus === "connecting"
+              className={`w-3 h-3 rounded-full ${connectionStatus === "connected"
+                ? "bg-emerald-500 shadow-lg shadow-emerald-500/50"
+                : connectionStatus === "connecting"
                   ? "bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50"
                   : "bg-red-500 shadow-lg shadow-red-500/50"
-              }`}
+                }`}
             ></div>
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
               {connectionStatus === "connected"
                 ? "Live Updates"
                 : connectionStatus === "connecting"
-                ? "Connecting..."
-                : "Disconnected"}
+                  ? "Connecting..."
+                  : "Disconnected"}
             </span>
             {lastUpdate && (
               <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">
@@ -912,89 +925,111 @@ const openEditModal = (record) => {
                 </tr>
               </thead>
               <tbody>
-                {attendanceRecords.map((record) => (
-                  <tr
-                    key={record.id}
-                    className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    <td className="p-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedRecords.has(record.id)}
-                        onChange={() => toggleRecordSelection(record.id)}
-                        className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
-                      />
-                    </td>
-                    <td className="p-4">
-                      <div className="font-medium text-slate-800 dark:text-slate-200">
-                        {formatEmployeeName(record)}
-                      </div>
-                      <div className="text-sm text-slate-600 dark:text-slate-400">
-                        {record.department || "N/A"}
-                      </div>
-                    </td>
-                    <td className="p-4 text-slate-700 dark:text-slate-300">{record.date}</td>
-                    <td className="p-4">
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full border ${getClockTypeColor(record.clock_type)}`}>
-                        {formatClockType(record.clock_type)}
-                      </span>
-                    </td>
-                    <td className="p-4 text-slate-700 dark:text-slate-300">
-                      {formatTime(record.clock_time)}
-                    </td>
-                    <td className="p-4">
-                      <div className="text-sm text-slate-700 dark:text-slate-300">
-                        <div>Reg: {record.regular_hours || 0}h</div>
-                        <div>OT: {record.overtime_hours || 0}h</div>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-col gap-1">
-                        {record.is_late && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-red-50 text-red-700 border border-red-200">
-                            ⏰ Late
-                          </span>
-                        )}
-                        {!record.is_synced && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                            🔄 Unsynced
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4">
-  <div className="flex items-center gap-2">
-    <button
-      onClick={() => openEditModal(record)}
-      className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
-      title="Edit Attendance"
-    >
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-      </svg>
-    </button>
-    <button
-      onClick={() => viewDailySummary(record)}
-      className="p-2 bg-teal-50 hover:bg-teal-100 text-teal-600 rounded-lg transition-colors"
-      title="View Daily Summary"
-    >
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-      </svg>
-    </button>
-    <button
-      onClick={() => openDeleteModal(record)}
-      className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
-      title="Delete"
-    >
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-      </svg>
-    </button>
-  </div>
-</td>
-                  </tr>
-                ))}
+                {attendanceRecords
+                  .slice() // Create a copy to avoid mutating the original array
+                  .sort((a, b) => {
+                    // Sort by last name first
+                    const lastNameA = (a.last_name || '').toLowerCase();
+                    const lastNameB = (b.last_name || '').toLowerCase();
+
+                    if (lastNameA !== lastNameB) {
+                      return lastNameA.localeCompare(lastNameB);
+                    }
+
+                    // If last names are the same, sort by first name
+                    const firstNameA = (a.first_name || '').toLowerCase();
+                    const firstNameB = (b.first_name || '').toLowerCase();
+
+                    if (firstNameA !== firstNameB) {
+                      return firstNameA.localeCompare(firstNameB);
+                    }
+
+                    // If names are the same, sort by date (most recent first)
+                    return new Date(b.date) - new Date(a.date);
+                  })
+                  .map((record) => (
+                    <tr
+                      key={record.id}
+                      className="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      <td className="p-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedRecords.has(record.id)}
+                          onChange={() => toggleRecordSelection(record.id)}
+                          className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                        />
+                      </td>
+                      <td className="p-4">
+                        <div className="font-medium text-slate-800 dark:text-slate-200">
+                          {formatEmployeeName(record)}
+                        </div>
+                        <div className="text-sm text-slate-600 dark:text-slate-400">
+                          {record.department || "N/A"}
+                        </div>
+                      </td>
+                      <td className="p-4 text-slate-700 dark:text-slate-300">{record.date}</td>
+                      <td className="p-4">
+                        <span className={`inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full border ${getClockTypeColor(record.clock_type)}`}>
+                          {formatClockType(record.clock_type)}
+                        </span>
+                      </td>
+                      <td className="p-4 text-slate-700 dark:text-slate-300">
+                        {formatTime(record.clock_time)}
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm text-slate-700 dark:text-slate-300">
+                          <div>Reg: {record.regular_hours || 0}h</div>
+                          <div>OT: {record.overtime_hours || 0}h</div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-1">
+                          {record.is_late && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-red-50 text-red-700 border border-red-200">
+                              ⏰ Late
+                            </span>
+                          )}
+                          {!record.is_synced && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                              🔄 Unsynced
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => openEditModal(record)}
+                            className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
+                            title="Edit Attendance"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => viewDailySummary(record)}
+                            className="p-2 bg-teal-50 hover:bg-teal-100 text-teal-600 rounded-lg transition-colors"
+                            title="View Daily Summary"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => openDeleteModal(record)}
+                            className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -1049,11 +1084,20 @@ const openEditModal = (record) => {
                       required
                     >
                       <option value="">Select an employee</option>
-                      {employees.map((emp) => (
-                        <option key={emp.id} value={emp.id}>
-                          {emp.fullName} - {emp.department || "N/A"}
-                        </option>
-                      ))}
+                      {employees.map((emp) => {
+                        // Display as "Last Name, First Name - Department"
+                        const lastName = emp.lastName || emp.last_name || '';
+                        const firstName = emp.firstName || emp.first_name || '';
+                        const displayName = lastName && firstName
+                          ? `${lastName}, ${firstName}`
+                          : emp.fullName || 'Unknown';
+
+                        return (
+                          <option key={emp.id} value={emp.id}>
+                            {displayName} - {emp.department || "N/A"}
+                          </option>
+                        );
+                      })}
                     </select>
                   )}
                 </div>
@@ -1727,13 +1771,12 @@ const openEditModal = (record) => {
 
       {/* Toast Notification */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-[60] animate-slide-in-right ${
-          toast.type === 'success'
-            ? 'bg-emerald-500'
-            : toast.type === 'error'
+        <div className={`fixed top-4 right-4 z-[60] animate-slide-in-right ${toast.type === 'success'
+          ? 'bg-emerald-500'
+          : toast.type === 'error'
             ? 'bg-red-500'
             : 'bg-amber-500'
-        } text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3`}>
+          } text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3`}>
           <span className="text-lg">
             {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : '⚠️'}
           </span>

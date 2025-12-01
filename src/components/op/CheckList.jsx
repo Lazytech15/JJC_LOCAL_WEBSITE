@@ -451,18 +451,16 @@ function Checklist({
     }
   }
 
-  const formatDuration = (seconds) => {
-    // Convert seconds to total minutes
-    const totalMinutes = Math.floor(seconds / 60)
-    const h = Math.floor(totalMinutes / 60)
-    const m = totalMinutes % 60
-    const s = seconds % 60
+const formatDuration = (minutes) => {
+  // Input is already in minutes
+  const h = Math.floor(minutes / 60)
+  const m = Math.round(minutes % 60)
 
-    if (h > 0 && m > 0) return `${h}h ${m}m ${s}s`
-    if (h > 0) return `${h} hour${h > 1 ? "s" : ""} ${m}m ${s}s`
-    if (m > 0) return `${m} minute${m !== 1 ? "s" : ""} ${s}s`
-    return `${s} second${s !== 1 ? "s" : ""}`
-  }
+  if (h > 0 && m > 0) return `${h}h ${m}m`
+  if (h > 0) return `${h} hour${h > 1 ? "s" : ""}`
+  if (m > 0) return `${m} minute${m !== 1 ? "s" : ""}`
+  return "0 minutes"
+}
 
   function getPhaseElapsedTime(phase) {
     if (!phase.start_time) return 0
@@ -891,24 +889,26 @@ function Checklist({
           // Get the current phase elapsed time in SECONDS (from the stopwatch)
           const currentPhaseElapsedSeconds = getPhaseElapsedTime(phase)
 
-          // Calculate the CUMULATIVE time of ALL previous completed subphases
+          // Calculate the CUMULATIVE time of ALL previous completed subphases (convert minutes back to seconds for calculation)
           let allPreviousCumulativeSeconds = 0
           for (let i = 0; i < currentSubphaseIndex; i++) {
             const prevSubphase = phase.subphases[i]
             if (prevSubphase.time_duration) {
-              // Add each previous subphase's duration
-              allPreviousCumulativeSeconds += Number.parseInt(prevSubphase.time_duration) || 0
+              // time_duration is stored in minutes, convert to seconds for calculation
+              const prevMinutes = Number.parseInt(prevSubphase.time_duration) || 0
+              allPreviousCumulativeSeconds += prevMinutes * 60
             }
           }
 
           // This subphase duration = current total elapsed time - sum of all previous durations
           const thisSubphaseSeconds = Math.max(0, currentPhaseElapsedSeconds - allPreviousCumulativeSeconds)
+          const thisSubphaseMinutes = Math.round(thisSubphaseSeconds / 60) // Convert to minutes
 
-          // Update this subphase with its time_duration IN SECONDS
+          // Update this subphase with its time_duration IN MINUTES
           updateSubphaseInState(partNumber, phaseId, subphaseId, {
             completed: 1,
             completed_at: now,
-            time_duration: thisSubphaseSeconds, // Store as integer seconds
+            time_duration: thisSubphaseMinutes, // Store as integer minutes
           })
         } else {
           // If unchecking, clear the time_duration for this subphase
@@ -932,19 +932,22 @@ function Checklist({
         const currentPhaseElapsedSeconds = getPhaseElapsedTime(phase)
         const currentSubphaseIndex = phase.subphases.findIndex((sp) => sp.id === subphaseId)
 
-        // Calculate cumulative time of ALL previous subphases
+        // Calculate cumulative time of ALL previous subphases (convert minutes back to seconds)
         let allPreviousCumulativeSeconds = 0
         for (let i = 0; i < currentSubphaseIndex; i++) {
           const prevSubphase = phase.subphases[i]
           if (prevSubphase.time_duration) {
-            allPreviousCumulativeSeconds += Number.parseInt(prevSubphase.time_duration) || 0
+            // time_duration is stored in minutes, convert to seconds for calculation
+            const prevMinutes = Number.parseInt(prevSubphase.time_duration) || 0
+            allPreviousCumulativeSeconds += prevMinutes * 60
           }
         }
 
         const thisSubphaseSeconds = Math.max(0, currentPhaseElapsedSeconds - allPreviousCumulativeSeconds)
+        const thisSubphaseMinutes = Math.round(thisSubphaseSeconds / 60) // Convert to minutes
 
-        // Complete subphase with calculated time_duration IN SECONDS
-        await apiService.operations.completeSubphaseWithDuration(subphaseId, true, thisSubphaseSeconds)
+        // Complete subphase with calculated time_duration IN MINUTES
+        await apiService.operations.completeSubphaseWithDuration(subphaseId, true, thisSubphaseMinutes)
       } else {
         // Just toggle completion status without duration
         await apiService.operations.completeSubphaseWithDuration(subphaseId, !currentStatus)
@@ -1826,13 +1829,9 @@ function Checklist({
 
                                                 {/* Time Duration */}
                                                 {subphase.time_duration > 0 && (
-                                                  <p
-                                                    className={`text-xs sm:text-sm ${
-                                                      isDarkMode ? "text-gray-400" : "text-gray-600"
-                                                    } italic flex items-center gap-1 mb-2`}
-                                                  >
+                                                  <p className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"} italic flex items-center gap-1 mb-2`}>
                                                     <Clock size={12} />
-                                                    {formatDuration(subphase.time_duration)}
+                                                    {formatDuration(subphase.time_duration / 60)} {/* Convert seconds to minutes */}
                                                   </p>
                                                 )}
 
@@ -1840,7 +1839,7 @@ function Checklist({
                                                 <div className="flex flex-wrap gap-2 items-center mb-2">
                                                   <span className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded flex items-center gap-1">
                                                     <Clock size={12} />
-                                                    {formatTime(subphase.expected_duration)}
+                                                    {formatDuration(subphase.expected_duration)} {/* Convert seconds to minutes */}
                                                   </span>
 
                                                   {/* Quantity Tracking */}

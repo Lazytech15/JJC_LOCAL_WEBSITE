@@ -217,7 +217,7 @@ function HRDepartment() {
           )}
           <div>
             <h1 className={`text-3xl font-bold mb-2 ${textPrimaryClass}`}>👥 Human Resources</h1>
-            <p className={textSecondaryClass}>Welcome back, {user?.username}!</p>
+            <p className={textSecondaryClass}>Welcome back, {user?.name}!</p>
           </div>
         </div>
         <div className="flex gap-3">

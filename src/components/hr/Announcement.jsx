@@ -743,9 +743,13 @@ const handleSubmit = async () => {
               type="button"
               onClick={handleSubmit}
               disabled={loading}
-              className="w-full `bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30 text-sm sm:text-base"
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30 text-sm sm:text-base"
             >
-              {loading ? "Processing..." : editingId ? "Update Announcement" : "Send Announcement"}
+              {loading
+                ? "Processing..."
+                : editingId
+                ? "Update Announcement"
+                : "Send Announcement"}
             </button>
           </div>
         </div>
