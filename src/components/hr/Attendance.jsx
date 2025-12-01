@@ -68,6 +68,10 @@ function Attendance() {
   const [isExporting, setIsExporting] = useState(false);
   const [showFaceRecognition, setShowFaceRecognition] = useState(false);
 
+  // Search and Filter UI State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
+
   // Group attendance records by employee and date
   const groupAttendanceByEmployee = (records) => {
     const grouped = {};
@@ -2681,8 +2685,28 @@ const formatTime = (timeString) => {
   };
 
   const groupedAttendance = useMemo(() => {
-    return groupAttendanceByEmployee(attendanceData);
-  }, [attendanceData]);
+    let filtered = attendanceData;
+    
+    // Client-side search filtering (instant, no API call)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = attendanceData.filter((record) => {
+        const fullName = `${record.first_name || ''} ${record.middle_name || ''} ${record.last_name || ''}`.toLowerCase();
+        const department = String(record.department || '').toLowerCase();
+        const position = String(record.position || '').toLowerCase();
+        const idNumber = String(record.id_number || '').toLowerCase();
+        const employeeUid = String(record.employee_uid || '').toLowerCase();
+        
+        return fullName.includes(query) ||
+               department.includes(query) ||
+               position.includes(query) ||
+               idNumber.includes(query) ||
+               employeeUid.includes(query);
+      });
+    }
+    
+    return groupAttendanceByEmployee(filtered);
+  }, [attendanceData, searchQuery]);
 
   return (
     <div className="space-y-8">
@@ -3033,90 +3057,114 @@ const formatTime = (timeString) => {
       )}
 
       {/* Combined Filters and Export Section */}
-      <div className="space-y-6">
-        {/* Main Container - Filters and Export */}
-        <div className={`backdrop-blur-xl rounded-3xl p-8 border shadow-2xl ${
+      <div className="space-y-4">
+        {/* Search & Filters Section */}
+        <div className={`backdrop-blur-xl rounded-2xl p-5 border shadow-xl ${
           isDarkMode 
             ? "bg-gray-800/70 border-gray-700/40" 
             : "bg-white/70 border-white/40"
         }`}>
-          {/* Header with Filters and Export */}
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${
-                isDarkMode ? "bg-slate-800" : "bg-slate-100"
-              }`}>
-                <span className="text-xl">🔍</span>
-              </div>
-              <h2 className={`text-2xl font-bold ${
-                isDarkMode ? "text-slate-200" : "text-slate-800"
-              }`}>
-                Filters
-              </h2>
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`p-2 rounded-xl ${isDarkMode ? "bg-slate-800" : "bg-slate-100"}`}>
+              <span className="text-xl">🔍</span>
             </div>
-            <button
-              onClick={exportToExcel}
-              disabled={isExporting}
-              className={`flex items-center gap-2 px-5 py-3 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl disabled:hover:translate-y-0 disabled:hover:shadow-none disabled:cursor-not-allowed ${
-                isDarkMode 
-                  ? "bg-linear-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:from-slate-600 disabled:to-slate-700" 
-                  : "bg-linear-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:from-slate-400 disabled:to-slate-500"
-              }`}
-            >
-              {isExporting ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Exporting...</span>
-                </>
-              ) : (
-                <>
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  <span>Export to Excel</span>
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => setShowEditModal(true)}
-              className={`px-5 py-3 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl flex items-center gap-2 ${
-                isDarkMode 
-                  ? "bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700" 
-                  : "bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
-              }`}
-            >
-              <span>✏️</span>
-              <span>Edit Records ({stats.unsynced_count || 0})</span>
-            </button>
-
-            <button
-              onClick={() => setShowFaceRecognition(true)}
-              className={`flex items-center gap-2 px-5 py-3 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl ${
-                isDarkMode 
-                  ? "bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700" 
-                  : "bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
-              }`}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              <span>Face Recognition</span>
-            </button>
+            <h2 className={`text-xl font-bold ${isDarkMode ? "text-slate-200" : "text-slate-800"}`}>
+              Search & Filters
+            </h2>
           </div>
 
-          {/* Date Mode Toggle */}
-          <div className="mb-6">
-            <label className="flex items-center gap-2 cursor-pointer">
+          {/* Main Filters Row */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-[200px] max-w-md">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className={`w-5 h-5 ${isDarkMode ? "text-slate-400" : "text-slate-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search employee, department, position..."
+                className={`w-full pl-10 pr-4 py-2.5 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-sm ${
+                  isDarkMode 
+                    ? "bg-gray-700/60 border-gray-600/40 text-slate-200 placeholder-slate-400" 
+                    : "bg-white/60 border-white/40 text-slate-800 placeholder-slate-500"
+                }`}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className={`absolute inset-y-0 right-0 pr-3 flex items-center ${
+                    isDarkMode ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Date Filter or Date Range */}
+            {!filters.useRange ? (
+              <div className="flex items-center gap-2">
+                <label className={`text-sm font-medium ${isDarkMode ? "text-slate-400" : "text-slate-600"}`}>Date:</label>
+                <input
+                  type="date"
+                  value={filters.date}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, date: e.target.value }))}
+                  className={`px-3 py-2.5 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-sm ${
+                    isDarkMode 
+                      ? "bg-gray-700/60 border-gray-600/40 text-slate-200" 
+                      : "bg-white/60 border-white/40 text-slate-800"
+                  }`}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <label className={`text-sm font-medium ${isDarkMode ? "text-slate-400" : "text-slate-600"}`}>From:</label>
+                  <input
+                    type="date"
+                    value={filters.startDate}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, startDate: e.target.value }))}
+                    className={`px-3 py-2.5 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-sm ${
+                      isDarkMode 
+                        ? "bg-gray-700/60 border-gray-600/40 text-slate-200" 
+                        : "bg-white/60 border-white/40 text-slate-800"
+                    }`}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className={`text-sm font-medium ${isDarkMode ? "text-slate-400" : "text-slate-600"}`}>To:</label>
+                  <input
+                    type="date"
+                    value={filters.endDate}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, endDate: e.target.value }))}
+                    min={filters.startDate}
+                    className={`px-3 py-2.5 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-sm ${
+                      isDarkMode 
+                        ? "bg-gray-700/60 border-gray-600/40 text-slate-200" 
+                        : "bg-white/60 border-white/40 text-slate-800"
+                    }`}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Date Range Toggle */}
+            <label className={`flex items-center gap-2 cursor-pointer px-3 py-2.5 rounded-xl border transition-all text-sm ${
+              filters.useRange
+                ? isDarkMode
+                  ? "bg-indigo-600/20 border-indigo-500/50 text-indigo-300"
+                  : "bg-indigo-50 border-indigo-300 text-indigo-700"
+                : isDarkMode
+                  ? "bg-gray-700/60 border-gray-600/40 text-slate-300 hover:bg-gray-700"
+                  : "bg-white/60 border-white/40 text-slate-700 hover:bg-white"
+            }`}>
               <input
                 type="checkbox"
                 checked={filters.useRange}
@@ -3134,172 +3182,16 @@ const formatTime = (timeString) => {
                     : "text-indigo-600 bg-gray-100 border-gray-300 focus:ring-indigo-500"
                 }`}
               />
-              <span className={`text-sm font-medium ${
-                isDarkMode ? "text-slate-300" : "text-slate-700"
-              }`}>
-                Use date range instead of single date
-              </span>
+              <span className="font-medium whitespace-nowrap">Date Range</span>
             </label>
-          </div>
 
-          {/* Date Inputs */}
-          <div
-            className={`grid gap-6 ${filters.useRange ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
-              }`}
-          >
-            {filters.useRange ? (
-              <>
-                <div>
-                  <label className={`block text-sm font-semibold mb-2 ${
-                    isDarkMode ? "text-slate-300" : "text-slate-700"
-                  }`}>
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={filters.startDate}
-                    onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        startDate: e.target.value,
-                      }))
-                    }
-                    className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all ${
-                      isDarkMode 
-                        ? "bg-gray-700/60 border-gray-600/40 text-slate-200" 
-                        : "bg-white/60 border-white/40 text-slate-800"
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className={`block text-sm font-semibold mb-2 ${
-                    isDarkMode ? "text-slate-300" : "text-slate-700"
-                  }`}>
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={filters.endDate}
-                    onChange={(e) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        endDate: e.target.value,
-                      }))
-                    }
-                    min={filters.startDate}
-                    className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all ${
-                      isDarkMode 
-                        ? "bg-gray-700/60 border-gray-600/40 text-slate-200" 
-                        : "bg-white/60 border-white/40 text-slate-800"
-                    }`}
-                  />
-                </div>
-              </>
-            ) : (
-              <div>
-                <label className={`block text-sm font-semibold mb-2 ${
-                  isDarkMode ? "text-slate-300" : "text-slate-700"
-                }`}>
-                  Date
-                </label>
-                <input
-                  type="date"
-                  value={filters.date}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, date: e.target.value }))
-                  }
-                  className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all ${
-                    isDarkMode 
-                      ? "bg-gray-700/60 border-gray-600/40 text-slate-200" 
-                      : "bg-white/60 border-white/40 text-slate-800"
-                  }`}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Date Status Messages */}
-          <div className="mt-6">
-            {filters.useRange &&
-              filters.startDate &&
-              filters.endDate &&
-              new Date(filters.startDate) > new Date(filters.endDate) && (
-                <div className={`p-3 border rounded-lg mb-4 ${
-                  isDarkMode 
-                    ? "bg-red-900/20 border-red-800/30" 
-                    : "bg-red-50 border-red-200"
-                }`}>
-                  <p className={`text-sm ${
-                    isDarkMode ? "text-red-400" : "text-red-600"
-                  }`}>
-                    ⚠️ Start date cannot be later than end date.
-                  </p>
-                </div>
-              )}
-
-            {filters.useRange &&
-              filters.startDate &&
-              filters.endDate &&
-              new Date(filters.startDate) <= new Date(filters.endDate) && (
-                <div className={`p-3 border rounded-lg ${
-                  isDarkMode 
-                    ? "bg-blue-900/20 border-blue-800/30" 
-                    : "bg-blue-50 border-blue-200"
-                }`}>
-                  <p className={`text-sm ${
-                    isDarkMode ? "text-blue-400" : "text-blue-600"
-                  }`}>
-                    📅 Selected range:{" "}
-                    {new Date(filters.startDate).toLocaleDateString()} -{" "}
-                    {new Date(filters.endDate).toLocaleDateString()}(
-                    {Math.ceil(
-                      (new Date(filters.endDate) -
-                        new Date(filters.startDate)) /
-                      (1000 * 60 * 60 * 24)
-                    ) + 1}{" "}
-                    days)
-                  </p>
-                </div>
-              )}
-          </div>
-        </div>
-
-        {/* Display Options & Actions Section */}
-        <div className={`backdrop-blur-xl rounded-3xl p-8 border shadow-2xl ${
-          isDarkMode 
-            ? "bg-gray-800/70 border-gray-700/40" 
-            : "bg-white/70 border-white/40"
-        }`}>
-          <div className="flex items-center gap-3 mb-6">
-            <div className={`p-2 rounded-xl ${
-              isDarkMode ? "bg-blue-900" : "bg-blue-100"
-            }`}>
-              <span className="text-xl">⚙️</span>
-            </div>
-            <h3 className={`text-xl font-bold ${
-              isDarkMode ? "text-slate-200" : "text-slate-800"
-            }`}>
-              Display Options & Actions
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
             {/* Clock Type Filter */}
-            <div>
-              <label className={`block text-sm font-semibold mb-3 ${
-                isDarkMode ? "text-slate-300" : "text-slate-700"
-              }`}>
-                Clock Type
-              </label>
+            <div className="flex items-center gap-2">
+              <label className={`text-sm font-medium ${isDarkMode ? "text-slate-400" : "text-slate-600"}`}>Type:</label>
               <select
                 value={filters.clock_type}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    clock_type: e.target.value,
-                  }))
-                }
-                className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all ${
+                onChange={(e) => setFilters((prev) => ({ ...prev, clock_type: e.target.value }))}
+                className={`px-3 py-2.5 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-sm ${
                   isDarkMode 
                     ? "bg-gray-700/60 border-gray-600/40 text-slate-200" 
                     : "bg-white/60 border-white/40 text-slate-800"
@@ -3314,51 +3206,173 @@ const formatTime = (timeString) => {
                 <option value="overtime_out">Overtime Out</option>
               </select>
             </div>
+          </div>
 
-            {/* Records Per Page Filter */}
-            <div>
-              <label className={`block text-sm font-semibold mb-3 ${
-                isDarkMode ? "text-slate-300" : "text-slate-700"
-              }`}>
-                Records per page
-              </label>
+          {/* Date Range Validation Message */}
+          {filters.useRange && filters.startDate && filters.endDate && (
+            <div className={`mt-3 p-2 rounded-lg text-sm ${
+              new Date(filters.startDate) > new Date(filters.endDate)
+                ? isDarkMode ? "bg-red-900/20 text-red-400" : "bg-red-50 text-red-600"
+                : isDarkMode ? "bg-blue-900/20 text-blue-400" : "bg-blue-50 text-blue-600"
+            }`}>
+              {new Date(filters.startDate) > new Date(filters.endDate)
+                ? "⚠️ Start date cannot be later than end date."
+                : `📅 Range: ${new Date(filters.startDate).toLocaleDateString()} - ${new Date(filters.endDate).toLocaleDateString()} (${Math.ceil((new Date(filters.endDate) - new Date(filters.startDate)) / (1000 * 60 * 60 * 24)) + 1} days)`
+              }
+            </div>
+          )}
+
+          {/* Active Filters Display */}
+          {(searchQuery || filters.date || filters.clock_type || (filters.useRange && filters.startDate && filters.endDate)) && (
+            <div className={`flex flex-wrap items-center gap-2 mt-4 pt-4 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
+              <span className={`text-xs font-medium ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>Active:</span>
+              {searchQuery && (
+                <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
+                  isDarkMode ? "bg-indigo-900/30 text-indigo-300" : "bg-indigo-100 text-indigo-700"
+                }`}>
+                  Search: "{searchQuery}"
+                  <button onClick={() => setSearchQuery("")} className="hover:text-red-500">×</button>
+                </span>
+              )}
+              {filters.date && !filters.useRange && (
+                <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
+                  isDarkMode ? "bg-blue-900/30 text-blue-300" : "bg-blue-100 text-blue-700"
+                }`}>
+                  Date: {filters.date}
+                  <button onClick={() => setFilters(prev => ({ ...prev, date: "" }))} className="hover:text-red-500">×</button>
+                </span>
+              )}
+              {filters.useRange && filters.startDate && filters.endDate && (
+                <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
+                  isDarkMode ? "bg-blue-900/30 text-blue-300" : "bg-blue-100 text-blue-700"
+                }`}>
+                  Range: {filters.startDate} to {filters.endDate}
+                  <button onClick={() => setFilters(prev => ({ ...prev, useRange: false, startDate: "", endDate: "" }))} className="hover:text-red-500">×</button>
+                </span>
+              )}
+              {filters.clock_type && (
+                <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
+                  isDarkMode ? "bg-amber-900/30 text-amber-300" : "bg-amber-100 text-amber-700"
+                }`}>
+                  Type: {formatClockType(filters.clock_type)}
+                  <button onClick={() => setFilters(prev => ({ ...prev, clock_type: "" }))} className="hover:text-red-500">×</button>
+                </span>
+              )}
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  setFilters(prev => ({ ...prev, date: "", startDate: "", endDate: "", useRange: false, clock_type: "" }));
+                }}
+                className={`text-xs font-medium hover:underline ${isDarkMode ? "text-red-400" : "text-red-600"}`}
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Display Options & Actions Section */}
+        <div className={`backdrop-blur-xl rounded-2xl p-5 border shadow-xl ${
+          isDarkMode 
+            ? "bg-gray-800/70 border-gray-700/40" 
+            : "bg-white/70 border-white/40"
+        }`}>
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`p-2 rounded-xl ${isDarkMode ? "bg-blue-900" : "bg-blue-100"}`}>
+              <span className="text-xl">⚙️</span>
+            </div>
+            <h3 className={`text-xl font-bold ${isDarkMode ? "text-slate-200" : "text-slate-800"}`}>
+              Display Options & Actions
+            </h3>
+          </div>
+
+          {/* Options and Actions Row */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Records Limit */}
+            <div className="flex items-center gap-2">
+              <label className={`text-sm font-medium ${isDarkMode ? "text-slate-400" : "text-slate-600"}`}>Show:</label>
               <select
                 value={filters.limit}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    limit: parseInt(e.target.value),
-                  }))
-                }
-                className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all ${
+                onChange={(e) => setFilters((prev) => ({ ...prev, limit: parseInt(e.target.value) }))}
+                className={`px-3 py-2.5 rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-sm ${
                   isDarkMode 
                     ? "bg-gray-700/60 border-gray-600/40 text-slate-200" 
                     : "bg-white/60 border-white/40 text-slate-800"
                 }`}
               >
-                <option value="10">10</option>
-                <option value="20">20</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
+                <option value="10">10 records</option>
+                <option value="20">20 records</option>
+                <option value="50">50 records</option>
+                <option value="100">100 records</option>
               </select>
             </div>
 
-            {/* Refresh Button */}
-            <div>
-              <button
-                onClick={() => {
-                  fetchAttendanceData();
-                  fetchAttendanceStats();
-                }}
-                className={`w-full px-6 py-3 text-white rounded-xl font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl ${
-                  isDarkMode 
-                    ? "bg-linear-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800" 
-                    : "bg-linear-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800"
-                }`}
-              >
-                Refresh Data
-              </button>
-            </div>
+            {/* Spacer */}
+            <div className="flex-1"></div>
+
+            {/* Action Buttons */}
+            <button
+              onClick={() => { fetchAttendanceData(); fetchAttendanceStats(); }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-medium text-sm transition-all hover:scale-105 ${
+                isDarkMode 
+                  ? "bg-gray-700/60 border-gray-600/40 text-slate-300 hover:bg-gray-700" 
+                  : "bg-white/60 border-white/40 text-slate-700 hover:bg-white"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>Refresh</span>
+            </button>
+
+            <button
+              onClick={exportToExcel}
+              disabled={isExporting}
+              className={`flex items-center gap-2 px-4 py-2.5 text-white rounded-xl font-medium text-sm transition-all hover:scale-105 disabled:hover:scale-100 disabled:cursor-not-allowed ${
+                isDarkMode 
+                  ? "bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600" 
+                  : "bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400"
+              }`}
+            >
+              {isExporting ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              )}
+              <span>Export to Excel</span>
+            </button>
+
+            <button
+              onClick={() => setShowEditModal(true)}
+              className={`flex items-center gap-2 px-4 py-2.5 text-white rounded-xl font-medium text-sm transition-all hover:scale-105 ${
+                isDarkMode 
+                  ? "bg-indigo-600 hover:bg-indigo-700" 
+                  : "bg-indigo-600 hover:bg-indigo-700"
+              }`}
+            >
+              <span>✏️</span>
+              <span>Edit Records</span>
+              {stats.unsynced_count > 0 && (
+                <span className="bg-white/20 px-1.5 py-0.5 rounded-full text-xs">{stats.unsynced_count}</span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setShowFaceRecognition(true)}
+              className={`flex items-center gap-2 px-4 py-2.5 text-white rounded-xl font-medium text-sm transition-all hover:scale-105 ${
+                isDarkMode 
+                  ? "bg-purple-600 hover:bg-purple-700" 
+                  : "bg-purple-600 hover:bg-purple-700"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span>Face Recognition</span>
+            </button>
           </div>
         </div>
       </div>
@@ -3366,17 +3380,24 @@ const formatTime = (timeString) => {
       {/* Grouped Employee Cards */}
       {!loading && (
         <div className="space-y-6">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl ${
-              isDarkMode ? "bg-slate-800" : "bg-slate-100"
-            }`}>
-              <span className="text-xl">👤</span>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${
+                isDarkMode ? "bg-slate-800" : "bg-slate-100"
+              }`}>
+                <span className="text-xl">👤</span>
+              </div>
+              <h2 className={`text-2xl font-bold ${
+                isDarkMode ? "text-slate-200" : "text-slate-800"
+              }`}>
+                Employee Attendance
+              </h2>
+              <span className={`px-2.5 py-1 text-sm font-semibold rounded-full ${
+                isDarkMode ? "bg-indigo-900/30 text-indigo-300" : "bg-indigo-100 text-indigo-700"
+              }`}>
+                {groupedAttendance.length} {groupedAttendance.length === 1 ? 'employee' : 'employees'}
+              </span>
             </div>
-            <h2 className={`text-2xl font-bold ${
-              isDarkMode ? "text-slate-200" : "text-slate-800"
-            }`}>
-              Employee Attendance
-            </h2>
             <div className={`text-sm ${
               isDarkMode ? "text-slate-400" : "text-slate-500"
             }`}>
@@ -3390,17 +3411,32 @@ const formatTime = (timeString) => {
                 ? "bg-gray-800/40 border-gray-700/40" 
                 : "bg-white/40 border-white/40"
             }`}>
-              <div className="text-6xl mb-4">📭</div>
+              <div className="text-6xl mb-4">{searchQuery ? "🔍" : "📭"}</div>
               <h3 className={`text-xl font-semibold mb-2 ${
                 isDarkMode ? "text-slate-300" : "text-slate-700"
               }`}>
-                No Records Found
+                {searchQuery ? "No Matching Records" : "No Records Found"}
               </h3>
               <p className={`${
                 isDarkMode ? "text-slate-400" : "text-slate-500"
               }`}>
-                No attendance records found for the selected filters.
+                {searchQuery 
+                  ? `No employees match "${searchQuery}". Try a different search term.`
+                  : "No attendance records found for the selected filters."
+                }
               </p>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className={`mt-4 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    isDarkMode 
+                      ? "bg-indigo-600 hover:bg-indigo-700 text-white" 
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                  }`}
+                >
+                  Clear Search
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
