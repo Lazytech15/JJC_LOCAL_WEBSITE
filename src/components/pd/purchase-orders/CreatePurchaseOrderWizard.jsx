@@ -60,11 +60,6 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   
-  // Input mode toggles for flexibility
-  const [supplierInputMode, setSupplierInputMode] = useState('inventory') // 'inventory' or 'custom'
-  const [itemInputMode, setItemInputMode] = useState('inventory') // 'inventory' or 'custom'
-  const [customItemCounter, setCustomItemCounter] = useState(0) // For generating unique IDs for custom items
-  
   // Available data from API
   const [suppliers, setSuppliers] = useState([])
   // Map supplier name => full supplier record (from API) for exact lookup by name or id
@@ -89,13 +84,16 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   
   // Form data
   const [formData, setFormData] = useState({
-    // Step 1 - PO Number & Supplier
+    // Step 1 - PO Number & Type
+    po_type: "inventory", // "inventory" (usual supplier flow) or "custom" (under maintenance)
+    po_number: "",
+    po_sequence: "",
+    
+    // Supplier (for inventory PO)
     supplier_name: "",
     supplier_id: "",
     supplier_address: "",
-  supplier_details: null,
-    po_number: "",
-    po_sequence: "",
+    supplier_details: null,
     
     // Step 2 - Items
     selectedItems: [],
@@ -121,14 +119,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     attached_images: [] // Array of base64 image data
   })
 
-  // Custom item entry form state
-  const [customItemForm, setCustomItemForm] = useState({
-    item_name: '',
-    description: '',
-    quantity: 1,
-    unit: '',
-    price_per_unit: 0
-  })
+  // Multi-select state for adding multiple items at once
+  const [selectedItemsToAdd, setSelectedItemsToAdd] = useState(new Set())
 
   // Helper to safely format currency numbers
   const formatAmount = (v, decimals = 2) => {
@@ -305,13 +297,16 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         const po = editingOrder
         setFormData(prev => ({
           ...prev,
+          // PO type - existing POs are always inventory type
+          po_type: po.po_type || "inventory",
+          // PO number fields retained but not editable in edit mode
+          po_number: po.id || po.po_number || prev.po_number,
+          po_sequence: (po.id || '').split('-')[1] || prev.po_sequence,
+          // Supplier fields
           supplier_name: po.supplier_name || po.supplier || prev.supplier_name,
           supplier_id: po.supplier_id || prev.supplier_id,
           supplier_address: po.supplier_address || po.supplier_address || prev.supplier_address,
           supplier_details: po.supplier_details || prev.supplier_details,
-          // PO number fields retained but not editable in edit mode
-          po_number: po.id || po.po_number || prev.po_number,
-          po_sequence: (po.id || '').split('-')[1] || prev.po_sequence,
           // Items
           selectedItems: (po.items || []).map(i => {
             const qty = Number(i.quantity) || 0
@@ -550,6 +545,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       notes: notes || prev.notes,
       selectedItems: [] // Clear items when changing supplier
     }))
+    // Clear multi-select when changing supplier
+    setSelectedItemsToAdd(new Set())
 
     // Update autofilled flags depending on which values were applied
     setAutofilledFields(prev => ({
@@ -602,57 +599,69 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
     }))
   }
 
-  const handleAddCustomItem = () => {
-    // Validate custom item form
-    if (!customItemForm.item_name.trim()) {
-      setError('Item name is required')
-      return
-    }
-    if (customItemForm.quantity <= 0) {
-      setError('Quantity must be greater than 0')
-      return
-    }
-    if (customItemForm.price_per_unit < 0) {
-      setError('Price cannot be negative')
-      return
-    }
+  // Toggle item selection for multi-select
+  const handleToggleItemSelection = (itemNo) => {
+    setSelectedItemsToAdd(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(itemNo)) {
+        newSet.delete(itemNo)
+      } else {
+        newSet.add(itemNo)
+      }
+      return newSet
+    })
+  }
 
-    // Generate unique ID for custom item
-    const customId = `custom-${customItemCounter + 1}`
-    setCustomItemCounter(prev => prev + 1)
+  // Select all available items that aren't already added
+  const handleSelectAllItems = () => {
+    const notAddedItems = availableItems.filter(item => 
+      !formData.selectedItems.some(i => i.item_no === item.item_no)
+    )
+    setSelectedItemsToAdd(new Set(notAddedItems.map(i => i.item_no)))
+  }
 
-    const pricePerUnit = Number(customItemForm.price_per_unit) || 0
-    const quantity = Number(customItemForm.quantity) || 1
-    const amount = quantity * pricePerUnit
+  // Clear all selections
+  const handleClearSelection = () => {
+    setSelectedItemsToAdd(new Set())
+  }
+
+  // Add all selected items at once
+  const handleAddSelectedItems = () => {
+    if (selectedItemsToAdd.size === 0) return
+
+    const itemsToAdd = availableItems.filter(item => 
+      selectedItemsToAdd.has(item.item_no) && 
+      !formData.selectedItems.some(i => i.item_no === item.item_no)
+    )
+
+    const newItems = itemsToAdd.map(item => {
+      const moq = Number(item.moq) || 0
+      const initialQuantity = moq > 0 ? moq : 1
+      const pricePerUnit = Number(item.price_per_unit) || 0
+      const initialAmount = initialQuantity * pricePerUnit
+
+      return {
+        item_no: item.item_no,
+        item_name: item.item_name,
+        description: item.description || "",
+        moq: moq,
+        quantity: initialQuantity,
+        unit: (item.unit_of_measure && String(item.unit_of_measure).trim()) || (unitOptions && unitOptions[0]) || 'pcs',
+        custom_unit_active: !!(item.unit_of_measure && unitOptions && !unitOptions.includes(String(item.unit_of_measure).trim())),
+        custom_unit_value: item.unit_of_measure && String(item.unit_of_measure).trim() || '',
+        unit_dropdown_open: false,
+        price_per_unit: pricePerUnit,
+        amount: initialAmount
+      }
+    })
 
     setFormData(prev => ({
       ...prev,
-      selectedItems: [...prev.selectedItems, {
-        item_no: customId, // Custom ID for non-inventory items
-        item_name: customItemForm.item_name,
-        description: customItemForm.description || "",
-        moq: 0, // No MOQ for custom items
-        quantity: quantity,
-        unit: customItemForm.unit || 'pcs',
-        custom_unit_active: false,
-        custom_unit_value: '',
-        unit_dropdown_open: false,
-        price_per_unit: pricePerUnit,
-        amount: amount,
-        is_custom: true // Flag to identify custom items
-      }]
+      selectedItems: [...prev.selectedItems, ...newItems]
     }))
 
-    // Reset custom item form
-    setCustomItemForm({
-      item_name: '',
-      description: '',
-      quantity: 1,
-      unit: '',
-      price_per_unit: 0
-    })
-
-    setError(null)
+    // Clear selection after adding
+    setSelectedItemsToAdd(new Set())
   }
 
   const handleRemoveItem = (itemNo) => {
@@ -769,16 +778,23 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   const handleNext = () => {
     // Validate current step before proceeding
       if (currentStep === 1) {
-      if (!(formData.supplier_id || formData.supplier_name)) {
-        setError("Please select a supplier")
-        return
-      }
+      // First check PO number
       if (!formData.po_number) {
         setError("Please enter a valid 3-digit PO sequence")
         return
       }
       if (poNumberStatus.exists) {
         setShowOverwriteModal(true)
+        return
+      }
+      // Then check PO type (currently only inventory is available)
+      if (!formData.po_type) {
+        setError("Please select a PO type")
+        return
+      }
+      // For inventory PO, supplier is required
+      if (formData.po_type === "inventory" && !(formData.supplier_id || formData.supplier_name)) {
+        setError("Please select a supplier")
         return
       }
     }
@@ -812,9 +828,13 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   // Validation helper used for guarded breadcrumb navigation
   const validateForStep = (step) => {
     if (step === 1) {
-      if (!(formData.supplier_id || formData.supplier_name)) return false
+      // PO number is required first
       if (!formData.po_number) return false
       if (poNumberStatus.exists) return false
+      // PO type must be selected
+      if (!formData.po_type) return false
+      // For inventory PO, supplier is required
+      if (formData.po_type === "inventory" && !(formData.supplier_id || formData.supplier_name)) return false
     }
     if (step === 2) {
       if (!formData.selectedItems || formData.selectedItems.length === 0) return false
@@ -883,12 +903,9 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         grand_total: taxBreakdown.grandTotal,
         items: formData.selectedItems.map(item => ({
           item_no: item.item_no,
-          item_name: item.is_custom ? item.item_name : undefined, // Include item name for custom items
-          description: item.is_custom ? item.description : undefined, // Include description for custom items
           quantity: item.quantity,
           unit: item.custom_unit_active ? (item.custom_unit_value || item.unit) : item.unit,
-          price_per_unit: item.price_per_unit,
-          is_custom: item.is_custom || false // Include custom flag
+          price_per_unit: item.price_per_unit
         })),
         overwrite_existing: overwriteExisting
       }
@@ -929,15 +946,20 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   const handleClose = () => {
     setCurrentStep(1)
     setFormData({
-      supplier_name: "",
-      supplier_address: "",
+      po_type: "inventory",
       po_number: "",
       po_sequence: "",
+      supplier_name: "",
+      supplier_id: "",
+      supplier_address: "",
+      supplier_details: null,
       selectedItems: [],
       apply_tax: true,
       tax_type: "goods",
       has_discount: false,
       discount_percentage: 0,
+      discount_type: "percentage",
+      discount_value: 0,
       priority: 'P2',
       attention_person: "",
       terms: "",
@@ -958,7 +980,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   if (!isOpen) return null
 
   const steps = [
-    { number: 1, title: "PO Number & Supplier", icon: "🏭" },
+    { number: 1, title: "PO Number & Type", icon: "📋" },
     { number: 2, title: "Select Items", icon: "📦" },
     { number: 3, title: "Tax & Discount", icon: "💰" },
     { number: 4, title: "PO Details", icon: "📝" },
@@ -1072,152 +1094,169 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       </p>
                     </div>
 
-                    {/* Supplier Selection */}
-                    <div>
-                      <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
-                        Select Supplier *
-                      </label>
-                      
-                      {/* Input Mode Toggle */}
-                      <div className="flex gap-2 mb-3">
-                        <button
-                          type="button"
-                          onClick={() => setSupplierInputMode('inventory')}
-                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                            supplierInputMode === 'inventory'
-                              ? 'bg-blue-600 text-white shadow-lg'
-                              : 'bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          📦 From Inventory
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSupplierInputMode('custom')}
-                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                            supplierInputMode === 'custom'
-                              ? 'bg-blue-600 text-white shadow-lg'
-                              : 'bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          ✏️ Custom Supplier
-                        </button>
-                      </div>
-
-                      {/* Dropdown for inventory mode */}
-                      {supplierInputMode === 'inventory' && (
-                        <select
-                          value={formData.supplier_id || formData.supplier_name}
-                          onChange={(e) => handleSupplierSelect(e.target.value)}
-                          disabled={!!editingOrder}
-                          className={`w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                            bg-white dark:bg-gray-800 text-black dark:text-gray-100
-                            focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${editingOrder ? 'opacity-60 cursor-not-allowed' : ''}`}
-                        >
-                          <option value="">-- Choose a supplier --</option>
-                          {suppliers.map((supplier, index) => (
-                            <option key={`${supplier.name}-${index}`} value={supplier.id || supplier.name}>
-                              {supplier.name} ({supplier.item_count} items)
-                            </option>
-                          ))}
-                        </select>
-                      )}
-
-                      {/* Text input for custom mode */}
-                      {supplierInputMode === 'custom' && (
-                        <div className="space-y-3">
+                    {/* PO Number Generation - FIRST */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
+                          Purchase Order Number *
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <div className="bg-gray-100 dark:bg-gray-800 px-6 py-3 rounded-lg border-2 border-gray-300 dark:border-gray-600">
+                            <span className="text-2xl font-bold text-black dark:text-gray-100">
+                              {poPrefix}-
+                            </span>
+                          </div>
                           <input
                             type="text"
-                            value={formData.supplier_name}
-                            onChange={(e) => setFormData(prev => ({
-                              ...prev,
-                              supplier_name: e.target.value,
-                              supplier_id: '' // Clear ID when using custom supplier
-                            }))}
-                            placeholder="Enter supplier name..."
-                            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                              bg-white dark:bg-gray-800 text-black dark:text-gray-100
+                            value={formData.po_sequence}
+                            onChange={(e) => handleSequenceChange(e.target.value)}
+                            placeholder="000"
+                            maxLength="3"
+                            className="w-32 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                              bg-white dark:bg-gray-800 text-black dark:text-gray-100 text-2xl font-bold text-center
                               focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                           />
-                          <textarea
-                            value={formData.supplier_address}
-                            onChange={(e) => setFormData(prev => ({ ...prev, supplier_address: e.target.value }))}
-                            placeholder="Supplier address (optional)..."
-                            rows="2"
-                            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                              bg-white dark:bg-gray-800 text-black dark:text-gray-100
-                              focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all resize-none"
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* PO Number Generation */}
-                    {(formData.supplier_id || formData.supplier_name) && (
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
-                            Purchase Order Number *
-                          </label>
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gray-100 dark:bg-gray-800 px-6 py-3 rounded-lg border-2 border-gray-300 dark:border-gray-600">
-                              <span className="text-2xl font-bold text-black dark:text-gray-100">
-                                {poPrefix}-
+                          {poNumberStatus.checking && (
+                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
+                          )}
+                          {!poNumberStatus.checking && formData.po_sequence.length === 3 && (
+                            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+                              poNumberStatus.exists 
+                                ? 'bg-yellow-100 dark:bg-yellow-900/30 text-black dark:text-yellow-300'
+                                : 'bg-green-100 dark:bg-green-900/30 text-black dark:text-green-300'
+                            }`}>
+                              <span className="text-xl">
+                                {poNumberStatus.exists ? '⚠️' : '✅'}
+                              </span>
+                              <span className="font-medium text-sm">
+                                {poNumberStatus.message}
                               </span>
                             </div>
-                            <input
-                              type="text"
-                              value={formData.po_sequence}
-                              onChange={(e) => handleSequenceChange(e.target.value)}
-                              placeholder="000"
-                              maxLength="3"
-                              className="w-32 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                                bg-white dark:bg-gray-800 text-black dark:text-gray-100 text-2xl font-bold text-center
-                                focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                            />
-                            {poNumberStatus.checking && (
-                              <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
-                            )}
-                            {!poNumberStatus.checking && formData.po_sequence.length === 3 && (
-                              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                                poNumberStatus.exists 
-                                  ? 'bg-yellow-100 dark:bg-yellow-900/30 text-black dark:text-yellow-300'
-                                  : 'bg-green-100 dark:bg-green-900/30 text-black dark:text-green-300'
-                              }`}>
-                                <span className="text-xl">
-                                  {poNumberStatus.exists ? '⚠️' : '✅'}
-                                </span>
-                                <span className="font-medium text-sm">
-                                  {poNumberStatus.message}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          <p className="text-xs text-black dark:text-gray-400 mt-2">
-                            Enter a 3-digit sequence number (001-999)
-                          </p>
+                          )}
                         </div>
+                        <p className="text-xs text-black dark:text-gray-400 mt-2">
+                          Enter a 3-digit sequence number (001-999)
+                        </p>
+                      </div>
+                    </div>
 
+                    {/* PO Type Selection - Show after PO number is entered */}
+                    {formData.po_number && (
+                      <div className="space-y-4">
+                        <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
+                          Purchase Order Type *
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Inventory PO Option */}
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, po_type: "inventory" }))}
+                            className={`p-6 rounded-xl border-3 transition-all text-left ${
+                              formData.po_type === "inventory"
+                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-300 dark:ring-blue-600'
+                                : 'border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 bg-white dark:bg-gray-800'
+                            }`}
+                          >
+                            <div className="flex items-start gap-4">
+                              <div className="text-4xl">🏭</div>
+                              <div className="flex-1">
+                                <div className="font-bold text-lg text-black dark:text-gray-100 mb-1">
+                                  Inventory PO
+                                </div>
+                                <p className="text-sm text-black dark:text-gray-400">
+                                  Select from existing suppliers and items in your inventory. Items will be tracked and synced with inventory.
+                                </p>
+                                {formData.po_type === "inventory" && (
+                                  <div className="mt-3 flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                    <span className="font-medium">Selected</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+
+                          {/* Custom PO Option - Under Maintenance */}
+                          <div
+                            className="relative p-6 rounded-xl border-3 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800/50 opacity-60 cursor-not-allowed"
+                          >
+                            {/* Under Maintenance Banner */}
+                            <div className="absolute -top-3 -right-3 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
+                              🔧 Under Maintenance
+                            </div>
+                            <div className="flex items-start gap-4">
+                              <div className="text-4xl grayscale">📝</div>
+                              <div className="flex-1">
+                                <div className="font-bold text-lg text-gray-500 dark:text-gray-500 mb-1">
+                                  Custom PO
+                                </div>
+                                <p className="text-sm text-gray-500 dark:text-gray-500">
+                                  Create a PO with custom items and suppliers not in your inventory. Items will NOT be saved to inventory.
+                                </p>
+                                <div className="mt-3 p-2 bg-orange-100 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700 rounded-lg">
+                                  <p className="text-xs text-orange-700 dark:text-orange-400 flex items-center gap-1">
+                                    <span>🚧</span>
+                                    This feature is currently under development and will be available soon.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Supplier Selection - Only show for Inventory PO type after PO type is selected */}
+                    {formData.po_number && formData.po_type === "inventory" && (
+                      <div className="space-y-4 border-t-2 border-gray-200 dark:border-gray-700 pt-6">
                         <div>
                           <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
-                            Supplier Address
+                            Select Supplier *
                           </label>
-                          <textarea
-                            value={formData.supplier_address}
-                            onChange={(e) => setFormData(prev => ({ ...prev, supplier_address: e.target.value }))}
-                            rows="3"
-                            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                          
+                          {/* Supplier Dropdown */}
+                          <select
+                            value={formData.supplier_id || formData.supplier_name}
+                            onChange={(e) => handleSupplierSelect(e.target.value)}
+                            disabled={!!editingOrder}
+                            className={`w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
                               bg-white dark:bg-gray-800 text-black dark:text-gray-100
-                              focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                            placeholder="Enter supplier's complete address..."
-                          />
-                          <p className="text-xs text-black dark:text-blue-400 mt-2 flex items-start gap-1">
-                            <span className="mt-0.5">ℹ️</span>
-                            <span>
-                              This address will be saved for future reference. You can edit or update it anytime when creating new purchase orders.
-                            </span>
-                          </p>
+                              focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all ${editingOrder ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          >
+                            <option value="">-- Choose a supplier --</option>
+                            {suppliers.map((supplier, index) => (
+                              <option key={`${supplier.name}-${index}`} value={supplier.id || supplier.name}>
+                                {supplier.name} ({supplier.item_count} items)
+                              </option>
+                            ))}
+                          </select>
                         </div>
+
+                        {/* Supplier Address - Show when supplier is selected */}
+                        {(formData.supplier_id || formData.supplier_name) && (
+                          <div>
+                            <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
+                              Supplier Address
+                            </label>
+                            <textarea
+                              value={formData.supplier_address}
+                              onChange={(e) => setFormData(prev => ({ ...prev, supplier_address: e.target.value }))}
+                              rows="3"
+                              className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                                bg-white dark:bg-gray-800 text-black dark:text-gray-100
+                                focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                              placeholder="Enter supplier's complete address..."
+                            />
+                            <p className="text-xs text-black dark:text-blue-400 mt-2 flex items-start gap-1">
+                              <span className="mt-0.5">ℹ️</span>
+                              <span>
+                                This address will be saved for future reference. You can edit or update it anytime when creating new purchase orders.
+                              </span>
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1231,10 +1270,19 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                         📦 Add Items to Purchase Order
                       </h3>
                       <p className="text-black dark:text-green-300 text-sm">
-                        {supplierInputMode === 'inventory' 
-                          ? `Items from ${formData.supplier_name} in inventory`
-                          : 'Add items from inventory or create custom items'}
+                        Items from {formData.supplier_name} in inventory
                       </p>
+                    </div>
+
+                    {/* Info box about price changes */}
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                      <div className="flex items-start gap-2">
+                        <span className="text-blue-600 dark:text-blue-400">💡</span>
+                        <div className="text-sm text-blue-700 dark:text-blue-300">
+                          <strong>Price Editing:</strong> You can edit prices for each item. When this PO is marked as "Received", 
+                          the inventory prices will be automatically updated to match.
+                        </div>
+                      </div>
                     </div>
 
                     {/* Selected Items */}
@@ -1337,7 +1385,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                       </div>
                                     </div>
                                     <div>
-                                      <label className="text-xs text-black dark:text-gray-400">Price/Unit</label>
+                                      <label className="text-xs text-black dark:text-gray-400">Price/Unit ✏️</label>
                                       <input
                                         type="number"
                                         min="0"
@@ -1346,6 +1394,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                         onChange={(e) => handleUpdateItem(item.item_no, 'price_per_unit', e.target.value)}
                                         className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded
                                           bg-white dark:bg-gray-800 text-black dark:text-gray-100 text-sm"
+                                        title="Edit price - will update inventory when PO is received"
                                       />
                                     </div>
                                     <div>
@@ -1381,62 +1430,82 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
 
                     {/* Available Items */}
                     <div>
-                      {/* Item Input Mode Toggle */}
-                      <div className="flex gap-2 mb-4">
-                        <button
-                          type="button"
-                          onClick={() => setItemInputMode('inventory')}
-                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                            itemInputMode === 'inventory'
-                              ? 'bg-green-600 text-white shadow-lg'
-                              : 'bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          📦 Add from Inventory
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setItemInputMode('custom')}
-                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                            itemInputMode === 'custom'
-                              ? 'bg-green-600 text-white shadow-lg'
-                              : 'bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          ✏️ Add Custom Item
-                        </button>
+                      {/* Available Items Header with Multi-select controls */}
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-semibold text-black dark:text-gray-100">
+                          Available Items ({availableItems.length})
+                        </h4>
+                        {/* Multi-select controls */}
+                        {availableItems.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            {selectedItemsToAdd.size > 0 && (
+                              <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                                {selectedItemsToAdd.size} selected
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={handleSelectAllItems}
+                              className="px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                            >
+                              Select All
+                            </button>
+                            {selectedItemsToAdd.size > 0 && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={handleClearSelection}
+                                  className="px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                >
+                                  Clear
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleAddSelectedItems}
+                                  className="px-4 py-1.5 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                  </svg>
+                                  Add {selectedItemsToAdd.size} Items
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
-
-                      {/* Inventory Items Section */}
-                      {itemInputMode === 'inventory' && (
-                        <>
-                          <h4 className="font-semibold text-black dark:text-gray-100 mb-3">
-                            Available Items ({availableItems.length})
-                          </h4>
-                          {supplierInputMode === 'custom' && availableItems.length === 0 && (
-                            <div className="text-center py-8 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                              <p className="text-black dark:text-blue-300 mb-2">
-                                💡 No inventory items available for custom supplier
-                              </p>
-                              <p className="text-sm text-black dark:text-blue-400">
-                                Switch to "Add Custom Item" to manually add items to this purchase order
-                              </p>
-                            </div>
-                          )}
-                          {availableItems.length > 0 && (
+                      
+                      {/* Available Items Grid */}
+                      {availableItems.length > 0 && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
                               {availableItems.map((item, idx) => {
                                 const isAdded = formData.selectedItems.some(i => i.item_no === item.item_no)
+                                const isSelected = selectedItemsToAdd.has(item.item_no)
                                 return (
                                   <div
                                     key={`${item.item_no}-${idx}`}
-                                    className={`p-4 border-2 rounded-lg transition-all ${
+                                    onClick={() => !isAdded && handleToggleItemSelection(item.item_no)}
+                                    className={`p-4 border-2 rounded-lg transition-all cursor-pointer ${
                                       isAdded
-                                        ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/20'
+                                        ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/20 cursor-not-allowed'
+                                        : isSelected
+                                        ? 'border-blue-500 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/30 ring-2 ring-blue-300 dark:ring-blue-600'
                                         : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 hover:border-blue-300 dark:hover:border-blue-600'
                                     }`}
                                   >
-                                    <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-start gap-3">
+                                      {/* Checkbox for multi-select */}
+                                      {!isAdded && (
+                                        <div className="pt-1">
+                                          <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => handleToggleItemSelection(item.item_no)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                          />
+                                        </div>
+                                      )}
                                       <div className="flex-1 min-w-0">
                                         <div className="font-semibold text-black dark:text-gray-100 truncate">
                                           #{item.item_no} - {item.item_name}
@@ -1446,7 +1515,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                             {item.description}
                                           </div>
                                         )}
-                                        <div className="flex items-center gap-2 mt-2">
+                                        <div className="flex items-center gap-2 mt-2 flex-wrap">
                                           <span className={`text-xs px-2 py-1 rounded ${
                                             item.status === 'Out Of Stock'
                                               ? 'bg-red-100 text-black dark:bg-red-900/30 dark:text-red-300'
@@ -1472,9 +1541,12 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                                         </div>
                                       </div>
                                       <button
-                                        onClick={() => !isAdded && handleAddItem(item)}
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          if (!isAdded) handleAddItem(item)
+                                        }}
                                         disabled={isAdded}
-                                        className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
+                                        className={`px-3 py-2 rounded-lg font-medium text-sm transition-all shrink-0 ${
                                           isAdded
                                             ? 'bg-green-100 text-black dark:bg-green-900/30 dark:text-green-300 cursor-not-allowed'
                                             : 'bg-blue-600 text-white hover:bg-blue-700'
@@ -1488,119 +1560,11 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                               })}
                             </div>
                           )}
-                          {supplierInputMode === 'inventory' && availableItems.length === 0 && (
+                          {availableItems.length === 0 && (
                             <div className="text-center py-8 text-black dark:text-gray-400">
                               No items needing restock from this supplier
                             </div>
                           )}
-                        </>
-                      )}
-
-                      {/* Custom Item Form */}
-                      {itemInputMode === 'custom' && (
-                        <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 p-6">
-                          <h4 className="font-semibold text-black dark:text-gray-100 mb-4">
-                            ✏️ Add Custom Item
-                          </h4>
-                          <div className="space-y-4">
-                            <div>
-                              <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
-                                Item Name *
-                              </label>
-                              <input
-                                type="text"
-                                value={customItemForm.item_name}
-                                onChange={(e) => setCustomItemForm(prev => ({ ...prev, item_name: e.target.value }))}
-                                placeholder="Enter item name..."
-                                className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                                  bg-white dark:bg-gray-800 text-black dark:text-gray-100
-                                  focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
-                                Description
-                              </label>
-                              <textarea
-                                value={customItemForm.description}
-                                onChange={(e) => setCustomItemForm(prev => ({ ...prev, description: e.target.value }))}
-                                placeholder="Enter item description (optional)..."
-                                rows="2"
-                                className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                                  bg-white dark:bg-gray-800 text-black dark:text-gray-100
-                                  focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all resize-none"
-                              />
-                            </div>
-                            <div className="grid grid-cols-3 gap-4">
-                              <div>
-                                <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
-                                  Quantity *
-                                </label>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={customItemForm.quantity}
-                                  onChange={(e) => setCustomItemForm(prev => ({ ...prev, quantity: Number(e.target.value) || 1 }))}
-                                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                                    bg-white dark:bg-gray-800 text-black dark:text-gray-100
-                                    focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
-                                  Unit
-                                </label>
-                                <input
-                                  type="text"
-                                  value={customItemForm.unit}
-                                  onChange={(e) => setCustomItemForm(prev => ({ ...prev, unit: e.target.value }))}
-                                  placeholder="pcs, kg, etc."
-                                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                                    bg-white dark:bg-gray-800 text-black dark:text-gray-100
-                                    focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-black dark:text-gray-300 mb-2">
-                                  Price/Unit
-                                </label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={customItemForm.price_per_unit}
-                                  onChange={(e) => setCustomItemForm(prev => ({ ...prev, price_per_unit: Number(e.target.value) || 0 }))}
-                                  className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg
-                                    bg-white dark:bg-gray-800 text-black dark:text-gray-100
-                                    focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                                />
-                              </div>
-                            </div>
-                            <div className="flex justify-end gap-3 pt-2">
-                              <button
-                                type="button"
-                                onClick={() => setCustomItemForm({
-                                  item_name: '',
-                                  description: '',
-                                  quantity: 1,
-                                  unit: '',
-                                  price_per_unit: 0
-                                })}
-                                className="px-4 py-2 rounded-lg font-medium text-sm bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
-                              >
-                                Clear
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleAddCustomItem}
-                                className="px-4 py-2 rounded-lg font-medium text-sm bg-green-600 text-white hover:bg-green-700 transition-all"
-                              >
-                                + Add Item
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
