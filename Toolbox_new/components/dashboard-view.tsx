@@ -92,7 +92,8 @@ export function DashboardView({
   }, [apiUrl])
 
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  // Multi-select category filter: tracks which categories are excluded (empty = all included)
+  const [excludedCategories, setExcludedCategories] = useState<Set<string>>(new Set())
   const [showAvailable, setShowAvailable] = useState(true)
   const [showUnavailable, setShowUnavailable] = useState(true)
   const [localSearchQuery, setLocalSearchQuery] = useState("")
@@ -804,7 +805,7 @@ export function DashboardView({
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedCategory, showAvailable, showUnavailable, searchQuery, localSearchQuery, sortBy])
+  }, [excludedCategories, showAvailable, showUnavailable, searchQuery, localSearchQuery, sortBy])
 
   // Get unique categories (memoized)
   const categories = useMemo(() => {
@@ -844,8 +845,8 @@ export function DashboardView({
   // Filter and sort products
   const { paginatedProducts, totalFilteredCount, hasMorePages } = useMemo(() => {
     const filtered = products.filter((product) => {
-      // Category filter
-      if (selectedCategory !== "all" && product.itemType !== selectedCategory) {
+      // Category filter - exclude products whose category is in the excluded set
+      if (excludedCategories.has(product.itemType)) {
         return false
       }
 
@@ -899,7 +900,7 @@ export function DashboardView({
       totalFilteredCount: totalItems,
       hasMorePages: hasMore,
     }
-  }, [products, selectedCategory, showAvailable, showUnavailable, searchQuery, localSearchQuery, sortBy, currentPage])
+  }, [products, excludedCategories, showAvailable, showUnavailable, searchQuery, localSearchQuery, sortBy, currentPage])
 
   const handleLoadMore = () => {
     setIsLoadingMore(true)
@@ -1154,39 +1155,80 @@ export function DashboardView({
                       <Filter className="w-2.5 h-2.5 text-white" />
                     </div>
                     Categories
+                    {excludedCategories.size > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-red-500/20 text-red-500 rounded-full">
+                        {excludedCategories.size} hidden
+                      </span>
+                    )}
                   </h3>
                   <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${isCategoriesCollapsed ? "-rotate-90" : ""}`} />
                 </button>
                 
                 {!isCategoriesCollapsed && (
                   <div className="space-y-0.5 max-h-64 overflow-y-auto custom-scrollbar">
-                    <button
-                      onClick={() => setSelectedCategory("all")}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-md transition-all duration-200 ${
-                        selectedCategory === "all"
-                          ? "bg-primary text-primary-foreground shadow-sm font-semibold"
-                          : "text-foreground hover:bg-muted font-medium"
-                      }`}
-                    >
-                      <span className="text-xs">All Items</span>
-                      <span className="text-[10px] ml-1.5 opacity-70">({products.length})</span>
-                    </button>
-                    {categories.map((cat) => (
+                    {/* Select All / Clear All buttons */}
+                    <div className="flex gap-1 mb-2">
                       <button
-                        key={cat}
-                        onClick={() => setSelectedCategory(cat)}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-md transition-all duration-200 ${
-                          selectedCategory === cat
-                            ? "bg-primary text-primary-foreground shadow-sm font-semibold"
-                            : "text-foreground hover:bg-muted font-medium"
-                        }`}
+                        onClick={() => setExcludedCategories(new Set())}
+                        className="flex-1 text-[10px] px-2 py-1 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30 transition-colors font-medium"
                       >
-                        <span className="text-xs truncate block">{cat === "all" ? "All Items" : cat}</span>
-                        <span className="text-[10px] opacity-70">
-                          ({cat === "all" ? products.length : products.filter((p) => p.itemType === cat).length})
-                        </span>
+                        Show All
                       </button>
-                    ))}
+                      <button
+                        onClick={() => {
+                          const allCats = categories.filter(c => c !== "all")
+                          setExcludedCategories(new Set(allCats))
+                        }}
+                        className="flex-1 text-[10px] px-2 py-1 rounded bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/30 transition-colors font-medium"
+                      >
+                        Hide All
+                      </button>
+                    </div>
+                    {categories.filter(cat => cat !== "all").map((cat) => {
+                      const isExcluded = excludedCategories.has(cat)
+                      const itemCount = products.filter((p) => p.itemType === cat).length
+                      return (
+                        <button
+                          key={cat}
+                          onClick={() => {
+                            setExcludedCategories(prev => {
+                              const newSet = new Set(prev)
+                              if (newSet.has(cat)) {
+                                newSet.delete(cat)
+                              } else {
+                                newSet.add(cat)
+                              }
+                              return newSet
+                            })
+                          }}
+                          className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-all duration-200 ${
+                            isExcluded
+                              ? "bg-red-500/10 text-muted-foreground line-through opacity-60 hover:opacity-80"
+                              : "bg-emerald-500/10 text-foreground hover:bg-emerald-500/20"
+                          }`}
+                        >
+                          <div className={`w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                            isExcluded 
+                              ? "border-red-400 bg-red-500/20" 
+                              : "border-emerald-400 bg-emerald-500"
+                          }`}>
+                            {!isExcluded && (
+                              <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </div>
+                          <span className="text-xs truncate flex-1 text-left">{cat}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                            isExcluded 
+                              ? "bg-red-500/20 text-red-500" 
+                              : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                          }`}>
+                            {itemCount}
+                          </span>
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -1588,8 +1630,13 @@ export function DashboardView({
                     Categories
                   </h3>
                   <div className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full font-medium">
-                    {categories.length}
+                    {categories.filter(c => c !== "all").length}
                   </div>
+                  {excludedCategories.size > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 bg-red-500/20 text-red-500 rounded-full">
+                      {excludedCategories.size} hidden
+                    </span>
+                  )}
                 </div>
                 <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${
                   isCategoriesCollapsed ? 'rotate-180' : ''
@@ -1597,29 +1644,74 @@ export function DashboardView({
               </button>
               
               <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                isCategoriesCollapsed ? 'max-h-0 opacity-0' : 'max-h-64 opacity-100 overflow-y-auto custom-scrollbar'
+                isCategoriesCollapsed ? 'max-h-0 opacity-0' : 'max-h-80 opacity-100 overflow-y-auto custom-scrollbar'
               }`}>
-                <div className="space-y-0.5 pt-0.5">
-                  {categories.map((category) => (
-                    <button
-                      key={category}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-all duration-200 ${
-                        selectedCategory === category
-                          ? "bg-linear-to-r from-slate-900 to-slate-800 dark:from-slate-100 dark:to-slate-200 text-white dark:text-slate-900 shadow-sm font-semibold"
-                          : "text-foreground hover:bg-muted font-medium"
-                      }`}
-                      onClick={() => setSelectedCategory(category)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="truncate">
-                          {category === "all" ? "All Items" : category}
+                {/* Select All / Clear All buttons */}
+                <div className="flex gap-1 mb-2 pt-1">
+                  <button
+                    onClick={() => setExcludedCategories(new Set())}
+                    className="flex-1 text-[10px] px-2 py-1.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30 transition-colors font-medium"
+                  >
+                    Show All
+                  </button>
+                  <button
+                    onClick={() => {
+                      const allCats = categories.filter(c => c !== "all")
+                      setExcludedCategories(new Set(allCats))
+                    }}
+                    className="flex-1 text-[10px] px-2 py-1.5 rounded bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/30 transition-colors font-medium"
+                  >
+                    Hide All
+                  </button>
+                </div>
+                <div className="space-y-0.5">
+                  {categories.filter(category => category !== "all").map((category) => {
+                    const isExcluded = excludedCategories.has(category)
+                    const itemCount = products.filter((p) => p.itemType === category).length
+                    return (
+                      <button
+                        key={category}
+                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs transition-all duration-200 ${
+                          isExcluded
+                            ? "bg-red-500/10 text-muted-foreground line-through opacity-60 hover:opacity-80"
+                            : "bg-emerald-500/10 text-foreground hover:bg-emerald-500/20 font-medium"
+                        }`}
+                        onClick={() => {
+                          setExcludedCategories(prev => {
+                            const newSet = new Set(prev)
+                            if (newSet.has(category)) {
+                              newSet.delete(category)
+                            } else {
+                              newSet.add(category)
+                            }
+                            return newSet
+                          })
+                        }}
+                      >
+                        <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                          isExcluded 
+                            ? "border-red-400 bg-red-500/20" 
+                            : "border-emerald-400 bg-emerald-500"
+                        }`}>
+                          {!isExcluded && (
+                            <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="truncate flex-1 text-left">
+                          {category}
                         </span>
-                        {selectedCategory === category && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-slate-900 shrink-0 ml-1"></div>
-                        )}
-                      </div>
-                    </button>
-                  ))}
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${
+                          isExcluded 
+                            ? "bg-red-500/20 text-red-500" 
+                            : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                        }`}>
+                          {itemCount}
+                        </span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             </div>
