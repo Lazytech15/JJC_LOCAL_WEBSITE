@@ -3,6 +3,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { X, Eye, Download, FileText, ImageIcon, Trash2, Search, Loader2, Lock } from "lucide-react";
 import apiService from "../../utils/api/api-service";
 import { getStoredToken } from "../../utils/auth";
+import EditEmployeeWizard from "./EditEmployeeWizard";
 
 function EmployeeRecords() {
   const { user, isDarkMode } = useAuth();
@@ -1490,7 +1491,7 @@ function EmployeeRecords() {
                 : "bg-white/20 border-white/30 text-gray-800"
               }`}
           >
-            <option value="">All Status</option>
+            <option value="All">All Status</option>
             <option value="Active">Active</option>
             <option value="Inactive">Inactive</option>
             <option value="On Leave">On Leave</option>
@@ -2049,8 +2050,71 @@ function EmployeeRecords() {
         </div>
       )}
 
-      {/* Edit Employee Modal */}
-      {isEditModalOpen && editingEmployee && (
+      {/* Edit Employee Wizard */}
+      <EditEmployeeWizard
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingEmployee(null);
+          setSelectedProfileFile(null);
+          setSelectedDocumentFiles([]);
+          setProfilePreview(null);
+        }}
+        employee={editingEmployee}
+        isDarkMode={isDarkMode}
+        onSave={async (updatedEmployeeData, uploadResults) => {
+          await apiService.employees.updateEmployee(
+            editingEmployee.id,
+            updatedEmployeeData
+          );
+          await fetchEmployees();
+
+          // Update selected employee if it was the one being edited
+          if (selectedEmployee?.id === editingEmployee.id) {
+            const updatedEmployee = { ...selectedEmployee, ...updatedEmployeeData };
+            setSelectedEmployee(updatedEmployee);
+
+            // If profile picture was updated, clear from cache
+            if (uploadResults?.profilePicture) {
+              setProfilePictures(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(editingEmployee.id);
+                return newMap;
+              });
+
+              if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({
+                  type: 'CLEAR_PROFILE',
+                  uid: editingEmployee.id
+                });
+              }
+
+              setTimeout(() => {
+                loadProfilePicturesIndividually([updatedEmployee]);
+              }, 500);
+            }
+
+            await fetchEmployeeDocuments(updatedEmployee.id);
+          }
+        }}
+        onChangePassword={() => setIsChangePasswordOpen(true)}
+        getProfilePictureUrl={getProfilePictureUrl}
+        existingDocuments={employeeDocuments}
+        onDeleteDocument={async (docId) => {
+          try {
+            await apiService.document.deleteDocument(docId);
+            if (editingEmployee?.id) {
+              await fetchEmployeeDocuments(editingEmployee.id);
+            }
+          } catch (err) {
+            console.error("Error deleting document:", err);
+          }
+        }}
+        getFileIcon={getFileIcon}
+      />
+
+      {/* Legacy code - keeping for reference during transition */}
+      {false && isEditModalOpen && editingEmployee && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className={`rounded-2xl max-w-4xl w-full max-h-[93vh] overflow-hidden shadow-2xl ${isDarkMode ? "bg-gray-800" : "bg-white"
             }`}>
@@ -2748,8 +2812,7 @@ function EmployeeRecords() {
 </div>
 </div>
 </div>
-)
-}
+)}
 
 {isChangePasswordOpen && editingEmployee && (
 <div className="fixed inset-0 bg-gray-90 bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50 p-4">

@@ -115,7 +115,12 @@ export function useCartPersistence(): UseCartPersistenceReturn {
 
   const addToCart = useCallback(async (product: Product, quantity: number = 1, notes?: string): Promise<boolean> => {
     try {
-      const success = persistAddToCart(product, quantity, notes)
+      const result = persistAddToCart(product, quantity, notes)
+      
+      // Handle the new return type { success: boolean; error?: string }
+      const success = typeof result === 'object' ? result.success : result
+      const errorMsg = typeof result === 'object' ? result.error : undefined
+      
       if (success) {
         const updatedState = loadCartState()
         setCartState(updatedState)
@@ -123,14 +128,30 @@ export function useCartPersistence(): UseCartPersistenceReturn {
         
         // Only show toast for manual adds, not for barcode scans
         if (!notes || !notes.includes('barcode')) {
-          toast({
-            title: "Added to Cart",
-            description: `${product.name} (${quantity}) added to cart`,
-          })
+          // Show warning if partial add or success
+          if (errorMsg && errorMsg.includes('Only')) {
+            toast({
+              title: "Partially Added",
+              description: errorMsg,
+              variant: "default",
+            })
+          } else {
+            toast({
+              title: "Added to Cart",
+              description: `${product.name} (${quantity}) added to cart`,
+            })
+          }
         }
         
         return true
       }
+      
+      // Failed to add - show error
+      toast({
+        title: "Cannot Add to Cart",
+        description: errorMsg || `${product.name} could not be added`,
+        variant: "destructive",
+      })
       return false
     } catch (error) {
       console.error('Failed to add to cart:', error)

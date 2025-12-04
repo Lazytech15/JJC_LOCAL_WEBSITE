@@ -50,10 +50,18 @@ export class EmployeesService {
 
   /**
    * Fetch all employees from the API
+   * @param includeAllStatuses - If true, fetch all employees including Inactive/Disabled ones
    */
-  async fetchEmployees(): Promise<any[]> {
+  async fetchEmployees(includeAllStatuses: boolean = true): Promise<any[]> {
     try {
-      const response = await fetch(`${this.config.baseUrl}${API_ENDPOINTS.employees}`, {
+      // Build URL with query params to include all statuses (Active, Inactive, On Leave, etc.)
+      // This is needed so we can show proper error messages for disabled employees
+      const url = new URL(`${this.config.baseUrl}${API_ENDPOINTS.employees}`)
+      if (includeAllStatuses) {
+        url.searchParams.set('includeAllStatuses', 'true')
+      }
+      
+      const response = await fetch(url.toString(), {
         method: "GET",
         headers: {
           "Content-Type": "application/json",

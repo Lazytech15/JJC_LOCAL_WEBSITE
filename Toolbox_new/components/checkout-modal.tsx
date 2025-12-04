@@ -103,7 +103,8 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
     setError(null)
     try {
       const employeeData = await apiService.fetchEmployees()
-      setEmployees(employeeData.filter((emp: Employee) => emp.status === 'Active'))
+      // Store ALL employees (including disabled) so we can show proper error messages
+      setEmployees(employeeData)
       console.log("[CheckoutModal] Loaded", employeeData.length, "employees")
       console.log(employeeData)
     } catch (error) {
@@ -122,6 +123,16 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
     const employee = employees.find(emp => emp.idBarcode === barcode)
 
     if (employee) {
+      // Check if employee is disabled/inactive
+      if (employee.status !== 'Active') {
+        setError(`⚠️ Employee ID is DISABLED: ${employee.firstName} ${employee.lastName}'s ID has been deactivated. Please report to HR Department to resolve this issue.`)
+        setUserInput(barcode)
+        setSelectedEmployee(null)
+        console.warn("[CheckoutModal] Employee found but DISABLED:", employee.firstName, employee.lastName, "Status:", employee.status)
+        setIsScanning(false)
+        return
+      }
+      
       setSelectedEmployee(employee)
       setUserInput(barcode)
       setError(null)
@@ -145,14 +156,51 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
       return
     }
 
-    // Find employee by idNumber
-    const employee = employees.find(emp => emp.idNumber === value.trim())
+    // Only search when we have enough characters (at least 3)
+    if (value.trim().length < 3) {
+      setSelectedEmployee(null)
+      return
+    }
+
+    // Debug: Log what we're searching for and available employees
+    console.log("[CheckoutModal] Searching for ID:", value.trim())
+    console.log("[CheckoutModal] Available employee IDs:", employees.map(e => ({ id: e.idNumber, barcode: e.idBarcode, name: e.fullName, status: e.status })).slice(0, 10))
+
+    // Find employee by idNumber (try exact match first, then partial match)
+    let employee = employees.find(emp => emp.idNumber === value.trim())
+    
+    // If no exact match, try case-insensitive match
+    if (!employee) {
+      employee = employees.find(emp => 
+        emp.idNumber?.toLowerCase() === value.trim().toLowerCase()
+      )
+    }
+    
+    // Also try matching by idBarcode in case user entered barcode in manual mode
+    if (!employee) {
+      employee = employees.find(emp => emp.idBarcode === value.trim())
+    }
 
     if (employee) {
+      console.log("[CheckoutModal] Found employee:", employee.fullName, "Status:", employee.status)
+      // Check if employee is disabled/inactive
+      if (employee.status !== 'Active') {
+        setError(`⚠️ Employee ID is DISABLED: ${employee.firstName} ${employee.lastName}'s ID has been deactivated. Please report to HR Department to resolve this issue.`)
+        setSelectedEmployee(null)
+        console.warn("[CheckoutModal] Employee found but DISABLED:", employee.firstName, employee.lastName, "Status:", employee.status)
+        return
+      }
+      
       setSelectedEmployee(employee)
+      setError(null)
       console.log("[CheckoutModal] Employee found by ID:", employee.firstName, employee.lastName)
     } else {
       setSelectedEmployee(null)
+      // Show error when ID is long enough but not found
+      if (value.trim().length >= 5) {
+        setError(`No employee found with ID number: ${value.trim()}. Please check the ID and try again.`)
+        console.warn("[CheckoutModal] No employee found for ID:", value.trim())
+      }
     }
   }
 
@@ -348,8 +396,25 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
 
             {/* Error Display */}
             {error && (
-              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
-                {error}
+              <div className={`p-3 rounded-lg text-sm ${
+                error.includes('DISABLED') 
+                  ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-2 border-orange-400 dark:border-orange-600' 
+                  : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
+              }`}>
+                {error.includes('DISABLED') ? (
+                  <div className="space-y-2">
+                    <div className="font-semibold text-orange-800 dark:text-orange-200 flex items-center gap-2">
+                      <span className="text-xl">⚠️</span>
+                      <span>Employee ID Disabled</span>
+                    </div>
+                    <p>{error.replace('⚠️ Employee ID is DISABLED: ', '')}</p>
+                    <p className="text-xs mt-2 font-medium">
+                      The employee must visit HR to have their ID reactivated before they can checkout items.
+                    </p>
+                  </div>
+                ) : (
+                  error
+                )}
               </div>
             )}
 
