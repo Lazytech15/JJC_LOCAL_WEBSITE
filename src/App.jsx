@@ -24,6 +24,9 @@ const EmployeeLogin = lazy(() => import("./components/employeeLandingPage/Employ
 const EmployeeDashboard = lazy(() => import("./components/employeeLandingPage/EmployeeDashboard"))
 const ToolboxWrapper = lazy(() => import("./components/ToolboxWrapper"))
 
+//opertions new route
+const PublicChecklist = lazy(() => import("./components/op/PublicChecklistAuth"))
+
 // Loading component for lazy-loaded routes
 function LoadingFallback() {
   const { isDarkMode } = useAuth()
@@ -179,6 +182,15 @@ function RoutesWrapper() {
                 <EngineeringDepartment />
               </AdminProtectedRoute>
             }
+          />
+
+          <Route 
+            path="/operations-checklist" 
+            element={
+              <Suspense fallback={<LoadingFallback />}>
+                <PublicChecklist />
+              </Suspense>
+            } 
           />
 
           {/* Catch all - redirect to employee landing */}

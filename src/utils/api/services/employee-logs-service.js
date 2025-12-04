@@ -4,6 +4,66 @@
 import { BaseAPIService } from "../core/base-api.js"
 
 export class EmployeeLogsService extends BaseAPIService {
+  // POST /api/employee-logs - Create a new employee log entry
+  async createEmployeeLog(logData) {
+    // Client-side validation for required fields
+    const requiredFields = ['username', 'purpose'];
+    const missingFields = [];
+    
+    for (const field of requiredFields) {
+      if (!logData[field] || String(logData[field]).trim() === '') {
+        missingFields.push(field);
+      }
+    }
+    
+    if (missingFields.length > 0) {
+      throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+    }
+    
+    // Trim string fields
+    const cleanData = {
+      ...logData,
+      username: String(logData.username).trim(),
+      purpose: String(logData.purpose).trim()
+    };
+    
+    if (cleanData.details) {
+      cleanData.details = String(cleanData.details).trim();
+    }
+    
+    return this.request("/api/employee-logs", {
+      method: "POST",
+      body: JSON.stringify(cleanData),
+    });
+  }
+
+  // Validation helper - check if log data is valid
+  validateLogData(logData) {
+    const errors = [];
+    
+    if (!logData.username || String(logData.username).trim() === '') {
+      errors.push('Username is required');
+    }
+    
+    if (!logData.purpose || String(logData.purpose).trim() === '') {
+      errors.push('Purpose is required');
+    }
+    
+    // Optional: Add length validations
+    if (logData.username && String(logData.username).length > 255) {
+      errors.push('Username must be 255 characters or less');
+    }
+    
+    if (logData.purpose && String(logData.purpose).length > 500) {
+      errors.push('Purpose must be 500 characters or less');
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
   // GET /api/employee-logs - Retrieve all employee logs with optional filtering and pagination
   async getEmployeeLogs(params = {}) {
     const queryParams = new URLSearchParams(params).toString()

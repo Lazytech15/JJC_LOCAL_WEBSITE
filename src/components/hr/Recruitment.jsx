@@ -380,156 +380,152 @@ const getValidationMessage = (fieldName, validationData) => {
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-    setSuccess(false)
+  e.preventDefault()
+  setLoading(true)
+  setError(null)
+  setSuccess(false)
 
-    try {
-      // Final validation check
-      const finalValidationErrors = {}
+  try {
+    // Final validation check
+    const finalValidationErrors = {}
 
-      // Check required fields
-      if (!formData.firstName) finalValidationErrors.firstName = "First name is required"
-      if (!formData.lastName) finalValidationErrors.lastName = "Last name is required"
-      if (!formData.email) finalValidationErrors.email = "Email is required"
-      if (!formData.position) finalValidationErrors.position = "Position is required"
-      if (!formData.department) finalValidationErrors.department = "Department is required"
-      if (!formData.idNumber) finalValidationErrors.idNumber = "ID Number is required"
+    // Check required fields
+    if (!formData.firstName) finalValidationErrors.firstName = "First name is required"
+    if (!formData.lastName) finalValidationErrors.lastName = "Last name is required"
+    if (!formData.email) finalValidationErrors.email = "Email is required"
+    if (!formData.position) finalValidationErrors.position = "Position is required"
+    if (!formData.department) finalValidationErrors.department = "Department is required"
+    if (!formData.idNumber) finalValidationErrors.idNumber = "ID Number is required"
 
-      // Only check email format
-      if (formData.email && !isValidEmail(formData.email)) {
-        finalValidationErrors.email = "Please enter a valid email address"
-      }
+    // Only check email format
+    if (formData.email && !isValidEmail(formData.email)) {
+      finalValidationErrors.email = "Please enter a valid email address"
+    }
 
-      if (Object.keys(finalValidationErrors).length > 0) {
-        setValidationErrors(finalValidationErrors)
-        throw new Error("Please correct the validation errors")
-      }
+    if (Object.keys(finalValidationErrors).length > 0) {
+      setValidationErrors(finalValidationErrors)
+      throw new Error("Please correct the validation errors")
+    }
 
-      // Check for existing validation errors
-      const hasExistingErrors = Object.values(validationErrors).some((error) => error !== null)
-      if (hasExistingErrors) {
-        throw new Error("Please resolve all validation errors before submitting")
-      }
+    // Check for existing validation errors
+    const hasExistingErrors = Object.values(validationErrors).some((error) => error !== null)
+    if (hasExistingErrors) {
+      throw new Error("Please resolve all validation errors before submitting")
+    }
 
-      // Prepare data to match your backend route structure
-      const employeeData = {
-        // Personal information - matching backend parameter names
-        first_name: formData.firstName,
-        middle_name: formData.middleName || null,
-        last_name: formData.lastName,
+    // ✅ FIXED: Use camelCase to match PHP expectations
+    const employeeData = {
+      // Personal information - CAMELCASE
+      firstName: formData.firstName,
+      middleName: formData.middleName || null,
+      lastName: formData.lastName,
 
-        // Contact information
-        email: formData.email,
-        contact_number: formData.contactNumber || null,
-        address: formData.address || null,
+      // Contact information
+      email: formData.email,
+      contactNumber: formData.contactNumber || null,
+      address: formData.address || null,
 
-        // Personal details
-        age: formData.age ? parseInt(formData.age) : null,
-        birth_date: formData.birthDate || null,
-        civil_status: formData.civilStatus || null,
+      // Personal details
+      age: formData.age ? parseInt(formData.age) : null,
+      birthDate: formData.birthDate || null,
+      civilStatus: formData.civilStatus || null,
 
-        // Job information
-        position: formData.position,
-        department: formData.department,
-        salary: formData.salary ? parseFloat(formData.salary.toString().replace(/[₱,]/g, "")) : null,
-        hire_date: formData.hireDate || new Date().toISOString().split("T")[0],
-        status: formData.status,
+      // Job information
+      position: formData.position,
+      department: formData.department,
+      salary: formData.salary ? parseFloat(formData.salary.toString().replace(/[₱,]/g, "")) : null,
+      hireDate: formData.hireDate || new Date().toISOString().split("T")[0],
+      status: formData.status,
 
-        // Government IDs
-        tin_number: formData.tinNumber || null,
-        sss_number: formData.sssNumber || null,
-        pagibig_number: formData.pagibigNumber || null,
-        philhealth_number: formData.philhealthNumber || null,
+      // Government IDs
+      tinNumber: formData.tinNumber || null,
+      sssNumber: formData.sssNumber || null,
+      pagibigNumber: formData.pagibigNumber || null,
+      philhealthNumber: formData.philhealthNumber || null,
 
-        // System information
-        username: formData.username,
-        access_level: formData.accessLevel,
+      // System information
+      username: formData.username,
+      accessLevel: formData.accessLevel,
 
-        // Employee identification - matching backend parameter names
-        id_number: formData.idNumber,
-        id_barcode: formData.idBarcode || null,
+      // Employee identification - CAMELCASE
+      employeeId: formData.idNumber,  // ✅ Changed from id_number to employeeId
+      idBarcode: formData.idBarcode || null,
 
-        // File references - will be updated after uploads
-        profile_picture: null,
-        document: null,
+      // File references - will be updated after uploads
+      profilePicture: null,
+      document: null
+    }
 
-        // Optional fields
-        action: null,
-        password: null
-      }
+    console.log("Sending employee data to backend:", employeeData)
 
-      console.log("Sending employee data to backend:", employeeData)
+    // Step 1: Create employee using your EmployeeService
+    const result = await apiService.employees.addEmployeeToEmpList(employeeData)
+    console.log("Server response:", result)
 
-      // Step 1: Create employee using your EmployeeService
-      const result = await apiService.employees.addEmployeeToEmpList(employeeData)
-      console.log("Server response:", result)
+    if (result && result.success) {
+      const employeeUid = result.data?.uid || result.data?.id
 
-      if (result && result.success) {
-        const employeeUid = result.data?.uid || result.data?.id
+      if (employeeUid) {
+        setCreatedEmployeeUid(employeeUid)
 
-        if (employeeUid) {
-          setCreatedEmployeeUid(employeeUid)
-
-          // Step 2: Upload profile picture if one was selected
-          if (profilePictureFile) {
-            await uploadProfilePictureForEmployee(employeeUid)
-          }
-
-          // Step 3: Upload document if one was selected
-          if (documentFile) {
-            await uploadDocumentForEmployee(employeeUid)
-          }
+        // Step 2: Upload profile picture if one was selected
+        if (profilePictureFile) {
+          await uploadProfilePictureForEmployee(employeeUid)
         }
 
-        setSuccess(true)
-
-        // Reset form
-        setFormData({
-          firstName: "",
-          middleName: "",
-          lastName: "",
-          age: "",
-          birthDate: "",
-          contactNumber: "",
-          email: "",
-          civilStatus: "",
-          address: "",
-          position: "",
-          department: "",
-          salary: "",
-          hireDate: "",
-          status: "Active",
-          tinNumber: "",
-          sssNumber: "",
-          pagibigNumber: "",
-          philhealthNumber: "",
-          username: "",
-          accessLevel: "user",
-          idNumber: "",
-          idBarcode: "",
-        })
-        setValidationErrors({})
-        setValidationLoading({})
-        setHasBeenValidated({})
-        setProfilePictureFile(null)
-        setProfilePreview(null)
-        setDocumentFile(null)
-        setDocumentPreview(null)
-        setCreatedEmployeeUid(null)
-
-        setTimeout(() => setSuccess(false), 5000)
-      } else {
-        throw new Error(result?.error || "Failed to add employee")
+        // Step 3: Upload document if one was selected
+        if (documentFile) {
+          await uploadDocumentForEmployee(employeeUid)
+        }
       }
-    } catch (err) {
-      console.error("Error adding employee:", err)
-      setError(err.message)
-    } finally {
-      setLoading(false)
+
+      setSuccess(true)
+
+      // Reset form
+      setFormData({
+        firstName: "",
+        middleName: "",
+        lastName: "",
+        age: "",
+        birthDate: "",
+        contactNumber: "",
+        email: "",
+        civilStatus: "",
+        address: "",
+        position: "",
+        department: "",
+        salary: "",
+        hireDate: "",
+        status: "Active",
+        tinNumber: "",
+        sssNumber: "",
+        pagibigNumber: "",
+        philhealthNumber: "",
+        username: "",
+        accessLevel: "user",
+        idNumber: "",
+        idBarcode: "",
+      })
+      setValidationErrors({})
+      setValidationLoading({})
+      setHasBeenValidated({})
+      setProfilePictureFile(null)
+      setProfilePreview(null)
+      setDocumentFile(null)
+      setDocumentPreview(null)
+      setCreatedEmployeeUid(null)
+
+      setTimeout(() => setSuccess(false), 5000)
+    } else {
+      throw new Error(result?.error || "Failed to add employee")
     }
+  } catch (err) {
+    console.error("Error adding employee:", err)
+    setError(err.message)
+  } finally {
+    setLoading(false)
   }
+}
 
   const validateForm = () => {
     const hasValidationErrors = Object.values(validationErrors).some((error) => error !== null)

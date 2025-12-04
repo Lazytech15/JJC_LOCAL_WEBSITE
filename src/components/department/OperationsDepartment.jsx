@@ -92,36 +92,36 @@ function OperationsDepartment() {
   const [selectedTargetSubphase, setSelectedTargetSubphase] = useState(null);
 
   // Load items for selected client in transfer modal
-useEffect(() => {
-  if (newClient.trim() && transferModalOpen && selectedItem) {
-    const basePartNumber = getBasePartNumber(selectedItem?.part_number);
-    const filtered = items.filter((item) => {
-      const itemBasePartNumber = getBasePartNumber(item.part_number);
-      return item.client_name === newClient.trim() && itemBasePartNumber === basePartNumber;
-    });
-    setClientItems(filtered);
-  } else {
-    setClientItems([]);
-  }
-}, [newClient, items, selectedItem, transferModalOpen]);
+  useEffect(() => {
+    if (newClient.trim() && transferModalOpen && selectedItem) {
+      const basePartNumber = getBasePartNumber(selectedItem?.part_number);
+      const filtered = items.filter((item) => {
+        const itemBasePartNumber = getBasePartNumber(item.part_number);
+        return item.client_name === newClient.trim() && itemBasePartNumber === basePartNumber;
+      });
+      setClientItems(filtered);
+    } else {
+      setClientItems([]);
+    }
+  }, [newClient, items, selectedItem, transferModalOpen]);
 
-// Filter clients for dropdown
-useEffect(() => {
-  if (!Array.isArray(clients)) {
-    setShowClientDropdown(false);
-    return;
-  }
+  // Filter clients for dropdown
+  useEffect(() => {
+    if (!Array.isArray(clients)) {
+      setShowClientDropdown(false);
+      return;
+    }
 
-  const searchValue = newClient.trim().toLowerCase();
-  if (searchValue.length >= 1) {
-    const matches = clients.filter(
-      (client) => client.toLowerCase().includes(searchValue) && client !== selectedItem?.client_name
-    );
-    setShowClientDropdown(matches.length > 0);
-  } else {
-    setShowClientDropdown(false);
-  }
-}, [newClient, clients, selectedItem]);
+    const searchValue = newClient.trim().toLowerCase();
+    if (searchValue.length >= 1) {
+      const matches = clients.filter(
+        (client) => client.toLowerCase().includes(searchValue) && client !== selectedItem?.client_name
+      );
+      setShowClientDropdown(matches.length > 0);
+    } else {
+      setShowClientDropdown(false);
+    }
+  }, [newClient, clients, selectedItem]);
 
   useEffect(() => {
     const needsPolling =
@@ -1366,99 +1366,73 @@ useEffect(() => {
   };
 
   const openTransferModal = (item, phase, subphase) => {
-  setSelectedItem(item);
-  setSelectedPhase(phase);
-  setSelectedSubphase(subphase);
-  setNewClient("");
-  setTransferQuantity("");
-  setTransferRemarks("");
-  setSelectedTargetItem(null);
-  setSelectedTargetPhase(null);
-  setSelectedTargetSubphase(null);
-  setTransferModalOpen(true);
-  setClientItems([]);
-};
+    setSelectedItem(item);
+    setSelectedPhase(phase);
+    setSelectedSubphase(subphase);
+    setNewClient("");
+    setTransferQuantity("");
+    setTransferRemarks("");
+    setSelectedTargetItem(null);
+    setSelectedTargetPhase(null);
+    setSelectedTargetSubphase(null);
+    setTransferModalOpen(true);
+    setClientItems([]);
+  };
 
-const handleTransferClient = async () => {
-  if (!newClient.trim()) {
-    alert("Please enter a client name");
-    return;
-  }
-
-  if (!selectedTargetItem) {
-    alert("Please select a target item");
-    return;
-  }
-
-  if (!selectedTargetPhase) {
-    alert("Please select a target phase");
-    return;
-  }
-
-  if (!selectedTargetSubphase) {
-    alert("Please select a target subphase");
-    return;
-  }
-
-  const transferQty = Number.parseInt(transferQuantity);
-  if (!transferQty || transferQty < 1) {
-    alert("Please enter a valid transfer quantity");
-    return;
-  }
-
-  const currentQty = selectedSubphase.current_completed_quantity || 0;
-  if (transferQty > currentQty) {
-    alert(`Transfer quantity (${transferQty}) cannot exceed current completed quantity (${currentQty})`);
-    return;
-  }
-
-  try {
-    const timestamp = new Date().toLocaleString("en-PH", {
-      timeZone: "Asia/Manila",
-    });
-
-    // Get full target item details
-    const targetItem = await apiService.operations.getItem(selectedTargetItem.part_number);
-    const targetPhase = targetItem.phases?.find((p) => p.id === Number.parseInt(selectedTargetPhase));
-    const targetSubphase = targetPhase?.subphases?.find((s) => s.id === Number.parseInt(selectedTargetSubphase));
-
-    if (!targetSubphase) {
-      alert("Could not find target subphase");
+  const handleTransferClient = async () => {
+    if (!newClient.trim()) {
+      alert("Please enter a client name");
       return;
     }
 
-    // Calculate new quantities
-    const newSourceQty = currentQty - transferQty;
-    const targetCurrentQty = targetSubphase.current_completed_quantity || 0;
-    const newTargetQty = targetCurrentQty + transferQty;
+    if (!selectedTargetItem) {
+      alert("Please select a target item");
+      return;
+    }
 
-    // Optimistic update for source subphase quantity
-    setItems((prevItems) =>
-      prevItems.map((item) => {
-        if (item.part_number === selectedItem.part_number && item.phases) {
-          return {
-            ...item,
-            phases: item.phases.map((phase) => {
-              if (phase.id === selectedPhase.id && phase.subphases) {
-                return {
-                  ...phase,
-                  subphases: phase.subphases.map((subphase) =>
-                    subphase.id === selectedSubphase.id
-                      ? { ...subphase, current_completed_quantity: newSourceQty }
-                      : subphase
-                  ),
-                };
-              }
-              return phase;
-            }),
-          };
-        }
-        return item;
-      })
-    );
+    if (!selectedTargetPhase) {
+      alert("Please select a target phase");
+      return;
+    }
 
-    // Auto-uncheck if quantity drops below expected
-    if (selectedSubphase.completed == 1 && newSourceQty < selectedSubphase.expected_quantity) {
+    if (!selectedTargetSubphase) {
+      alert("Please select a target subphase");
+      return;
+    }
+
+    const transferQty = Number.parseInt(transferQuantity);
+    if (!transferQty || transferQty < 1) {
+      alert("Please enter a valid transfer quantity");
+      return;
+    }
+
+    const currentQty = selectedSubphase.current_completed_quantity || 0;
+    if (transferQty > currentQty) {
+      alert(`Transfer quantity (${transferQty}) cannot exceed current completed quantity (${currentQty})`);
+      return;
+    }
+
+    try {
+      const timestamp = new Date().toLocaleString("en-PH", {
+        timeZone: "Asia/Manila",
+      });
+
+      // Get full target item details
+      const targetItem = await apiService.operations.getItem(selectedTargetItem.part_number);
+      const targetPhase = targetItem.phases?.find((p) => p.id === Number.parseInt(selectedTargetPhase));
+      const targetSubphase = targetPhase?.subphases?.find((s) => s.id === Number.parseInt(selectedTargetSubphase));
+
+      if (!targetSubphase) {
+        alert("Could not find target subphase");
+        return;
+      }
+
+      // Calculate new quantities
+      const newSourceQty = currentQty - transferQty;
+      const targetCurrentQty = targetSubphase.current_completed_quantity || 0;
+      const newTargetQty = targetCurrentQty + transferQty;
+
+      // Optimistic update for source subphase quantity
       setItems((prevItems) =>
         prevItems.map((item) => {
           if (item.part_number === selectedItem.part_number && item.phases) {
@@ -1470,12 +1444,7 @@ const handleTransferClient = async () => {
                     ...phase,
                     subphases: phase.subphases.map((subphase) =>
                       subphase.id === selectedSubphase.id
-                        ? {
-                            ...subphase,
-                            current_completed_quantity: newSourceQty,
-                            completed: 0,
-                            completed_at: null,
-                          }
+                        ? { ...subphase, current_completed_quantity: newSourceQty }
                         : subphase
                     ),
                   };
@@ -1487,79 +1456,110 @@ const handleTransferClient = async () => {
           return item;
         })
       );
+
+      // Auto-uncheck if quantity drops below expected
+      if (selectedSubphase.completed == 1 && newSourceQty < selectedSubphase.expected_quantity) {
+        setItems((prevItems) =>
+          prevItems.map((item) => {
+            if (item.part_number === selectedItem.part_number && item.phases) {
+              return {
+                ...item,
+                phases: item.phases.map((phase) => {
+                  if (phase.id === selectedPhase.id && phase.subphases) {
+                    return {
+                      ...phase,
+                      subphases: phase.subphases.map((subphase) =>
+                        subphase.id === selectedSubphase.id
+                          ? {
+                            ...subphase,
+                            current_completed_quantity: newSourceQty,
+                            completed: 0,
+                            completed_at: null,
+                          }
+                          : subphase
+                      ),
+                    };
+                  }
+                  return phase;
+                }),
+              };
+            }
+            return item;
+          })
+        );
+      }
+
+      // Optimistic update for target subphase quantity
+      setItems((prevItems) =>
+        prevItems.map((item) => {
+          if (item.part_number === selectedTargetItem.part_number && item.phases) {
+            return {
+              ...item,
+              phases: item.phases.map((phase) => {
+                if (phase.id === Number.parseInt(selectedTargetPhase) && phase.subphases) {
+                  return {
+                    ...phase,
+                    subphases: phase.subphases.map((subphase) =>
+                      subphase.id === Number.parseInt(selectedTargetSubphase)
+                        ? { ...subphase, current_completed_quantity: newTargetQty }
+                        : subphase
+                    ),
+                  };
+                }
+                return phase;
+              }),
+            };
+          }
+          return item;
+        })
+      );
+
+      // Close modal immediately
+      setTransferModalOpen(false);
+      setSelectedItem(null);
+      setSelectedPhase(null);
+      setSelectedSubphase(null);
+      setNewClient("");
+      setTransferQuantity("");
+      setTransferRemarks("");
+      setSelectedTargetItem(null);
+      setSelectedTargetPhase(null);
+      setSelectedTargetSubphase(null);
+
+      // Show success message
+      alert(`Successfully transferred ${transferQty} units to ${targetPhase.name} > ${targetSubphase.name}!`);
+
+      // API call to update source quantity
+      await apiService.operations.updateSubphaseCompletedQuantity(selectedSubphase.id, newSourceQty);
+
+      // If subphase was marked complete and now quantity is insufficient, uncheck it
+      if (selectedSubphase.completed == 1 && newSourceQty < selectedSubphase.expected_quantity) {
+        await apiService.operations.completeSubphaseWithDuration(selectedSubphase.id, false);
+      }
+
+      // API call to update target quantity
+      await apiService.operations.updateSubphaseCompletedQuantity(targetSubphase.id, newTargetQty);
+
+      // Add remarks with transfer details
+      const transferRemark = `[${timestamp}] Transferred OUT ${transferQty} units to ${newClient} (${selectedTargetItem.part_number}) - ${targetPhase.name} > ${targetSubphase.name} | From: ${selectedPhase.name} > ${selectedSubphase.name}: ${transferRemarks.trim() || "No remarks"}`;
+      const receiveRemark = `[${timestamp}] Received IN ${transferQty} units from ${selectedItem.client_name} (${selectedItem.part_number}) - ${selectedPhase.name} > ${selectedSubphase.name} | To: ${targetPhase.name} > ${targetSubphase.name}: ${transferRemarks.trim() || "No remarks"}`;
+
+      await apiService.operations.updateItem(selectedItem.part_number, {
+        remarks: selectedItem.remarks ? `${selectedItem.remarks}\n${transferRemark}` : transferRemark,
+      });
+
+      await apiService.operations.updateItem(selectedTargetItem.part_number, {
+        remarks: selectedTargetItem.remarks ? `${selectedTargetItem.remarks}\n${receiveRemark}` : receiveRemark,
+      });
+
+      // Reload data in background to sync all changes
+      loadData();
+    } catch (error) {
+      console.error("Error transferring:", error);
+      alert("Failed to transfer: " + error.message);
+      await loadData(); // Reload on error
     }
-
-    // Optimistic update for target subphase quantity
-    setItems((prevItems) =>
-      prevItems.map((item) => {
-        if (item.part_number === selectedTargetItem.part_number && item.phases) {
-          return {
-            ...item,
-            phases: item.phases.map((phase) => {
-              if (phase.id === Number.parseInt(selectedTargetPhase) && phase.subphases) {
-                return {
-                  ...phase,
-                  subphases: phase.subphases.map((subphase) =>
-                    subphase.id === Number.parseInt(selectedTargetSubphase)
-                      ? { ...subphase, current_completed_quantity: newTargetQty }
-                      : subphase
-                  ),
-                };
-              }
-              return phase;
-            }),
-          };
-        }
-        return item;
-      })
-    );
-
-    // Close modal immediately
-    setTransferModalOpen(false);
-    setSelectedItem(null);
-    setSelectedPhase(null);
-    setSelectedSubphase(null);
-    setNewClient("");
-    setTransferQuantity("");
-    setTransferRemarks("");
-    setSelectedTargetItem(null);
-    setSelectedTargetPhase(null);
-    setSelectedTargetSubphase(null);
-
-    // Show success message
-    alert(`Successfully transferred ${transferQty} units to ${targetPhase.name} > ${targetSubphase.name}!`);
-
-    // API call to update source quantity
-    await apiService.operations.updateSubphaseCompletedQuantity(selectedSubphase.id, newSourceQty);
-
-    // If subphase was marked complete and now quantity is insufficient, uncheck it
-    if (selectedSubphase.completed == 1 && newSourceQty < selectedSubphase.expected_quantity) {
-      await apiService.operations.completeSubphaseWithDuration(selectedSubphase.id, false);
-    }
-
-    // API call to update target quantity
-    await apiService.operations.updateSubphaseCompletedQuantity(targetSubphase.id, newTargetQty);
-
-    // Add remarks with transfer details
-    const transferRemark = `[${timestamp}] Transferred OUT ${transferQty} units to ${newClient} (${selectedTargetItem.part_number}) - ${targetPhase.name} > ${targetSubphase.name} | From: ${selectedPhase.name} > ${selectedSubphase.name}: ${transferRemarks.trim() || "No remarks"}`;
-    const receiveRemark = `[${timestamp}] Received IN ${transferQty} units from ${selectedItem.client_name} (${selectedItem.part_number}) - ${selectedPhase.name} > ${selectedSubphase.name} | To: ${targetPhase.name} > ${targetSubphase.name}: ${transferRemarks.trim() || "No remarks"}`;
-
-    await apiService.operations.updateItem(selectedItem.part_number, {
-      remarks: selectedItem.remarks ? `${selectedItem.remarks}\n${transferRemark}` : transferRemark,
-    });
-
-    await apiService.operations.updateItem(selectedTargetItem.part_number, {
-      remarks: selectedTargetItem.remarks ? `${selectedTargetItem.remarks}\n${receiveRemark}` : receiveRemark,
-    });
-
-    // Reload data in background to sync all changes
-    loadData();
-  } catch (error) {
-    console.error("Error transferring:", error);
-    alert("Failed to transfer: " + error.message);
-    await loadData(); // Reload on error
-  }
-};
+  };
 
   // Helper function to extract base part number (remove batch suffix)
   const getBasePartNumber = (partNumber) => {
@@ -1569,396 +1569,566 @@ const handleTransferClient = async () => {
     return match ? match[1] : partNumber;
   };
 
-return (
-  <div
-    className={`min-h-screen transition-colors duration-300 ${
-      isDarkMode
+  return (
+    <div
+      className={`min-h-screen transition-colors duration-300 ${isDarkMode
         ? "bg-linear-to-br from-gray-950 via-gray-900 to-gray-950"
         : "bg-linear-to-br from-gray-50 via-slate-50 to-stone-50"
-    }`}
-  >
-    {/* Main Container - Responsive padding */}
-    <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
-      <div className="max-w-7xl mx-auto">
-        
-        {/* Header - Responsive layout */}
-        <div
-          className={`backdrop-blur-md rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 mb-4 sm:mb-6 border shadow-lg transition-all duration-300 ${
-            isDarkMode
+        }`}
+    >
+      {/* Main Container - Responsive padding */}
+      <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
+        <div className="max-w-7xl mx-auto">
+
+          {/* Header - Responsive layout */}
+          <div
+            className={`backdrop-blur-md rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 mb-4 sm:mb-6 border shadow-lg transition-all duration-300 ${isDarkMode
               ? "bg-gray-800/60 border-gray-700/50"
               : "bg-white/20 border-white/30"
-          }`}
-        >
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
-            {/* Title Section */}
-            <div className="flex-1 min-w-0">
-              <h1
-                className={`text-xl sm:text-2xl md:text-3xl font-bold wrap-break-word ${
-                  isDarkMode ? "text-gray-100" : "text-gray-800"
-                }`}
-              >
-                ⚙️ Operations Department
-              </h1>
-              <p
-                className={`text-xs sm:text-sm md:text-base mt-1 sm:mt-2 ${
-                  isDarkMode ? "text-gray-300" : "text-gray-600"
-                }`}
-              >
-                Welcome, {user?.name || "Operations Manager"}
-              </p>
-              {lastUpdateCheck && (
-                <p
-                  className={`text-xs mt-1 ${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  }`}
+              }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
+              {/* Title Section */}
+              <div className="flex-1 min-w-0">
+                <h1
+                  className={`text-xl sm:text-2xl md:text-3xl font-bold wrap-break-word ${isDarkMode ? "text-gray-100" : "text-gray-800"
+                    }`}
                 >
-                  Last updated: {lastUpdateCheck.toLocaleTimeString()}
+                  ⚙️ Operations Department
+                </h1>
+                <p
+                  className={`text-xs sm:text-sm md:text-base mt-1 sm:mt-2 ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                    }`}
+                >
+                  Welcome, {user?.name || "Operations Manager"}
                 </p>
-              )}
-            </div>
+                {lastUpdateCheck && (
+                  <p
+                    className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"
+                      }`}
+                  >
+                    Last updated: {lastUpdateCheck.toLocaleTimeString()}
+                  </p>
+                )}
+              </div>
 
-            {/* Action Buttons - Responsive */}
-            <div className="flex gap-2 shrink-0 self-end sm:self-start">
-              {/* Refresh Button */}
-              <button
-                onClick={handleManualRefresh}
-                disabled={isRefreshing || loading}
-                className={`p-2 sm:p-2.5 rounded-lg backdrop-blur-sm border transition-all duration-300 ${
-                  isDarkMode
+              {/* Action Buttons - Responsive */}
+              <div className="flex gap-2 shrink-0 self-end sm:self-start">
+                {/* Refresh Button */}
+                <button
+                  onClick={handleManualRefresh}
+                  disabled={isRefreshing || loading}
+                  className={`p-2 sm:p-2.5 rounded-lg backdrop-blur-sm border transition-all duration-300 ${isDarkMode
                     ? "bg-gray-800/60 border-gray-700/50 hover:bg-gray-800/80 text-cyan-400"
                     : "bg-white/20 border-white/30 hover:bg-white/30 text-blue-700"
-                } ${
-                  isRefreshing || loading
-                    ? "opacity-50 cursor-not-allowed"
-                    : ""
-                }`}
-                aria-label="Refresh data"
-                title={
-                  lastUpdateCheck
-                    ? `Last checked: ${lastUpdateCheck.toLocaleTimeString()}`
-                    : "Refresh data"
-                }
-              >
-                <RefreshCw
-                  className={`w-4 h-4 sm:w-5 sm:h-5 ${
-                    isRefreshing ? "animate-spin" : ""
-                  }`}
-                />
-              </button>
+                    } ${isRefreshing || loading
+                      ? "opacity-50 cursor-not-allowed"
+                      : ""
+                    }`}
+                  aria-label="Refresh data"
+                  title={
+                    lastUpdateCheck
+                      ? `Last checked: ${lastUpdateCheck.toLocaleTimeString()}`
+                      : "Refresh data"
+                  }
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 sm:w-5 sm:h-5 ${isRefreshing ? "animate-spin" : ""
+                      }`}
+                  />
+                </button>
 
-              {/* Dark Mode Toggle */}
-              <button
-                onClick={toggleDarkMode}
-                className={`p-2 sm:p-2.5 rounded-lg backdrop-blur-sm border transition-all duration-300 ${
-                  isDarkMode
+                {/* Dark Mode Toggle */}
+                <button
+                  onClick={toggleDarkMode}
+                  className={`p-2 sm:p-2.5 rounded-lg backdrop-blur-sm border transition-all duration-300 ${isDarkMode
                     ? "bg-gray-800/60 border-gray-700/50 hover:bg-gray-800/80 text-yellow-400"
                     : "bg-white/20 border-white/30 hover:bg-white/30 text-gray-700"
-                }`}
-                aria-label="Toggle dark mode"
-              >
-                <span className="text-lg sm:text-xl">
-                  {isDarkMode ? "☀️" : "🌙"}
-                </span>
-              </button>
+                    }`}
+                  aria-label="Toggle dark mode"
+                >
+                  <span className="text-lg sm:text-xl">
+                    {isDarkMode ? "☀️" : "🌙"}
+                  </span>
+                </button>
 
-              {/* Logout Button */}
-              <button
-                onClick={logout}
-                className={`px-3 sm:px-4 py-2 rounded-lg font-medium text-sm sm:text-base transition-colors duration-200 ${
-                  isDarkMode
+                {/* Logout Button */}
+                <button
+                  onClick={logout}
+                  className={`px-3 sm:px-4 py-2 rounded-lg font-medium text-sm sm:text-base transition-colors duration-200 ${isDarkMode
                     ? "bg-slate-700 hover:bg-slate-600 text-white"
                     : "bg-slate-600 hover:bg-slate-700 text-white"
-                }`}
-              >
-                Logout
-              </button>
+                    }`}
+                >
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Loading Spinner */}
-        {(loading || submitting) && (
-          <div
-            className={`fixed inset-0 z-50 flex items-center justify-center ${
-              isDarkMode ? "bg-gray-900/95" : "bg-gray-100/95"
-            }`}
-          >
-            <GearLoadingSpinner isDarkMode={isDarkMode} />
-          </div>
-        )}
-
-        {/* Loading Progress */}
-        {!loading &&
-          !submitting &&
-          !initialLoadComplete &&
-          loadingProgress.total > 0 && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/30 p-4">
-              <div
-                className={`max-w-md w-full backdrop-blur-md rounded-xl sm:rounded-2xl p-6 sm:p-8 border shadow-2xl transition-all duration-300 ${
-                  isDarkMode
-                    ? "bg-gray-800/90 border-gray-700/50"
-                    : "bg-white/90 border-white/50"
+          {/* Loading Spinner */}
+          {(loading || submitting) && (
+            <div
+              className={`fixed inset-0 z-50 flex items-center justify-center ${isDarkMode ? "bg-gray-900/95" : "bg-gray-100/95"
                 }`}
-              >
-                {/* Gear Animation */}
-                <div className="flex justify-center mb-4 sm:mb-6">
-                  <div className="relative flex items-center justify-center scale-75 sm:scale-100">
-                    {/* Left Small Gear */}
-                    <div className="absolute -left-6 bottom-2">
-                      <svg
-                        className="w-12 h-12 animate-spin"
-                        style={{ animationDuration: "2s" }}
-                        viewBox="0 0 120 120"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <g transform="translate(60, 60)">
-                          {[...Array(8)].map((_, i) => {
-                            const angle = (i * 360) / 8;
-                            return (
-                              <rect
-                                key={i}
-                                x="-6"
-                                y="-40"
-                                width="12"
-                                height="15"
-                                fill={isDarkMode ? "#64748B" : "#546E7A"}
-                                transform={`rotate(${angle})`}
-                              />
-                            );
-                          })}
-                          <circle
-                            cx="0"
-                            cy="0"
-                            r="32"
-                            fill={isDarkMode ? "#64748B" : "#546E7A"}
-                          />
-                          <circle
-                            cx="0"
-                            cy="0"
-                            r="20"
-                            fill="none"
-                            stroke={isDarkMode ? "#38BDF8" : "#7DD3C0"}
-                            strokeWidth="3"
-                          />
-                          <circle
-                            cx="0"
-                            cy="0"
-                            r="20"
-                            fill={isDarkMode ? "#1E293B" : "#F3F4F6"}
-                          />
-                        </g>
-                      </svg>
-                    </div>
-
-                    {/* Center Large Gear */}
-                    <div className="z-10">
-                      <svg
-                        className="w-28 h-28 animate-spin"
-                        style={{
-                          animationDuration: "3s",
-                          animationDirection: "reverse",
-                        }}
-                        viewBox="0 0 140 140"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <g transform="translate(70, 70)">
-                          {[...Array(12)].map((_, i) => {
-                            const angle = (i * 360) / 12;
-                            return (
-                              <rect
-                                key={i}
-                                x="-8"
-                                y="-55"
-                                width="16"
-                                height="20"
-                                fill="#546E7A"
-                                transform={`rotate(${angle})`}
-                              />
-                            );
-                          })}
-                          <circle
-                            cx="0"
-                            cy="0"
-                            r="45"
-                            fill={isDarkMode ? "#64748B" : "#546E7A"}
-                          />
-                          <circle
-                            cx="0"
-                            cy="0"
-                            r="28"
-                            fill="none"
-                            stroke={isDarkMode ? "#38BDF8" : "#7DD3C0"}
-                            strokeWidth="4"
-                          />
-                          <circle
-                            cx="0"
-                            cy="0"
-                            r="28"
-                            fill={isDarkMode ? "#1E293B" : "#F3F4F6"}
-                          />
-                        </g>
-                      </svg>
-                    </div>
-
-                    {/* Right Small Gear */}
-                    <div className="absolute -right-6 bottom-2">
-                      <svg
-                        className="w-12 h-12 animate-spin"
-                        style={{ animationDuration: "2s" }}
-                        viewBox="0 0 120 120"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <g transform="translate(60, 60)">
-                          {[...Array(8)].map((_, i) => {
-                            const angle = (i * 360) / 8;
-                            return (
-                              <rect
-                                key={i}
-                                x="-6"
-                                y="-40"
-                                width="12"
-                                height="15"
-                                fill={isDarkMode ? "#64748B" : "#546E7A"}
-                                transform={`rotate(${angle})`}
-                              />
-                            );
-                          })}
-                          <circle
-                            cx="0"
-                            cy="0"
-                            r="32"
-                            fill={isDarkMode ? "#64748B" : "#546E7A"}
-                          />
-                          <circle
-                            cx="0"
-                            cy="0"
-                            r="20"
-                            fill="none"
-                            stroke={isDarkMode ? "#38BDF8" : "#7DD3C0"}
-                            strokeWidth="3"
-                          />
-                          <circle
-                            cx="0"
-                            cy="0"
-                            r="20"
-                            fill={isDarkMode ? "#1E293B" : "#F3F4F6"}
-                          />
-                        </g>
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Loading Text */}
-                <h3
-                  className={`text-lg sm:text-xl font-bold text-center mb-3 ${
-                    isDarkMode ? "text-gray-100" : "text-gray-800"
-                  }`}
-                >
-                  Loading Item Details
-                </h3>
-
-                <p
-                  className={`text-sm text-center mb-4 ${
-                    isDarkMode ? "text-gray-300" : "text-gray-600"
-                  }`}
-                >
-                  {loadingProgress.message ||
-                    `Processing ${loadingProgress.current} of ${loadingProgress.total} items...`}
-                </p>
-
-                {/* Progress Bar */}
-                <div
-                  className={`w-full rounded-full h-2.5 sm:h-3 mb-2 ${
-                    isDarkMode ? "bg-gray-700" : "bg-gray-300"
-                  }`}
-                >
-                  <div
-                    className="bg-linear-to-r from-blue-500 to-cyan-500 h-2.5 sm:h-3 rounded-full transition-all duration-300 relative overflow-hidden"
-                    style={{
-                      width: `${
-                        (loadingProgress.current / loadingProgress.total) * 100
-                      }%`,
-                    }}
-                  >
-                    <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
-                  </div>
-                </div>
-
-                {/* Percentage */}
-                <p
-                  className={`text-center text-sm font-mono ${
-                    isDarkMode ? "text-gray-300" : "text-gray-600"
-                  }`}
-                >
-                  {Math.round(
-                    (loadingProgress.current / loadingProgress.total) * 100
-                  )}
-                  %
-                </p>
-
-                {/* Warning Message */}
-                <div
-                  className={`mt-4 p-3 rounded-lg ${
-                    isDarkMode
-                      ? "bg-yellow-900/20 border border-yellow-700/50"
-                      : "bg-yellow-50 border border-yellow-300"
-                  }`}
-                >
-                  <p
-                    className={`text-xs text-center ${
-                      isDarkMode ? "text-yellow-300" : "text-yellow-700"
-                    }`}
-                  >
-                    ⏳ Please wait... Do not close or refresh the page
-                  </p>
-                </div>
-              </div>
+            >
+              <GearLoadingSpinner isDarkMode={isDarkMode} />
             </div>
           )}
 
-        {/* Error State */}
-        {error && (
-          <div
-            className={`backdrop-blur-sm border rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 transition-all duration-300 ${
-              isDarkMode
+          {/* Loading Progress */}
+          {!loading &&
+            !submitting &&
+            !initialLoadComplete &&
+            loadingProgress.total > 0 && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/30 p-4">
+                <div
+                  className={`max-w-md w-full backdrop-blur-md rounded-xl sm:rounded-2xl p-6 sm:p-8 border shadow-2xl transition-all duration-300 ${isDarkMode
+                    ? "bg-gray-800/90 border-gray-700/50"
+                    : "bg-white/90 border-white/50"
+                    }`}
+                >
+                  {/* Gear Animation */}
+                  <div className="flex justify-center mb-4 sm:mb-6">
+                    <div className="relative flex items-center justify-center scale-75 sm:scale-100">
+                      {/* Left Small Gear */}
+                      <div className="absolute -left-6 bottom-2">
+                        <svg
+                          className="w-12 h-12 animate-spin"
+                          style={{ animationDuration: "2s" }}
+                          viewBox="0 0 120 120"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <g transform="translate(60, 60)">
+                            {[...Array(8)].map((_, i) => {
+                              const angle = (i * 360) / 8;
+                              return (
+                                <rect
+                                  key={i}
+                                  x="-6"
+                                  y="-40"
+                                  width="12"
+                                  height="15"
+                                  fill={isDarkMode ? "#64748B" : "#546E7A"}
+                                  transform={`rotate(${angle})`}
+                                />
+                              );
+                            })}
+                            <circle
+                              cx="0"
+                              cy="0"
+                              r="32"
+                              fill={isDarkMode ? "#64748B" : "#546E7A"}
+                            />
+                            <circle
+                              cx="0"
+                              cy="0"
+                              r="20"
+                              fill="none"
+                              stroke={isDarkMode ? "#38BDF8" : "#7DD3C0"}
+                              strokeWidth="3"
+                            />
+                            <circle
+                              cx="0"
+                              cy="0"
+                              r="20"
+                              fill={isDarkMode ? "#1E293B" : "#F3F4F6"}
+                            />
+                          </g>
+                        </svg>
+                      </div>
+
+                      {/* Center Large Gear */}
+                      <div className="z-10">
+                        <svg
+                          className="w-28 h-28 animate-spin"
+                          style={{
+                            animationDuration: "3s",
+                            animationDirection: "reverse",
+                          }}
+                          viewBox="0 0 140 140"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <g transform="translate(70, 70)">
+                            {[...Array(12)].map((_, i) => {
+                              const angle = (i * 360) / 12;
+                              return (
+                                <rect
+                                  key={i}
+                                  x="-8"
+                                  y="-55"
+                                  width="16"
+                                  height="20"
+                                  fill="#546E7A"
+                                  transform={`rotate(${angle})`}
+                                />
+                              );
+                            })}
+                            <circle
+                              cx="0"
+                              cy="0"
+                              r="45"
+                              fill={isDarkMode ? "#64748B" : "#546E7A"}
+                            />
+                            <circle
+                              cx="0"
+                              cy="0"
+                              r="28"
+                              fill="none"
+                              stroke={isDarkMode ? "#38BDF8" : "#7DD3C0"}
+                              strokeWidth="4"
+                            />
+                            <circle
+                              cx="0"
+                              cy="0"
+                              r="28"
+                              fill={isDarkMode ? "#1E293B" : "#F3F4F6"}
+                            />
+                          </g>
+                        </svg>
+                      </div>
+
+                      {/* Right Small Gear */}
+                      <div className="absolute -right-6 bottom-2">
+                        <svg
+                          className="w-12 h-12 animate-spin"
+                          style={{ animationDuration: "2s" }}
+                          viewBox="0 0 120 120"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <g transform="translate(60, 60)">
+                            {[...Array(8)].map((_, i) => {
+                              const angle = (i * 360) / 8;
+                              return (
+                                <rect
+                                  key={i}
+                                  x="-6"
+                                  y="-40"
+                                  width="12"
+                                  height="15"
+                                  fill={isDarkMode ? "#64748B" : "#546E7A"}
+                                  transform={`rotate(${angle})`}
+                                />
+                              );
+                            })}
+                            <circle
+                              cx="0"
+                              cy="0"
+                              r="32"
+                              fill={isDarkMode ? "#64748B" : "#546E7A"}
+                            />
+                            <circle
+                              cx="0"
+                              cy="0"
+                              r="20"
+                              fill="none"
+                              stroke={isDarkMode ? "#38BDF8" : "#7DD3C0"}
+                              strokeWidth="3"
+                            />
+                            <circle
+                              cx="0"
+                              cy="0"
+                              r="20"
+                              fill={isDarkMode ? "#1E293B" : "#F3F4F6"}
+                            />
+                          </g>
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Loading Text */}
+                  <h3
+                    className={`text-lg sm:text-xl font-bold text-center mb-3 ${isDarkMode ? "text-gray-100" : "text-gray-800"
+                      }`}
+                  >
+                    Loading Item Details
+                  </h3>
+
+                  <p
+                    className={`text-sm text-center mb-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}
+                  >
+                    {loadingProgress.message ||
+                      `Processing ${loadingProgress.current} of ${loadingProgress.total} items...`}
+                  </p>
+
+                  {/* Progress Bar */}
+                  <div
+                    className={`w-full rounded-full h-2.5 sm:h-3 mb-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"
+                      }`}
+                  >
+                    <div
+                      className="bg-linear-to-r from-blue-500 to-cyan-500 h-2.5 sm:h-3 rounded-full transition-all duration-300 relative overflow-hidden"
+                      style={{
+                        width: `${(loadingProgress.current / loadingProgress.total) * 100
+                          }%`,
+                      }}
+                    >
+                      <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                    </div>
+                  </div>
+
+                  {/* Percentage */}
+                  <p
+                    className={`text-center text-sm font-mono ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}
+                  >
+                    {Math.round(
+                      (loadingProgress.current / loadingProgress.total) * 100
+                    )}
+                    %
+                  </p>
+
+                  {/* Warning Message */}
+                  <div
+                    className={`mt-4 p-3 rounded-lg ${isDarkMode
+                      ? "bg-yellow-900/20 border border-yellow-700/50"
+                      : "bg-yellow-50 border border-yellow-300"
+                      }`}
+                  >
+                    <p
+                      className={`text-xs text-center ${isDarkMode ? "text-yellow-300" : "text-yellow-700"
+                        }`}
+                    >
+                      ⏳ Please wait... Do not close or refresh the page
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          {/* Error State */}
+          {error && (
+            <div
+              className={`backdrop-blur-sm border rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 transition-all duration-300 ${isDarkMode
                 ? "bg-red-950/50 border-red-800/60 text-red-300"
                 : "bg-red-100/80 border-red-300 text-red-700"
-            }`}
-          >
-            <p className="text-xs sm:text-sm md:text-base wrap-break-word font-medium">
-              Error: {error}
-            </p>
-            <button
-              onClick={() => setError(null)}
-              className={`mt-2 text-xs sm:text-sm hover:underline font-medium ${
-                isDarkMode ? "text-red-300" : "text-red-600"
-              }`}
+                }`}
             >
-              Dismiss
-            </button>
-          </div>
-        )}
+              <p className="text-xs sm:text-sm md:text-base wrap-break-word font-medium">
+                Error: {error}
+              </p>
+              <button
+                onClick={() => setError(null)}
+                className={`mt-2 text-xs sm:text-sm hover:underline font-medium ${isDarkMode ? "text-red-300" : "text-red-600"
+                  }`}
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
-        {!loading && (
-          <>
-            {/* Desktop Navigation Tabs */}
-            <div
-              className={`hidden lg:block backdrop-blur-md rounded-xl sm:rounded-2xl shadow-lg mb-4 sm:mb-6 border transition-all duration-300 ${
-                isDarkMode
+          {!loading && (
+            <>
+              {/* Desktop Navigation Tabs */}
+              <div
+                className={`hidden lg:block backdrop-blur-md rounded-xl sm:rounded-2xl shadow-lg mb-4 sm:mb-6 border transition-all duration-300 ${isDarkMode
                   ? "bg-gray-800/60 border-gray-700/50"
                   : "bg-white/20 border-white/30"
-              }`}
-            >
-              <div
-                className={`flex border-b ${
-                  isDarkMode ? "border-gray-700/50" : "border-gray-300/20"
-                }`}
+                  }`}
               >
-                {tabs.map((tab) => (
+                <div
+                  className={`flex border-b ${isDarkMode ? "border-gray-700/50" : "border-gray-300/20"
+                    }`}
+                >
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleTabChange(tab.id)}
+                      disabled={
+                        !initialLoadComplete &&
+                        (tab.id === "checklist" ||
+                          tab.id === "dashboard" ||
+                          tab.id === "reports")
+                      }
+                      className={`flex-1 px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-sm sm:text-base transition-colors ${activeTab === tab.id
+                        ? isDarkMode
+                          ? "border-b-2 border-slate-400 text-slate-300"
+                          : "border-b-2 border-slate-600 text-slate-700"
+                        : isDarkMode
+                          ? "text-gray-400 hover:text-slate-400"
+                          : "text-gray-600 hover:text-slate-600"
+                        } ${!initialLoadComplete &&
+                          (tab.id === "checklist" ||
+                            tab.id === "dashboard" ||
+                            tab.id === "reports")
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                        }`}
+                    >
+                      {tab.label}
+                      {!initialLoadComplete &&
+                        (tab.id === "checklist" ||
+                          tab.id === "dashboard" ||
+                          tab.id === "reports") && (
+                          <span className="ml-2 text-xs">⏳</span>
+                        )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Content Area - Responsive */}
+              <div
+                className={`backdrop-blur-md rounded-xl sm:rounded-2xl shadow-lg p-3 sm:p-4 md:p-6 border transition-all duration-300 ${isDarkMode
+                  ? "bg-gray-800/60 border-gray-700/50"
+                  : "bg-white/20 border-white/30"
+                  }`}
+              >
+                {/* Keep all your existing tab content exactly as is */}
+                {activeTab === "dashboard" && (
+                  <Dashboard
+                    items={items}
+                    isDarkMode={isDarkMode}
+                    calculateItemProgress={calculateItemProgress}
+                    loading={loading}
+                    apiService={apiService}
+                    formatTime={formatTime}
+                  />
+                )}
+
+                {activeTab === "add-items" && (
+                  <AddItems
+                    items={items}
+                    submitting={submitting}
+                    setSubmitting={setSubmitting}
+                    apiService={apiService}
+                    isDarkMode={isDarkMode}
+                  />
+                )}
+
+                {activeTab === "checklist" && (
+                  <Checklist
+                    items={items}
+                    setItems={setItems}
+                    formatTime={formatTime}
+                    formatActionDuration={formatActionDuration}
+                    expandedItems={expandedItems}
+                    expandedPhases={expandedPhases}
+                    scanningFor={scanningFor}
+                    barcodeInput={barcodeInput}
+                    setBarcodeInput={setBarcodeInput}
+                    calculateItemProgress={calculateItemProgress}
+                    calculatePhaseProgress={calculatePhaseProgress}
+                    toggleItemExpansion={toggleItemExpansion}
+                    togglePhaseExpansion={togglePhaseExpansion}
+                    toggleSubPhase={toggleSubPhase}
+                    updateActualHours={updateActualHours}
+                    handleBarcodeScan={handleBarcodeScan}
+                    submitBarcode={submitBarcode}
+                    setScanningFor={setScanningFor}
+                    deleteItem={deleteItem}
+                    apiService={apiService}
+                    loadData={loadData}
+                    isDarkMode={isDarkMode}
+                    setShowEditItemModal={setShowEditItemModal}
+                    setShowEditPhaseModal={setShowEditPhaseModal}
+                    setShowEditSubphaseModal={setShowEditSubphaseModal}
+                    setShowAddPhaseModal={setShowAddPhaseModal}
+                    setShowAddSubphaseModal={setShowAddSubphaseModal}
+                    setShowBulkEditModal={setShowBulkEditModal}
+                    setSelectedItemForEdit={setSelectedItemForEdit}
+                    setSelectedPhaseForEdit={setSelectedPhaseForEdit}
+                    setSelectedSubphaseForEdit={setSelectedSubphaseForEdit}
+                    setSelectedItemsForBulk={setSelectedItemsForBulk}
+                    clients={clients}
+                    openTransferModal={openTransferModal}
+                    transferModalOpen={transferModalOpen}
+                    setTransferModalOpen={setTransferModalOpen}
+                    selectedSubphaseForTransfer={selectedSubphase}
+                    selectedItemForTransfer={selectedItem}
+                    selectedPhaseForTransfer={selectedPhase}
+                    newClient={newClient}
+                    setNewClient={setNewClient}
+                    transferQuantity={transferQuantity}
+                    setTransferQuantity={setTransferQuantity}
+                    transferRemarks={transferRemarks}
+                    setTransferRemarks={setTransferRemarks}
+                    clientItems={clientItems}
+                    showClientDropdown={showClientDropdown}
+                    setShowClientDropdown={setShowClientDropdown}
+                    selectedTargetItem={selectedTargetItem}
+                    setSelectedTargetItem={setSelectedTargetItem}
+                    selectedTargetPhase={selectedTargetPhase}
+                    setSelectedTargetPhase={setSelectedTargetPhase}
+                    selectedTargetSubphase={selectedTargetSubphase}
+                    setSelectedTargetSubphase={setSelectedTargetSubphase}
+                    handleTransferClient={handleTransferClient}
+                    getBasePartNumber={getBasePartNumber}
+                  />
+                )}
+
+                {activeTab === "comparison" && (
+                  <ItemComparison
+                    items={items}
+                    isDarkMode={isDarkMode}
+                    apiService={apiService}
+                    formatTime={formatTime}
+                    calculateItemProgress={calculateItemProgress}
+                  />
+                )}
+
+                {activeTab === "reports" && (
+                  <Reports
+                    items={items}
+                    isDarkMode={isDarkMode}
+                    calculateItemProgress={calculateItemProgress}
+                    calculatePhaseProgress={calculatePhaseProgress}
+                    getItemElapsedTime={getItemElapsedTime}
+                    formatTime={formatTime}
+                    formatActionDuration={formatActionDuration}
+                    getPhaseElapsedTime={getPhaseElapsedTime}
+                    apiService={apiService}
+                  />
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Mobile/Tablet Bottom Navigation - Fixed at bottom */}
+        {!loading && (
+          <div
+            className={`lg:hidden fixed bottom-0 left-0 right-0 z-30 backdrop-blur-md border-t shadow-2xl transition-all duration-300 ${isDarkMode
+              ? "bg-gray-900/95 border-gray-700/50"
+              : "bg-white/95 border-gray-300/50"
+              }`}
+          >
+            <div className="flex justify-around items-center px-2 py-2 max-w-7xl mx-auto">
+              {tabs.map((tab) => {
+                const icons = {
+                  dashboard: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                  ),
+                  "add-items": (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  ),
+                  checklist: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                  ),
+                  comparison: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  ),
+                  reports: (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  )
+                };
+
+                return (
                   <button
                     key={tab.id}
                     onClick={() => handleTabChange(tab.id)}
@@ -1968,668 +2138,458 @@ return (
                         tab.id === "dashboard" ||
                         tab.id === "reports")
                     }
-                    className={`flex-1 px-3 sm:px-4 py-2.5 sm:py-3 font-medium text-sm sm:text-base transition-colors ${
-                      activeTab === tab.id
-                        ? isDarkMode
-                          ? "border-b-2 border-slate-400 text-slate-300"
-                          : "border-b-2 border-slate-600 text-slate-700"
-                        : isDarkMode
-                        ? "text-gray-400 hover:text-slate-400"
-                        : "text-gray-600 hover:text-slate-600"
-                    } ${
-                      !initialLoadComplete &&
-                      (tab.id === "checklist" ||
-                        tab.id === "dashboard" ||
-                        tab.id === "reports")
-                        ? "opacity-50 cursor-not-allowed"
-                        : ""
-                    }`}
-                  >
-                    {tab.label}
-                    {!initialLoadComplete &&
-                      (tab.id === "checklist" ||
-                        tab.id === "dashboard" ||
-                        tab.id === "reports") && (
-                        <span className="ml-2 text-xs">⏳</span>
-                      )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Content Area - Responsive */}
-            <div
-              className={`backdrop-blur-md rounded-xl sm:rounded-2xl shadow-lg p-3 sm:p-4 md:p-6 border transition-all duration-300 ${
-                isDarkMode
-                  ? "bg-gray-800/60 border-gray-700/50"
-                  : "bg-white/20 border-white/30"
-              }`}
-            >
-              {/* Keep all your existing tab content exactly as is */}
-              {activeTab === "dashboard" && (
-                <Dashboard
-                  items={items}
-                  isDarkMode={isDarkMode}
-                  calculateItemProgress={calculateItemProgress}
-                  loading={loading}
-                  apiService={apiService}
-                  formatTime={formatTime}
-                />
-              )}
-
-              {activeTab === "add-items" && (
-                <AddItems
-                  items={items}
-                  submitting={submitting}
-                  setSubmitting={setSubmitting}
-                  apiService={apiService}
-                  isDarkMode={isDarkMode}
-                />
-              )}
-
-              {activeTab === "checklist" && (
-                <Checklist
-                  items={items}
-                  setItems={setItems}
-                  formatTime={formatTime}
-                  formatActionDuration={formatActionDuration}
-                  expandedItems={expandedItems}
-                  expandedPhases={expandedPhases}
-                  scanningFor={scanningFor}
-                  barcodeInput={barcodeInput}
-                  setBarcodeInput={setBarcodeInput}
-                  calculateItemProgress={calculateItemProgress}
-                  calculatePhaseProgress={calculatePhaseProgress}
-                  toggleItemExpansion={toggleItemExpansion}
-                  togglePhaseExpansion={togglePhaseExpansion}
-                  toggleSubPhase={toggleSubPhase}
-                  updateActualHours={updateActualHours}
-                  handleBarcodeScan={handleBarcodeScan}
-                  submitBarcode={submitBarcode}
-                  setScanningFor={setScanningFor}
-                  deleteItem={deleteItem}
-                  apiService={apiService}
-                  loadData={loadData}
-                  isDarkMode={isDarkMode}
-                  setShowEditItemModal={setShowEditItemModal}
-                  setShowEditPhaseModal={setShowEditPhaseModal}
-                  setShowEditSubphaseModal={setShowEditSubphaseModal}
-                  setShowAddPhaseModal={setShowAddPhaseModal}
-                  setShowAddSubphaseModal={setShowAddSubphaseModal}
-                  setShowBulkEditModal={setShowBulkEditModal}
-                  setSelectedItemForEdit={setSelectedItemForEdit}
-                  setSelectedPhaseForEdit={setSelectedPhaseForEdit}
-                  setSelectedSubphaseForEdit={setSelectedSubphaseForEdit}
-                  setSelectedItemsForBulk={setSelectedItemsForBulk}
-                  clients={clients}
-                  openTransferModal={openTransferModal}
-                  transferModalOpen={transferModalOpen}
-                  setTransferModalOpen={setTransferModalOpen}
-                  selectedSubphaseForTransfer={selectedSubphase}
-                  selectedItemForTransfer={selectedItem}
-                  selectedPhaseForTransfer={selectedPhase}
-                  newClient={newClient}
-                  setNewClient={setNewClient}
-                  transferQuantity={transferQuantity}
-                  setTransferQuantity={setTransferQuantity}
-                  transferRemarks={transferRemarks}
-                  setTransferRemarks={setTransferRemarks}
-                  clientItems={clientItems}
-                  showClientDropdown={showClientDropdown}
-                  setShowClientDropdown={setShowClientDropdown}
-                  selectedTargetItem={selectedTargetItem}
-                  setSelectedTargetItem={setSelectedTargetItem}
-                  selectedTargetPhase={selectedTargetPhase}
-                  setSelectedTargetPhase={setSelectedTargetPhase}
-                  selectedTargetSubphase={selectedTargetSubphase}
-                  setSelectedTargetSubphase={setSelectedTargetSubphase}
-                  handleTransferClient={handleTransferClient}
-                  getBasePartNumber={getBasePartNumber}
-                />
-              )}
-
-              {activeTab === "comparison" && (
-                <ItemComparison
-                  items={items}
-                  isDarkMode={isDarkMode}
-                  apiService={apiService}
-                  formatTime={formatTime}
-                  calculateItemProgress={calculateItemProgress}
-                />
-              )}
-
-              {activeTab === "reports" && (
-                <Reports
-                  items={items}
-                  isDarkMode={isDarkMode}
-                  calculateItemProgress={calculateItemProgress}
-                  calculatePhaseProgress={calculatePhaseProgress}
-                  getItemElapsedTime={getItemElapsedTime}
-                  formatTime={formatTime}
-                  formatActionDuration={formatActionDuration}
-                  getPhaseElapsedTime={getPhaseElapsedTime}
-                  apiService={apiService}
-                />
-              )}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Mobile/Tablet Bottom Navigation - Fixed at bottom */}
-      {!loading && (
-        <div
-          className={`lg:hidden fixed bottom-0 left-0 right-0 z-30 backdrop-blur-md border-t shadow-2xl transition-all duration-300 ${
-            isDarkMode
-              ? "bg-gray-900/95 border-gray-700/50"
-              : "bg-white/95 border-gray-300/50"
-          }`}
-        >
-          <div className="flex justify-around items-center px-2 py-2 max-w-7xl mx-auto">
-            {tabs.map((tab) => {
-              const icons = {
-                dashboard: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  </svg>
-                ),
-                "add-items": (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                ),
-                checklist: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                  </svg>
-                ),
-                comparison: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                ),
-                reports: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                )
-              };
-
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabChange(tab.id)}
-                  disabled={
-                    !initialLoadComplete &&
-                    (tab.id === "checklist" ||
-                      tab.id === "dashboard" ||
-                      tab.id === "reports")
-                  }
-                  className={`flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-all duration-200 min-w-16 ${
-                    activeTab === tab.id
+                    className={`flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-all duration-200 min-w-16 ${activeTab === tab.id
                       ? isDarkMode
                         ? "text-cyan-400 bg-gray-800/60"
                         : "text-blue-600 bg-blue-50/80"
                       : isDarkMode
-                      ? "text-gray-400 hover:text-gray-300 hover:bg-gray-800/40"
-                      : "text-gray-600 hover:text-gray-800 hover:bg-gray-100/60"
-                  } ${
-                    !initialLoadComplete &&
-                    (tab.id === "checklist" ||
-                      tab.id === "dashboard" ||
-                      tab.id === "reports")
-                      ? "opacity-50 cursor-not-allowed"
-                      : ""
-                  }`}
-                >
-                  <div className="relative">
-                    {icons[tab.id]}
-                    {!initialLoadComplete &&
-                      (tab.id === "checklist" ||
-                        tab.id === "dashboard" ||
-                        tab.id === "reports") && (
-                        <span className="absolute -top-1 -right-1 text-xs">⏳</span>
-                      )}
-                  </div>
-                  <span className="text-xs mt-1 font-medium">{tab.label}</span>
-                </button>
-              );
-            })}
+                        ? "text-gray-400 hover:text-gray-300 hover:bg-gray-800/40"
+                        : "text-gray-600 hover:text-gray-800 hover:bg-gray-100/60"
+                      } ${!initialLoadComplete &&
+                        (tab.id === "checklist" ||
+                          tab.id === "dashboard" ||
+                          tab.id === "reports")
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
+                      }`}
+                  >
+                    <div className="relative">
+                      {icons[tab.id]}
+                      {!initialLoadComplete &&
+                        (tab.id === "checklist" ||
+                          tab.id === "dashboard" ||
+                          tab.id === "reports") && (
+                          <span className="absolute -top-1 -right-1 text-xs">⏳</span>
+                        )}
+                    </div>
+                    <span className="text-xs mt-1 font-medium">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Add padding to bottom of content to prevent overlap with bottom nav on mobile/tablet */}
-      {!loading && <div className="lg:hidden h-20"></div>}
+        {/* Add padding to bottom of content to prevent overlap with bottom nav on mobile/tablet */}
+        {!loading && <div className="lg:hidden h-20"></div>}
 
-      {/* Scroll to Top Button - Responsive */}
-      {showScrollTop && (
-        <button
-          onClick={scrollToTop}
-          className="fixed bottom-20 sm:bottom-20 md:bottom-20 right-4 sm:right-6 md:right-8 z-40 w-12 h-12 sm:w-14 sm:h-14 bg-zinc-900 hover:bg-zinc-800 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-          aria-label="Scroll to top"
-        >
-          <ArrowUp className="w-5 h-5 sm:w-6 sm:h-6" />
-        </button>
-      )}
+        {/* Scroll to Top Button - Responsive */}
+        {showScrollTop && (
+          <button
+            onClick={scrollToTop}
+            className="fixed bottom-20 sm:bottom-20 md:bottom-20 right-4 sm:right-6 md:right-8 z-40 w-12 h-12 sm:w-14 sm:h-14 bg-zinc-900 hover:bg-zinc-800 text-white rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+            aria-label="Scroll to top"
+          >
+            <ArrowUp className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+        )}
 
-      {/* Keep all your existing modals exactly as they are */}
-      {showEditItemModal && selectedItemForEdit && (
-        <EditItemModal
-          item={selectedItemForEdit}
-          clients={clients}
-          isDarkMode={isDarkMode}
-          onClose={() => {
-            setShowEditItemModal(false);
-            setSelectedItemForEdit(null);
-          }}
-          onSave={handleEditItem}
-        />
-      )}
-
-      {showEditPhaseModal && selectedPhaseForEdit && (
-        <EditPhaseModal
-          phase={selectedPhaseForEdit}
-          isDarkMode={isDarkMode}
-          onClose={() => {
-            setShowEditPhaseModal(false);
-            setSelectedPhaseForEdit(null);
-          }}
-          onSave={handleEditPhase}
-          onDelete={handleDeletePhase}
-        />
-      )}
-
-      {showEditSubphaseModal &&
-        selectedSubphaseForEdit &&
-        selectedItemForEdit && (
-          <EditSubphaseModal
-            subphase={selectedSubphaseForEdit}
-            batchQty={selectedItemForEdit.qty}
+        {/* Keep all your existing modals exactly as they are */}
+        {showEditItemModal && selectedItemForEdit && (
+          <EditItemModal
+            item={selectedItemForEdit}
+            clients={clients}
             isDarkMode={isDarkMode}
             onClose={() => {
-              setShowEditSubphaseModal(false);
-              setSelectedSubphaseForEdit(null);
-              setSelectedPhaseForEdit(null);
+              setShowEditItemModal(false);
               setSelectedItemForEdit(null);
             }}
-            onSave={handleEditSubphase}
-            onDelete={handleDeleteSubphase}
+            onSave={handleEditItem}
           />
         )}
 
-      {showAddPhaseModal && selectedItemForEdit && (
-        <AddPhaseModal
-          item={selectedItemForEdit}
-          isDarkMode={isDarkMode}
-          onClose={() => {
-            setShowAddPhaseModal(false);
-            setSelectedItemForEdit(null);
-          }}
-          onSave={handleAddPhase}
-        />
-      )}
-
-      {showAddSubphaseModal && selectedPhaseForEdit && selectedItemForEdit && (
-        <AddSubphaseModal
-          item={selectedItemForEdit}
-          phase={selectedPhaseForEdit}
-          batchQty={selectedItemForEdit.qty}
-          isDarkMode={isDarkMode}
-          onClose={() => {
-            setShowAddSubphaseModal(false);
-            setSelectedPhaseForEdit(null);
-            setSelectedItemForEdit(null);
-          }}
-          onSave={handleAddSubphase}
-        />
-      )}
-
-      {showBulkEditModal && selectedItemsForBulk.length > 0 && (
-        <BulkEditModal
-          selectedItems={selectedItemsForBulk}
-          clients={clients}
-          isDarkMode={isDarkMode}
-          onClose={() => {
-            setShowBulkEditModal(false);
-            setSelectedItemsForBulk([]);
-          }}
-          onSave={handleBulkEdit}
-        />
-      )}
-
-{/* Barcode Scanner Modal - Mobile Optimized */}
-    {scanningFor && (
-      <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-        <div className={`rounded-t-2xl sm:rounded-lg w-full sm:max-w-md sm:w-full p-4 sm:p-6 ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
-          <h3 className={`text-lg sm:text-xl font-bold mb-4 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-            Scan Employee Barcode
-          </h3>
-          <input
-            type="text"
-            placeholder="Enter barcode or employee ID"
-            value={barcodeInput}
-            onChange={(e) => setBarcodeInput(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && submitBarcode()}
-            autoFocus
-            className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 mb-4 text-base ${
-              isDarkMode
-                ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
-            }`}
+        {showEditPhaseModal && selectedPhaseForEdit && (
+          <EditPhaseModal
+            phase={selectedPhaseForEdit}
+            isDarkMode={isDarkMode}
+            onClose={() => {
+              setShowEditPhaseModal(false);
+              setSelectedPhaseForEdit(null);
+            }}
+            onSave={handleEditPhase}
+            onDelete={handleDeletePhase}
           />
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={submitBarcode}
-              className="flex-1 bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
-            >
-              Submit
-            </button>
-            <button
-              onClick={() => {
-                setScanningFor(null)
-                setBarcodeInput("")
+        )}
+
+        {showEditSubphaseModal &&
+          selectedSubphaseForEdit &&
+          selectedItemForEdit && (
+            <EditSubphaseModal
+              subphase={selectedSubphaseForEdit}
+              batchQty={selectedItemForEdit.qty}
+              isDarkMode={isDarkMode}
+              apiService={apiService}
+              onClose={() => {
+                setShowEditSubphaseModal(false);
+                setSelectedSubphaseForEdit(null);
+                setSelectedPhaseForEdit(null);
+                setSelectedItemForEdit(null);
               }}
-              className="flex-1 bg-gray-500 hover:bg-gray-600 active:bg-gray-700 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
+              onSave={handleEditSubphase}
+              onDelete={handleDeleteSubphase}
+            />
+          )}
 
-{/* Transfer Modal - Mobile Optimized */}
-    {transferModalOpen && selectedItem && selectedSubphase && (
-      <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-        <div
-          className={`rounded-t-2xl sm:rounded-lg w-full sm:max-w-md sm:w-full max-h-[90vh] overflow-y-auto ${
-            isDarkMode ? "bg-gray-800" : "bg-white"
-          }`}
-        >
-          <div className="p-4 sm:p-6">
-            <h3
-              className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${
-                isDarkMode ? "text-gray-200" : "text-gray-800"
-              }`}
-            >
-              <ArrowRightLeft size={20} />
-              Transfer Subphase Quantity
-            </h3>
+        {showAddPhaseModal && selectedItemForEdit && (
+          <AddPhaseModal
+            item={selectedItemForEdit}
+            isDarkMode={isDarkMode}
+            apiService={apiService}
+            onClose={() => {
+              setShowAddPhaseModal(false);
+              setSelectedItemForEdit(null);
+            }}
+            onSave={handleAddPhase}
+          />
+        )}
 
-            <div className={`mb-4 p-3 rounded-lg space-y-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
-              <div>
-                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>From Item:</p>
-                <p className={`font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>{selectedItem.name}</p>
-                <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                  Client: {selectedItem.client_name}
-                </p>
-              </div>
-              <div>
-                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Phase / Subphase:</p>
-                <p className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                  {selectedPhase.name} → {selectedSubphase.name}
-                </p>
-              </div>
-              <div>
-                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Available to Transfer:</p>
-                <p className={`font-bold ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
-                  {selectedSubphase.current_completed_quantity || 0} units
-                </p>
+        {showAddSubphaseModal && selectedPhaseForEdit && selectedItemForEdit && (
+          <AddSubphaseModal
+            item={selectedItemForEdit}
+            phase={selectedPhaseForEdit}
+            batchQty={selectedItemForEdit.qty}
+            isDarkMode={isDarkMode}
+            onClose={() => {
+              setShowAddSubphaseModal(false);
+              setSelectedPhaseForEdit(null);
+              setSelectedItemForEdit(null);
+            }}
+            onSave={handleAddSubphase}
+          />
+        )}
+
+        {showBulkEditModal && selectedItemsForBulk.length > 0 && (
+          <BulkEditModal
+            selectedItems={selectedItemsForBulk}
+            clients={clients}
+            isDarkMode={isDarkMode}
+            onClose={() => {
+              setShowBulkEditModal(false);
+              setSelectedItemsForBulk([]);
+            }}
+            onSave={handleBulkEdit}
+          />
+        )}
+
+        {/* Barcode Scanner Modal - Mobile Optimized */}
+        {scanningFor && (
+          <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+            <div className={`rounded-t-2xl sm:rounded-lg w-full sm:max-w-md sm:w-full p-4 sm:p-6 ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
+              <h3 className={`text-lg sm:text-xl font-bold mb-4 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                Scan Employee Barcode
+              </h3>
+              <input
+                type="text"
+                placeholder="Enter barcode or employee ID"
+                value={barcodeInput}
+                onChange={(e) => setBarcodeInput(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && submitBarcode()}
+                autoFocus
+                className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 mb-4 text-base ${isDarkMode
+                  ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                  : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
+                  }`}
+              />
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={submitBarcode}
+                  className="flex-1 bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
+                >
+                  Submit
+                </button>
+                <button
+                  onClick={() => {
+                    setScanningFor(null)
+                    setBarcodeInput("")
+                  }}
+                  className="flex-1 bg-gray-500 hover:bg-gray-600 active:bg-gray-700 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
+          </div>
+        )}
 
-            <div className="space-y-4">
-              {/* Client Selection */}
-              <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Target Client *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter client name"
-                  value={newClient}
-                  onChange={(e) => {
-                    setNewClient(e.target.value)
-                    setSelectedTargetItem(null)
-                    setSelectedTargetPhase(null)
-                    setSelectedTargetSubphase(null)
-                  }}
-                  autoFocus
-                  className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
-                    isDarkMode
-                      ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                      : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
-                  }`}
-                />
-
-                {showClientDropdown && (
-                  <div
-                    className={`absolute z-10 w-full mt-1 border rounded-lg shadow-lg max-h-48 overflow-y-auto ${
-                      isDarkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"
+        {/* Transfer Modal - Mobile Optimized */}
+        {transferModalOpen && selectedItem && selectedSubphase && (
+          <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+            <div
+              className={`rounded-t-2xl sm:rounded-lg w-full sm:max-w-md sm:w-full max-h-[90vh] overflow-y-auto ${isDarkMode ? "bg-gray-800" : "bg-white"
+                }`}
+            >
+              <div className="p-4 sm:p-6">
+                <h3
+                  className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${isDarkMode ? "text-gray-200" : "text-gray-800"
                     }`}
-                  >
-                    {clients
-                      .filter(
-                        (c) => c !== selectedItem?.client_name && c.toLowerCase().includes(newClient.toLowerCase())
-                      )
-                      .map((client, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            setNewClient(client)
-                            setShowClientDropdown(false)
-                          }}
-                          className={`w-full text-left px-4 py-3 border-b transition-colors text-base ${
-                            isDarkMode
-                              ? "hover:bg-gray-600 active:bg-gray-500 border-gray-600 text-gray-200"
-                              : "hover:bg-gray-100 active:bg-gray-200 border-gray-200 text-gray-800"
-                          } last:border-b-0`}
-                        >
-                          {client}
-                        </button>
-                      ))}
-                  </div>
-                )}
-              </div>
+                >
+                  <ArrowRightLeft size={20} />
+                  Transfer Subphase Quantity
+                </h3>
 
-              {/* Target Item Selection */}
-              {newClient.trim() && (
-                <div className="space-y-3">
+                <div className={`mb-4 p-3 rounded-lg space-y-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
                   <div>
+                    <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>From Item:</p>
+                    <p className={`font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>{selectedItem.name}</p>
+                    <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                      Client: {selectedItem.client_name}
+                    </p>
+                  </div>
+                  <div>
+                    <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Phase / Subphase:</p>
+                    <p className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                      {selectedPhase.name} → {selectedSubphase.name}
+                    </p>
+                  </div>
+                  <div>
+                    <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Available to Transfer:</p>
+                    <p className={`font-bold ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
+                      {selectedSubphase.current_completed_quantity || 0} units
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Client Selection */}
+                  <div className="relative">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Target Item *
+                      Target Client *
                     </label>
-                    {clientItems.length > 0 ? (
-                      <select
-                        value={selectedTargetItem?.part_number || ""}
-                        onChange={(e) => {
-                          const item = clientItems.find((i) => i.part_number === e.target.value)
-                          setSelectedTargetItem(item || null)
-                          setSelectedTargetPhase(null)
-                          setSelectedTargetSubphase(null)
-                        }}
-                        className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
-                          isDarkMode
-                            ? "bg-gray-700 border-gray-600 text-gray-200"
-                            : "bg-gray-100 border-gray-300 text-gray-800"
+                    <input
+                      type="text"
+                      placeholder="Enter client name"
+                      value={newClient}
+                      onChange={(e) => {
+                        setNewClient(e.target.value)
+                        setSelectedTargetItem(null)
+                        setSelectedTargetPhase(null)
+                        setSelectedTargetSubphase(null)
+                      }}
+                      autoFocus
+                      className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${isDarkMode
+                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                        : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
                         }`}
+                    />
+
+                    {showClientDropdown && (
+                      <div
+                        className={`absolute z-10 w-full mt-1 border rounded-lg shadow-lg max-h-48 overflow-y-auto ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"
+                          }`}
                       >
-                        <option value="">Select target item</option>
-                        {clientItems.map((item) => (
-                          <option key={item.part_number} value={item.part_number}>
-                            {item.part_number} ({item.quantity || 0} qty)
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <p
-                        className={`text-sm p-3 rounded ${
-                          isDarkMode ? "text-yellow-400 bg-yellow-500/10" : "text-yellow-600 bg-yellow-500/10"
-                        }`}
-                      >
-                        No matching items found for part number "{getBasePartNumber(selectedItem?.part_number)}" under
-                        client "{newClient}"
-                      </p>
+                        {clients
+                          .filter(
+                            (c) => c !== selectedItem?.client_name && c.toLowerCase().includes(newClient.toLowerCase())
+                          )
+                          .map((client, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                setNewClient(client)
+                                setShowClientDropdown(false)
+                              }}
+                              className={`w-full text-left px-4 py-3 border-b transition-colors text-base ${isDarkMode
+                                ? "hover:bg-gray-600 active:bg-gray-500 border-gray-600 text-gray-200"
+                                : "hover:bg-gray-100 active:bg-gray-200 border-gray-200 text-gray-800"
+                                } last:border-b-0`}
+                            >
+                              {client}
+                            </button>
+                          ))}
+                      </div>
                     )}
                   </div>
 
-                  {/* Target Phase Selection */}
-                  {selectedTargetItem && selectedTargetItem.phases && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Target Phase *
-                      </label>
-                      <select
-                        value={selectedTargetPhase || ""}
-                        onChange={(e) => {
-                          setSelectedTargetPhase(e.target.value)
-                          setSelectedTargetSubphase(null)
-                        }}
-                        className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
-                          isDarkMode
-                            ? "bg-gray-700 border-gray-600 text-gray-200"
-                            : "bg-gray-100 border-gray-300 text-gray-800"
-                        }`}
-                      >
-                        <option value="">Select target phase</option>
-                        {selectedTargetItem.phases.map((phase) => (
-                          <option key={phase.id} value={phase.id}>
-                            {phase.name} ({phase.subphases?.length || 0} subphases)
-                          </option>
-                        ))}
-                      </select>
+                  {/* Target Item Selection */}
+                  {newClient.trim() && (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Target Item *
+                        </label>
+                        {clientItems.length > 0 ? (
+                          <select
+                            value={selectedTargetItem?.part_number || ""}
+                            onChange={(e) => {
+                              const item = clientItems.find((i) => i.part_number === e.target.value)
+                              setSelectedTargetItem(item || null)
+                              setSelectedTargetPhase(null)
+                              setSelectedTargetSubphase(null)
+                            }}
+                            className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${isDarkMode
+                              ? "bg-gray-700 border-gray-600 text-gray-200"
+                              : "bg-gray-100 border-gray-300 text-gray-800"
+                              }`}
+                          >
+                            <option value="">Select target item</option>
+                            {clientItems.map((item) => (
+                              <option key={item.part_number} value={item.part_number}>
+                                {item.part_number} ({item.quantity || 0} qty)
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <p
+                            className={`text-sm p-3 rounded ${isDarkMode ? "text-yellow-400 bg-yellow-500/10" : "text-yellow-600 bg-yellow-500/10"
+                              }`}
+                          >
+                            No matching items found for part number "{getBasePartNumber(selectedItem?.part_number)}" under
+                            client "{newClient}"
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Target Phase Selection */}
+                      {selectedTargetItem && selectedTargetItem.phases && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Target Phase *
+                          </label>
+                          <select
+                            value={selectedTargetPhase || ""}
+                            onChange={(e) => {
+                              setSelectedTargetPhase(e.target.value)
+                              setSelectedTargetSubphase(null)
+                            }}
+                            className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${isDarkMode
+                              ? "bg-gray-700 border-gray-600 text-gray-200"
+                              : "bg-gray-100 border-gray-300 text-gray-800"
+                              }`}
+                          >
+                            <option value="">Select target phase</option>
+                            {selectedTargetItem.phases.map((phase) => (
+                              <option key={phase.id} value={phase.id}>
+                                {phase.name} ({phase.subphases?.length || 0} subphases)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Target Subphase Selection */}
+                      {selectedTargetItem && selectedTargetPhase && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Target Subphase *
+                          </label>
+                          <select
+                            value={selectedTargetSubphase || ""}
+                            onChange={(e) => {
+                              setSelectedTargetSubphase(e.target.value)
+                            }}
+                            className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${isDarkMode
+                              ? "bg-gray-700 border-gray-600 text-gray-200"
+                              : "bg-gray-100 border-gray-300 text-gray-800"
+                              }`}
+                          >
+                            <option value="">Select target subphase</option>
+                            {selectedTargetItem.phases
+                              .find((p) => p.id === Number.parseInt(selectedTargetPhase))
+                              ?.subphases?.map((subphase) => (
+                                <option key={subphase.id} value={subphase.id}>
+                                  {subphase.name} (Current: {subphase.current_completed_quantity || 0} / Expected:{" "}
+                                  {subphase.expected_quantity})
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Show selected target info */}
+                      {selectedTargetItem && selectedTargetPhase && selectedTargetSubphase && (
+                        <div
+                          className={`p-3 rounded-lg border ${isDarkMode ? "bg-green-500/10 border-green-500/30" : "bg-green-500/10 border-green-500/30"
+                            }`}
+                        >
+                          <p className={`text-sm font-medium ${isDarkMode ? "text-green-300" : "text-green-700"}`}>
+                            ✓ Transfer destination selected
+                          </p>
+                          <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"} mt-1`}>
+                            {selectedTargetItem.phases.find((p) => p.id === Number.parseInt(selectedTargetPhase))?.name} →{" "}
+                            {
+                              selectedTargetItem.phases
+                                .find((p) => p.id === Number.parseInt(selectedTargetPhase))
+                                ?.subphases?.find((s) => s.id === Number.parseInt(selectedTargetSubphase))?.name
+                            }
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {/* Target Subphase Selection */}
-                  {selectedTargetItem && selectedTargetPhase && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Target Subphase *
-                      </label>
-                      <select
-                        value={selectedTargetSubphase || ""}
-                        onChange={(e) => {
-                          setSelectedTargetSubphase(e.target.value)
-                        }}
-                        className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
-                          isDarkMode
-                            ? "bg-gray-700 border-gray-600 text-gray-200"
-                            : "bg-gray-100 border-gray-300 text-gray-800"
+                  {/* Transfer Quantity */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                      <Package size={16} />
+                      Quantity to Transfer *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={selectedSubphase.current_completed_quantity || 0}
+                      value={transferQuantity}
+                      onChange={(e) => setTransferQuantity(e.target.value)}
+                      className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${isDarkMode
+                        ? "bg-gray-700 border-gray-600 text-gray-200"
+                        : "bg-gray-100 border-gray-300 text-gray-800"
                         }`}
-                      >
-                        <option value="">Select target subphase</option>
-                        {selectedTargetItem.phases
-                          .find((p) => p.id === Number.parseInt(selectedTargetPhase))
-                          ?.subphases?.map((subphase) => (
-                            <option key={subphase.id} value={subphase.id}>
-                              {subphase.name} (Current: {subphase.current_completed_quantity || 0} / Expected:{" "}
-                              {subphase.expected_quantity})
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  )}
+                    />
+                  </div>
 
-                  {/* Show selected target info */}
-                  {selectedTargetItem && selectedTargetPhase && selectedTargetSubphase && (
-                    <div
-                      className={`p-3 rounded-lg border ${
-                        isDarkMode ? "bg-green-500/10 border-green-500/30" : "bg-green-500/10 border-green-500/30"
-                      }`}
-                    >
-                      <p className={`text-sm font-medium ${isDarkMode ? "text-green-300" : "text-green-700"}`}>
-                        ✓ Transfer destination selected
-                      </p>
-                      <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"} mt-1`}>
-                        {selectedTargetItem.phases.find((p) => p.id === Number.parseInt(selectedTargetPhase))?.name} →{" "}
-                        {
-                          selectedTargetItem.phases
-                            .find((p) => p.id === Number.parseInt(selectedTargetPhase))
-                            ?.subphases?.find((s) => s.id === Number.parseInt(selectedTargetSubphase))?.name
-                        }
-                      </p>
-                    </div>
-                  )}
+                  {/* Transfer Remarks */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                      <FileText size={16} />
+                      Transfer Remarks
+                    </label>
+                    <textarea
+                      placeholder="Enter reason for transfer..."
+                      value={transferRemarks}
+                      onChange={(e) => setTransferRemarks(e.target.value)}
+                      rows={3}
+                      className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 resize-none text-base ${isDarkMode
+                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                        : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
+                        }`}
+                    />
+                  </div>
                 </div>
-              )}
 
-              {/* Transfer Quantity */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <Package size={16} />
-                  Quantity to Transfer *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max={selectedSubphase.current_completed_quantity || 0}
-                  value={transferQuantity}
-                  onChange={(e) => setTransferQuantity(e.target.value)}
-                  className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
-                    isDarkMode
-                      ? "bg-gray-700 border-gray-600 text-gray-200"
-                      : "bg-gray-100 border-gray-300 text-gray-800"
-                  }`}
-                />
+                <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                  <button
+                    onClick={handleTransferClient}
+                    disabled={!selectedTargetItem || !selectedTargetPhase || !selectedTargetSubphase || !transferQuantity}
+                    className="flex-1 bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed text-base"
+                  >
+                    Transfer
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTransferModalOpen(false)
+                      setSelectedItem(null)
+                      setSelectedPhase(null)
+                      setSelectedSubphase(null)
+                      setNewClient("")
+                      setTransferQuantity("")
+                      setTransferRemarks("")
+                      setSelectedTargetItem(null)
+                      setSelectedTargetPhase(null)
+                      setSelectedTargetSubphase(null)
+                      setShowClientDropdown(false)
+                    }}
+                    className="flex-1 bg-gray-500 hover:bg-gray-600 active:bg-gray-700 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-
-              {/* Transfer Remarks */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FileText size={16} />
-                  Transfer Remarks
-                </label>
-                <textarea
-                  placeholder="Enter reason for transfer..."
-                  value={transferRemarks}
-                  onChange={(e) => setTransferRemarks(e.target.value)}
-                  rows={3}
-                  className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 resize-none text-base ${
-                    isDarkMode
-                      ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                      : "bg-gray-100 border-gray-300 text-gray-800 placeholder-gray-500"
-                  }`}
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 mt-6">
-              <button
-                onClick={handleTransferClient}
-                disabled={!selectedTargetItem || !selectedTargetPhase || !selectedTargetSubphase || !transferQuantity}
-                className="flex-1 bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed text-base"
-              >
-                Transfer
-              </button>
-              <button
-                onClick={() => {
-                  setTransferModalOpen(false)
-                  setSelectedItem(null)
-                  setSelectedPhase(null)
-                  setSelectedSubphase(null)
-                  setNewClient("")
-                  setTransferQuantity("")
-                  setTransferRemarks("")
-                  setSelectedTargetItem(null)
-                  setSelectedTargetPhase(null)
-                  setSelectedTargetSubphase(null)
-                  setShowClientDropdown(false)
-                }}
-                className="flex-1 bg-gray-500 hover:bg-gray-600 active:bg-gray-700 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
-              >
-                Cancel
-              </button>
             </div>
           </div>
-        </div>
+        )}
+
       </div>
-    )}
-      
     </div>
-  </div>
-);
+  );
 }
 
 export default OperationsDepartment;

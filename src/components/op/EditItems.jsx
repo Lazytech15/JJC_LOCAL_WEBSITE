@@ -10,8 +10,6 @@ import {
   Package,
   Clock,
   AlertTriangle,
-  ChevronDown,
-  ChevronUp
 } from "lucide-react"
 
 // ============================================================================
@@ -24,7 +22,9 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
     client_name: item?.client_name || "",
     priority: item?.priority || "Medium",
     qty: item?.qty || 1,
-    remarks: item?.remarks || ""
+    remarks: item?.remarks || "",
+    material_raw: "",
+    material_quantity: ""
   })
   const [showClientDropdown, setShowClientDropdown] = useState(false)
   const [filteredClients, setFilteredClients] = useState([])
@@ -87,8 +87,8 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${isDarkMode
-                ? "hover:bg-gray-700 text-gray-300"
-                : "hover:bg-gray-100 text-gray-600"
+              ? "hover:bg-gray-700 text-gray-300"
+              : "hover:bg-gray-100 text-gray-600"
               }`}
           >
             <X size={20} />
@@ -108,8 +108,8 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100"
-                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                ? "bg-gray-700 border border-gray-600 text-gray-100"
+                : "bg-gray-100 border border-gray-300 text-gray-800"
                 }`}
             />
           </div>
@@ -125,8 +125,8 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={3}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100"
-                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                ? "bg-gray-700 border border-gray-600 text-gray-100"
+                : "bg-gray-100 border border-gray-300 text-gray-800"
                 }`}
             />
           </div>
@@ -144,8 +144,8 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
               onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
               onFocus={() => setShowClientDropdown(clients.length > 0)}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100"
-                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                ? "bg-gray-700 border border-gray-600 text-gray-100"
+                : "bg-gray-100 border border-gray-300 text-gray-800"
                 }`}
             />
             {showClientDropdown && filteredClients.length > 0 && (
@@ -160,8 +160,8 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
                       setShowClientDropdown(false)
                     }}
                     className={`w-full text-left px-4 py-2 border-b last:border-b-0 transition-colors ${isDarkMode
-                        ? "hover:bg-gray-600 border-gray-600 text-gray-100"
-                        : "hover:bg-gray-50 border-gray-200 text-gray-800"
+                      ? "hover:bg-gray-600 border-gray-600 text-gray-100"
+                      : "hover:bg-gray-50 border-gray-200 text-gray-800"
                       }`}
                   >
                     {client}
@@ -185,10 +185,10 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
                   type="button"
                   onClick={() => setFormData({ ...formData, priority: p })}
                   className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors ${formData.priority === p
-                      ? getPriorityColor(p)
-                      : isDarkMode
-                        ? "bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600"
-                        : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
+                    ? getPriorityColor(p)
+                    : isDarkMode
+                      ? "bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600"
+                      : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
                     }`}
                 >
                   {p}
@@ -210,8 +210,8 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
               value={formData.qty}
               onChange={(e) => setFormData({ ...formData, qty: e.target.value })}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100"
-                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                ? "bg-gray-700 border border-gray-600 text-gray-100"
+                : "bg-gray-100 border border-gray-300 text-gray-800"
                 }`}
             />
           </div>
@@ -227,8 +227,8 @@ function EditItemModal({ item, onClose, onSave, isDarkMode, clients = [] }) {
               onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
               rows={4}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100"
-                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                ? "bg-gray-700 border border-gray-600 text-gray-100"
+                : "bg-gray-100 border border-gray-300 text-gray-800"
                 }`}
             />
           </div>
@@ -295,8 +295,8 @@ function EditPhaseModal({ phase, onClose, onSave, onDelete, isDarkMode }) {
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${isDarkMode
-                ? "hover:bg-gray-700 text-gray-300"
-                : "hover:bg-gray-100 text-gray-600"
+              ? "hover:bg-gray-700 text-gray-300"
+              : "hover:bg-gray-100 text-gray-600"
               }`}
           >
             <X size={20} />
@@ -315,8 +315,8 @@ function EditPhaseModal({ phase, onClose, onSave, onDelete, isDarkMode }) {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100"
-                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                ? "bg-gray-700 border border-gray-600 text-gray-100"
+                : "bg-gray-100 border border-gray-300 text-gray-800"
                 }`}
             />
           </div>
@@ -332,8 +332,8 @@ function EditPhaseModal({ phase, onClose, onSave, onDelete, isDarkMode }) {
               value={formData.phase_order}
               onChange={(e) => setFormData({ ...formData, phase_order: e.target.value })}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100"
-                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                ? "bg-gray-700 border border-gray-600 text-gray-100"
+                : "bg-gray-100 border border-gray-300 text-gray-800"
                 }`}
             />
           </div>
@@ -372,13 +372,62 @@ function EditPhaseModal({ phase, onClose, onSave, onDelete, isDarkMode }) {
 // ============================================================================
 // EDIT SUBPHASE MODAL
 // ============================================================================
-function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, batchQty = 1 }) {
+function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, batchQty = 1, apiService }) {
   const [formData, setFormData] = useState({
     name: subphase?.name || "",
     expected_duration: subphase?.expected_duration || 0,
     expected_quantity: subphase?.expected_quantity || 0,
     subphase_order: subphase?.subphase_order || 0
   })
+
+  const [materialsRawList, setMaterialsRawList] = useState([])
+  const [loadingMaterials, setLoadingMaterials] = useState(false)
+
+  // Add useEffect to load materials on mount
+  useEffect(() => {
+    loadMaterialsRaw()
+  }, [])
+
+  // Add function to fetch materials from inventory
+  const loadMaterialsRaw = async () => {
+    try {
+      setLoadingMaterials(true)
+
+      // ✅ Fetch items with item_type = "OPERATION PARTICULARS" from inventory
+      const response = await apiService.items.getItems({
+        item_type: "OPERATION PARTICULARS",
+        limit: 500, // Get all materials
+        sort_by: "item_name",
+        sort_order: "ASC"
+      })
+
+      if (response && response.success && response.data) {
+        // Map inventory items to dropdown options
+        const materials = response.data.map(item => ({
+          value: item.item_name,           // Use item_name as value
+          label: item.item_name,           // Display name
+          item_no: item.item_no,           // For checkout reference
+          unit: item.unit_of_measure || 'pcs',
+          balance: parseFloat(item.balance) || 0,
+          supplier: item.supplier || '',
+          brand: item.brand || '',
+          location: item.location || ''
+        }))
+
+        setMaterialsRawList(materials)
+        console.log(`✅ Loaded ${materials.length} operation materials from inventory`)
+      } else {
+        console.warn("⚠️ No materials found or invalid response")
+        setMaterialsRawList([])
+      }
+    } catch (error) {
+      console.error("❌ Failed to load materials:", error)
+      alert("Failed to load materials list from inventory: " + error.message)
+      setMaterialsRawList([])
+    } finally {
+      setLoadingMaterials(false)
+    }
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -417,8 +466,8 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${isDarkMode
-                ? "hover:bg-gray-700 text-gray-300"
-                : "hover:bg-gray-100 text-gray-600"
+              ? "hover:bg-gray-700 text-gray-300"
+              : "hover:bg-gray-100 text-gray-600"
               }`}
           >
             <X size={20} />
@@ -437,8 +486,8 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100"
-                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                ? "bg-gray-700 border border-gray-600 text-gray-100"
+                : "bg-gray-100 border border-gray-300 text-gray-800"
                 }`}
             />
           </div>
@@ -456,8 +505,8 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
               value={formData.expected_duration}
               onChange={(e) => setFormData({ ...formData, expected_duration: e.target.value })}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100"
-                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                ? "bg-gray-700 border border-gray-600 text-gray-100"
+                : "bg-gray-100 border border-gray-300 text-gray-800"
                 }`}
             />
           </div>
@@ -475,8 +524,8 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
               value={formData.expected_quantity}
               onChange={(e) => setFormData({ ...formData, expected_quantity: e.target.value })}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100"
-                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                ? "bg-gray-700 border border-gray-600 text-gray-100"
+                : "bg-gray-100 border border-gray-300 text-gray-800"
                 }`}
             />
             <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
@@ -495,10 +544,101 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
               value={formData.subphase_order}
               onChange={(e) => setFormData({ ...formData, subphase_order: e.target.value })}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100"
-                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                ? "bg-gray-700 border border-gray-600 text-gray-100"
+                : "bg-gray-100 border border-gray-300 text-gray-800"
                 }`}
             />
+          </div>
+
+          {/* Material Raw - Load from Inventory */}
+          <div>
+            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
+              <Package size={16} />
+              Material Raw (Optional)
+            </label>
+            <select
+              value={formData.material_raw}
+              onChange={(e) => {
+                const selectedMaterial = materialsRawList.find(m => m.value === e.target.value)
+                setFormData({
+                  ...formData,
+                  material_raw: e.target.value,
+                  // Optionally pre-fill unit info
+                  _material_unit: selectedMaterial?.unit || ''
+                })
+              }}
+              disabled={loadingMaterials}
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${isDarkMode
+                ? "bg-gray-700 border border-gray-600 text-gray-100"
+                : "bg-gray-100 border border-gray-300 text-gray-800"
+                }`}
+            >
+              <option value="">
+                {loadingMaterials ? "Loading materials..." : "Select material..."}
+              </option>
+
+              {materialsRawList.length > 0 ? (
+                materialsRawList.map((material) => (
+                  <option key={material.item_no} value={material.value}>
+                    {material.label} ({material.unit}) - Stock: {material.balance}
+                  </option>
+                ))
+              ) : !loadingMaterials && (
+                <option value="" disabled>No materials found in inventory</option>
+              )}
+            </select>
+
+            {/* Show material details if selected */}
+            {formData.material_raw && (
+              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                {(() => {
+                  const material = materialsRawList.find(m => m.value === formData.material_raw)
+                  if (material) {
+                    return `Available: ${material.balance} ${material.unit}${material.supplier ? ` • Supplier: ${material.supplier}` : ''}`
+                  }
+                  return null
+                })()}
+              </p>
+            )}
+          </div>
+
+          {/* Material Quantity */}
+          <div>
+            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
+              <Package size={16} />
+              Material Quantity
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.material_quantity || ''}
+              onChange={(e) => setFormData({ ...formData, material_quantity: e.target.value })}
+              placeholder="Enter quantity needed"
+              disabled={!formData.material_raw}
+              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${isDarkMode
+                ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-500"
+                : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
+                }`}
+            />
+            {!formData.material_raw && (
+              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                Select a material first
+              </p>
+            )}
+            {formData.material_raw && formData.material_quantity && (
+              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                {(() => {
+                  const material = materialsRawList.find(m => m.value === formData.material_raw)
+                  if (material) {
+                    return `Requesting: ${formData.material_quantity} ${material.unit}`
+                  }
+                  return null
+                })()}
+              </p>
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -565,8 +705,8 @@ function AddPhaseModal({ item, onClose, onSave, isDarkMode }) {
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${isDarkMode
-                ? "hover:bg-gray-700 text-gray-300"
-                : "hover:bg-gray-100 text-gray-600"
+              ? "hover:bg-gray-700 text-gray-300"
+              : "hover:bg-gray-100 text-gray-600"
               }`}
           >
             <X size={20} />
@@ -594,8 +734,8 @@ function AddPhaseModal({ item, onClose, onSave, isDarkMode }) {
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               autoFocus
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
-                  : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
+                ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
+                : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
                 }`}
             />
           </div>
@@ -611,8 +751,8 @@ function AddPhaseModal({ item, onClose, onSave, isDarkMode }) {
               value={formData.phase_order}
               onChange={(e) => setFormData({ ...formData, phase_order: e.target.value })}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100"
-                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                ? "bg-gray-700 border border-gray-600 text-gray-100"
+                : "bg-gray-100 border border-gray-300 text-gray-800"
                 }`}
             />
           </div>
@@ -682,8 +822,8 @@ function AddSubphaseModal({ item, phase, onClose, onSave, isDarkMode, batchQty =
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${isDarkMode
-                ? "hover:bg-gray-700 text-gray-300"
-                : "hover:bg-gray-100 text-gray-600"
+              ? "hover:bg-gray-700 text-gray-300"
+              : "hover:bg-gray-100 text-gray-600"
               }`}
           >
             <X size={20} />
@@ -714,8 +854,8 @@ function AddSubphaseModal({ item, phase, onClose, onSave, isDarkMode, batchQty =
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               autoFocus
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
-                  : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
+                ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
+                : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
                 }`}
             />
           </div>
@@ -734,8 +874,8 @@ function AddSubphaseModal({ item, phase, onClose, onSave, isDarkMode, batchQty =
               value={formData.expected_duration}
               onChange={(e) => setFormData({ ...formData, expected_duration: e.target.value })}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
-                  : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
+                ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
+                : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
                 }`}
             />
           </div>
@@ -754,8 +894,8 @@ function AddSubphaseModal({ item, phase, onClose, onSave, isDarkMode, batchQty =
               value={formData.expected_quantity}
               onChange={(e) => setFormData({ ...formData, expected_quantity: e.target.value })}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
-                  : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
+                ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
+                : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
                 }`}
             />
             <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
@@ -774,8 +914,8 @@ function AddSubphaseModal({ item, phase, onClose, onSave, isDarkMode, batchQty =
               value={formData.subphase_order}
               onChange={(e) => setFormData({ ...formData, subphase_order: e.target.value })}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100"
-                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                ? "bg-gray-700 border border-gray-600 text-gray-100"
+                : "bg-gray-100 border border-gray-300 text-gray-800"
                 }`}
             />
           </div>
@@ -883,8 +1023,8 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${isDarkMode
-                ? "hover:bg-gray-700 text-gray-300"
-                : "hover:bg-gray-100 text-gray-600"
+              ? "hover:bg-gray-700 text-gray-300"
+              : "hover:bg-gray-100 text-gray-600"
               }`}
           >
             <X size={20} />
@@ -945,8 +1085,8 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
               disabled={!formData.updateClient}
               placeholder="Enter new client name"
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
-                  : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
+                ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
+                : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
                 }`}
             />
             {showClientDropdown && filteredClients.length > 0 && formData.updateClient && (
@@ -961,8 +1101,8 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
                       setShowClientDropdown(false)
                     }}
                     className={`w-full text-left px-4 py-2 border-b last:border-b-0 transition-colors ${isDarkMode
-                        ? "hover:bg-gray-600 border-gray-600 text-gray-100"
-                        : "hover:bg-gray-50 border-gray-200 text-gray-800"
+                      ? "hover:bg-gray-600 border-gray-600 text-gray-100"
+                      : "hover:bg-gray-50 border-gray-200 text-gray-800"
                       }`}
                   >
                     {client}
@@ -995,10 +1135,10 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
                   onClick={() => setFormData({ ...formData, priority: p })}
                   disabled={!formData.updatePriority}
                   className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors disabled:opacity-50 ${formData.priority === p && formData.updatePriority
-                      ? getPriorityColor(p)
-                      : isDarkMode
-                        ? "bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600"
-                        : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
+                    ? getPriorityColor(p)
+                    : isDarkMode
+                      ? "bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600"
+                      : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
                     }`}
                 >
                   {p}
@@ -1028,8 +1168,8 @@ function BulkEditModal({ selectedItems, onClose, onSave, isDarkMode, clients = [
               placeholder="Enter remarks to append to all selected items"
               rows={3}
               className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50 ${isDarkMode
-                  ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
-                  : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
+                ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400"
+                : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
                 }`}
             />
             <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
@@ -1155,8 +1295,8 @@ export default function EditItemComponents() {
 
   return (
     <div className={`min-h-screen p-8 transition-colors duration-300 ${isDarkMode
-        ? "bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950"
-        : "bg-gradient-to-br from-gray-50 via-slate-50 to-stone-50"
+      ? "bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950"
+      : "bg-gradient-to-br from-gray-50 via-slate-50 to-stone-50"
       }`}>
       <div className="max-w-4xl mx-auto">
         {/* Header */}
@@ -1174,8 +1314,8 @@ export default function EditItemComponents() {
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
               className={`p-3 rounded-lg transition-all ${isDarkMode
-                  ? "bg-gray-700 hover:bg-gray-600 text-yellow-400"
-                  : "bg-white/50 hover:bg-white/70 text-gray-700"
+                ? "bg-gray-700 hover:bg-gray-600 text-yellow-400"
+                : "bg-white/50 hover:bg-white/70 text-gray-700"
                 }`}
             >
               {isDarkMode ? "☀️" : "🌙"}
