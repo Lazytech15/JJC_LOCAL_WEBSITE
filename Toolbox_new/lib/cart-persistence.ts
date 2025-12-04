@@ -198,9 +198,41 @@ export function loadCartMetadata(): CartMetadata | null {
 }
 
 /**
+ * Check if a product is available for adding to cart
+ */
+export function isProductAvailable(product: Product | null | undefined, requestedQty: number = 1): { available: boolean; reason?: string; maxAvailable?: number } {
+  if (!product) return { available: false, reason: 'Product not found' }
+  
+  // Check status - any status containing "out" is unavailable
+  const status = (product.status || '').toString().toLowerCase()
+  if (status.includes('out')) {
+    return { available: false, reason: 'Item is out of stock', maxAvailable: 0 }
+  }
+  
+  // Check balance
+  if (typeof product.balance === 'number') {
+    if (product.balance <= 0) {
+      return { available: false, reason: 'Item has no available balance', maxAvailable: 0 }
+    }
+    if (requestedQty > product.balance) {
+      return { available: false, reason: `Only ${product.balance} available`, maxAvailable: product.balance }
+    }
+  }
+  
+  return { available: true }
+}
+
+/**
  * Add item to persistent cart
  */
-export function addToCart(product: Product, quantity: number = 1, notes?: string): boolean {
+export function addToCart(product: Product, quantity: number = 1, notes?: string): { success: boolean; error?: string } {
+  // Validate product availability first
+  const availabilityCheck = isProductAvailable(product, quantity)
+  if (!availabilityCheck.available) {
+    console.warn(`[cart-persistence] Cannot add ${product?.name}: ${availabilityCheck.reason}`)
+    return { success: false, error: availabilityCheck.reason }
+  }
+  
   const currentState = loadCartState() || {
     items: [],
     totalItems: 0,
@@ -213,10 +245,23 @@ export function addToCart(product: Product, quantity: number = 1, notes?: string
   const existingItemIndex = currentState.items.findIndex(item => item.id === product.id)
   
   if (existingItemIndex >= 0) {
-    // Update existing item
+    // Update existing item - but check if new total would exceed balance
     const existingItem = currentState.items[existingItemIndex]
     if (existingItem) {
-      existingItem.quantity += quantity
+      const newQuantity = existingItem.quantity + quantity
+      // Check if new total exceeds available balance
+      if (typeof product.balance === 'number' && newQuantity > product.balance) {
+        const canAdd = Math.max(0, product.balance - existingItem.quantity)
+        if (canAdd <= 0) {
+          return { success: false, error: `Cannot add more - already have maximum (${product.balance}) in cart` }
+        }
+        // Add only what's available
+        existingItem.quantity += canAdd
+        existingItem.notes = notes !== undefined ? notes : existingItem.notes
+        saveCartState(currentState)
+        return { success: true, error: `Only ${canAdd} added (reached max balance of ${product.balance})` }
+      }
+      existingItem.quantity = newQuantity
       existingItem.notes = notes !== undefined ? notes : existingItem.notes
     }
   } else {
@@ -231,7 +276,8 @@ export function addToCart(product: Product, quantity: number = 1, notes?: string
     currentState.items.push(cartItem)
   }
 
-  return saveCartState(currentState)
+  const saved = saveCartState(currentState)
+  return { success: saved, error: saved ? undefined : 'Failed to save cart' }
 }
 
 /**

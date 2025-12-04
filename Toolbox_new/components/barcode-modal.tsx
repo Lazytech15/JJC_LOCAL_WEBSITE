@@ -29,14 +29,18 @@ export default function BarcodeModal({ open, initialValue = '', products = [], o
   // Multi-line items state when products prop supplied
   const [lineItems, setLineItems] = useState<BulkLineItem[]>([])
 
-  // Helper: determine if a product is available for adding
-  const isAvailable = (p?: Product | null, qty = 1) => {
+  // Helper: determine if a product is available for adding (considers current cart quantity)
+  const isAvailable = (p?: Product | null, additionalQty = 1) => {
     if (!p) return false
     const status = (p.status || '').toString().toLowerCase()
     if (status.includes('out')) return false
     if (typeof p.balance === 'number') {
       if (p.balance <= 0) return false
-      if (qty && p.balance < qty) return false
+      // Check how many are already in lineItems for this product
+      const existingInQueue = lineItems.find(li => String(li.product.id) === String(p.id))
+      const currentQtyInQueue = existingInQueue ? existingInQueue.quantity : 0
+      const totalRequested = currentQtyInQueue + additionalQty
+      if (totalRequested > p.balance) return false
     }
     return true
   }
@@ -127,8 +131,15 @@ export default function BarcodeModal({ open, initialValue = '', products = [], o
   }
 
   const handleConfirmBulk = () => {
-    // filter out zero quantities
-    const items = lineItems.filter(li => li.quantity > 0)
+    // filter out zero quantities and out-of-stock items
+    const items = lineItems.filter(li => {
+      if (li.quantity <= 0) return false
+      // Also filter out-of-stock or zero-balance items
+      const status = (li.product.status || '').toString().toLowerCase()
+      if (status.includes('out')) return false
+      if (typeof li.product.balance === 'number' && li.product.balance <= 0) return false
+      return true
+    })
     if (items.length === 0) {
       // nothing to add
       onClose()
@@ -147,7 +158,10 @@ export default function BarcodeModal({ open, initialValue = '', products = [], o
       const next = [...prev]
       const existing = next[index]
       if (!existing) return prev
-      next[index] = { product: existing.product, quantity: qty }
+      // Clamp quantity to available balance
+      const maxQty = typeof existing.product.balance === 'number' ? existing.product.balance : Infinity
+      const clampedQty = Math.max(0, Math.min(qty, maxQty))
+      next[index] = { product: existing.product, quantity: clampedQty }
       return next
     })
   }
@@ -200,20 +214,39 @@ export default function BarcodeModal({ open, initialValue = '', products = [], o
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">Select quantities for the items to add to cart</p>
               <div className="grid gap-3">
-                {lineItems.map((li, idx) => (
-                  <div key={`${li.product.id}-${idx}`} className="flex items-center space-x-3 p-3 border rounded-md">
-                    <ItemImage item={li.product} />
-                    <div className="flex-1">
-                      <div className="font-medium">{li.product.name}</div>
-                      <div className="text-xs text-muted-foreground">{li.product.brand} • {li.product.itemType}</div>
-                      <div className="text-xs text-muted-foreground">ID: {li.product.id} • Status: {li.product.status}</div>
+                {lineItems.map((li, idx) => {
+                  const maxQty = typeof li.product.balance === 'number' ? li.product.balance : 9999
+                  const isOutOfStock = li.product.status === 'out-of-stock' || maxQty <= 0
+                  
+                  return (
+                    <div key={`${li.product.id}-${idx}`} className={`flex items-center space-x-3 p-3 border rounded-md ${isOutOfStock ? 'border-red-500/50 bg-red-950/20' : ''}`}>
+                      <ItemImage item={li.product} />
+                      <div className="flex-1">
+                        <div className="font-medium">{li.product.name}</div>
+                        <div className="text-xs text-muted-foreground">{li.product.brand} • {li.product.itemType}</div>
+                        <div className="text-xs text-muted-foreground">
+                          ID: {li.product.id} • Status: {li.product.status}
+                          {isOutOfStock && <span className="text-red-400 ml-2 font-semibold">⚠️ OUT OF STOCK</span>}
+                        </div>
+                      </div>
+                      <div className="w-36">
+                        <label className="text-xs flex justify-between">
+                          <span>Quantity</span>
+                          <span className="text-muted-foreground">Max: {maxQty}</span>
+                        </label>
+                        <Input 
+                          type="number" 
+                          min={0} 
+                          max={maxQty}
+                          value={li.quantity} 
+                          onChange={(e: any) => updateLineQuantity(idx, Number(e.target.value || 0))}
+                          disabled={isOutOfStock}
+                          className={isOutOfStock ? 'opacity-50' : ''}
+                        />
+                      </div>
                     </div>
-                    <div className="w-32">
-                      <label className="text-xs">Quantity</label>
-                      <Input type="number" min={0} value={li.quantity} onChange={(e: any) => updateLineQuantity(idx, Number(e.target.value || 0))} />
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           ) : (
