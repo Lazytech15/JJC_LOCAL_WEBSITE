@@ -136,12 +136,13 @@ function EditEmployeeWizard({
       }
 
       if (selectedDocumentFiles.length > 0) {
-        const documentResults = await apiService.document.uploadMultipleDocuments(
+        const documentResult = await apiService.document.uploadDocuments(
           editingEmployee.id,
-          selectedDocumentFiles,
-          { category: "general", uploadedBy: "HR Admin" }
+          selectedDocumentFiles
         );
-        uploadResults.newDocuments = documentResults.filter((r) => r.success);
+        if (documentResult.success) {
+          uploadResults.newDocuments = documentResult.data?.documents || [];
+        }
       }
 
       return uploadResults;

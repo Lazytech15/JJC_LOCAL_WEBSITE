@@ -242,14 +242,37 @@ export class DocumentService extends BaseAPIService {
 
     console.log(`[DocumentService] Uploading ${fileArray.length} documents for employee ${employeeId}`)
 
-    const result = await this.request(`/api/document/${employeeId}/upload`, {
+    // Use fetch directly for FormData to avoid Content-Type header issues
+    const token = getStoredToken()
+    
+    if (!token) {
+      console.error("[DocumentService] No authentication token found")
+      throw new Error("Authentication required - please log in again")
+    }
+    
+    // Include token in both header AND query parameter for maximum compatibility
+    const url = `${this.baseURL}/api/document/${employeeId}/upload?token=${encodeURIComponent(token)}`
+    
+    const response = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${getStoredToken()}`,
+        Authorization: `Bearer ${token}`,
+        // Do NOT set Content-Type - browser will set it with boundary for FormData
       },
       body: formData
     })
 
+    if (response.status === 401) {
+      console.warn("[DocumentService] Authentication failed")
+      throw new Error("Authentication required")
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || errorData.error || `HTTP ${response.status}`)
+    }
+
+    const result = await response.json()
     console.log(`[DocumentService] Upload result:`, result)
 
     // Clear all caches for this employee
