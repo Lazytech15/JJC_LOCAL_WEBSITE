@@ -146,6 +146,9 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   const [showOverwriteModal, setShowOverwriteModal] = useState(false)
   const [existingPO, setExistingPO] = useState(null)
   const [showImagePreview, setShowImagePreview] = useState(false)
+  // Confirmation modal for PO type switching
+  const [showPOTypeSwitchModal, setShowPOTypeSwitchModal] = useState(false)
+  const [pendingPOType, setPendingPOType] = useState(null)
 
   // Initialize data when modal opens
   useEffect(() => {
@@ -787,14 +790,19 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         setShowOverwriteModal(true)
         return
       }
-      // Then check PO type (currently only inventory is available)
+      // Then check PO type
       if (!formData.po_type) {
         setError("Please select a PO type")
         return
       }
-      // For inventory PO, supplier is required
+      // For inventory PO, supplier selection is required
       if (formData.po_type === "inventory" && !(formData.supplier_id || formData.supplier_name)) {
         setError("Please select a supplier")
+        return
+      }
+      // For custom PO, supplier name is required (manually entered)
+      if (formData.po_type === "custom" && !formData.supplier_name?.trim()) {
+        setError("Please enter a supplier name")
         return
       }
     }
@@ -833,8 +841,10 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       if (poNumberStatus.exists) return false
       // PO type must be selected
       if (!formData.po_type) return false
-      // For inventory PO, supplier is required
+      // For inventory PO, supplier selection is required
       if (formData.po_type === "inventory" && !(formData.supplier_id || formData.supplier_name)) return false
+      // For custom PO, supplier name is required
+      if (formData.po_type === "custom" && !formData.supplier_name?.trim()) return false
     }
     if (step === 2) {
       if (!formData.selectedItems || formData.selectedItems.length === 0) return false
@@ -874,9 +884,10 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
       
       const orderData = {
         po_number: formData.po_number,
+        po_type: formData.po_type, // "inventory" or "custom" - Custom PO items won't sync with inventory
         supplier_name: formData.supplier_name,
         supplier_address: formData.supplier_address,
-        supplier_details: formData.supplier_details || null,
+        supplier_details: formData.po_type === "inventory" ? (formData.supplier_details || null) : null, // No supplier details for custom PO
         attention_person: formData.attention_person,
         terms: formData.terms,
         // Priority level included
@@ -903,9 +914,11 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
         grand_total: taxBreakdown.grandTotal,
         items: formData.selectedItems.map(item => ({
           item_no: item.item_no,
+          item_name: item.item_name, // Include item_name for custom items display
           quantity: item.quantity,
           unit: item.custom_unit_active ? (item.custom_unit_value || item.unit) : item.unit,
-          price_per_unit: item.price_per_unit
+          price_per_unit: item.price_per_unit,
+          is_custom: item.is_custom || false // Flag to identify custom items
         })),
         overwrite_existing: overwriteExisting
       }
@@ -1150,7 +1163,15 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           {/* Inventory PO Option */}
                           <button
                             type="button"
-                            onClick={() => setFormData(prev => ({ ...prev, po_type: "inventory" }))}
+                            onClick={() => {
+                              // If switching from custom to inventory and there are selected items, show confirmation
+                              if (formData.po_type === "custom" && formData.selectedItems.length > 0) {
+                                setPendingPOType("inventory")
+                                setShowPOTypeSwitchModal(true)
+                              } else {
+                                setFormData(prev => ({ ...prev, po_type: "inventory" }))
+                              }
+                            }}
                             className={`p-6 rounded-xl border-3 transition-all text-left ${
                               formData.po_type === "inventory"
                                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-300 dark:ring-blue-600'
@@ -1178,32 +1199,44 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                             </div>
                           </button>
 
-                          {/* Custom PO Option - Under Maintenance */}
-                          <div
-                            className="relative p-6 rounded-xl border-3 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800/50 opacity-60 cursor-not-allowed"
+                          {/* Custom PO Option */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // If switching from inventory to custom and there are selected items, show confirmation
+                              if (formData.po_type === "inventory" && formData.selectedItems.length > 0) {
+                                setPendingPOType("custom")
+                                setShowPOTypeSwitchModal(true)
+                              } else {
+                                setFormData(prev => ({ ...prev, po_type: "custom", supplier_id: "", supplier_name: "", supplier_address: "", supplier_details: null, selectedItems: [] }))
+                              }
+                            }}
+                            className={`p-6 rounded-xl border-3 transition-all text-left ${
+                              formData.po_type === "custom"
+                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-300 dark:ring-blue-600'
+                                : 'border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 bg-white dark:bg-gray-800'
+                            }`}
                           >
-                            {/* Under Maintenance Banner */}
-                            <div className="absolute -top-3 -right-3 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
-                              🔧 Under Maintenance
-                            </div>
                             <div className="flex items-start gap-4">
-                              <div className="text-4xl grayscale">📝</div>
+                              <div className="text-4xl">📝</div>
                               <div className="flex-1">
-                                <div className="font-bold text-lg text-gray-500 dark:text-gray-500 mb-1">
+                                <div className="font-bold text-lg text-black dark:text-gray-100 mb-1">
                                   Custom PO
                                 </div>
-                                <p className="text-sm text-gray-500 dark:text-gray-500">
+                                <p className="text-sm text-black dark:text-gray-400">
                                   Create a PO with custom items and suppliers not in your inventory. Items will NOT be saved to inventory.
                                 </p>
-                                <div className="mt-3 p-2 bg-orange-100 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700 rounded-lg">
-                                  <p className="text-xs text-orange-700 dark:text-orange-400 flex items-center gap-1">
-                                    <span>🚧</span>
-                                    This feature is currently under development and will be available soon.
-                                  </p>
-                                </div>
+                                {formData.po_type === "custom" && (
+                                  <div className="mt-3 flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                    <span className="font-medium">Selected</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </div>
+                          </button>
                         </div>
                       </div>
                     )}
@@ -1259,38 +1292,226 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                         )}
                       </div>
                     )}
+
+                    {/* Custom Supplier Input - Only show for Custom PO type */}
+                    {formData.po_number && formData.po_type === "custom" && (
+                      <div className="space-y-4 border-t-2 border-gray-200 dark:border-gray-700 pt-6">
+                        <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
+                          <div className="flex items-start gap-2">
+                            <span className="text-purple-600 dark:text-purple-400">📝</span>
+                            <div className="text-sm text-purple-700 dark:text-purple-300">
+                              <strong>Custom PO Mode:</strong> Enter supplier details manually. This information will NOT be saved to your supplier database.
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
+                            Supplier Name *
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.supplier_name}
+                            onChange={(e) => setFormData(prev => ({ ...prev, supplier_name: e.target.value }))}
+                            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                              bg-white dark:bg-gray-800 text-black dark:text-gray-100
+                              focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                            placeholder="Enter supplier name..."
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-semibold text-black dark:text-gray-300 mb-2">
+                            Supplier Address
+                          </label>
+                          <textarea
+                            value={formData.supplier_address}
+                            onChange={(e) => setFormData(prev => ({ ...prev, supplier_address: e.target.value }))}
+                            rows="3"
+                            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg
+                              bg-white dark:bg-gray-800 text-black dark:text-gray-100
+                              focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                            placeholder="Enter supplier's complete address (optional)..."
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* Step 2: Select Items */}
                 {currentStep === 2 && (
                   <div className="space-y-6">
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                      <h3 className="font-semibold text-black dark:text-green-100 mb-2">
-                        📦 Add Items to Purchase Order
-                      </h3>
-                      <p className="text-black dark:text-green-300 text-sm">
-                        Items from {formData.supplier_name} in inventory
-                      </p>
-                    </div>
-
-                    {/* Info box about price changes */}
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                      <div className="flex items-start gap-2">
-                        <span className="text-blue-600 dark:text-blue-400">💡</span>
-                        <div className="text-sm text-blue-700 dark:text-blue-300">
-                          <strong>Price Editing:</strong> You can edit prices for each item. When this PO is marked as "Received", 
-                          the inventory prices will be automatically updated to match.
+                    {/* Header - Different for Inventory vs Custom PO */}
+                    {formData.po_type === "inventory" ? (
+                      <>
+                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                          <h3 className="font-semibold text-black dark:text-green-100 mb-2">
+                            📦 Add Items to Purchase Order
+                          </h3>
+                          <p className="text-black dark:text-green-300 text-sm">
+                            Items from {formData.supplier_name} in inventory
+                          </p>
                         </div>
-                      </div>
-                    </div>
+
+                        {/* Info box about price changes */}
+                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                          <div className="flex items-start gap-2">
+                            <span className="text-blue-600 dark:text-blue-400">💡</span>
+                            <div className="text-sm text-blue-700 dark:text-blue-300">
+                              <strong>Price Editing:</strong> You can edit prices for each item. When this PO is marked as "Received", 
+                              the inventory prices will be automatically updated to match.
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                          <h3 className="font-semibold text-black dark:text-purple-100 mb-2">
+                            📝 Add Custom Items to Purchase Order
+                          </h3>
+                          <p className="text-black dark:text-purple-300 text-sm">
+                            Add custom items for {formData.supplier_name}. These items will NOT be saved to your inventory.
+                          </p>
+                        </div>
+
+                        {/* Info box for custom PO */}
+                        <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
+                          <div className="flex items-start gap-2">
+                            <span className="text-orange-600 dark:text-orange-400">⚠️</span>
+                            <div className="text-sm text-orange-700 dark:text-orange-300">
+                              <strong>Custom PO Note:</strong> Items and supplier info entered here are for this PO only. 
+                              Nothing will be committed to your inventory or supplier database.
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Add Custom Item Form */}
+                        <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-dashed border-purple-300 dark:border-purple-700 p-4">
+                          <h4 className="font-semibold text-black dark:text-gray-100 mb-4 flex items-center gap-2">
+                            <span>➕</span> Add New Custom Item
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                            <div className="md:col-span-2">
+                              <label className="text-xs text-black dark:text-gray-400 mb-1 block">Item Name *</label>
+                              <input
+                                type="text"
+                                id="customItemName"
+                                placeholder="Enter item name..."
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                                  bg-white dark:bg-gray-800 text-black dark:text-gray-100 text-sm
+                                  focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-black dark:text-gray-400 mb-1 block">Quantity *</label>
+                              <input
+                                type="number"
+                                id="customItemQty"
+                                min="1"
+                                defaultValue="1"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                                  bg-white dark:bg-gray-800 text-black dark:text-gray-100 text-sm
+                                  focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-black dark:text-gray-400 mb-1 block">Unit</label>
+                              <select
+                                id="customItemUnit"
+                                defaultValue="pcs"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                                  bg-white dark:bg-gray-800 text-black dark:text-gray-100 text-sm
+                                  focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
+                              >
+                                {(unitOptions && unitOptions.length > 0 ? unitOptions : ['pcs', 'sets', 'box', 'kg', 'liters', 'meters']).map(u => (
+                                  <option key={u} value={u}>{u}</option>
+                                ))}
+                                <option value="other">Other...</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-black dark:text-gray-400 mb-1 block">Price/Unit *</label>
+                              <input
+                                type="number"
+                                id="customItemPrice"
+                                min="0"
+                                step="0.01"
+                                placeholder="0.00"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                                  bg-white dark:bg-gray-800 text-black dark:text-gray-100 text-sm
+                                  focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-3 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nameInput = document.getElementById('customItemName')
+                                const qtyInput = document.getElementById('customItemQty')
+                                const unitSelect = document.getElementById('customItemUnit')
+                                const priceInput = document.getElementById('customItemPrice')
+                                
+                                const itemName = nameInput?.value?.trim()
+                                const quantity = Number(qtyInput?.value) || 1
+                                const unit = unitSelect?.value || 'pcs'
+                                const price = Number(priceInput?.value) || 0
+                                
+                                if (!itemName) {
+                                  setError("Please enter an item name")
+                                  return
+                                }
+                                if (price <= 0) {
+                                  setError("Please enter a valid price")
+                                  return
+                                }
+                                
+                                // For custom items, use a simple sequential number as item_no
+                                // Find the next available number based on existing custom items
+                                const existingCustomItems = formData.selectedItems.filter(i => i.is_custom)
+                                const nextItemNo = existingCustomItems.length + 1
+                                
+                                setFormData(prev => ({
+                                  ...prev,
+                                  selectedItems: [...prev.selectedItems, {
+                                    item_no: nextItemNo,
+                                    item_name: itemName,
+                                    description: "",
+                                    quantity: quantity,
+                                    unit: unit,
+                                    price_per_unit: price,
+                                    amount: quantity * price,
+                                    is_custom: true // Flag to identify custom items
+                                  }]
+                                }))
+                                
+                                // Clear the form
+                                if (nameInput) nameInput.value = ''
+                                if (qtyInput) qtyInput.value = '1'
+                                if (unitSelect) unitSelect.value = 'pcs'
+                                if (priceInput) priceInput.value = ''
+                                setError(null)
+                              }}
+                              className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center gap-2"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                              </svg>
+                              Add Item
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
 
                     {/* Selected Items */}
                     {formData.selectedItems.length > 0 && (
                       <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 overflow-visible">
                         <div className="bg-gray-50 dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                           <h4 className="font-semibold text-black dark:text-gray-100">
-                            Selected Items ({formData.selectedItems.length})
+                            {formData.po_type === "custom" ? "Custom Items" : "Selected Items"} ({formData.selectedItems.length})
                           </h4>
                         </div>
                         <div className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -1298,8 +1519,16 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                             <div key={`${item.item_no}-${idx}`} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                               <div className="flex items-start gap-4">
                                 <div className="flex-1">
-                                  <div className="font-semibold text-black dark:text-gray-100">
-                                    #{item.item_no} - {item.item_name}
+                                  <div className="font-semibold text-black dark:text-gray-100 flex items-center gap-2">
+                                    {item.is_custom ? (
+                                      <>
+                                        <span className="text-purple-600 dark:text-purple-400">📝</span>
+                                        {item.item_name}
+                                        <span className="text-xs px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">Custom</span>
+                                      </>
+                                    ) : (
+                                      <>#{item.item_no} - {item.item_name}</>
+                                    )}
                                   </div>
                                   {item.description && (
                                     <div className="text-sm text-black dark:text-gray-400 mt-1">
@@ -1428,7 +1657,8 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                       </div>
                     )}
 
-                    {/* Available Items */}
+                    {/* Available Items - Only show for Inventory PO */}
+                    {formData.po_type === "inventory" && (
                     <div>
                       {/* Available Items Header with Multi-select controls */}
                       <div className="flex items-center justify-between mb-3">
@@ -1566,6 +1796,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                             </div>
                           )}
                     </div>
+                    )}
                   </div>
                 )}
 
@@ -2108,6 +2339,11 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                         <div>
                           <div className="text-sm text-black">P.O.#</div>
                           <div className="text-2xl font-bold text-black">{formData.po_number}</div>
+                          {formData.po_type === "custom" && (
+                            <div className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded inline-block mt-1">
+                              Custom PO
+                            </div>
+                          )}
                           <div className="text-sm text-black mt-2">Date: {formData.po_date}</div>
                           <div className="text-sm text-black">Terms: {formData.terms}</div>
                         </div>
@@ -2117,7 +2353,7 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           <div className="text-sm text-black mt-1 whitespace-pre-wrap">
                             {formData.supplier_address}
                           </div>
-                          {formData.supplier_details && (
+                          {formData.po_type === "inventory" && formData.supplier_details && (
                             <div className="mt-3 text-sm text-black space-y-1">
                               <div><strong>Contact:</strong> {formData.supplier_details.contact_person || formData.supplier_details.contact || 'N/A'}</div>
                               <div><strong>Email:</strong> {formData.supplier_details.email || 'N/A'}</div>
@@ -2150,7 +2386,13 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                         <tbody>
                           {formData.selectedItems.map((item, index) => (
                             <tr key={`${item.item_no}-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="border border-gray-900 px-3 py-2 text-sm text-black">#{item.item_no}</td>
+                              <td className="border border-gray-900 px-3 py-2 text-sm text-black">
+                                {item.is_custom ? (
+                                  <span className="text-purple-700">{index + 1}</span>
+                                ) : (
+                                  <>#{item.item_no}</>
+                                )}
+                              </td>
                               <td className="border border-gray-900 px-3 py-2 text-center text-sm text-black">{item.quantity}</td>
                               <td className="border border-gray-900 px-3 py-2 text-center text-sm text-black">{item.unit}</td>
                               <td className="border border-gray-900 px-3 py-2 text-sm text-black">{item.item_name}</td>
@@ -2442,6 +2684,74 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
               
               <button
                 onClick={() => setShowOverwriteModal(false)}
+                className="w-full mt-3 text-sm text-black dark:text-gray-400 hover:text-black dark:hover:text-gray-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* PO Type Switch Confirmation Modal */}
+        {showPOTypeSwitchModal && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full mx-4 p-6">
+              <div className="text-center mb-4">
+                <div className="text-5xl mb-3">⚠️</div>
+                <h3 className="text-xl font-bold text-black dark:text-gray-100 mb-2">
+                  Change PO Type?
+                </h3>
+                <p className="text-black dark:text-gray-400">
+                  You have <strong>{formData.selectedItems.length} item{formData.selectedItems.length !== 1 ? 's' : ''}</strong> already selected. 
+                  Switching to <strong>{pendingPOType === "custom" ? "Custom PO" : "Inventory PO"}</strong> will clear all selected items.
+                </p>
+              </div>
+              
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4">
+                <div className="text-sm text-black dark:text-yellow-100">
+                  <div className="font-semibold mb-1">Selected items to be removed:</div>
+                  <ul className="list-disc list-inside text-xs max-h-32 overflow-y-auto">
+                    {formData.selectedItems.slice(0, 5).map((item, idx) => (
+                      <li key={idx}>{item.item_name} (Qty: {item.quantity})</li>
+                    ))}
+                    {formData.selectedItems.length > 5 && (
+                      <li className="text-gray-500">...and {formData.selectedItems.length - 5} more items</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowPOTypeSwitchModal(false)
+                    setPendingPOType(null)
+                  }}
+                  className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Keep Current
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPOTypeSwitchModal(false)
+                    if (pendingPOType === "custom") {
+                      setFormData(prev => ({ ...prev, po_type: "custom", supplier_id: "", supplier_name: "", supplier_address: "", supplier_details: null, selectedItems: [] }))
+                    } else {
+                      setFormData(prev => ({ ...prev, po_type: "inventory", supplier_id: "", supplier_name: "", supplier_address: "", supplier_details: null, selectedItems: [] }))
+                    }
+                    setPendingPOType(null)
+                  }}
+                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                >
+                  Clear & Switch
+                </button>
+              </div>
+              
+              <button
+                onClick={() => {
+                  setShowPOTypeSwitchModal(false)
+                  setPendingPOType(null)
+                }}
                 className="w-full mt-3 text-sm text-black dark:text-gray-400 hover:text-black dark:hover:text-gray-100"
               >
                 Cancel

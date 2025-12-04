@@ -91,6 +91,9 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
   const stockStatus = getStockStatus(product.balance || 0)
   const StockIcon = stockStatus.icon
 
+  // Helper to check if product can be added to cart
+  const isAddDisabled = product.status === 'out-of-stock' || (typeof product.balance === 'number' && product.balance <= 0)
+
   if (viewMode === 'list') {
     return (
       <Card className="group hover:shadow-md transition-all duration-200 hover:scale-[1.005] border border-border hover:border-primary/50 bg-card">
@@ -150,7 +153,7 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
                 <Button
                   size="sm"
                   onClick={() => onAddToCart(product)}
-                  disabled={product.status === 'out-of-stock'}
+                  disabled={isAddDisabled}
                   className="h-9 w-9 p-0"
                 >
                   <Briefcase className="w-4 h-4" />
@@ -204,7 +207,7 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
                 e.stopPropagation()
                 onAddToCart(product)
               }}
-              disabled={product.status === 'out-of-stock'}
+              disabled={isAddDisabled}
               className="backdrop-blur-sm h-7 text-xs px-2"
             >
               <Briefcase className="w-3 h-3 mr-1" />
@@ -248,7 +251,7 @@ export const EnhancedItemCard = React.memo<EnhancedItemCardProps>(({
                 e.stopPropagation()
                 onAddToCart(product)
               }}
-              disabled={product.status === 'out-of-stock'}
+              disabled={isAddDisabled}
               className="h-6 w-6 p-0"
             >
               <Briefcase className="w-3 h-3" />

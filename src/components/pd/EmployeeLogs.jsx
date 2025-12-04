@@ -1621,7 +1621,8 @@ export default EmployeeLogs
 
 // Multi-step Edit Log Wizard (separate modal)
 function EditLogWizard({ isOpen, onClose, log, onSaved, showToast }) {
-  const { user } = useAuth()
+  const { user, isDarkMode } = useAuth()
+  const t = themeFor(isDarkMode)
   const [step, setStep] = useState(1)
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
