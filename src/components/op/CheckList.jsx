@@ -1101,6 +1101,37 @@ const formatMaterialsCheckoutDetails = (materials) => {
 }
 
   const handleCheckoutSubphaseMaterials = async (item, phase, subphase) => {
+  // NEW: Check if using new materials array format
+  if (subphase.materials) {
+    let materials = []
+    try {
+      materials = typeof subphase.materials === 'string' 
+        ? JSON.parse(subphase.materials) 
+        : subphase.materials || []
+    } catch (error) {
+      console.error("Failed to parse materials:", error)
+      alert("Error reading materials data")
+      return
+    }
+
+    if (materials.length > 0) {
+      // Use multi-material checkout flow
+      const uncheckedMaterials = materials.filter(m => !m.checked_out)
+      
+      if (uncheckedMaterials.length === 0) {
+        alert("All materials have already been checked out")
+        return
+      }
+
+      // Checkout all unchecked materials
+      for (let i = 0; i < materials.length; i++) {
+        if (!materials[i].checked_out) {
+          await handleCheckoutSingleMaterial(item, phase, subphase, i)
+        }
+      }
+      return
+    }
+  }
   if (!subphase.material_raw || !subphase.material_quantity) {
     console.log("No materials to checkout for this subphase")
     return null
@@ -1260,6 +1291,167 @@ const formatMaterialsCheckoutDetails = (materials) => {
     console.error("❌ Failed to checkout materials:", error)
     alert(`Failed to checkout materials:\n\n${error.message}`)
     throw error
+  }
+}
+
+const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex) => {
+  // Parse materials array
+  let materials = []
+  try {
+    materials = typeof subphase.materials === 'string' 
+      ? JSON.parse(subphase.materials) 
+      : subphase.materials || []
+  } catch (error) {
+    console.error("Failed to parse materials:", error)
+    alert("Error reading materials data")
+    return
+  }
+
+  const material = materials[materialIndex]
+  if (!material || material.checked_out) {
+    alert("Material already checked out or not found")
+    return
+  }
+
+  try {
+    // STEP 1: Determine who is checking out
+    let checkoutByUid = null
+    let checkoutBy = null
+    let checkoutByName = null
+
+    if (subphase.employee_uid && subphase.employee_name) {
+      checkoutByUid = subphase.employee_uid
+      checkoutBy = subphase.employee_barcode
+      checkoutByName = subphase.employee_name
+    } else {
+      throw new Error("No employee assigned to this subphase. Please assign an employee first.")
+    }
+
+    // STEP 2: Find material in inventory
+    const materialsResponse = await apiService.items.getItems({
+      item_type: "OPERATION PARTICULARS",
+      search: material.name,
+      limit: 10
+    })
+
+    let inventoryItems = []
+    if (materialsResponse.data && Array.isArray(materialsResponse.data)) {
+      inventoryItems = materialsResponse.data
+    } else if (materialsResponse.items && Array.isArray(materialsResponse.items)) {
+      inventoryItems = materialsResponse.items
+    } else if (Array.isArray(materialsResponse)) {
+      inventoryItems = materialsResponse
+    }
+
+    const inventoryItem = inventoryItems.find(m =>
+      m.item_name?.toLowerCase() === material.name.toLowerCase()
+    )
+
+    if (!inventoryItem) {
+      throw new Error(`Material "${material.name}" not found in inventory`)
+    }
+
+    const requestedQty = parseFloat(material.quantity)
+
+    // STEP 3: Check stock availability
+    if (inventoryItem.balance < requestedQty) {
+      const proceed = window.confirm(
+        `⚠️ Insufficient stock for ${inventoryItem.item_name}\n\n` +
+        `Requested: ${requestedQty} ${material.unit || 'units'}\n` +
+        `Available: ${inventoryItem.balance} ${inventoryItem.unit_of_measure || 'units'}\n\n` +
+        `Proceed with checkout anyway?`
+      )
+      if (!proceed) return
+    }
+
+    // STEP 4: Confirm checkout
+    const confirmMsg =
+      `Checkout material:\n\n` +
+      `Material: ${inventoryItem.item_name}\n` +
+      `Quantity: ${requestedQty} ${material.unit || 'units'}\n` +
+      `Available: ${inventoryItem.balance} ${inventoryItem.unit_of_measure || 'units'}\n\n` +
+      `For: ${item.name} → ${phase.name} → ${subphase.name}\n` +
+      `✅ Checked out by: ${checkoutByName} (${checkoutBy})\n\n` +
+      `Proceed?`
+
+    if (!window.confirm(confirmMsg)) return
+
+    // STEP 5: Process checkout
+    const checkoutResult = await apiService.items.removeStock(
+      inventoryItem.item_no,
+      requestedQty,
+      `Operations Material Checkout\n` +
+      `Item: ${item.name} (${item.part_number})\n` +
+      `Phase: ${phase.name}\n` +
+      `Subphase: ${subphase.name}\n` +
+      `Material: ${material.name}\n` +
+      `Checked out by: ${checkoutByName}`,
+      checkoutBy
+    )
+
+    const isSuccess = checkoutResult.success ||
+      (checkoutResult.successful && checkoutResult.successful > 0) ||
+      (checkoutResult.results && checkoutResult.results.some(r => r.success))
+
+    if (isSuccess) {
+      // STEP 6: Update materials array with checkout info
+      materials[materialIndex] = {
+        ...material,
+        checked_out: true,
+        checkout_date: formatMySQLDateTime(),
+        checkout_by: checkoutBy,
+        checkout_by_name: checkoutByName,
+        checkout_by_uid: checkoutByUid
+      }
+
+      // Save updated materials array
+      await apiService.operations.updateSubphase(subphase.id, {
+        materials: JSON.stringify(materials)
+      })
+
+      // STEP 7: Create employee log
+      try {
+        const fullEmployeeData = await getEmployeeData(checkoutByUid, apiService)
+        
+        const materialsArray = [{
+          item_no: inventoryItem.item_no,
+          item_name: inventoryItem.item_name,
+          quantity: requestedQty,
+          unit: material.unit || 'pcs'
+        }]
+
+        const operationContext = {
+          item_name: item.name,
+          part_number: item.part_number,
+          phase_name: phase.name,
+          subphase_name: subphase.name
+        }
+
+        await createMaterialCheckoutLog(
+          materialsArray,
+          fullEmployeeData,
+          operationContext,
+          apiService
+        )
+      } catch (logError) {
+        console.error("⚠️ Failed to create employee log (non-critical):", logError)
+      }
+
+      alert(
+        `✅ Successfully checked out:\n\n` +
+        `${inventoryItem.item_name}: ${requestedQty} ${material.unit || 'units'}\n\n` +
+        `Checked out by: ${checkoutByName} (${checkoutBy})`
+      )
+
+      // Reload data to show updated checkout status
+      await loadItemDetails(item.part_number)
+    } else {
+      throw new Error(checkoutResult.error || "Checkout failed")
+    }
+
+  } catch (error) {
+    console.error("❌ Failed to checkout material:", error)
+    alert(`Failed to checkout material:\n\n${error.message}`)
   }
 }
 
@@ -2142,97 +2334,221 @@ const formatMaterialsCheckoutDetails = (materials) => {
                                                       )}
                                                   </div>
 
-                                                  {/* ✅ Material Raw & Quantity Display with User Tracking */}
-                                                  {(subphase.material_raw || subphase.material_quantity) && (
-                                                    <div className="space-y-2 mb-2">
-                                                      <div className="flex flex-wrap gap-2 items-center">
-                                                        {subphase.material_raw && (
-                                                          <span className="text-xs bg-teal-500/20 text-teal-700 dark:text-teal-300 px-2 py-1 rounded flex items-center gap-1">
-                                                            <Package size={12} />
-                                                            Material: {subphase.material_raw}
-                                                          </span>
-                                                        )}
+                                                  {/* ✅ Multiple Materials Display */}
+{(() => {
+  // Safely parse and validate materials
+  let materialsArray = []
+  
+  try {
+    if (subphase.materials) {
+      // Parse if string
+      const parsed = typeof subphase.materials === 'string' 
+        ? JSON.parse(subphase.materials) 
+        : subphase.materials
+      
+      // Ensure it's an array
+      if (Array.isArray(parsed)) {
+        materialsArray = parsed
+      } else {
+        console.warn('Materials is not an array:', parsed)
+        materialsArray = []
+      }
+    }
+  } catch (error) {
+    console.error('Failed to parse materials:', error)
+    materialsArray = []
+  }
 
-                                                        {subphase.material_quantity && (
-                                                          <span className="text-xs bg-orange-500/20 text-orange-700 dark:text-orange-300 px-2 py-1 rounded flex items-center gap-1">
-                                                            <Package size={12} />
-                                                            Qty: {subphase.material_quantity}
-                                                          </span>
-                                                        )}
+  // If we have materials array, display them
+  if (materialsArray.length > 0) {
+    return (
+      <div className="space-y-2 mb-2">
+        <div className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+          Required Materials:
+        </div>
+        {materialsArray.map((material, idx) => (
+          <div key={idx} className="space-y-2">
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-xs bg-teal-500/20 text-teal-700 dark:text-teal-300 px-2 py-1 rounded flex items-center gap-1">
+                <Package size={12} />
+                {material.name || 'Unknown Material'}
+              </span>
+              
+              <span className="text-xs bg-orange-500/20 text-orange-700 dark:text-orange-300 px-2 py-1 rounded flex items-center gap-1">
+                <Package size={12} />
+                Qty: {material.quantity || 0} {material.unit || 'pcs'}
+              </span>
 
-                                                        {/* ✅ Checkout Status with User Info */}
-                                                        {subphase.material_checked_out ? (
-                                                          <span className="text-xs bg-green-500/20 text-green-700 dark:text-green-300 px-2 py-1 rounded flex items-center gap-1">
-                                                            <CheckCircle size={12} />
-                                                            Checked Out
-                                                          </span>
-                                                        ) : (
-                                                          <button
-                                                            onClick={(e) => {
-                                                              e.stopPropagation()
-                                                              handleCheckoutSubphaseMaterials(item, phase, subphase)
-                                                            }}
-                                                            disabled={!subphase.material_raw || !subphase.material_quantity}
-                                                            className="text-xs bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white px-3 py-1.5 rounded transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                          >
-                                                            <Package size={12} />
-                                                            Checkout Materials
-                                                          </button>
-                                                        )}
-                                                      </div>
+              {/* Individual Material Checkout Status */}
+              {material.checked_out ? (
+                <span className="text-xs bg-green-500/20 text-green-700 dark:text-green-300 px-2 py-1 rounded flex items-center gap-1">
+                  <CheckCircle size={12} />
+                  Checked Out
+                </span>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleCheckoutSingleMaterial(item, phase, subphase, idx)
+                  }}
+                  className="text-xs bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white px-3 py-1.5 rounded transition-colors flex items-center gap-1"
+                >
+                  <Package size={12} />
+                  Checkout
+                </button>
+              )}
+            </div>
 
-                                                      {/* ✅ Show checkout details if checked out */}
-                                                      {subphase.material_checked_out && (
-                                                        <div className={`text-xs p-2 rounded-lg border ${isDarkMode
-                                                          ? "bg-green-500/10 border-green-500/30 text-green-300"
-                                                          : "bg-green-500/10 border-green-500/30 text-green-700"
-                                                          }`}>
-                                                          <div className="flex flex-col gap-1">
-                                                            {/* Date */}
-                                                            {subphase.material_checkout_date && (
-                                                              <div className="flex items-center gap-1">
-                                                                <Clock size={12} />
-                                                                <span>
-                                                                  {new Date(subphase.material_checkout_date).toLocaleString('en-PH', {
-                                                                    timeZone: 'Asia/Manila',
-                                                                    year: 'numeric',
-                                                                    month: 'short',
-                                                                    day: 'numeric',
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit'
-                                                                  })}
-                                                                </span>
-                                                              </div>
-                                                            )}
+            {/* Show checkout details if checked out */}
+            {material.checked_out && material.checkout_by_name && (
+              <div className={`text-xs p-2 rounded-lg border ${
+                isDarkMode
+                  ? "bg-green-500/10 border-green-500/30 text-green-300"
+                  : "bg-green-500/10 border-green-500/30 text-green-700"
+              }`}>
+                <div className="flex flex-col gap-1">
+                  {material.checkout_date && (
+                    <div className="flex items-center gap-1">
+                      <Clock size={12} />
+                      <span>
+                        {new Date(material.checkout_date).toLocaleString('en-PH', {
+                          timeZone: 'Asia/Manila',
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1">
+                    <User size={12} />
+                    <span>
+                      By: {material.checkout_by_name}
+                      {material.checkout_by && ` (${material.checkout_by})`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
 
-                                                            {/* User who checked out */}
-                                                            {subphase.material_checkout_by_name && (
-                                                              <div className="flex items-center gap-1">
-                                                                <User size={12} />
-                                                                <span>
-                                                                  By: {subphase.material_checkout_by_name}
-                                                                  {subphase.material_checkout_by && ` (${subphase.material_checkout_by})`}
-                                                                </span>
-                                                              </div>
-                                                            )}
-                                                          </div>
-                                                        </div>
-                                                      )}
+        {/* Show warning if no employee assigned */}
+        {!subphase.employee_barcode && materialsArray.some(m => !m.checked_out) && (
+          <div className={`text-xs p-2 rounded-lg border ${
+            isDarkMode
+              ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-300"
+              : "bg-yellow-500/10 border-yellow-500/30 text-yellow-700"
+          }`}>
+            <div className="flex items-center gap-1">
+              <AlertTriangle size={12} />
+              <span>No employee assigned - checkout will use current user</span>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
-                                                      {/* ✅ Show warning if no employee assigned */}
-                                                      {!subphase.material_checked_out && !subphase.employee_barcode && (
-                                                        <div className={`text-xs p-2 rounded-lg border ${isDarkMode
-                                                          ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-300"
-                                                          : "bg-yellow-500/10 border-yellow-500/30 text-yellow-700"
-                                                          }`}>
-                                                          <div className="flex items-center gap-1">
-                                                            <AlertTriangle size={12} />
-                                                            <span>No employee assigned - checkout will use current user</span>
-                                                          </div>
-                                                        </div>
-                                                      )}
-                                                    </div>
-                                                  )}
+  // Fallback to old single-material format
+  if (subphase.material_raw || subphase.material_quantity) {
+    return (
+      <div className="space-y-2 mb-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          {subphase.material_raw && (
+            <span className="text-xs bg-teal-500/20 text-teal-700 dark:text-teal-300 px-2 py-1 rounded flex items-center gap-1">
+              <Package size={12} />
+              Material: {subphase.material_raw}
+            </span>
+          )}
+
+          {subphase.material_quantity && (
+            <span className="text-xs bg-orange-500/20 text-orange-700 dark:text-orange-300 px-2 py-1 rounded flex items-center gap-1">
+              <Package size={12} />
+              Qty: {subphase.material_quantity}
+            </span>
+          )}
+
+          {/* ✅ Checkout Status with User Info */}
+          {subphase.material_checked_out ? (
+            <span className="text-xs bg-green-500/20 text-green-700 dark:text-green-300 px-2 py-1 rounded flex items-center gap-1">
+              <CheckCircle size={12} />
+              Checked Out
+            </span>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleCheckoutSubphaseMaterials(item, phase, subphase)
+              }}
+              disabled={!subphase.material_raw || !subphase.material_quantity}
+              className="text-xs bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white px-3 py-1.5 rounded transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Package size={12} />
+              Checkout Materials
+            </button>
+          )}
+        </div>
+
+        {/* ✅ Show checkout details if checked out */}
+        {subphase.material_checked_out && (
+          <div className={`text-xs p-2 rounded-lg border ${isDarkMode
+            ? "bg-green-500/10 border-green-500/30 text-green-300"
+            : "bg-green-500/10 border-green-500/30 text-green-700"
+          }`}>
+            <div className="flex flex-col gap-1">
+              {/* Date */}
+              {subphase.material_checkout_date && (
+                <div className="flex items-center gap-1">
+                  <Clock size={12} />
+                  <span>
+                    {new Date(subphase.material_checkout_date).toLocaleString('en-PH', {
+                      timeZone: 'Asia/Manila',
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                </div>
+              )}
+
+              {/* User who checked out */}
+              {subphase.material_checkout_by_name && (
+                <div className="flex items-center gap-1">
+                  <User size={12} />
+                  <span>
+                    By: {subphase.material_checkout_by_name}
+                    {subphase.material_checkout_by && ` (${subphase.material_checkout_by})`}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ✅ Show warning if no employee assigned */}
+        {!subphase.material_checked_out && !subphase.employee_barcode && (
+          <div className={`text-xs p-2 rounded-lg border ${isDarkMode
+            ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-300"
+            : "bg-yellow-500/10 border-yellow-500/30 text-yellow-700"
+          }`}>
+            <div className="flex items-center gap-1">
+              <AlertTriangle size={12} />
+              <span>No employee assigned - checkout will use current user</span>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // No materials at all
+  return null
+})()}
 
                                                   {/* Quantity Update Modal - Mobile Optimized */}
                                                   {quantityModalOpen && quantityModalData && (

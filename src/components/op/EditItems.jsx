@@ -10,6 +10,7 @@ import {
   Package,
   Clock,
   AlertTriangle,
+  CheckCircle
 } from "lucide-react"
 
 // ============================================================================
@@ -373,6 +374,36 @@ function EditPhaseModal({ phase, onClose, onSave, onDelete, isDarkMode }) {
 // EDIT SUBPHASE MODAL
 // ============================================================================
 function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, batchQty = 1, apiService }) {
+  // Parse existing materials if they exist
+  const parseExistingMaterials = () => {
+    if (subphase?.materials) {
+      try {
+        return typeof subphase.materials === 'string' 
+          ? JSON.parse(subphase.materials) 
+          : subphase.materials || []
+      } catch (error) {
+        console.error("Failed to parse existing materials:", error)
+        return []
+      }
+    }
+    
+    // Fallback to old single-material format
+    if (subphase?.material_raw && subphase?.material_quantity) {
+      return [{
+        name: subphase.material_raw,
+        quantity: parseFloat(subphase.material_quantity) || 0,
+        unit: 'pcs',
+        checked_out: subphase.material_checked_out || false,
+        checkout_date: subphase.material_checkout_date || null,
+        checkout_by: subphase.material_checkout_by || null,
+        checkout_by_name: subphase.material_checkout_by_name || null,
+        checkout_by_uid: subphase.material_checkout_by_uid || null
+      }]
+    }
+    
+    return []
+  }
+
   const [formData, setFormData] = useState({
     name: subphase?.name || "",
     expected_duration: subphase?.expected_duration || 0,
@@ -380,6 +411,9 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
     subphase_order: subphase?.subphase_order || 0
   })
 
+  // NEW: Materials array state
+  const [materials, setMaterials] = useState(parseExistingMaterials())
+  
   const [materialsRawList, setMaterialsRawList] = useState([])
   const [loadingMaterials, setLoadingMaterials] = useState(false)
 
@@ -429,21 +463,40 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
     }
   }
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (!formData.name.trim()) {
-      alert("Subphase name is required")
-      return
-    }
-
-    const expectedQty = parseInt(formData.expected_quantity) || 0
-    if (expectedQty > batchQty) {
-      alert(`Expected quantity (${expectedQty}) cannot exceed batch quantity (${batchQty})`)
-      return
-    }
-
-    onSave(formData)
+const handleSubmit = (e) => {
+  e.preventDefault()
+  if (!formData.name.trim()) {
+    alert("Subphase name is required")
+    return
   }
+
+  const expectedQty = parseInt(formData.expected_quantity) || 0
+  if (expectedQty > batchQty) {
+    alert(`Expected quantity (${expectedQty}) cannot exceed batch quantity (${batchQty})`)
+    return
+  }
+
+  // Validate materials
+  for (let i = 0; i < materials.length; i++) {
+    const mat = materials[i]
+    if (!mat.name || !mat.name.trim()) {
+      alert(`Material #${i + 1}: Name is required`)
+      return
+    }
+    if (!mat.quantity || mat.quantity <= 0) {
+      alert(`Material #${i + 1}: Quantity must be greater than 0`)
+      return
+    }
+  }
+
+  // Include materials in save data
+  const saveData = {
+    ...formData,
+    materials: JSON.stringify(materials) // Convert to JSON string for storage
+  }
+
+  onSave(saveData)
+}
 
   const handleDelete = () => {
     if (window.confirm(`Delete subphase "${subphase.name}"?`)) {
@@ -453,7 +506,7 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`rounded-lg max-w-md w-full ${isDarkMode ? "bg-gray-800" : "bg-white"
+      <div className={`rounded-lg max-w-6xl w-full max-h-[90vh] flex flex-col ${isDarkMode ? "bg-gray-800" : "bg-white"
         }`}>
         {/* Header */}
         <div className={`flex justify-between items-center p-6 border-b ${isDarkMode ? "border-gray-700" : "border-gray-200"
@@ -475,7 +528,8 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+          <div className="p-6 space-y-4">
           <div>
             <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
               }`}>
@@ -492,185 +546,289 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
             />
           </div>
 
-          <div>
-            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-              }`}>
-              <Clock size={16} />
-              Expected Duration (Minutes)
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              value={formData.expected_duration}
-              onChange={(e) => setFormData({ ...formData, expected_duration: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                ? "bg-gray-700 border border-gray-600 text-gray-100"
-                : "bg-gray-100 border border-gray-300 text-gray-800"
-                }`}
-            />
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}>
+                <Clock size={16} />
+                Expected Duration (Minutes)
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={formData.expected_duration}
+                onChange={(e) => setFormData({ ...formData, expected_duration: e.target.value })}
+                className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
+                  ? "bg-gray-700 border border-gray-600 text-gray-100"
+                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                  }`}
+              />
+            </div>
 
-          <div>
-            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-              }`}>
-              <Package size={16} />
-              Expected Quantity
-            </label>
-            <input
-              type="number"
-              min="0"
-              max={batchQty}
-              value={formData.expected_quantity}
-              onChange={(e) => setFormData({ ...formData, expected_quantity: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                ? "bg-gray-700 border border-gray-600 text-gray-100"
-                : "bg-gray-100 border border-gray-300 text-gray-800"
-                }`}
-            />
-            <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              Max: {batchQty} (batch quantity)
-            </p>
-          </div>
-
-          <div>
-            <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-              }`}>
-              Subphase Order
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={formData.subphase_order}
-              onChange={(e) => setFormData({ ...formData, subphase_order: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
-                ? "bg-gray-700 border border-gray-600 text-gray-100"
-                : "bg-gray-100 border border-gray-300 text-gray-800"
-                }`}
-            />
-          </div>
-
-          {/* Material Raw - Load from Inventory */}
-          <div>
-            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-              }`}>
-              <Package size={16} />
-              Material Raw (Optional)
-            </label>
-            <select
-              value={formData.material_raw}
-              onChange={(e) => {
-                const selectedMaterial = materialsRawList.find(m => m.value === e.target.value)
-                setFormData({
-                  ...formData,
-                  material_raw: e.target.value,
-                  // Optionally pre-fill unit info
-                  _material_unit: selectedMaterial?.unit || ''
-                })
-              }}
-              disabled={loadingMaterials}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${isDarkMode
-                ? "bg-gray-700 border border-gray-600 text-gray-100"
-                : "bg-gray-100 border border-gray-300 text-gray-800"
-                }`}
-            >
-              <option value="">
-                {loadingMaterials ? "Loading materials..." : "Select material..."}
-              </option>
-
-              {materialsRawList.length > 0 ? (
-                materialsRawList.map((material) => (
-                  <option key={material.item_no} value={material.value}>
-                    {material.label} ({material.unit}) - Stock: {material.balance}
-                  </option>
-                ))
-              ) : !loadingMaterials && (
-                <option value="" disabled>No materials found in inventory</option>
-              )}
-            </select>
-
-            {/* Show material details if selected */}
-            {formData.material_raw && (
+            <div>
+              <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}>
+                <Package size={16} />
+                Expected Quantity
+              </label>
+              <input
+                type="number"
+                min="0"
+                max={batchQty}
+                value={formData.expected_quantity}
+                onChange={(e) => setFormData({ ...formData, expected_quantity: e.target.value })}
+                className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
+                  ? "bg-gray-700 border border-gray-600 text-gray-100"
+                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                  }`}
+              />
               <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                {(() => {
-                  const material = materialsRawList.find(m => m.value === formData.material_raw)
-                  if (material) {
-                    return `Available: ${material.balance} ${material.unit}${material.supplier ? ` • Supplier: ${material.supplier}` : ''}`
-                  }
-                  return null
-                })()}
+                Max: {batchQty} (batch quantity)
+              </p>
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}>
+                Subphase Order
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={formData.subphase_order}
+                onChange={(e) => setFormData({ ...formData, subphase_order: e.target.value })}
+                className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode
+                  ? "bg-gray-700 border border-gray-600 text-gray-100"
+                  : "bg-gray-100 border border-gray-300 text-gray-800"
+                  }`}
+              />
+            </div>
+          </div>
+
+          {/* ========== REDESIGNED MULTIPLE MATERIALS SECTION - HORIZONTAL GRID ========== */}
+          <div className={`space-y-3 p-4 rounded-lg border ${
+            isDarkMode ? "bg-gray-700/30 border-gray-600" : "bg-gray-50 border-gray-300"
+          }`}>
+            <div className="flex items-center justify-between">
+              <label className={`text-sm font-semibold flex items-center gap-2 ${
+                isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}>
+                <Package size={16} />
+                Required Materials ({materials.length})
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setMaterials([...materials, {
+                    name: '',
+                    quantity: 0,
+                    unit: 'pcs',
+                    checked_out: false
+                  }])
+                }}
+                className="flex items-center gap-1 text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded transition-colors"
+              >
+                <Plus size={14} />
+                Add Material
+              </button>
+            </div>
+
+            {/* Materials Grid - Responsive with Scroll */}
+            {materials.length > 0 ? (
+              <div className="max-h-[300px] overflow-y-auto pr-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {materials.map((material, index) => (
+                  <div key={index} className={`p-3 rounded-lg border ${
+                    isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"
+                  }`}>
+                    {/* Material Header */}
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-sm font-medium ${
+                        isDarkMode ? "text-gray-300" : "text-gray-700"
+                      }`}>
+                        Material #{index + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMaterials(materials.filter((_, i) => i !== index))
+                        }}
+                        className="p-1 text-red-600 hover:bg-red-500/10 rounded transition-colors"
+                        title="Remove material"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+
+                    {/* Checkout Status Badge */}
+                    {material.checked_out && (
+                      <div className={`mb-2 p-2 rounded text-xs ${
+                        isDarkMode 
+                          ? "bg-green-500/10 border border-green-500/30 text-green-300"
+                          : "bg-green-500/10 border border-green-500/30 text-green-700"
+                      }`}>
+                        <div className="flex items-center gap-1">
+                          <CheckCircle size={12} />
+                          <span>✅ Checked out</span>
+                        </div>
+                        {material.checkout_by_name && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <User size={12} />
+                            <span>By: {material.checkout_by_name}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Material Name */}
+                    <div className="mb-2">
+                      <label className={`block text-xs mb-1 ${
+                        isDarkMode ? "text-gray-400" : "text-gray-600"
+                      }`}>
+                        Material Name *
+                      </label>
+                      <select
+                        value={material.name}
+                        onChange={(e) => {
+                          const selectedMaterial = materialsRawList.find(m => m.value === e.target.value)
+                          const updated = [...materials]
+                          updated[index] = {
+                            ...updated[index],
+                            name: e.target.value,
+                            unit: selectedMaterial?.unit || 'pcs'
+                          }
+                          setMaterials(updated)
+                        }}
+                        disabled={loadingMaterials || material.checked_out}
+                        className={`w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
+                          isDarkMode
+                            ? "bg-gray-700 border border-gray-600 text-gray-100"
+                            : "bg-gray-100 border border-gray-300 text-gray-800"
+                        }`}
+                      >
+                        <option value="">
+                          {loadingMaterials ? "Loading..." : "Select material..."}
+                        </option>
+                        {materialsRawList.map((mat) => (
+                          <option key={mat.item_no} value={mat.value}>
+                            {mat.label} ({mat.unit}) - Stock: {mat.balance}
+                          </option>
+                        ))}
+                      </select>
+                      
+                      {/* Material Details */}
+                      {material.name && !material.checked_out && (
+                        <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                          {(() => {
+                            const mat = materialsRawList.find(m => m.value === material.name)
+                            if (mat) {
+                              return `Available: ${mat.balance} ${mat.unit}${mat.supplier ? ` • ${mat.supplier}` : ''}`
+                            }
+                            return null
+                          })()}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Quantity and Unit */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={`block text-xs mb-1 ${
+                          isDarkMode ? "text-gray-400" : "text-gray-600"
+                        }`}>
+                          Quantity *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={material.quantity}
+                          onChange={(e) => {
+                            const updated = [...materials]
+                            updated[index].quantity = e.target.value
+                            setMaterials(updated)
+                          }}
+                          disabled={!material.name || material.checked_out}
+                          placeholder="0"
+                          className={`w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
+                            isDarkMode
+                              ? "bg-gray-700 border border-gray-600 text-gray-100"
+                              : "bg-gray-100 border border-gray-300 text-gray-800"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs mb-1 ${
+                          isDarkMode ? "text-gray-400" : "text-gray-600"
+                        }`}>
+                          Unit
+                        </label>
+                        <input
+                          type="text"
+                          value={material.unit}
+                          onChange={(e) => {
+                            const updated = [...materials]
+                            updated[index].unit = e.target.value
+                            setMaterials(updated)
+                          }}
+                          disabled={material.checked_out}
+                          placeholder="pcs"
+                          className={`w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
+                            isDarkMode
+                              ? "bg-gray-700 border border-gray-600 text-gray-100"
+                              : "bg-gray-100 border border-gray-300 text-gray-800"
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              </div>
+            ) : (
+              <p className={`text-sm text-center py-4 ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}>
+                No materials added yet. Click "Add Material" to start.
               </p>
             )}
           </div>
-
-          {/* Material Quantity */}
-          <div>
-            <label className={`block text-sm font-medium mb-1 flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-              }`}>
-              <Package size={16} />
-              Material Quantity
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.material_quantity || ''}
-              onChange={(e) => setFormData({ ...formData, material_quantity: e.target.value })}
-              placeholder="Enter quantity needed"
-              disabled={!formData.material_raw}
-              className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${isDarkMode
-                ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-500"
-                : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-500"
-                }`}
-            />
-            {!formData.material_raw && (
-              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                Select a material first
-              </p>
-            )}
-            {formData.material_raw && formData.material_quantity && (
-              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                {(() => {
-                  const material = materialsRawList.find(m => m.value === formData.material_raw)
-                  if (material) {
-                    return `Requesting: ${formData.material_quantity} ${material.unit}`
-                  }
-                  return null
-                })()}
-              </p>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="space-y-2 pt-4">
-            <button
-              type="submit"
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-            >
-              <Save size={16} />
-              Save Changes
-            </button>
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-            >
-              <Trash2 size={16} />
-              Delete Subphase
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+            </div>
+  
+            {/* Action Buttons - Fixed at bottom */}
+            <div className={`p-6 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <button
+                  type="submit"
+                  className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+                >
+                  <Save size={16} />
+                  Save Changes
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+                >
+                  <Trash2 size={16} />
+                  Delete Subphase
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
-  )
-}
+    )
+  }
+
 
 // ============================================================================
 // ADD PHASE MODAL
