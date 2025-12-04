@@ -17,6 +17,7 @@ import { EmployeeLogsService } from "./services/employee-logs-service.js"
 import { AttendanceEditService } from "./services/attendance-edit-service.js"
 import { AnnouncementService } from "./services/announcement-service.js"
 import { OperationsService } from "./services/operation-service.js"
+import { EmailService } from "./services/email-service.js"
 
 class APIService {
   constructor() {
@@ -35,8 +36,9 @@ class APIService {
     this.suppliers = new SuppliersService()
     this.employeeLogs = new EmployeeLogsService()
     this.editAttendance = new AttendanceEditService()
-    this.announcements =  new AnnouncementService();
+    this.announcements = new AnnouncementService()
     this.operations = new OperationsService()
+    this.email = new EmailService()
   }
 
   // Lazy initialization for socket to avoid circular dependency issues
@@ -94,7 +96,8 @@ export const {
   editAttendance,
   suppliers,
   announcements,
-  operations
+  operations,
+  email
 } = apiService
 
 // Export socket separately to maintain lazy initialization

@@ -148,7 +148,7 @@ async getEmployees(params = {}, options = {}) {
    * @returns {Promise} List of departments
    */
   async getDepartments() {
-    return this.request("/api/employees", {
+    return this.request("/api/employees/departments", {
       method: "GET",
     })
   }
