@@ -146,6 +146,9 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
   const [showOverwriteModal, setShowOverwriteModal] = useState(false)
   const [existingPO, setExistingPO] = useState(null)
   const [showImagePreview, setShowImagePreview] = useState(false)
+  // Confirmation modal for PO type switching
+  const [showPOTypeSwitchModal, setShowPOTypeSwitchModal] = useState(false)
+  const [pendingPOType, setPendingPOType] = useState(null)
 
   // Initialize data when modal opens
   useEffect(() => {
@@ -1160,7 +1163,15 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           {/* Inventory PO Option */}
                           <button
                             type="button"
-                            onClick={() => setFormData(prev => ({ ...prev, po_type: "inventory" }))}
+                            onClick={() => {
+                              // If switching from custom to inventory and there are selected items, show confirmation
+                              if (formData.po_type === "custom" && formData.selectedItems.length > 0) {
+                                setPendingPOType("inventory")
+                                setShowPOTypeSwitchModal(true)
+                              } else {
+                                setFormData(prev => ({ ...prev, po_type: "inventory" }))
+                              }
+                            }}
                             className={`p-6 rounded-xl border-3 transition-all text-left ${
                               formData.po_type === "inventory"
                                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-300 dark:ring-blue-600'
@@ -1191,7 +1202,15 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
                           {/* Custom PO Option */}
                           <button
                             type="button"
-                            onClick={() => setFormData(prev => ({ ...prev, po_type: "custom", supplier_id: "", supplier_name: "", supplier_address: "", supplier_details: null, selectedItems: [] }))}
+                            onClick={() => {
+                              // If switching from inventory to custom and there are selected items, show confirmation
+                              if (formData.po_type === "inventory" && formData.selectedItems.length > 0) {
+                                setPendingPOType("custom")
+                                setShowPOTypeSwitchModal(true)
+                              } else {
+                                setFormData(prev => ({ ...prev, po_type: "custom", supplier_id: "", supplier_name: "", supplier_address: "", supplier_details: null, selectedItems: [] }))
+                              }
+                            }}
                             className={`p-6 rounded-xl border-3 transition-all text-left ${
                               formData.po_type === "custom"
                                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-300 dark:ring-blue-600'
@@ -2665,6 +2684,74 @@ function CreatePurchaseOrderWizard({ isOpen, onClose, onSuccess, editingOrder = 
               
               <button
                 onClick={() => setShowOverwriteModal(false)}
+                className="w-full mt-3 text-sm text-black dark:text-gray-400 hover:text-black dark:hover:text-gray-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* PO Type Switch Confirmation Modal */}
+        {showPOTypeSwitchModal && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full mx-4 p-6">
+              <div className="text-center mb-4">
+                <div className="text-5xl mb-3">⚠️</div>
+                <h3 className="text-xl font-bold text-black dark:text-gray-100 mb-2">
+                  Change PO Type?
+                </h3>
+                <p className="text-black dark:text-gray-400">
+                  You have <strong>{formData.selectedItems.length} item{formData.selectedItems.length !== 1 ? 's' : ''}</strong> already selected. 
+                  Switching to <strong>{pendingPOType === "custom" ? "Custom PO" : "Inventory PO"}</strong> will clear all selected items.
+                </p>
+              </div>
+              
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4">
+                <div className="text-sm text-black dark:text-yellow-100">
+                  <div className="font-semibold mb-1">Selected items to be removed:</div>
+                  <ul className="list-disc list-inside text-xs max-h-32 overflow-y-auto">
+                    {formData.selectedItems.slice(0, 5).map((item, idx) => (
+                      <li key={idx}>{item.item_name} (Qty: {item.quantity})</li>
+                    ))}
+                    {formData.selectedItems.length > 5 && (
+                      <li className="text-gray-500">...and {formData.selectedItems.length - 5} more items</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowPOTypeSwitchModal(false)
+                    setPendingPOType(null)
+                  }}
+                  className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-black dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Keep Current
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPOTypeSwitchModal(false)
+                    if (pendingPOType === "custom") {
+                      setFormData(prev => ({ ...prev, po_type: "custom", supplier_id: "", supplier_name: "", supplier_address: "", supplier_details: null, selectedItems: [] }))
+                    } else {
+                      setFormData(prev => ({ ...prev, po_type: "inventory", supplier_id: "", supplier_name: "", supplier_address: "", supplier_details: null, selectedItems: [] }))
+                    }
+                    setPendingPOType(null)
+                  }}
+                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                >
+                  Clear & Switch
+                </button>
+              </div>
+              
+              <button
+                onClick={() => {
+                  setShowPOTypeSwitchModal(false)
+                  setPendingPOType(null)
+                }}
                 className="w-full mt-3 text-sm text-black dark:text-gray-400 hover:text-black dark:hover:text-gray-100"
               >
                 Cancel
