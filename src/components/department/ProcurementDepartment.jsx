@@ -581,9 +581,14 @@ function ProcurementDepartment() {
                             onClick={() => {
                               const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
                               if (token) {
-                                const encodedToken = encodeURIComponent(token)
                                 const username = user?.username || ''
-                                window.location.href = `/employee/dashboard?autoLogin=true&token=${encodedToken}&username=${encodeURIComponent(username)}&tab=announcements`
+                                // Store token securely in sessionStorage instead of URL
+                                sessionStorage.setItem('nav_auth_token', JSON.stringify({
+                                  token: token,
+                                  username: username,
+                                  timestamp: Date.now()
+                                }))
+                                window.location.href = `/employee/dashboard?autoLogin=true&tab=announcements`
                               } else {
                                 window.location.href = '/employee/dashboard?tab=announcements'
                               }
@@ -646,9 +651,14 @@ function ProcurementDepartment() {
                           onClick={() => {
                             const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
                             if (token) {
-                              const encodedToken = encodeURIComponent(token)
                               const username = user?.username || ''
-                              window.location.href = `/employee/dashboard?autoLogin=true&token=${encodedToken}&username=${encodeURIComponent(username)}&tab=profile`
+                              // Store token securely in sessionStorage instead of URL
+                              sessionStorage.setItem('nav_auth_token', JSON.stringify({
+                                token: token,
+                                username: username,
+                                timestamp: Date.now()
+                              }))
+                              window.location.href = `/employee/dashboard?autoLogin=true&tab=profile`
                             } else {
                               window.location.href = '/employee/dashboard?tab=profile'
                             }

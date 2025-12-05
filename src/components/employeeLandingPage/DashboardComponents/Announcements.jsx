@@ -4,6 +4,142 @@ import { Loader2, AlertCircle, Check, ChevronDown, ChevronUp, Download, FileText
 import apiService from "../../../utils/api/api-service"
 import { getStoredToken, verifyToken } from "../../../utils/auth"
 
+// Constants moved outside component to avoid recreation on every render
+const ITEMS_PER_PAGE_OPTIONS = [5, 10, 20, 50]
+const AUTO_ARCHIVE_DAYS = 7
+const IS_DEV = import.meta.env.DEV
+const MAX_VISIBLE_PAGES = 5
+
+// Extracted pagination component for better maintainability
+function PaginationControls({ 
+  currentPage, 
+  totalPages, 
+  totalItems,
+  startIndex,
+  endIndex,
+  itemsPerPage,
+  setItemsPerPage,
+  goToPage, 
+  goToFirstPage,
+  goToLastPage,
+  goToPrevPage,
+  goToNextPage,
+  isDarkMode 
+}) {
+  // Generate page numbers with ellipsis
+  const renderPageNumbers = () => {
+    const pages = []
+    let startPage = Math.max(1, currentPage - Math.floor(MAX_VISIBLE_PAGES / 2))
+    let endPage = Math.min(totalPages, startPage + MAX_VISIBLE_PAGES - 1)
+    
+    if (endPage - startPage + 1 < MAX_VISIBLE_PAGES) {
+      startPage = Math.max(1, endPage - MAX_VISIBLE_PAGES + 1)
+    }
+
+    const buttonClass = (isActive) => `min-w-[36px] h-9 px-2 text-sm rounded-lg transition-colors font-medium ${
+      isActive
+        ? "bg-amber-500 text-white"
+        : isDarkMode 
+          ? "hover:bg-zinc-800 text-zinc-400 hover:text-white" 
+          : "hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"
+    }`
+
+    const dotsClass = `px-1 ${isDarkMode ? "text-zinc-600" : "text-zinc-400"}`
+
+    // First page + dots if needed
+    if (startPage > 1) {
+      pages.push(
+        <button key={1} onClick={() => goToPage(1)} className={buttonClass(false)}>
+          1
+        </button>
+      )
+      if (startPage > 2) {
+        pages.push(<span key="dots1" className={dotsClass}>...</span>)
+      }
+    }
+
+    // Page number buttons
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <button key={i} onClick={() => goToPage(i)} className={buttonClass(currentPage === i)}>
+          {i}
+        </button>
+      )
+    }
+
+    // Last page + dots if needed
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pages.push(<span key="dots2" className={dotsClass}>...</span>)
+      }
+      pages.push(
+        <button key={totalPages} onClick={() => goToPage(totalPages)} className={buttonClass(false)}>
+          {totalPages}
+        </button>
+      )
+    }
+
+    return pages
+  }
+
+  const navButtonClass = `p-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+    isDarkMode 
+      ? "hover:bg-zinc-800 text-zinc-400 hover:text-white" 
+      : "hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"
+  }`
+
+  return (
+    <div className={`mt-6 p-4 rounded-xl border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-zinc-50 border-zinc-200"}`}>
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        {/* Items per page selector */}
+        <div className="flex items-center gap-2">
+          <span className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>Show</span>
+          <select
+            value={itemsPerPage}
+            onChange={(e) => setItemsPerPage(Number(e.target.value))}
+            className={`px-3 py-1.5 text-sm rounded-lg border cursor-pointer transition-colors ${
+              isDarkMode 
+                ? "bg-zinc-800 border-zinc-700 text-white hover:border-zinc-600" 
+                : "bg-white border-zinc-300 text-zinc-900 hover:border-zinc-400"
+            }`}
+          >
+            {ITEMS_PER_PAGE_OPTIONS.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+          <span className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>per page</span>
+        </div>
+
+        {/* Page info */}
+        <div className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+          Showing {startIndex + 1} - {Math.min(endIndex, totalItems)} of {totalItems} announcements
+        </div>
+
+        {/* Page navigation */}
+        <div className="flex items-center gap-1">
+          <button onClick={goToFirstPage} disabled={currentPage === 1} className={navButtonClass} title="First page">
+            <ChevronsLeft className="w-4 h-4" />
+          </button>
+          <button onClick={goToPrevPage} disabled={currentPage === 1} className={navButtonClass} title="Previous page">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <div className="flex items-center gap-1 mx-2">
+            {renderPageNumbers()}
+          </div>
+
+          <button onClick={goToNextPage} disabled={currentPage === totalPages} className={navButtonClass} title="Next page">
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          <button onClick={goToLastPage} disabled={currentPage === totalPages} className={navButtonClass} title="Last page">
+            <ChevronsRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Announcements({ isDarkMode }) {
   const [announcements, setAnnouncements] = useState([])
   const [archivedAnnouncements, setArchivedAnnouncements] = useState([])
@@ -27,7 +163,6 @@ export default function Announcements({ isDarkMode }) {
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
-  const itemsPerPageOptions = [5, 10, 20, 50]
 
   useEffect(() => {
     const fetchAnnouncementsData = async () => {
@@ -57,13 +192,17 @@ export default function Announcements({ isDarkMode }) {
         // Fetch announcements for the employee
         const response = await apiService.announcements.getEmployeeAnnouncements(uid)
         
-        console.log("📢 Employee announcements response:", response)
-        console.log("📋 Raw data:", response.data)
+        if (IS_DEV) {
+          console.log("📢 Employee announcements response:", response)
+          console.log("📋 Raw data:", response.data)
+        }
         
         if (response?.data) {
           const formattedAnnouncements = response.data.map((ann) => {
-            console.log("📋 Processing announcement:", ann.id, ann.title)
-            console.log("📎 Attachments found:", ann.attachments)
+            if (IS_DEV) {
+              console.log("📋 Processing announcement:", ann.id, ann.title)
+              console.log("📎 Attachments found:", ann.attachments)
+            }
             
             return {
               id: ann.id,
@@ -78,30 +217,46 @@ export default function Announcements({ isDarkMode }) {
             }
           })
           
-          console.log("✅ Formatted announcements:", formattedAnnouncements)
-          console.log("✅ First announcement attachments:", formattedAnnouncements[0]?.attachments)
+          if (IS_DEV) {
+            console.log("✅ Formatted announcements:", formattedAnnouncements)
+            console.log("✅ First announcement attachments:", formattedAnnouncements[0]?.attachments)
+          }
           
           // Load archived announcements from localStorage
+          // Note: uid here equals employeeId state - both are used for the same localStorage key
           const storedArchived = localStorage.getItem(`archived_announcements_${uid}`)
           let archivedIds = storedArchived ? JSON.parse(storedArchived) : []
           
-          // Auto-archive announcements older than 7 days
-          const sevenDaysAgo = new Date()
-          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+          // Auto-archive announcements older than 7 days (only run once per day)
+          const lastAutoArchiveKey = `last_auto_archive_${uid}`
+          const lastAutoArchive = localStorage.getItem(lastAutoArchiveKey)
+          const now = new Date()
+          const today = now.toDateString()
           
-          const autoArchivedIds = []
-          formattedAnnouncements.forEach((ann) => {
-            const announcementDate = new Date(ann.createdAt)
-            if (announcementDate < sevenDaysAgo && !archivedIds.includes(ann.id)) {
-              autoArchivedIds.push(ann.id)
+          // Only run auto-archive if we haven't done it today
+          if (lastAutoArchive !== today) {
+            const archiveThreshold = new Date()
+            archiveThreshold.setDate(archiveThreshold.getDate() - AUTO_ARCHIVE_DAYS)
+            
+            const autoArchivedIds = []
+            formattedAnnouncements.forEach((ann) => {
+              const announcementDate = new Date(ann.createdAt)
+              if (announcementDate < archiveThreshold && !archivedIds.includes(ann.id)) {
+                autoArchivedIds.push(ann.id)
+              }
+            })
+            
+            // Add auto-archived IDs to archived list and save to localStorage
+            if (autoArchivedIds.length > 0) {
+              archivedIds = [...archivedIds, ...autoArchivedIds]
+              localStorage.setItem(`archived_announcements_${uid}`, JSON.stringify(archivedIds))
+              if (IS_DEV) {
+                console.log(`📦 Auto-archived ${autoArchivedIds.length} announcements older than ${AUTO_ARCHIVE_DAYS} days`)
+              }
             }
-          })
-          
-          // Add auto-archived IDs to archived list and save to localStorage
-          if (autoArchivedIds.length > 0) {
-            archivedIds = [...archivedIds, ...autoArchivedIds]
-            localStorage.setItem(`archived_announcements_${uid}`, JSON.stringify(archivedIds))
-            console.log(`📦 Auto-archived ${autoArchivedIds.length} announcements older than 7 days`)
+            
+            // Mark that we've run auto-archive today
+            localStorage.setItem(lastAutoArchiveKey, today)
           }
           
           // Separate archived and active announcements
@@ -129,7 +284,7 @@ export default function Announcements({ isDarkMode }) {
 
   const handleDownloadAttachment = async (announcementId, filename) => {
     try {
-      console.log(`📥 Downloading: ${filename} from announcement ${announcementId}`)
+      if (IS_DEV) console.log(`📥 Downloading: ${filename} from announcement ${announcementId}`)
       const blob = await apiService.announcements.getAnnouncementAttachment(announcementId, filename)
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -139,7 +294,7 @@ export default function Announcements({ isDarkMode }) {
       link.click()
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
-      console.log("✅ Download successful")
+      if (IS_DEV) console.log("✅ Download successful")
     } catch (error) {
       console.error('❌ Error downloading attachment:', error)
       alert('Failed to download attachment: ' + error.message)
@@ -205,8 +360,9 @@ export default function Announcements({ isDarkMode }) {
     try {
       await apiService.announcements.dismissAnnouncement(announcementId, employeeId)
       
-      // Remove from local state
+      // Remove from both active and archived lists
       setAnnouncements((prev) => prev.filter((ann) => ann.id !== announcementId))
+      setArchivedAnnouncements((prev) => prev.filter((ann) => ann.id !== announcementId))
       setSelectedIds((prev) => {
         const newSet = new Set(prev)
         newSet.delete(announcementId)
@@ -216,6 +372,7 @@ export default function Announcements({ isDarkMode }) {
       console.error("Error deleting announcement:", err)
       // Still remove from UI even if API fails
       setAnnouncements((prev) => prev.filter((ann) => ann.id !== announcementId))
+      setArchivedAnnouncements((prev) => prev.filter((ann) => ann.id !== announcementId))
     } finally {
       setDeletingIds((prev) => {
         const newSet = new Set(prev)
@@ -418,7 +575,8 @@ export default function Announcements({ isDarkMode }) {
 
   // Filter and sort announcements
   const filteredAndSortedAnnouncements = useMemo(() => {
-    let result = [...currentList]
+    const sourceList = viewMode === "archived" ? archivedAnnouncements : announcements
+    let result = [...sourceList]
 
     // Apply search filter
     if (searchQuery.trim()) {
@@ -452,7 +610,7 @@ export default function Announcements({ isDarkMode }) {
     // Apply sort
     switch (sortBy) {
       case "oldest":
-        result.sort((a, b) => new Date(a.fullData?.created_at || a.time) - new Date(b.fullData?.created_at || b.time))
+        result.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
         break
       case "priority":
         const priorityOrder = { urgent: 0, important: 1, normal: 2 }
@@ -464,12 +622,12 @@ export default function Announcements({ isDarkMode }) {
         break
       case "newest":
       default:
-        result.sort((a, b) => new Date(b.fullData?.created_at || b.time) - new Date(a.fullData?.created_at || a.time))
+        result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
         break
     }
 
     return result
-  }, [currentList, filterBy, sortBy, searchQuery])
+  }, [announcements, archivedAnnouncements, viewMode, filterBy, sortBy, searchQuery])
 
   // Paginate the filtered and sorted announcements
   const totalItems = filteredAndSortedAnnouncements.length
@@ -897,7 +1055,12 @@ export default function Announcements({ isDarkMode }) {
             const isSelected = selectedIds.has(announcement.id)
             const isDeleting = deletingIds.has(announcement.id)
             
-            console.log(`🔍 Rendering announcement ${announcement.id}, hasAttachments:`, hasAttachments, announcement.attachments)
+            const handleKeyDown = (e) => {
+              if ((e.key === 'Enter' || e.key === ' ') && !isSelectionMode) {
+                e.preventDefault()
+                toggleExpand(announcement.id, announcement.read)
+              }
+            }
             
             return (
               <Card key={announcement.id} className={`overflow-hidden transition-all ${isSelected ? (isDarkMode ? "ring-2 ring-amber-500/50" : "ring-2 ring-amber-400") : ""}`}>
@@ -925,6 +1088,11 @@ export default function Announcements({ isDarkMode }) {
                       <div 
                         className="flex items-center justify-between gap-3 flex-1 min-w-0 cursor-pointer"
                         onClick={() => !isSelectionMode && toggleExpand(announcement.id, announcement.read)}
+                        onKeyDown={handleKeyDown}
+                        role="button"
+                        tabIndex={isSelectionMode ? -1 : 0}
+                        aria-expanded={isExpanded}
+                        aria-label={`${announcement.title}${!announcement.read ? ' (unread)' : ''}`}
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           {/* Priority/Unread indicator */}
@@ -1132,170 +1300,21 @@ export default function Announcements({ isDarkMode }) {
 
         {/* Pagination Controls */}
         {totalItems > 0 && (
-          <div className={`mt-6 p-4 rounded-xl border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-zinc-50 border-zinc-200"}`}>
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              {/* Items per page selector */}
-              <div className="flex items-center gap-2">
-                <span className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>Show</span>
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                  className={`px-3 py-1.5 text-sm rounded-lg border cursor-pointer transition-colors ${
-                    isDarkMode 
-                      ? "bg-zinc-800 border-zinc-700 text-white hover:border-zinc-600" 
-                      : "bg-white border-zinc-300 text-zinc-900 hover:border-zinc-400"
-                  }`}
-                >
-                  {itemsPerPageOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-                <span className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>per page</span>
-              </div>
-
-              {/* Page info */}
-              <div className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                Showing {startIndex + 1} - {Math.min(endIndex, totalItems)} of {totalItems} announcements
-              </div>
-
-              {/* Page navigation */}
-              <div className="flex items-center gap-1">
-                {/* First page */}
-                <button
-                  onClick={goToFirstPage}
-                  disabled={currentPage === 1}
-                  className={`p-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                    isDarkMode 
-                      ? "hover:bg-zinc-800 text-zinc-400 hover:text-white" 
-                      : "hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"
-                  }`}
-                  title="First page"
-                >
-                  <ChevronsLeft className="w-4 h-4" />
-                </button>
-
-                {/* Previous page */}
-                <button
-                  onClick={goToPrevPage}
-                  disabled={currentPage === 1}
-                  className={`p-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                    isDarkMode 
-                      ? "hover:bg-zinc-800 text-zinc-400 hover:text-white" 
-                      : "hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"
-                  }`}
-                  title="Previous page"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-
-                {/* Page numbers */}
-                <div className="flex items-center gap-1 mx-2">
-                  {(() => {
-                    const pages = []
-                    const maxVisiblePages = 5
-                    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2))
-                    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1)
-                    
-                    if (endPage - startPage + 1 < maxVisiblePages) {
-                      startPage = Math.max(1, endPage - maxVisiblePages + 1)
-                    }
-
-                    if (startPage > 1) {
-                      pages.push(
-                        <button
-                          key={1}
-                          onClick={() => goToPage(1)}
-                          className={`min-w-[36px] h-9 px-2 text-sm rounded-lg transition-colors ${
-                            isDarkMode 
-                              ? "hover:bg-zinc-800 text-zinc-400 hover:text-white" 
-                              : "hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"
-                          }`}
-                        >
-                          1
-                        </button>
-                      )
-                      if (startPage > 2) {
-                        pages.push(
-                          <span key="dots1" className={`px-1 ${isDarkMode ? "text-zinc-600" : "text-zinc-400"}`}>...</span>
-                        )
-                      }
-                    }
-
-                    for (let i = startPage; i <= endPage; i++) {
-                      pages.push(
-                        <button
-                          key={i}
-                          onClick={() => goToPage(i)}
-                          className={`min-w-[36px] h-9 px-2 text-sm rounded-lg transition-colors font-medium ${
-                            currentPage === i
-                              ? isDarkMode 
-                                ? "bg-amber-500 text-white" 
-                                : "bg-amber-500 text-white"
-                              : isDarkMode 
-                                ? "hover:bg-zinc-800 text-zinc-400 hover:text-white" 
-                                : "hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"
-                          }`}
-                        >
-                          {i}
-                        </button>
-                      )
-                    }
-
-                    if (endPage < totalPages) {
-                      if (endPage < totalPages - 1) {
-                        pages.push(
-                          <span key="dots2" className={`px-1 ${isDarkMode ? "text-zinc-600" : "text-zinc-400"}`}>...</span>
-                        )
-                      }
-                      pages.push(
-                        <button
-                          key={totalPages}
-                          onClick={() => goToPage(totalPages)}
-                          className={`min-w-[36px] h-9 px-2 text-sm rounded-lg transition-colors ${
-                            isDarkMode 
-                              ? "hover:bg-zinc-800 text-zinc-400 hover:text-white" 
-                              : "hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"
-                          }`}
-                        >
-                          {totalPages}
-                        </button>
-                      )
-                    }
-
-                    return pages
-                  })()}
-                </div>
-
-                {/* Next page */}
-                <button
-                  onClick={goToNextPage}
-                  disabled={currentPage === totalPages}
-                  className={`p-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                    isDarkMode 
-                      ? "hover:bg-zinc-800 text-zinc-400 hover:text-white" 
-                      : "hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"
-                  }`}
-                  title="Next page"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-
-                {/* Last page */}
-                <button
-                  onClick={goToLastPage}
-                  disabled={currentPage === totalPages}
-                  className={`p-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                    isDarkMode 
-                      ? "hover:bg-zinc-800 text-zinc-400 hover:text-white" 
-                      : "hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"
-                  }`}
-                  title="Last page"
-                >
-                  <ChevronsRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            itemsPerPage={itemsPerPage}
+            setItemsPerPage={setItemsPerPage}
+            goToPage={goToPage}
+            goToFirstPage={goToFirstPage}
+            goToLastPage={goToLastPage}
+            goToPrevPage={goToPrevPage}
+            goToNextPage={goToNextPage}
+            isDarkMode={isDarkMode}
+          />
         )}
         </>
       )}

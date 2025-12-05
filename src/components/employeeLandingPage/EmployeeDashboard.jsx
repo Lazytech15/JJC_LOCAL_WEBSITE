@@ -96,22 +96,30 @@ export default function EmployeeDashboard() {
       setError(null)
 
       try {
-        // Check for auto-login from department pages via URL parameters
+        // Check for auto-login from department pages via sessionStorage (secure method)
         const urlParams = new URLSearchParams(window.location.search)
         const autoLogin = urlParams.get('autoLogin')
-        const tokenParam = urlParams.get('token')
-        const usernameParam = urlParams.get('username')
         const tabParam = urlParams.get('tab')
 
         let token = null
         
-        if (autoLogin === 'true' && tokenParam) {
-          console.log('[EmployeeDashboard] Auto-login detected from URL')
-          // Decode and use the token from URL
-          token = decodeURIComponent(tokenParam)
-          
-          // Store the token
-          storeTokens(token, true) // true for employee token
+        if (autoLogin === 'true') {
+          console.log('[EmployeeDashboard] Auto-login detected')
+          // Get token from secure sessionStorage instead of URL
+          const navAuth = sessionStorage.getItem('nav_auth_token')
+          if (navAuth) {
+            try {
+              const authData = JSON.parse(navAuth)
+              token = authData.token
+              // Clear the temporary auth data immediately after reading
+              sessionStorage.removeItem('nav_auth_token')
+              
+              // Store the token properly
+              storeTokens(token, true) // true for employee token
+            } catch (e) {
+              console.error('[EmployeeDashboard] Failed to parse nav auth:', e)
+            }
+          }
           
           // Set the active tab if provided
           if (tabParam) {
@@ -120,8 +128,10 @@ export default function EmployeeDashboard() {
           
           // Clean up URL
           window.history.replaceState({}, document.title, window.location.pathname)
-        } else {
-          // Get token from storage
+        }
+        
+        // Fall back to stored token if no nav auth
+        if (!token) {
           token = getStoredToken()
         }
         
@@ -343,16 +353,20 @@ export default function EmployeeDashboard() {
       console.log("[DepartmentAccess] Employee data:", employeeData)
       console.log("[DepartmentAccess] Target department:", rawDepartment)
 
-      // Encode token for URL parameter (safe for cross-domain)
-      const encodedToken = encodeURIComponent(token)
+      // Store token securely in sessionStorage for cross-page navigation
       const username = payload.username || employee?.username || employeeData?.username
+      sessionStorage.setItem('nav_auth_token', JSON.stringify({
+        token: token,
+        username: username,
+        timestamp: Date.now()
+      }))
       
-      // Build URL with token parameter for auto-login
-      const urlWithAuth = `${deptRoute.url}?autoLogin=true&token=${encodedToken}&username=${encodeURIComponent(username)}&loginType=employee`
+      // Build URL without sensitive token
+      const urlWithAuth = `${deptRoute.url}?autoLogin=true&loginType=employee`
       
       console.log("[DepartmentAccess] Navigating to:", deptRoute.url)
       
-      // Navigate to department page with auth params
+      // Navigate to department page
       window.location.href = urlWithAuth
     } catch (error) {
       console.error("Error accessing department:", error)
