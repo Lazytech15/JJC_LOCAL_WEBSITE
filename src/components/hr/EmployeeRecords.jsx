@@ -1409,14 +1409,14 @@ function EmployeeRecords() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 pb-20 sm:pb-0">
       {/* Header with Statistics */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
         <div>
-          <h2 className={`text-2xl font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+          <h2 className={`text-xl sm:text-2xl font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
             👥 Employee Records
           </h2>
-          <div className={`flex gap-4 mt-2 text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+          <div className={`grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 mt-2 text-xs sm:text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
             <span>Total: {statistics.totalEmployees || 0}</span>
             <span>Active: {statistics.activeEmployees || 0}</span>
             <span>New Hires (30d): {statistics.newHiresLast30Days || 0}</span>
@@ -1428,7 +1428,7 @@ function EmployeeRecords() {
           className={`${isDarkMode
               ? "bg-slate-700 hover:bg-slate-600"
               : "bg-slate-600 hover:bg-slate-700"
-            } text-white px-4 py-2 rounded-lg transition-colors duration-200`}
+            } text-white px-3 sm:px-4 py-2 rounded-lg transition-colors duration-200 text-sm sm:text-base self-start sm:self-auto`}
         >
           Refresh
         </button>
@@ -1436,10 +1436,10 @@ function EmployeeRecords() {
 
       {/* Filters and Search */}
       <div className={`${isDarkMode ? "bg-gray-800/40 border-gray-700/30" : "bg-white/20 border-white/30"
-        } backdrop-blur-md rounded-2xl p-4 border`}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        } backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border`}>
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
           {/* Simple Search Input - No Autocomplete */}
-          <div className="relative">
+          <div className="relative col-span-2 sm:col-span-1">
             <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isDarkMode ? "text-gray-500" : "text-gray-400"
               }`} />
             <input
@@ -1447,7 +1447,7 @@ function EmployeeRecords() {
               placeholder="Search employees..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full pl-10 pr-10 py-2 rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
+              className={`w-full pl-10 pr-10 py-2 text-sm sm:text-base rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
                   ? "bg-gray-800/60 border-gray-700/40 text-gray-100 placeholder-gray-400"
                   : "bg-white/20 border-white/30 text-gray-800 placeholder-gray-500"
                 }`}
@@ -1469,7 +1469,7 @@ function EmployeeRecords() {
           <select
             value={filterDepartment}
             onChange={(e) => setFilterDepartment(e.target.value)}
-            className={`px-4 py-2 rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
+            className={`px-2 sm:px-4 py-2 text-sm sm:text-base rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
                 ? "bg-gray-800/60 border-gray-700/40 text-gray-100"
                 : "bg-white/20 border-white/30 text-gray-800"
               }`}
@@ -1486,7 +1486,7 @@ function EmployeeRecords() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className={`px-4 py-2 rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
+            className={`px-2 sm:px-4 py-2 text-sm sm:text-base rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
                 ? "bg-gray-800/60 border-gray-700/40 text-gray-100"
                 : "bg-white/20 border-white/30 text-gray-800"
               }`}
@@ -1502,7 +1502,7 @@ function EmployeeRecords() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className={`px-4 py-2 rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
+            className={`px-2 sm:px-4 py-2 text-sm sm:text-base rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
                 ? "bg-gray-800/60 border-gray-700/40 text-gray-100"
                 : "bg-white/20 border-white/30 text-gray-800"
               }`}
@@ -1519,7 +1519,7 @@ function EmployeeRecords() {
           <select
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value)}
-            className={`px-4 py-2 rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
+            className={`px-2 sm:px-4 py-2 text-sm sm:text-base rounded-lg backdrop-blur-sm border focus:outline-none focus:ring-2 focus:ring-slate-500 ${isDarkMode
                 ? "bg-gray-800/60 border-gray-700/40 text-gray-100"
                 : "bg-white/20 border-white/30 text-gray-800"
               }`}
@@ -1550,25 +1550,25 @@ function EmployeeRecords() {
       )}
 
       {/* Employee Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Employee List */}
-        <div className={`backdrop-blur-md rounded-2xl p-6 border shadow-lg ${isDarkMode
+        <div className={`backdrop-blur-md rounded-xl sm:rounded-2xl p-4 sm:p-6 border shadow-lg ${isDarkMode
             ? "bg-gray-800/40 border-gray-700/30"
             : "bg-white/20 border-white/30"
           }`}>
-          <div className="flex justify-between items-center mb-4">
-            <h3 className={`text-lg font-semibold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
+            <h3 className={`text-base sm:text-lg font-semibold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
               Employees ({employees.length} of {pagination.total})
             </h3>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {searchLoading && (
-                <div className={`flex items-center gap-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"
+                <div className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"
                   }`}>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Updating...</span>
+                  <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                  <span className="hidden sm:inline">Updating...</span>
                 </div>
               )}
-              <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+              <div className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
                 Page {pagination.currentPage} of{" "}
                 {Math.ceil(pagination.total / pagination.limit)}
               </div>
@@ -1589,12 +1589,12 @@ function EmployeeRecords() {
               </div>
             )}
 
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+            <div className="space-y-2 sm:space-y-3 max-h-[350px] sm:max-h-[485px] overflow-y-auto">
               {employees.map((employee) => (
                 <div
                   key={employee.id}
                   onClick={() => setSelectedEmployee(employee)}
-                  className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${selectedEmployee?.id === employee.id
+                  className={`p-3 sm:p-4 rounded-lg border cursor-pointer transition-all duration-200 ${selectedEmployee?.id === employee.id
                       ? isDarkMode
                         ? "bg-gray-700/60 border-slate-500"
                         : "bg-white/40 border-slate-300"
@@ -1603,9 +1603,9 @@ function EmployeeRecords() {
                         : "bg-white/20 border-white/20 hover:bg-white/30"
                     }`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     {/* Profile Picture in List */}
-                    <div className={`w-10 h-10 rounded-full overflow-hidden flex-shrink-0 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden flex-shrink-0 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"
                       }`}>
                       {getProfilePictureUrl(employee) ? (
                         <img
@@ -1626,29 +1626,29 @@ function EmployeeRecords() {
                       </div>
                     </div>
 
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className={`font-medium ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="min-w-0 flex-1">
+                          <h4 className={`font-medium text-sm sm:text-base truncate ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
                             {employee.fullName}
                             {employee.isNewHire && (
-                              <span className="ml-2 text-xs bg-green-500 text-white px-2 py-1 rounded">
+                              <span className="ml-1 sm:ml-2 text-[10px] sm:text-xs bg-green-500 text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded">
                                 NEW
                               </span>
                             )}
                           </h4>
-                          <p className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                          <p className={`text-xs sm:text-sm truncate ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
                             {employee.position}
                           </p>
-                          <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          <p className={`text-[10px] sm:text-xs truncate ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                             {employee.department}
                           </p>
-                          <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          <p className={`text-[10px] sm:text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                             ID: {employee.idNumber}
                           </p>
                         </div>
                         <span
-                          className={`px-2 py-1 rounded-full text-xs ${employee.status === "Active"
+                          className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0 ${employee.status === "Active"
                               ? isDarkMode
                                 ? "bg-green-900/40 text-green-300"
                                 : "bg-green-100/80 text-green-700"
@@ -1686,18 +1686,18 @@ function EmployeeRecords() {
             )}
           </div>
           {/* Pagination */}
-          <div className="flex justify-center mt-4 gap-2">
+          <div className="flex justify-center mt-3 sm:mt-4 gap-1 sm:gap-2">
             <button
               onClick={() => handlePageChange(pagination.currentPage - 1)}
               disabled={pagination.currentPage === 1 || searchLoading}
-              className={`px-3 py-1 rounded text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity ${isDarkMode
+              className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity ${isDarkMode
                   ? "bg-slate-700 hover:bg-slate-600"
                   : "bg-slate-600 hover:bg-slate-700"
                 }`}
             >
-              Previous
+              Prev
             </button>
-            <span className={`px-3 py-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+            <span className={`px-2 sm:px-3 py-1 text-xs sm:text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               {pagination.currentPage} /{" "}
               {Math.ceil(pagination.total / pagination.limit)}
             </span>
@@ -1707,7 +1707,7 @@ function EmployeeRecords() {
                 pagination.currentPage >= Math.ceil(pagination.total / pagination.limit) ||
                 searchLoading
               }
-              className={`px-3 py-1 rounded text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity ${isDarkMode
+              className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity ${isDarkMode
                   ? "bg-slate-700 hover:bg-slate-600"
                   : "bg-slate-600 hover:bg-slate-700"
                 }`}
@@ -1718,20 +1718,19 @@ function EmployeeRecords() {
         </div>
 
         {/* Employee Details */}
-        <div className={`backdrop-blur-md rounded-2xl p-6 border shadow-lg ${isDarkMode
+        <div className={`backdrop-blur-md rounded-xl sm:rounded-2xl p-4 sm:p-6 border shadow-lg ${isDarkMode
             ? "bg-gray-800/40 border-gray-700/30"
             : "bg-white/20 border-white/30"
           }`}>
-          <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
+          <h3 className={`text-base sm:text-lg font-semibold mb-3 sm:mb-4 ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
             Employee Details
           </h3>
           {selectedEmployee ? (
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              <div className={`text-center pb-4 border-b ${isDarkMode ? "border-gray-600/30" : "border-white/30"
-                }`}>
+            <div className="space-y-3 sm:space-y-4 max-h-[400px] sm:max-h-[500px] overflow-y-auto pr-1 sm:pr-2">
+              {/* Profile Header */}
+              <div className={`text-center pb-3 sm:pb-4 border-b ${isDarkMode ? "border-gray-600/30" : "border-white/30"}`}>
                 {/* Profile Picture Display */}
-                <div className={`w-24 h-24 mx-auto mb-3 rounded-full overflow-hidden ${isDarkMode ? "bg-gray-700" : "bg-gray-200"
-                  }`}>
+                <div className={`w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-2 sm:mb-3 rounded-full overflow-hidden ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}>
                   {getProfilePictureUrl(selectedEmployee) ? (
                     <img
                       src={getProfilePictureUrl(selectedEmployee)}
@@ -1754,12 +1753,41 @@ function EmployeeRecords() {
                 <h4 className={`text-xl font-bold ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
                   {selectedEmployee.fullName}
                 </h4>
-                <p className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+                <p className={`text-sm sm:text-base ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
                   {selectedEmployee.position}
                 </p>
-                <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                <p className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                   {selectedEmployee.department}
                 </p>
+
+                {/* Action Buttons - Right after profile info */}
+                <div className="flex gap-2 mt-3 sm:mt-4 justify-center">
+                  <button
+                    onClick={() => handleEditEmployee(selectedEmployee)}
+                    className={`flex-1 max-w-[100px] sm:max-w-[140px] text-white py-1.5 sm:py-2 px-2 sm:px-4 rounded-lg transition-colors duration-200 text-xs sm:text-sm font-medium flex items-center justify-center gap-1 sm:gap-1.5 ${isDarkMode
+                        ? "bg-slate-700 hover:bg-slate-600"
+                        : "bg-slate-600 hover:bg-slate-700"
+                      }`}
+                  >
+                    <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteClick(selectedEmployee)}
+                    className={`py-1.5 sm:py-2 px-2 sm:px-4 rounded-lg transition-colors duration-200 text-xs sm:text-sm font-medium flex items-center justify-center gap-1 sm:gap-1.5 ${isDarkMode
+                        ? "bg-red-700/80 hover:bg-red-600 text-white"
+                        : "bg-red-100 hover:bg-red-200 text-red-700"
+                      }`}
+                  >
+                    <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete
+                  </button>
+                </div>
+              </div>
 
                 {/* Documents Display */}
                 {loadingDocuments ? (
@@ -1831,15 +1859,14 @@ function EmployeeRecords() {
                     </p>
                   </div>
                 )}
-              </div>
 
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 gap-2 sm:gap-3">
                 {/* Personal Information */}
-                <div className={`border-b pb-3 ${isDarkMode ? "border-gray-600/20" : "border-white/20"}`}>
-                  <h5 className={`font-medium mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                <div className={`border-b pb-2 sm:pb-3 ${isDarkMode ? "border-gray-600/20" : "border-white/20"}`}>
+                  <h5 className={`font-medium mb-1.5 sm:mb-2 text-sm sm:text-base ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                     Personal Information
                   </h5>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
                     <div>
                       <label className={`text-xs font-medium block ${isDarkMode ? "text-gray-300" : "text-gray-600"
                         }`}>
@@ -1898,11 +1925,11 @@ function EmployeeRecords() {
                 </div>
 
                 {/* Employment Information */}
-                <div className={`border-b pb-3 ${isDarkMode ? "border-gray-600/20" : "border-white/20"}`}>
-                  <h5 className={`font-medium mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                <div className={`border-b pb-2 sm:pb-3 ${isDarkMode ? "border-gray-600/20" : "border-white/20"}`}>
+                  <h5 className={`font-medium mb-1.5 sm:mb-2 text-sm sm:text-base ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                     Employment Information
                   </h5>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
                     <div>
                       <label className={`text-xs font-medium block ${isDarkMode ? "text-gray-300" : "text-gray-600"
                         }`}>
@@ -1965,11 +1992,11 @@ function EmployeeRecords() {
                 </div>
 
                 {/* Government IDs */}
-                <div className="pb-3">
-                  <h5 className={`font-medium mb-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                <div className="pb-2 sm:pb-3">
+                  <h5 className={`font-medium mb-1.5 sm:mb-2 text-sm sm:text-base ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                     Government IDs & Numbers
                   </h5>
-                  <div className="grid grid-cols-1 gap-2 text-sm">
+                  <div className="grid grid-cols-1 gap-1.5 sm:gap-2 text-xs sm:text-sm">
                     <div className="flex justify-between">
                       <label className={`text-xs font-medium ${isDarkMode ? "text-gray-300" : "text-gray-600"
                         }`}>
@@ -2009,34 +2036,12 @@ function EmployeeRecords() {
                   </div>
                 </div>
               </div>
-
-              <div className={`flex gap-3 pt-4 border-t ${isDarkMode ? "border-gray-600/30" : "border-white/30"
-                }`}>
-                <button
-                  onClick={() => handleEditEmployee(selectedEmployee)}
-                  className={`flex-1 text-white py-2 rounded-lg transition-colors duration-200 text-sm ${isDarkMode
-                      ? "bg-slate-700 hover:bg-slate-600"
-                      : "bg-slate-600 hover:bg-slate-700"
-                    }`}
-                >
-                  Edit Employee
-                </button>
-                <button
-                  onClick={() => handleDeleteClick(selectedEmployee)}
-                  className={`flex-1 text-white py-2 rounded-lg transition-colors duration-200 text-sm ${isDarkMode
-                      ? "bg-red-700 hover:bg-red-600"
-                      : "bg-red-600 hover:bg-red-700"
-                    }`}
-                >
-                  Delete Employee
-                </button>
-              </div>
             </div>
           ) : (
-            <div className="text-center py-8">
-              <div className="text-6xl mb-4">👤</div>
-              <p className={isDarkMode ? "text-gray-400" : "text-gray-500"}>
-                Select an employee to view detailed information
+            <div className="text-center py-4 sm:py-8">
+              <div className="text-4xl sm:text-6xl mb-2 sm:mb-4">👤</div>
+              <p className={`text-sm sm:text-base ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                Select an employee to view details
               </p>
             </div>
           )}

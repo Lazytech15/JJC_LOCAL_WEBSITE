@@ -8,7 +8,9 @@ function Announcement() {
   const [employees, setEmployees] = useState([])
   const [departments, setDepartments] = useState([])
   const [announcements, setAnnouncements] = useState([])
-  const [attachments, setAttachments] = useState([])
+  const [attachments, setAttachments] = useState([]) // New files to upload
+  const [existingAttachments, setExistingAttachments] = useState([]) // Attachments already saved on server
+  const [attachmentsToDelete, setAttachmentsToDelete] = useState([]) // IDs of existing attachments to delete
   const [uploadingFiles, setUploadingFiles] = useState(false)
   
   const [formData, setFormData] = useState({
@@ -148,6 +150,12 @@ const removeAttachment = (index) => {
   setAttachments(prev => prev.filter((_, i) => i !== index))
 }
 
+const removeExistingAttachment = (attachment) => {
+  setExistingAttachments(prev => prev.filter(att => att.id !== attachment.id))
+  // Store the filename for deletion (API uses filename, not ID)
+  setAttachmentsToDelete(prev => [...prev, attachment.filename || attachment.original_name])
+}
+
 const formatFileSize = (bytes) => {
   if (bytes === 0) return '0 Bytes'
   const k = 1024
@@ -212,9 +220,23 @@ const handleSubmit = async () => {
       throw new Error("Server did not return an announcement ID")
     }
     
-    // Upload attachments if any
+    // Delete attachments that were marked for removal
+    if (attachmentsToDelete.length > 0) {
+      console.log(`🗑️ Deleting ${attachmentsToDelete.length} attachments`)
+      try {
+        for (const filename of attachmentsToDelete) {
+          await apiService.announcements.deleteAnnouncementAttachment(announcementId, filename)
+          console.log(`✅ Deleted attachment: ${filename}`)
+        }
+      } catch (err) {
+        console.error("❌ Error deleting attachments:", err)
+        // Continue with the rest of the operation even if deletion fails
+      }
+    }
+    
+    // Upload new attachments if any
     if (attachments.length > 0) {
-      console.log(`📎 Uploading ${attachments.length} attachments for announcement ${announcementId}`)
+      console.log(`📎 Uploading ${attachments.length} new attachments for announcement ${announcementId}`)
       console.log("📎 Attachments to upload:", attachments.map(f => ({
         name: f.name,
         size: f.size,
@@ -241,7 +263,7 @@ const handleSubmit = async () => {
         setUploadingFiles(false)
       }
     } else {
-      console.log("ℹ️ No attachments to upload")
+      console.log("ℹ️ No new attachments to upload")
       alert(editingId ? "Announcement updated successfully!" : "Announcement created successfully!")
     }
     
@@ -256,6 +278,8 @@ const handleSubmit = async () => {
       expiryDate: ""
     })
     setAttachments([])
+    setExistingAttachments([])
+    setAttachmentsToDelete([])
     setEditingId(null)
     setShowCreateForm(false)
     
@@ -291,6 +315,11 @@ const handleSubmit = async () => {
         ?.filter(r => r.recipient_type === 'employee')
         .map(r => r.employee_id) || []
     })
+    
+    // Load existing attachments
+    setExistingAttachments(announcement.attachments || [])
+    setAttachments([]) // Clear any new attachments from previous state
+    setAttachmentsToDelete([]) // Clear any pending deletions
     
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -404,12 +433,14 @@ const handleSubmit = async () => {
       expiryDate: ""
     })
     setAttachments([])
+    setExistingAttachments([])
+    setAttachmentsToDelete([])
     setEditingId(null)
     setShowCreateForm(false)
   }
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${
+    <div className={`min-h-screen pb-20 sm:pb-0 transition-colors duration-300 ${
       isDarkMode
         ? "bg-linear-to-br from-gray-950 via-gray-900 to-gray-950"
         : "bg-linear-to-br from-gray-50 via-slate-50 to-stone-50"
@@ -593,10 +624,56 @@ const handleSubmit = async () => {
       </span>
     </label>
     
+    {/* Existing Attachments (when editing) */}
+    {existingAttachments.length > 0 && (
+      <div className="mt-4 space-y-2">
+        <p className={`text-xs font-medium ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
+          📎 {existingAttachments.length} existing attachment(s)
+        </p>
+        {existingAttachments.map((att) => (
+          <div
+            key={att.id}
+            className={`flex items-center justify-between p-3 rounded-lg ${
+              isDarkMode ? "bg-green-900/20 border border-green-700/50" : "bg-green-50 border border-green-200"
+            }`}
+          >
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <svg className={`w-5 h-5 shrink-0 ${isDarkMode ? "text-green-400" : "text-green-600"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                  {att.original_name || att.filename}
+                </p>
+                <p className={`text-xs ${isDarkMode ? "text-green-400/70" : "text-green-600/70"}`}>
+                  Saved
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => removeExistingAttachment(att)}
+              className={`p-2 rounded-lg transition-all shrink-0 ${
+                isDarkMode
+                  ? "text-red-400 hover:bg-red-500/20"
+                  : "text-red-600 hover:bg-red-50"
+              }`}
+              title="Remove attachment"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ))}
+      </div>
+    )}
+    
+    {/* New Attachments */}
     {attachments.length > 0 && (
       <div className="mt-4 space-y-2">
-        <p className={`text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-          {attachments.length} file(s) selected
+        <p className={`text-xs font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
+          📤 {attachments.length} new file(s) to upload
         </p>
         {attachments.map((file, index) => (
           <div

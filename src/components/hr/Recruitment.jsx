@@ -630,11 +630,11 @@ const getValidationMessage = (fieldName, validationData) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 sm:pb-0">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">🎯 Employee Recruitment</h2>
-        <div className="text-sm text-gray-600 dark:text-gray-400">Required fields marked with *</div>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-200">🎯 Employee Recruitment</h2>
+        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Required fields marked with *</div>
       </div>
 
       {/* Success Message */}
