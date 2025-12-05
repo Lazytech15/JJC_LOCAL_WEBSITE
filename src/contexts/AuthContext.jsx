@@ -5,6 +5,24 @@ import { getStoredToken, verifyToken, clearTokens, storeTokens } from "../utils/
 
 const AuthContext = createContext(null)
 
+// Helper function to extract user ID from token payload (handles multiple field names)
+const resolveUserId = (payload) => {
+  if (!payload) return null
+  return payload.id || payload.userId || payload.uid || payload.employeeId || null
+}
+
+// Helper function to extract access level from token payload (handles camelCase and snake_case)
+const resolveAccessLevel = (payload, defaultLevel = 'user') => {
+  if (!payload) return defaultLevel
+  return payload.accessLevel || payload.access_level || defaultLevel
+}
+
+// Helper function to extract department from token payload
+const resolveDepartment = (payload) => {
+  if (!payload) return null
+  return payload.department || payload.loginDepartment || null
+}
+
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
@@ -59,15 +77,15 @@ export function AuthProvider({ children }) {
           const payload = verifyToken(adminToken)
           if (payload && payload.role) {
             setUser({
-              id: payload.id,
+              id: resolveUserId(payload),
               username: payload.username,
               name: payload.name,
               role: payload.role,
               permissions: payload.permissions || [],
-              access_level: payload.access_level,
+              access_level: resolveAccessLevel(payload),
               loginTime: payload.iat ? new Date(payload.iat * 1000).toISOString() : new Date().toISOString(),
             })
-            setSelectedDepartment(payload.department)
+            setSelectedDepartment(resolveDepartment(payload))
           } else {
             // Token invalid, clear it
             clearTokens()
@@ -80,13 +98,13 @@ export function AuthProvider({ children }) {
           const payload = verifyToken(employeeToken)
           if (payload) {
             setEmployee({
-              id: payload.id || payload.userId,
+              id: resolveUserId(payload),
               username: payload.username,
               name: payload.name,
               employeeId: payload.employeeId,
-              department: payload.department,
+              department: resolveDepartment(payload),
               position: payload.position,
-              access_level: payload.accessLevel || payload.access_level || 'user',
+              access_level: resolveAccessLevel(payload),
               loginTime: payload.iat ? new Date(payload.iat * 1000).toISOString() : new Date().toISOString(),
             })
           } else {
