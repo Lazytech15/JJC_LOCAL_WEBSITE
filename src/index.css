@@ -100,6 +100,30 @@ html {
   background: rgba(255, 255, 255, 0.3);
 }
 
+/* Subtle notification scrollbar */
+.notification-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.notification-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notification-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+
+.notification-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* Firefox scrollbar support */
+.notification-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
 /* Smooth transitions for suggestions */
 .autocomplete-suggestion {
   transition: all 0.15s ease-in-out;

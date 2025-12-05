@@ -271,35 +271,40 @@ export default function DashboardHome({
               announcements.slice(0, 3).map((announcement) => (
                 <div
                   key={announcement.id}
+                  onClick={() => handleAnnouncementClick(announcement)}
                   className={`p-4 rounded-xl border transition-all cursor-pointer ${isDarkMode ? "border-zinc-800 hover:bg-zinc-800/50" : "border-zinc-200 hover:bg-zinc-50"
                     }`}
-                  onClick={() => handleAnnouncementClick(announcement)}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <p className={`font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
-                          {announcement.title}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {/* Priority indicator */}
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${!announcement.read ? 'bg-red-500' : getPriorityColor(announcement.priority)}`}></div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className={`font-semibold truncate ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                            {announcement.title}
+                          </p>
+                          {!announcement.read && (
+                            <Badge variant="destructive" className="text-xs shrink-0">
+                              New
+                            </Badge>
+                          )}
+                          {announcement.priority && announcement.priority !== "normal" && (
+                            <Badge className={`text-xs shrink-0 ${getPriorityColor(announcement.priority)} text-white`}>
+                              {announcement.priority}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className={`text-xs mt-1 ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>
+                          {announcement.time}
                         </p>
-                        {!announcement.read && (
-                          <Badge variant="destructive" className="text-xs">
-                            New
-                          </Badge>
-                        )}
-                        {announcement.priority && announcement.priority !== "normal" && (
-                          <Badge className={`text-xs ${getPriorityColor(announcement.priority)} text-white`}>
-                            {announcement.priority}
-                          </Badge>
-                        )}
                       </div>
-                      <p className={`text-sm mt-1 line-clamp-1 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-                        {announcement.description}
-                      </p>
-                      <p className={`text-xs mt-1 ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>
-                        {announcement.time}
-                      </p>
                     </div>
-                    {!announcement.read && <span className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 mt-1"></span>}
+                    
+                    <svg className={`w-4 h-4 shrink-0 ${isDarkMode ? "text-zinc-500" : "text-zinc-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </div>
                 </div>
               ))
