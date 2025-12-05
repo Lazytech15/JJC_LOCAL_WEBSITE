@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useAuth } from "../../contexts/AuthContext"
 import apiService from "../../utils/api/api-service"
 
@@ -25,6 +25,14 @@ function Announcement() {
   const [showEmployeeSelect, setShowEmployeeSelect] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  
+  // New states for improved UX
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [expandedAnnouncementId, setExpandedAnnouncementId] = useState(null)
+  const [announcementSearchTerm, setAnnouncementSearchTerm] = useState("")
+  const [priorityFilter, setPriorityFilter] = useState("all")
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   useEffect(() => {
     fetchEmployeesAndDepartments()
@@ -44,7 +52,7 @@ function Announcement() {
   const fetchAnnouncements = async () => {
     try {
       const response = await apiService.announcements.getAnnouncements({ 
-        limit: 10, 
+        limit: 100, 
         status: 'active' 
       })
       setAnnouncements(response.announcements || [])
@@ -237,7 +245,7 @@ const handleSubmit = async () => {
       alert(editingId ? "Announcement updated successfully!" : "Announcement created successfully!")
     }
     
-    // Reset form
+    // Reset form and hide it
     setFormData({
       title: "",
       message: "",
@@ -249,6 +257,7 @@ const handleSubmit = async () => {
     })
     setAttachments([])
     setEditingId(null)
+    setShowCreateForm(false)
     
     fetchAnnouncements()
   } catch (err) {
@@ -266,6 +275,8 @@ const handleSubmit = async () => {
 
   const handleEdit = (announcement) => {
     setEditingId(announcement.id)
+    setShowCreateForm(true)
+    setExpandedAnnouncementId(null)
     
     setFormData({
       title: announcement.title,
@@ -338,6 +349,65 @@ const handleSubmit = async () => {
     return `Employee ${emp.id}`
   }
 
+  // Filtered and paginated announcements
+  const filteredAnnouncements = useMemo(() => {
+    let filtered = announcements
+
+    // Apply search filter
+    if (announcementSearchTerm) {
+      const searchLower = announcementSearchTerm.toLowerCase()
+      filtered = filtered.filter(a =>
+        a.title?.toLowerCase().includes(searchLower) ||
+        a.message?.toLowerCase().includes(searchLower)
+      )
+    }
+
+    // Apply priority filter
+    if (priorityFilter !== "all") {
+      filtered = filtered.filter(a => a.priority === priorityFilter)
+    }
+
+    return filtered
+  }, [announcements, announcementSearchTerm, priorityFilter])
+
+  const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage)
+  const paginatedAnnouncements = filteredAnnouncements.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [announcementSearchTerm, priorityFilter])
+
+  const toggleAnnouncementExpand = (id) => {
+    setExpandedAnnouncementId(expandedAnnouncementId === id ? null : id)
+  }
+
+  const getPriorityIcon = (priority) => {
+    switch(priority) {
+      case 'urgent': return '🔴'
+      case 'important': return '🟡'
+      default: return '🔵'
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      title: "",
+      message: "",
+      recipientType: "all",
+      selectedDepartments: [],
+      selectedEmployees: [],
+      priority: "normal",
+      expiryDate: ""
+    })
+    setAttachments([])
+    setEditingId(null)
+    setShowCreateForm(false)
+  }
+
   return (
     <div className={`min-h-screen transition-colors duration-300 ${
       isDarkMode
@@ -345,28 +415,66 @@ const handleSubmit = async () => {
         : "bg-linear-to-br from-gray-50 via-slate-50 to-stone-50"
     }`}>
       <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6">
+        
+        {/* Quick Action Header */}
+        {!showCreateForm && !editingId && (
+          <div className={`rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl border transition-all ${
+            isDarkMode 
+              ? "bg-gradient-to-r from-blue-900/50 to-indigo-900/50 border-blue-700/50" 
+              : "bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200/50"
+          }`}>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h1 className={`text-2xl sm:text-3xl font-bold mb-2 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                  📣 Announcements
+                </h1>
+                <p className={`text-sm sm:text-base ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                  Create and manage company-wide announcements
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/30 text-sm sm:text-base"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                New Announcement
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Create/Edit Announcement Form */}
+        {(showCreateForm || editingId) && (
         <div className={`rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl border transition-all ${
           isDarkMode 
             ? "bg-gray-800/90 backdrop-blur-xl border-gray-700/50" 
             : "bg-white/90 backdrop-blur-xl border-white/50"
         }`}>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3 sm:gap-0">
-            <h2 className={`text-xl sm:text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              📣 {editingId ? "Edit Announcement" : "Create Announcement"}
-            </h2>
-            {editingId && (
+            <div className="flex items-center gap-3">
               <button
-                onClick={handleCancelEdit}
-                className={`px-4 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
+                onClick={resetForm}
+                className={`p-2 rounded-lg transition-all ${
                   isDarkMode
-                    ? "text-gray-300 hover:text-white hover:bg-gray-700/50"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    ? "text-gray-400 hover:text-white hover:bg-gray-700/50"
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                 }`}
               >
-                Cancel Edit
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
               </button>
-            )}
+              <h2 className={`text-xl sm:text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                {editingId ? "✏️ Edit Announcement" : "📝 Create Announcement"}
+              </h2>
+            </div>
+            <div className={`text-sm px-3 py-1.5 rounded-full ${
+              isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"
+            }`}>
+              {getRecipientCount()} recipient(s)
+            </div>
           </div>
 
           <div className="space-y-4 sm:space-y-6">
@@ -739,177 +847,347 @@ const handleSubmit = async () => {
             </div>
 
             {/* Submit Button */}
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30 text-sm sm:text-base"
-            >
-              {loading
-                ? "Processing..."
-                : editingId
-                ? "Update Announcement"
-                : "Send Announcement"}
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                type="button"
+                onClick={resetForm}
+                className={`flex-1 sm:flex-none px-6 py-3 rounded-xl font-medium transition-all text-sm sm:text-base border-2 ${
+                  isDarkMode
+                    ? "text-gray-300 border-gray-600 hover:bg-gray-700/50"
+                    : "text-gray-600 border-gray-300 hover:bg-gray-100"
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={loading || !formData.title || !formData.message}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30 text-sm sm:text-base flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    {editingId ? "Update Announcement" : "Send Announcement"}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
+        )}
 
-        {/* Recent Announcements */}
+        {/* Recent Announcements - Compact View */}
         <div className={`rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl border transition-all ${
           isDarkMode 
             ? "bg-gray-800/90 backdrop-blur-xl border-gray-700/50" 
             : "bg-white/90 backdrop-blur-xl border-white/50"
         }`}>
-          <h2 className={`text-xl sm:text-2xl font-bold mb-4 sm:mb-6 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-            Recent Announcements
-          </h2>
+          {/* Header with title and count */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
+            <div>
+              <h2 className={`text-xl sm:text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                📋 Recent Announcements
+              </h2>
+              <p className={`text-sm mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                {filteredAnnouncements.length} announcement{filteredAnnouncements.length !== 1 ? 's' : ''} found
+              </p>
+            </div>
+          </div>
 
-          <div className="space-y-3 sm:space-y-4">
-            {announcements.length === 0 ? (
+          {/* Search and Filters */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            {/* Search */}
+            <div className="relative flex-1">
+              <svg className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search announcements..."
+                value={announcementSearchTerm}
+                onChange={(e) => setAnnouncementSearchTerm(e.target.value)}
+                className={`w-full pl-10 pr-4 py-2.5 rounded-xl border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm ${
+                  isDarkMode
+                    ? "bg-gray-900/50 border-gray-700 text-white placeholder-gray-500"
+                    : "bg-white border-gray-200 text-gray-900 placeholder-gray-400"
+                }`}
+              />
+              {announcementSearchTerm && (
+                <button
+                  onClick={() => setAnnouncementSearchTerm("")}
+                  className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Priority Filter */}
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className={`px-4 py-2.5 rounded-xl border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm ${
+                isDarkMode
+                  ? "bg-gray-900/50 border-gray-700 text-white"
+                  : "bg-white border-gray-200 text-gray-900"
+              }`}
+            >
+              <option value="all">All Priorities</option>
+              <option value="urgent">🔴 Urgent</option>
+              <option value="important">🟡 Important</option>
+              <option value="normal">🔵 Normal</option>
+            </select>
+          </div>
+
+          {/* Compact Announcement List */}
+          <div className="space-y-2">
+            {paginatedAnnouncements.length === 0 ? (
               <div className={`text-center py-12 text-sm sm:text-base ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-                No announcements yet. Create your first announcement above!
+                {announcements.length === 0 
+                  ? "No announcements yet. Create your first announcement!" 
+                  : "No announcements match your search criteria."
+                }
               </div>
             ) : (
-              announcements.map((announcement) => (
+              paginatedAnnouncements.map((announcement) => (
                 <div
                   key={announcement.id}
-                  className={`rounded-xl p-4 sm:p-5 border-2 transition-all ${
+                  className={`rounded-xl border-2 transition-all overflow-hidden ${
                     isDarkMode
                       ? "bg-gray-900/50 border-gray-700 hover:border-gray-600"
                       : "bg-white border-gray-200 hover:border-gray-300"
-                  }`}
+                  } ${expandedAnnouncementId === announcement.id ? (isDarkMode ? "border-blue-500/50" : "border-blue-300") : ""}`}
                 >
-                  <div className="flex justify-between items-start mb-3 gap-2">
-                    <h3 className={`font-bold text-base sm:text-lg flex-1 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                      {announcement.title}
-                    </h3>
-                    <div className="flex items-center gap-1 sm:gap-2 fshrink-0">
-                      <span className={`text-xs px-2 sm:px-3 py-1 rounded-full font-medium whitespace-nowrap ${
-                        announcement.priority === "urgent"
-                          ? isDarkMode
-                            ? "bg-red-500/20 text-red-300 border border-red-500/30"
-                            : "bg-red-100 text-red-700 border border-red-200"
-                          : announcement.priority === "important"
-                          ? isDarkMode
-                            ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
-                            : "bg-yellow-100 text-yellow-700 border border-yellow-200"
-                          : isDarkMode
-                          ? "bg-gray-700 text-gray-300 border border-gray-600"
-                          : "bg-gray-100 text-gray-700 border border-gray-200"
-                      }`}>
-                        {announcement.priority}
-                      </span>
-                      <button
-                        onClick={() => handleEdit(announcement)}
-                        className={`p-1.5 sm:p-2 rounded-lg transition-all ${
-                          isDarkMode
-                            ? "text-blue-400 hover:bg-blue-500/20"
-                            : "text-blue-600 hover:bg-blue-100"
-                        }`}
-                        title="Edit"
-                      >
-                        <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => setDeleteConfirm(announcement.id)}
-                        className={`p-1.5 sm:p-2 rounded-lg transition-all ${
-                          isDarkMode
-                            ? "text-red-400 hover:bg-red-500/20"
-                            : "text-red-600 hover:bg-red-100"
-                        }`}
-                        title="Delete"
-                      >
-                        <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+                  {/* Compact Header - Always Visible */}
+                  <button
+                    onClick={() => toggleAnnouncementExpand(announcement.id)}
+                    className={`w-full p-3 sm:p-4 flex items-center gap-3 text-left transition-colors ${
+                      isDarkMode ? "hover:bg-gray-800/50" : "hover:bg-gray-50"
+                    }`}
+                  >
+                    {/* Priority Indicator */}
+                    <span className="text-lg shrink-0">{getPriorityIcon(announcement.priority)}</span>
+                    
+                    {/* Title and Date */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-semibold text-sm sm:text-base truncate ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                        {announcement.title}
+                      </h3>
+                      <div className={`flex items-center gap-2 text-xs ${isDarkMode ? "text-gray-500" : "text-gray-500"}`}>
+                        <span>{new Date(announcement.createdAt).toLocaleDateString()}</span>
+                        <span>•</span>
+                        <span>{announcement.recipientType === 'all' ? 'All Employees' : `${announcement.totalRecipients || 0} recipient(s)`}</span>
+                      </div>
                     </div>
-                  </div>
 
-                  <p className={`mb-4 leading-relaxed text-sm sm:text-base ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
-                    {announcement.message}
-                  </p>
+                    {/* Expand/Collapse Arrow */}
+                    <svg 
+                      className={`w-5 h-5 shrink-0 transition-transform duration-200 ${isDarkMode ? "text-gray-400" : "text-gray-500"} ${expandedAnnouncementId === announcement.id ? "rotate-180" : ""}`} 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
 
-                  {announcement.attachments && announcement.attachments.length > 0 && (
-                    <div className={`mt-3 pt-3 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
-                      <p className={`text-xs font-medium mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                        📎 {announcement.attachments.length} attachment(s)
+                  {/* Expanded Details */}
+                  {expandedAnnouncementId === announcement.id && (
+                    <div className={`px-3 sm:px-4 pb-4 pt-2 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
+                      {/* Message */}
+                      <p className={`mb-4 leading-relaxed text-sm sm:text-base whitespace-pre-wrap ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                        {announcement.message}
                       </p>
-                      <div className="flex flex-wrap gap-2">
-                        {announcement.attachments.map((att, idx) => (
-                          <span
-                            key={idx}
-                            className={`text-xs px-2 py-1 rounded ${
-                              isDarkMode ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-700"
-                            }`}
-                          >
-                            {att.original_name || att.filename}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
-                  <div className={`flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                    <span className="wrap-break-word">
-                      📨 To: {announcement.recipientType === 'all' 
-                        ? 'All Employees' 
-                        : announcement.recipientType === 'department'
-                        ? `${announcement.totalRecipients || 0} employee(s) in selected departments`
-                        : `${announcement.totalRecipients || 0} specific employee(s)`
-                      }
-                    </span>
-                    <span className="whitespace-nowrap">📅 {new Date(announcement.createdAt).toLocaleDateString()}</span>
-                  </div>
-
-                  {announcement.readCount !== undefined && announcement.totalRecipients && (
-                    <div className={`mt-3 pt-3 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
-                      <div className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                        ✓ Read by {announcement.readCount} of {announcement.totalRecipients} recipients
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Delete Confirmation Modal */}
-                  {deleteConfirm === announcement.id && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                      <div className={`rounded-xl sm:rounded-2xl p-5 sm:p-6 max-w-md w-full shadow-2xl ${
-                        isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-white"
-                      }`}>
-                        <h3 className={`text-lg sm:text-xl font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                          Delete Announcement?
-                        </h3>
-                        <p className={`mb-6 text-sm sm:text-base ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
-                          Are you sure you want to delete <strong>"{announcement.title}"</strong>? This action cannot be undone.
-                        </p>
-                        <div className="flex gap-3 justify-end">
-                          <button
-                            onClick={() => setDeleteConfirm(null)}
-                            className={`px-4 sm:px-5 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
-                              isDarkMode
-                                ? "text-gray-300 hover:bg-gray-700"
-                                : "text-gray-600 hover:bg-gray-100"
-                            }`}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={() => handleDelete(announcement.id)}
-                            disabled={loading}
-                            className="px-4 sm:px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-red-500/30 text-sm sm:text-base"
-                          >
-                            {loading ? "Deleting..." : "Delete"}
-                          </button>
+                      {/* Attachments */}
+                      {announcement.attachments && announcement.attachments.length > 0 && (
+                        <div className={`mb-4 p-3 rounded-lg ${isDarkMode ? "bg-gray-800" : "bg-gray-50"}`}>
+                          <p className={`text-xs font-medium mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                            📎 {announcement.attachments.length} attachment(s)
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {announcement.attachments.map((att, idx) => (
+                              <span
+                                key={idx}
+                                className={`text-xs px-2 py-1 rounded ${
+                                  isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-700"
+                                }`}
+                              >
+                                {att.original_name || att.filename}
+                              </span>
+                            ))}
+                          </div>
                         </div>
+                      )}
+
+                      {/* Read Status */}
+                      {announcement.readCount !== undefined && announcement.totalRecipients && (
+                        <div className={`mb-4 flex items-center gap-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Read by {announcement.readCount} of {announcement.totalRecipients} recipients
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 pt-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleEdit(announcement)
+                          }}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                            isDarkMode
+                              ? "text-blue-400 hover:bg-blue-500/20"
+                              : "text-blue-600 hover:bg-blue-50"
+                          }`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Edit
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDeleteConfirm(announcement.id)
+                          }}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                            isDarkMode
+                              ? "text-red-400 hover:bg-red-500/20"
+                              : "text-red-600 hover:bg-red-50"
+                          }`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Delete
+                        </button>
                       </div>
+
+                      {/* Delete Confirmation Modal */}
+                      {deleteConfirm === announcement.id && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                          <div className={`rounded-xl sm:rounded-2xl p-5 sm:p-6 max-w-md w-full shadow-2xl ${
+                            isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-white"
+                          }`}>
+                            <h3 className={`text-lg sm:text-xl font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                              Delete Announcement?
+                            </h3>
+                            <p className={`mb-6 text-sm sm:text-base ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                              Are you sure you want to delete <strong>"{announcement.title}"</strong>? This action cannot be undone.
+                            </p>
+                            <div className="flex gap-3 justify-end">
+                              <button
+                                onClick={() => setDeleteConfirm(null)}
+                                className={`px-4 sm:px-5 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
+                                  isDarkMode
+                                    ? "text-gray-300 hover:bg-gray-700"
+                                    : "text-gray-600 hover:bg-gray-100"
+                                }`}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => handleDelete(announcement.id)}
+                                disabled={loading}
+                                className="px-4 sm:px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-red-500/30 text-sm sm:text-base"
+                              >
+                                {loading ? "Deleting..." : "Delete"}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               ))
             )}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredAnnouncements.length)} of {filteredAnnouncements.length} announcements
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className={`p-2 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                    isDarkMode
+                      ? "text-gray-300 hover:bg-gray-700 disabled:hover:bg-transparent"
+                      : "text-gray-600 hover:bg-gray-100 disabled:hover:bg-transparent"
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                
+                {/* Page Numbers */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = currentPage - 2 + i
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-8 h-8 rounded-lg text-sm font-medium transition-all ${
+                          currentPage === pageNum
+                            ? "bg-blue-600 text-white"
+                            : isDarkMode
+                            ? "text-gray-300 hover:bg-gray-700"
+                            : "text-gray-600 hover:bg-gray-100"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`p-2 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                    isDarkMode
+                      ? "text-gray-300 hover:bg-gray-700 disabled:hover:bg-transparent"
+                      : "text-gray-600 hover:bg-gray-100 disabled:hover:bg-transparent"
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
