@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Factory, Loader2, Wifi, WifiOff, ArrowLeft, Sun, Moon } from "lucide-react"
-import { createToken, storeTokens, getStoredToken, clearTokens, isTokenExpired, verifyToken } from "../../utils/auth"
+import { createToken, storeTokens, storeEmployeeToken, getStoredToken, clearTokens, isTokenExpired, verifyToken } from "../../utils/auth"
 import { AuthService } from "../../utils/api/services/auth-service"
 import { useAuth } from "../../contexts/AuthContext"
 import logo from "../../assets/companyLogo.jpg"
@@ -210,39 +210,99 @@ export default function EmployeeLogin() {
   }, [isEmployeeAuthenticated, navigate])
 
   useEffect(() => {
-    const existingToken = getStoredToken()
-    if (existingToken && !isTokenExpired(existingToken)) {
-      const payload = verifyToken(existingToken)
+    // Check for EMPLOYEE token first
+    const employeeToken = getStoredToken(true) // true = employee token
+    if (employeeToken && !isTokenExpired(employeeToken)) {
+      const payload = verifyToken(employeeToken)
       if (payload) {
         setHasValidToken(true)
+        setIsInitializing(false)
+        return
       }
-    } else {
-      setHasValidToken(false)
-      clearTokens()
     }
+    
+    // Also check for ADMIN token - admins can access employee dashboard too
+    const adminToken = getStoredToken(false) // false = admin token
+    if (adminToken && !isTokenExpired(adminToken)) {
+      const payload = verifyToken(adminToken)
+      if (payload && (payload.role === 'admin' || payload.role === 'manager' || payload.access_level === 'admin')) {
+        setHasValidToken(true)
+        setIsInitializing(false)
+        return
+      }
+    }
+    
+    setHasValidToken(false)
     setIsInitializing(false)
   }, [])
 
-  const handleContinueWithToken = () => {
-    const existingToken = getStoredToken()
-    if (existingToken) {
-      const payload = verifyToken(existingToken)
-      if (payload && payload.role) {
-        if (payload.role === 'super-admin') {
-          navigate("/jjcewgsaccess/super-admin", { replace: true })
-        } else if (payload.role === 'admin' || payload.role === 'manager') {
-          const deptRoutes = {
-            'Human Resources': '/jjcewgsaccess/hr',
-            'Operations': '/jjcewgsaccess/operations',
-            'Finance': '/jjcewgsaccess/finance',
-            'Procurement': '/jjcewgsaccess/procurement',
-            'Engineering': '/jjcewgsaccess/engineering'
+  // Listen for storage changes from other tabs (login/logout events)
+  useEffect(() => {
+    const handleStorageChange = (event) => {
+      if (event.key === 'employeeToken' || event.key === 'auth_token' || event.key === 'jjc_session_sync') {
+        // Re-check tokens when storage changes
+        const employeeToken = getStoredToken(true)
+        if (employeeToken && !isTokenExpired(employeeToken)) {
+          const payload = verifyToken(employeeToken)
+          if (payload) {
+            setHasValidToken(true)
+            return
           }
-          const route = deptRoutes[payload.department] || '/jjcewgsaccess'
-          navigate(route, { replace: true })
-        } else {
-          navigate("/employee/dashboard", { replace: true })
         }
+        
+        const adminToken = getStoredToken(false)
+        if (adminToken && !isTokenExpired(adminToken)) {
+          const payload = verifyToken(adminToken)
+          if (payload && (payload.role === 'admin' || payload.role === 'manager' || payload.access_level === 'admin')) {
+            setHasValidToken(true)
+            return
+          }
+        }
+        
+        setHasValidToken(false)
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
+
+  const handleContinueWithToken = () => {
+    // Check employee token first
+    const employeeToken = getStoredToken(true)
+    if (employeeToken) {
+      const payload = verifyToken(employeeToken)
+      if (payload) {
+        navigate("/employee/dashboard", { replace: true })
+        return
+      }
+    }
+    
+    // If no employee token, check admin token - admins can access employee dashboard
+    const adminToken = getStoredToken(false)
+    if (adminToken) {
+      const payload = verifyToken(adminToken)
+      if (payload && (payload.role === 'admin' || payload.role === 'manager' || payload.access_level === 'admin')) {
+        // Admin accessing employee dashboard - create an employee session from admin data
+        const employeeData = {
+          id: payload.id || payload.userId,
+          username: payload.username,
+          name: payload.name,
+          department: payload.department,
+          position: payload.access_level,
+          access_level: payload.access_level,
+          role: payload.role,
+        }
+        
+        // Store employee token for the admin
+        storeEmployeeToken(adminToken)
+        
+        if (employeeLogin) {
+          employeeLogin(employeeData, adminToken)
+        }
+        
+        navigate("/employee/dashboard", { replace: true })
+        return
       }
     }
   }
@@ -320,21 +380,9 @@ export default function EmployeeLogin() {
 
       console.log("Login successful with JWT authentication")
 
-      if (userData.role === 'super-admin') {
-        navigate("/jjcewgsaccess/super-admin", { replace: true })
-      } else if (userData.role === 'admin' || userData.role === 'manager') {
-        const deptRoutes = {
-          'Human Resources': '/jjcewgsaccess/hr',
-          'Operations': '/jjcewgsaccess/operations',
-          'Finance': '/jjcewgsaccess/finance',
-          'Procurement': '/jjcewgsaccess/procurement',
-          'Engineering': '/jjcewgsaccess/engineering'
-        }
-        const route = deptRoutes[userData.department] || '/jjcewgsaccess'
-        navigate(route, { replace: true })
-      } else {
-        navigate("/employee/dashboard", { replace: true })
-      }
+      // ALWAYS navigate to employee dashboard when logging in from Employee Login page
+      // Regardless of admin/manager role - this is the EMPLOYEE portal
+      navigate("/employee/dashboard", { replace: true })
     } else {
       clearTokens()
       setError(response.message || response.error || "Authentication failed")
@@ -464,7 +512,7 @@ if (isInitializing) {
       </div>
 
       {/* Right Side - Login Form & Mobile Background */}
-      <div className="w-full lg:w-[42%] flex flex-col items-center justify-center p-6 lg:p-12 relative min-h-screen">
+      <div className="w-full lg:w-[42%] flex flex-col items-center justify-center p-4 sm:p-6 lg:p-12 relative min-h-[100svh]">
         {/* Mobile Background with Blur */}
         {currentImage && (
           <div className="lg:hidden absolute inset-0 z-0">
@@ -480,60 +528,60 @@ if (isInitializing) {
         {/* Dark Mode Toggle */}
         <button
           onClick={toggleDarkMode}
-          className={`absolute top-6 right-6 p-3 rounded-full backdrop-blur-sm border transition-all duration-300 z-20 ${
+          className={`absolute top-4 sm:top-6 right-4 sm:right-6 p-2.5 sm:p-3 rounded-full backdrop-blur-sm border transition-all duration-300 z-20 ${
             isDarkMode
               ? "bg-gray-800/50 border-gray-700/50 hover:bg-gray-800/70 text-gray-100"
               : "bg-white/50 border-zinc-300/50 hover:bg-white/70 text-zinc-900"
           }`}
         >
-          {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          {isDarkMode ? <Sun className="w-4 h-4 sm:w-5 sm:h-5" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5" />}
         </button>
 
         <button
           onClick={handleBackToHome}
-          className={`absolute top-6 left-6 flex items-center gap-2 transition-colors font-medium group z-20 ${
+          className={`absolute top-4 sm:top-6 left-4 sm:left-6 flex items-center gap-1.5 sm:gap-2 transition-colors font-medium group z-20 ${
             isDarkMode
               ? "text-gray-400 hover:text-gray-100"
               : "text-zinc-600 hover:text-zinc-900"
           }`}
         >
-          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-          <span className="hidden sm:inline">Back to Home</span>
+          <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 group-hover:-translate-x-1 transition-transform" />
+          <span className="hidden xs:inline text-sm sm:text-base">Back to Home</span>
         </button>
 
-        <div className="w-full max-w-md relative z-10 flex flex-col">
-          <div className="lg:hidden mb-12">
-            <div className="flex justify-center items-center gap-4">
-              <div className="w-14 h-14 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg border border-white/20">
+        <div className="w-full max-w-md relative z-10 flex flex-col pt-16 sm:pt-0">
+          <div className="lg:hidden mb-8 sm:mb-12">
+            <div className="flex justify-center items-center gap-3 sm:gap-4">
+              <div className="w-11 h-11 sm:w-14 sm:h-14 bg-white/10 backdrop-blur-sm rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg border border-white/20">
                 <img
                   src={logo}
                   alt="JJC Engineering Works Logo"
-                  className="w-12 h-12 rounded-xl object-cover shadow-md bg-primary"
+                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl object-cover shadow-md bg-primary"
                 />
               </div>
-              <div className="flex items-center califoniaFont gap-2">
+              <div className="flex items-center califoniaFont gap-1.5 sm:gap-2">
                 <div>
-                  <h1 className="text-5xl text-white drop-shadow-lg">JJC</h1>
+                  <h1 className="text-4xl sm:text-5xl text-white drop-shadow-lg">JJC</h1>
                 </div>
                 <div className="text-left">
-                  <p className="text-xs font-semibold uppercase leading-tight text-white drop-shadow-lg">Engineering Works</p>
+                  <p className="text-[10px] sm:text-xs font-semibold uppercase leading-tight text-white drop-shadow-lg">Engineering Works</p>
                   <hr className="border-white/70 my-0.5" />
-                  <p className="text-xs font-semibold uppercase text-white drop-shadow-lg">& General Services</p>
+                  <p className="text-[10px] sm:text-xs font-semibold uppercase text-white drop-shadow-lg">& General Services</p>
                 </div>
               </div>
             </div>
           </div>
 
           <Card className={`shadow-2xl backdrop-blur-sm ${isDarkMode ? "bg-gray-800/80 border-gray-700/50" : "bg-white/90 border-white/30"}`} isDarkMode={isDarkMode}>
-            <CardHeader className="relative space-y-1 pb-4">
-              <div className="absolute top-6 right-6 flex items-center gap-2">
-                <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`}></span>
+            <CardHeader className="relative space-y-1 pb-3 sm:pb-4 p-4 sm:p-6">
+              <div className="absolute top-4 sm:top-6 right-4 sm:right-6 flex items-center gap-2">
+                <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${isOnline ? "bg-green-500" : "bg-red-500"}`}></span>
               </div>
-              <CardTitle className="text-2xl" isDarkMode={isDarkMode}>Welcome Back</CardTitle>
-              <CardDescription className="text-base" isDarkMode={isDarkMode}>Sign in to access your dashboard</CardDescription>
+              <CardTitle className="text-xl sm:text-2xl" isDarkMode={isDarkMode}>Welcome Back</CardTitle>
+              <CardDescription className="text-sm sm:text-base" isDarkMode={isDarkMode}>Sign in to access your dashboard</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="space-y-4 sm:space-y-6">
                 {hasValidToken && (
                   <div className={`border rounded-xl p-4 ${
                     isDarkMode
@@ -576,8 +624,8 @@ if (isInitializing) {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="department" className="text-base" isDarkMode={isDarkMode}>
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label htmlFor="department" className="text-sm sm:text-base" isDarkMode={isDarkMode}>
                     Department
                   </Label>
                   <Select
@@ -585,7 +633,7 @@ if (isInitializing) {
                     value={department}
                     onChange={(e) => handleInputChange('department', e.target.value)}
                     disabled={isLoading}
-                    className="h-12 text-base"
+                    className="h-11 sm:h-12 text-sm sm:text-base"
                     isDarkMode={isDarkMode}
                   >
                     {departments.map((dept) => (
@@ -596,8 +644,8 @@ if (isInitializing) {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="username" className="text-base" isDarkMode={isDarkMode}>
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label htmlFor="username" className="text-sm sm:text-base" isDarkMode={isDarkMode}>
                     Username
                   </Label>
                   <Input
@@ -607,14 +655,14 @@ if (isInitializing) {
                     value={username}
                     onChange={(e) => handleInputChange('username', e.target.value)}
                     disabled={isLoading}
-                    className="h-12 text-base"
+                    className="h-11 sm:h-12 text-sm sm:text-base"
                     autoComplete="username"
                     isDarkMode={isDarkMode}
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-base" isDarkMode={isDarkMode}>
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label htmlFor="password" className="text-sm sm:text-base" isDarkMode={isDarkMode}>
                     Password
                   </Label>
                   <Input
@@ -629,7 +677,7 @@ if (isInitializing) {
                       }
                     }}
                     disabled={isLoading}
-                    className="h-12 text-base"
+                    className="h-11 sm:h-12 text-sm sm:text-base"
                     autoComplete="current-password"
                     isDarkMode={isDarkMode}
                   />
@@ -646,7 +694,7 @@ if (isInitializing) {
                     />
                     <label
                       htmlFor="remember"
-                      className={`text-sm font-medium leading-none cursor-pointer select-none ${
+                      className={`text-xs sm:text-sm font-medium leading-none cursor-pointer select-none ${
                         isDarkMode ? "text-gray-300" : "text-zinc-700"
                       }`}
                     >
@@ -658,7 +706,7 @@ if (isInitializing) {
                 <Button
                   type="button"
                   onClick={handleSubmit}
-                  className={`w-full h-12 text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] ${
+                  className={`w-full h-11 sm:h-12 text-sm sm:text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] ${
                     isDarkMode
                       ? "bg-gray-700 hover:bg-gray-600 text-white"
                       : "bg-zinc-900 hover:bg-zinc-800 text-white"
@@ -668,7 +716,7 @@ if (isInitializing) {
                 >
                   {isLoading ? (
                     <span className="flex items-center justify-center">
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin inline" />
+                      <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin inline" />
                       Signing in...
                     </span>
                   ) : (
@@ -682,8 +730,8 @@ if (isInitializing) {
             </CardContent>
           </Card>
 
-          <div className="mt-8 text-center">
-            <p className={`text-sm drop-shadow-lg ${isDarkMode ? "text-gray-400" : "text-white/80"}`}>
+          <div className="mt-6 sm:mt-8 text-center pb-6 sm:pb-0">
+            <p className={`text-xs sm:text-sm drop-shadow-lg ${isDarkMode ? "text-gray-400" : "text-white/80"}`}>
               © {new Date().getFullYear()} JJCEWGS. All rights reserved.
             </p>
           </div>

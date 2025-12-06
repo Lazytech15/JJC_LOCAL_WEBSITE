@@ -87,8 +87,23 @@ export const storeTokens = (accessToken, refreshToken) => {
   }
 }
 
-export const getStoredToken = () => {
+// Store employee token separately
+export const storeEmployeeToken = (token) => {
   try {
+    if (token) {
+      localStorage.setItem("employeeToken", token)
+      localStorage.setItem("token_stored_at", Date.now().toString())
+    }
+  } catch (error) {
+    console.error("Error storing employee token:", error)
+  }
+}
+
+export const getStoredToken = (isEmployee = false) => {
+  try {
+    if (isEmployee) {
+      return localStorage.getItem("employeeToken")
+    }
     return localStorage.getItem(TOKEN_KEY)
   } catch (error) {
     console.error("Error retrieving token:", error)

@@ -239,19 +239,32 @@ function LoginForm() {
       return
     }
 
-    // Check for employee auto-login from URL parameters (cross-domain support)
+    // Check for employee auto-login from sessionStorage (secure method)
     const urlParams = new URLSearchParams(window.location.search)
     const autoLogin = urlParams.get('autoLogin')
-    const tokenParam = urlParams.get('token')
-    const usernameParam = urlParams.get('username')
     const loginTypeParam = urlParams.get('loginType')
 
-    if (autoLogin === 'true' && tokenParam && usernameParam) {
-      console.log('[LoginForm] Auto-login detected from URL parameters')
+    if (autoLogin === 'true') {
+      console.log('[LoginForm] Auto-login detected')
       
       try {
-        // Decode and verify the token
-        const decodedToken = decodeURIComponent(tokenParam)
+        // Get token from secure sessionStorage instead of URL
+        const navAuth = sessionStorage.getItem('nav_auth_token')
+        if (!navAuth) {
+          console.log('[LoginForm] No nav auth token found in sessionStorage')
+          window.history.replaceState({}, document.title, window.location.pathname)
+          setIsInitializing(false)
+          return
+        }
+        
+        const authData = JSON.parse(navAuth)
+        const decodedToken = authData.token
+        const usernameParam = authData.username
+        
+        // Clear the temporary auth data immediately after reading
+        sessionStorage.removeItem('nav_auth_token')
+        
+        // Verify the token
         const payload = verifyToken(decodedToken)
         
         if (payload) {
@@ -296,21 +309,43 @@ function LoginForm() {
       }
     }
 
-    // Regular token check
-    const existingToken = getStoredToken()
+    // Regular token check - only for admin tokens
+    const existingToken = getStoredToken(false) // false = admin token
     if (existingToken) {
       const payload = verifyToken(existingToken)
       if (payload && payload.department === departmentName) {
         setHasValidToken(true)
       } else {
+        // Don't clear tokens if they're for a different department
+        // Just don't show the continue button
         setHasValidToken(false)
-        clearTokens()
       }
     } else {
       setHasValidToken(false)
     }
     setIsInitializing(false)
   }, [departmentName, isValidDepartment, deptSlug, login, navigate])
+
+  // Listen for storage changes from other tabs (login/logout events)
+  useEffect(() => {
+    const handleStorageChange = (event) => {
+      if (event.key === 'auth_token' || event.key === 'jjc_session_sync') {
+        // Re-check token when storage changes
+        const existingToken = getStoredToken(false) // false = admin token
+        if (existingToken) {
+          const payload = verifyToken(existingToken)
+          if (payload && payload.department === departmentName) {
+            setHasValidToken(true)
+            return
+          }
+        }
+        setHasValidToken(false)
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [departmentName])
 
   const handleContinueWithToken = () => {
     // FIXED: Navigate to correct route
