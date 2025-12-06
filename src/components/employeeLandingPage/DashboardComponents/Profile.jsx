@@ -199,32 +199,32 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className={`text-3xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>My Profile</h2>
-        <div className="flex gap-2">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
+        <h2 className={`text-2xl sm:text-3xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>My Profile</h2>
+        <div className="flex gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             onClick={() => setIsDigitalIDModalOpen(true)}
-            className={`${isDarkMode ? "border-zinc-700 text-zinc-300 hover:bg-zinc-800"  : ""}`}
+            className={`flex-1 sm:flex-none text-xs sm:text-sm ${isDarkMode ? "border-zinc-700 text-zinc-300 hover:bg-zinc-800"  : ""}`}
           >
-            <FileText className="w-4 h-4 mr-2" />
-            View Digital ID
+            <FileText className="w-4 h-4 mr-1 sm:mr-2" />
+            <span className="hidden xs:inline">View </span>Digital ID
           </Button>
           <Button
             variant="outline"
             onClick={() => setIsPasswordModalOpen(true)}
-            className={`${isDarkMode ? "border-zinc-700 text-zinc-300 hover:bg-zinc-800" : ""}`}
+            className={`flex-1 sm:flex-none text-xs sm:text-sm ${isDarkMode ? "border-zinc-700 text-zinc-300 hover:bg-zinc-800" : ""}`}
           >
-            <Lock className="w-4 h-4 mr-2" />
-            Change Password
+            <Lock className="w-4 h-4 mr-1 sm:mr-2" />
+            <span className="hidden xs:inline">Change </span>Password
           </Button>
         </div>
       </div>
 
       {/* Profile Header Card */}
       <Card className={`border overflow-hidden ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-        <CardContent className="p-8 relative">
+        <CardContent className="p-4 sm:p-6 md:p-8 relative">
           {profileImage && (
             <div
               className="absolute inset-0 opacity-40"
@@ -239,8 +239,8 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
           )}
 
           <div className="relative z-10">
-            <div className="flex flex-col items-center text-center mb-8">
-              <Avatar className={`w-32 h-32 ring-4 mb-4 ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}>
+            <div className="flex flex-col items-center text-center mb-6 sm:mb-8">
+              <Avatar className={`w-24 h-24 sm:w-32 sm:h-32 ring-4 mb-3 sm:mb-4 ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}>
                 {profileImage ? (
                   <img
                     src={profileImage}
@@ -249,7 +249,7 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
                   />
                 ) : (
                   <AvatarFallback
-                    className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-2xl font-semibold`}
+                    className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-xl sm:text-2xl font-semibold`}
                   >
                     {employee?.name
                       ?.split(" ")
@@ -258,7 +258,7 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
                   </AvatarFallback>
                 )}
               </Avatar>
-              <h3 className={`text-2xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+              <h3 className={`text-xl sm:text-2xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                 {fullEmployee?.fullName || fullEmployee?.name}
               </h3>
               <p className={`text-sm mt-1 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
@@ -269,20 +269,20 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
               </p>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className={`p-4 rounded-xl ${isDarkMode ? "bg-zinc-800/50" : "bg-zinc-50"}`}>
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
+              <div className={`p-3 sm:p-4 rounded-xl ${isDarkMode ? "bg-zinc-800/50" : "bg-zinc-50"}`}>
                 <label className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                   Employee ID
                 </label>
-                <p className={`mt-2 text-lg font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                <p className={`mt-1 sm:mt-2 text-base sm:text-lg font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                   {fullEmployee?.idNumber}
                 </p>
               </div>
-              <div className={`p-4 rounded-xl ${isDarkMode ? "bg-zinc-800/50" : "bg-zinc-50"}`}>
+              <div className={`p-3 sm:p-4 rounded-xl ${isDarkMode ? "bg-zinc-800/50" : "bg-zinc-50"}`}>
                 <label className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                   Status
                 </label>
-                <p className={`mt-2 text-lg font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                <p className={`mt-1 sm:mt-2 text-base sm:text-lg font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                   {fullEmployee?.status}
                 </p>
               </div>
@@ -293,92 +293,92 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
 
       {/* Personal Information Card */}
       <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-        <CardContent className="p-6">
-          <h3 className={`text-xl font-bold mb-6 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+        <CardContent className="p-4 sm:p-6">
+          <h3 className={`text-lg sm:text-xl font-bold mb-4 sm:mb-6 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
             Personal Information
           </h3>
 
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <div className="flex items-start gap-3">
-              <Mail className={`w-5 h-5 mt-0.5 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
-              <div className="flex-1">
+              <Mail className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
+              <div className="flex-1 min-w-0">
                 <p className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                   Email Address
                 </p>
-                <p className={`mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                <p className={`mt-1 text-sm sm:text-base break-all ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                   {fullEmployee?.email || "N/A"}
                 </p>
               </div>
             </div>
 
             <div className="flex items-start gap-3">
-              <Phone className={`w-5 h-5 mt-0.5 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
-              <div className="flex-1">
+              <Phone className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
+              <div className="flex-1 min-w-0">
                 <p className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                   Contact Number
                 </p>
-                <p className={`mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                <p className={`mt-1 text-sm sm:text-base ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                   {fullEmployee?.contactNumber || "N/A"}
                 </p>
               </div>
             </div>
 
             <div className="flex items-start gap-3">
-              <MapPin className={`w-5 h-5 mt-0.5 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
-              <div className="flex-1">
+              <MapPin className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
+              <div className="flex-1 min-w-0">
                 <p className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                   Address
                 </p>
-                <p className={`mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                <p className={`mt-1 text-sm sm:text-base ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                   {fullEmployee?.address || "N/A"}
                 </p>
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 pt-2">
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 pt-2">
               <div className="flex items-start gap-3">
-                <Calendar className={`w-5 h-5 mt-0.5 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
-                <div className="flex-1">
+                <Calendar className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
+                <div className="flex-1 min-w-0">
                   <p className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                     Birth Date
                   </p>
-                  <p className={`mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                  <p className={`mt-1 text-sm sm:text-base ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                     {formatDate(fullEmployee?.birthDate)}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
-                <Users className={`w-5 h-5 mt-0.5 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
-                <div className="flex-1">
+                <Users className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
+                <div className="flex-1 min-w-0">
                   <p className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                     Age
                   </p>
-                  <p className={`mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                  <p className={`mt-1 text-sm sm:text-base ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                     {fullEmployee?.age || "N/A"}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
-                <Users className={`w-5 h-5 mt-0.5 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
-                <div className="flex-1">
+                <Users className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
+                <div className="flex-1 min-w-0">
                   <p className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                     Civil Status
                   </p>
-                  <p className={`mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                  <p className={`mt-1 text-sm sm:text-base ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                     {fullEmployee?.civilStatus || "N/A"}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
-                <Briefcase className={`w-5 h-5 mt-0.5 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
-                <div className="flex-1">
+                <Briefcase className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
+                <div className="flex-1 min-w-0">
                   <p className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                     Hire Date
                   </p>
-                  <p className={`mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                  <p className={`mt-1 text-sm sm:text-base ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                     {formatDate(fullEmployee?.hireDate)}
                   </p>
                 </div>
@@ -390,44 +390,44 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
 
       {/* Government IDs Card */}
       <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-        <CardContent className="p-6">
-          <h3 className={`text-xl font-bold mb-6 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+        <CardContent className="p-4 sm:p-6">
+          <h3 className={`text-lg sm:text-xl font-bold mb-4 sm:mb-6 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
             Government Identification Numbers
           </h3>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className={`p-4 rounded-xl ${isDarkMode ? "bg-zinc-800/50" : "bg-zinc-50"}`}>
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
+            <div className={`p-3 sm:p-4 rounded-xl ${isDarkMode ? "bg-zinc-800/50" : "bg-zinc-50"}`}>
               <label className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                 SSS Number
               </label>
-              <p className={`mt-2 font-mono ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+              <p className={`mt-1 sm:mt-2 font-mono text-sm sm:text-base ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                 {fullEmployee?.sssNumber || "N/A"}
               </p>
             </div>
 
-            <div className={`p-4 rounded-xl ${isDarkMode ? "bg-zinc-800/50" : "bg-zinc-50"}`}>
+            <div className={`p-3 sm:p-4 rounded-xl ${isDarkMode ? "bg-zinc-800/50" : "bg-zinc-50"}`}>
               <label className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                 PhilHealth Number
               </label>
-              <p className={`mt-2 font-mono ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+              <p className={`mt-1 sm:mt-2 font-mono text-sm sm:text-base ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                 {fullEmployee?.philhealthNumber || "N/A"}
               </p>
             </div>
 
-            <div className={`p-4 rounded-xl ${isDarkMode ? "bg-zinc-800/50" : "bg-zinc-50"}`}>
+            <div className={`p-3 sm:p-4 rounded-xl ${isDarkMode ? "bg-zinc-800/50" : "bg-zinc-50"}`}>
               <label className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                 Pag-IBIG Number
               </label>
-              <p className={`mt-2 font-mono ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+              <p className={`mt-1 sm:mt-2 font-mono text-sm sm:text-base ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                 {fullEmployee?.pagibigNumber || "N/A"}
               </p>
             </div>
 
-            <div className={`p-4 rounded-xl ${isDarkMode ? "bg-zinc-800/50" : "bg-zinc-50"}`}>
+            <div className={`p-3 sm:p-4 rounded-xl ${isDarkMode ? "bg-zinc-800/50" : "bg-zinc-50"}`}>
               <label className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                 TIN Number
               </label>
-              <p className={`mt-2 font-mono ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+              <p className={`mt-1 sm:mt-2 font-mono text-sm sm:text-base ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                 {fullEmployee?.tinNumber || "N/A"}
               </p>
             </div>
@@ -437,40 +437,40 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
 
       {/* Documents Card */}
       <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className={`text-xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h3 className={`text-lg sm:text-xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
               My Documents
             </h3>
-            <span className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+            <span className={`text-xs sm:text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
               {documentData?.document_count || 0} {documentData?.document_count === 1 ? 'document' : 'documents'}
             </span>
           </div>
 
           {documentData?.documents && documentData.documents.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {documentData.documents.map((doc, index) => (
                 <div
                   key={index}
-                  className={`flex items-center justify-between p-4 rounded-xl border transition-colors ${isDarkMode
+                  className={`flex items-center justify-between p-3 sm:p-4 rounded-xl border transition-colors ${isDarkMode
                     ? "bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800"
                     : "bg-zinc-50 border-zinc-200 hover:bg-zinc-100"
                     }`}
                 >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className={`p-2 rounded-lg ${isDarkMode ? "bg-zinc-700" : "bg-white"}`}>
-                      <FileText className={`w-5 h-5 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
+                  <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                    <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${isDarkMode ? "bg-zinc-700" : "bg-white"}`}>
+                      <FileText className={`w-4 h-4 sm:w-5 sm:h-5 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`font-medium truncate ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                      <p className={`text-sm sm:text-base font-medium truncate ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                         {doc.filename}
                       </p>
-                      <div className={`flex items-center gap-3 text-xs mt-1 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                      <div className={`flex flex-wrap items-center gap-1 sm:gap-3 text-xs mt-0.5 sm:mt-1 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                         <span>{doc.type}</span>
-                        <span>•</span>
+                        <span className="hidden sm:inline">•</span>
                         <span>{formatFileSize(doc.size)}</span>
-                        <span>•</span>
-                        <span>{formatDate(doc.modified)}</span>
+                        <span className="hidden sm:inline">•</span>
+                        <span className="hidden sm:inline">{formatDate(doc.modified)}</span>
                       </div>
                     </div>
                   </div>
@@ -478,7 +478,7 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
                     variant="ghost"
                     size="icon"
                     onClick={() => handleDownload(doc)}
-                    className={`ml-2 ${isDarkMode ? "hover:bg-zinc-700 text-zinc-400 hover:text-white" : "hover:bg-zinc-200"}`}
+                    className={`ml-2 flex-shrink-0 ${isDarkMode ? "hover:bg-zinc-700 text-zinc-400 hover:text-white" : "hover:bg-zinc-200"}`}
                   >
                     <Download className="w-4 h-4" />
                   </Button>
@@ -486,9 +486,9 @@ export default function Profile({ employee, employeeData, handleLogout, profileD
               ))}
             </div>
           ) : (
-            <div className={`text-center py-12 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-              <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No documents available</p>
+            <div className={`text-center py-8 sm:py-12 ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+              <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 sm:mb-3 opacity-50" />
+              <p className="text-sm sm:text-base">No documents available</p>
             </div>
           )}
         </CardContent>

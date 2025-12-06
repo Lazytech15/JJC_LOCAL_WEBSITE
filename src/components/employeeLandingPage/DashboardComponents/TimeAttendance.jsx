@@ -71,93 +71,93 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
   const hasMoreRecords = dailySummaries.length > INITIAL_DISPLAY_COUNT
 
   return (
-    <div className="space-y-6">
-      <h2 className={`text-3xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>Time & Attendance</h2>
+    <div className="space-y-4 sm:space-y-6">
+      <h2 className={`text-xl sm:text-2xl lg:text-3xl font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>Time & Attendance</h2>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
         <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
                 <p
-                  className={`text-xs font-medium uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
+                  className={`text-[10px] sm:text-xs font-medium uppercase tracking-wider truncate ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
                 >
                   Total Hours
                 </p>
-                <p className={`text-3xl font-bold mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                <p className={`text-xl sm:text-2xl lg:text-3xl font-bold mt-0.5 sm:mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                   {stats.totalHours}
                 </p>
               </div>
               <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDarkMode ? "bg-blue-500/20 text-blue-400" : "bg-blue-50 text-blue-600"}`}
+                className={`w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-blue-500/20 text-blue-400" : "bg-blue-50 text-blue-600"}`}
               >
-                <Clock className="w-6 h-6" />
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
                 <p
-                  className={`text-xs font-medium uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
+                  className={`text-[10px] sm:text-xs font-medium uppercase tracking-wider truncate ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
                 >
                   Attendance Rate
                 </p>
-                <p className={`text-3xl font-bold mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                <p className={`text-xl sm:text-2xl lg:text-3xl font-bold mt-0.5 sm:mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                   {stats.attendanceRate}%
                 </p>
               </div>
               <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDarkMode ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-50 text-emerald-600"}`}
+                className={`w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-50 text-emerald-600"}`}
               >
-                <CheckCircle2 className="w-6 h-6" />
+                <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
                 <p
-                  className={`text-xs font-medium uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
+                  className={`text-[10px] sm:text-xs font-medium uppercase tracking-wider truncate ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
                 >
                   Overtime Hours
                 </p>
-                <p className={`text-3xl font-bold mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                <p className={`text-xl sm:text-2xl lg:text-3xl font-bold mt-0.5 sm:mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                   {stats.overtimeHours}
                 </p>
               </div>
               <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDarkMode ? "bg-violet-500/20 text-violet-400" : "bg-violet-50 text-violet-600"}`}
+                className={`w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-violet-500/20 text-violet-400" : "bg-violet-50 text-violet-600"}`}
               >
-                <TrendingUp className="w-6 h-6" />
+                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
                 <p
-                  className={`text-xs font-medium uppercase tracking-wider ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
+                  className={`text-[10px] sm:text-xs font-medium uppercase tracking-wider truncate ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}
                 >
                   Days Tracked
                 </p>
-                <p className={`text-3xl font-bold mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                <p className={`text-xl sm:text-2xl lg:text-3xl font-bold mt-0.5 sm:mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                   {stats.totalDays}
                 </p>
               </div>
               <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDarkMode ? "bg-amber-500/20 text-amber-400" : "bg-amber-50 text-amber-600"}`}
+                className={`w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-amber-500/20 text-amber-400" : "bg-amber-50 text-amber-600"}`}
               >
-                <Calendar className="w-6 h-6" />
+                <Calendar className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
               </div>
             </div>
           </CardContent>
@@ -165,26 +165,26 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
       </div>
 
       <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
-              <CardTitle className={isDarkMode ? "text-white" : "text-zinc-900"}>Attendance History</CardTitle>
-              <CardDescription className={isDarkMode ? "text-zinc-400" : "text-zinc-600"}>
+              <CardTitle className={`text-base sm:text-lg lg:text-xl ${isDarkMode ? "text-white" : "text-zinc-900"}`}>Attendance History</CardTitle>
+              <CardDescription className={`text-xs sm:text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                 Your recent clock-in and clock-out records
               </CardDescription>
             </div>
             {hasMoreRecords && (
-              <span className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+              <span className={`text-[10px] sm:text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                 Showing {showAll ? dailySummaries.length : INITIAL_DISPLAY_COUNT} of {dailySummaries.length}
               </span>
             )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6 pt-2 sm:pt-3">
           {!dailySummaries || dailySummaries.length === 0 ? (
-            <div className="text-center py-12">
-              <Clock className={`w-16 h-16 mx-auto mb-4 ${isDarkMode ? "text-zinc-700" : "text-zinc-300"}`} />
-              <p className={`text-lg ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>No attendance records found</p>
+            <div className="text-center py-8 sm:py-12">
+              <Clock className={`w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 ${isDarkMode ? "text-zinc-700" : "text-zinc-300"}`} />
+              <p className={`text-sm sm:text-lg ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>No attendance records found</p>
             </div>
           ) : (
             <>
@@ -261,27 +261,27 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
               </div>
 
               {/* Mobile Card View */}
-              <div className="lg:hidden space-y-4">
+              <div className="lg:hidden space-y-2 sm:space-y-4">
                 {displayedRecords.map((day, index) => (
                   <div
                     key={day.id || index}
-                    className={`p-4 rounded-xl border ${
+                    className={`p-3 sm:p-4 rounded-lg sm:rounded-xl border ${
                       isDarkMode ? "bg-zinc-800/50 border-zinc-800" : "bg-zinc-50 border-zinc-200"
                     }`}
                   >
                     {/* Header with Date and Status */}
-                    <div className="flex items-center justify-between mb-3">
-                      <div className={`font-semibold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                    <div className="flex items-center justify-between mb-2 sm:mb-3">
+                      <div className={`font-semibold text-sm sm:text-base ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                         {formatDate(day.date)}
                       </div>
                       {getStatusBadge(day)}
                     </div>
 
                     {/* Time Sessions */}
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 sm:space-y-2">
                       {/* Morning */}
                       {(day.morning_in || day.morning_out) && (
-                        <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center justify-between text-xs sm:text-sm">
                           <span className={`font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                             Morning
                           </span>
@@ -293,7 +293,7 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
 
                       {/* Afternoon */}
                       {(day.afternoon_in || day.afternoon_out) && (
-                        <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center justify-between text-xs sm:text-sm">
                           <span className={`font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                             Afternoon
                           </span>
@@ -305,7 +305,7 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
 
                       {/* Evening */}
                       {(day.evening_in || day.evening_out) && (
-                        <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center justify-between text-xs sm:text-sm">
                           <span className={`font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                             Evening
                           </span>
@@ -317,13 +317,13 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
                     </div>
 
                     {/* Total Hours */}
-                    <div className={`mt-3 pt-3 border-t flex items-center justify-between ${
+                    <div className={`mt-2 sm:mt-3 pt-2 sm:pt-3 border-t flex items-center justify-between ${
                       isDarkMode ? "border-zinc-700" : "border-zinc-200"
                     }`}>
-                      <span className={`text-sm font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                      <span className={`text-xs sm:text-sm font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                         Total Hours
                       </span>
-                      <span className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                      <span className={`text-base sm:text-lg font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                         {(parseFloat(day.total_hours) || 0).toFixed(1)}h
                       </span>
                     </div>
@@ -333,20 +333,20 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
 
               {/* Show More/Less Button */}
               {hasMoreRecords && (
-                <div className="mt-4 flex justify-center">
+                <div className="mt-3 sm:mt-4 flex justify-center">
                   <Button
                     variant={isDarkMode ? "secondary" : "outline"}
                     onClick={() => setShowAll(!showAll)}
-                    className="min-w-[200px]"
+                    className="min-w-[160px] sm:min-w-[200px] text-xs sm:text-sm py-2"
                   >
                     {showAll ? (
                       <>
-                        <ChevronUp className="w-4 h-4 mr-2" />
+                        <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
                         Show Less
                       </>
                     ) : (
                       <>
-                        <ChevronDown className="w-4 h-4 mr-2" />
+                        <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
                         Show All ({dailySummaries.length - INITIAL_DISPLAY_COUNT} more)
                       </>
                     )}
@@ -359,12 +359,12 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
       </Card>
 
       {stats.totalDays > 0 && (
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
           <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-start gap-3 sm:gap-4">
                 <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                     stats.lateDays > 0
                       ? isDarkMode
                         ? "bg-amber-500/20 text-amber-400"
@@ -374,16 +374,16 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
                         : "bg-emerald-50 text-emerald-600"
                   }`}
                 >
-                  <AlertCircle className="w-5 h-5" />
+                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <p className={`text-sm font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                  <p className={`text-xs sm:text-sm font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                     Late Arrivals
                   </p>
-                  <p className={`text-2xl font-bold mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                  <p className={`text-lg sm:text-xl lg:text-2xl font-bold mt-0.5 sm:mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                     {stats.lateDays} {stats.lateDays === 1 ? "day" : "days"}
                   </p>
-                  <p className={`text-xs mt-1 ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>
+                  <p className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>
                     Out of {stats.totalDays} tracked days
                   </p>
                 </div>
@@ -392,10 +392,10 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
           </Card>
 
           <Card className={`border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"}`}>
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-start gap-3 sm:gap-4">
                 <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                     stats.incompleteDays > 0
                       ? isDarkMode
                         ? "bg-red-500/20 text-red-400"
@@ -405,16 +405,16 @@ export default function TimeAttendance({ dailySummaries, isDarkMode }) {
                         : "bg-emerald-50 text-emerald-600"
                   }`}
                 >
-                  <XCircle className="w-5 h-5" />
+                  <XCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <p className={`text-sm font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                  <p className={`text-xs sm:text-sm font-medium ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                     Incomplete Days
                   </p>
-                  <p className={`text-2xl font-bold mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                  <p className={`text-lg sm:text-xl lg:text-2xl font-bold mt-0.5 sm:mt-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                     {stats.incompleteDays} {stats.incompleteDays === 1 ? "day" : "days"}
                   </p>
-                  <p className={`text-xs mt-1 ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>
+                  <p className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 ${isDarkMode ? "text-zinc-500" : "text-zinc-500"}`}>
                     Missing clock-in or clock-out
                   </p>
                 </div>

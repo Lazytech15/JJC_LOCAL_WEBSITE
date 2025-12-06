@@ -428,12 +428,12 @@ function ProcurementDepartment() {
 
                 {/* Notifications Dropdown Panel */}
                 {showNotifications && (
-                  <div className={`absolute top-16 left-1/2 transform -translate-x-1/2 w-80 sm:w-96 backdrop-blur-md rounded-lg shadow-2xl border z-9999 max-h-[calc(100vh-6rem)] overflow-y-auto notifications-menu ${
+                  <div className={`absolute top-16 left-1/2 transform -translate-x-1/2 w-80 sm:w-96 backdrop-blur-md rounded-lg shadow-2xl border z-9999 notifications-menu ${
                     isDarkMode ? "bg-slate-800/95 border-slate-700/50" : "bg-white border-slate-200"
                   }`}>
                     <div className="p-4">
-                      <div className={`flex items-center justify-between mb-4 pb-3 border-b sticky top-0 backdrop-blur-md z-10 ${
-                        isDarkMode ? "border-slate-700/50 bg-slate-800/95" : "border-slate-200 bg-white"
+                      <div className={`flex items-center justify-between mb-4 pb-3 border-b ${
+                        isDarkMode ? "border-slate-700/50" : "border-slate-200"
                       }`}>
                         <h3 className={`font-semibold ${isDarkMode ? "text-white" : "text-slate-900"}`}>Notifications</h3>
                         <div className="flex items-center gap-2">
@@ -488,7 +488,7 @@ function ProcurementDepartment() {
 
                       {/* Notifications List */}
                       {!notificationsLoading && !notificationsError && (
-                        <div className="space-y-2">
+                        <div className="space-y-2 max-h-[220px] overflow-y-auto notification-scroll">
                           {notifications.length > 0 ? (
                             notifications.map((notification) => (
                               <div 
@@ -576,8 +576,25 @@ function ProcurementDepartment() {
                       )}
 
                       {notifications.length > 0 && !notificationsLoading && !notificationsError && (
-                        <div className={`mt-4 pt-3 border-t sticky bottom-0 backdrop-blur-md ${isDarkMode ? "border-slate-700/50 bg-slate-800/95" : "border-slate-200 bg-white"}`}>
-                          <button className={`w-full text-center ${isDarkMode ? "text-amber-400 hover:text-amber-300" : "text-amber-600 hover:text-amber-700"} text-sm font-medium transition-colors py-2`}>
+                        <div className={`mt-4 pt-3 border-t ${isDarkMode ? "border-slate-700/50" : "border-slate-200"}`}>
+                          <button 
+                            onClick={() => {
+                              const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+                              if (token) {
+                                const username = user?.username || ''
+                                // Store token securely in sessionStorage instead of URL
+                                sessionStorage.setItem('nav_auth_token', JSON.stringify({
+                                  token: token,
+                                  username: username,
+                                  timestamp: Date.now()
+                                }))
+                                window.location.href = `/employee/dashboard?autoLogin=true&tab=announcements`
+                              } else {
+                                window.location.href = '/employee/dashboard?tab=announcements'
+                              }
+                            }}
+                            className={`w-full text-center ${isDarkMode ? "text-amber-400 hover:text-amber-300" : "text-amber-600 hover:text-amber-700"} text-sm font-medium transition-colors py-2`}
+                          >
                             View All Notifications
                           </button>
                         </div>
@@ -634,9 +651,14 @@ function ProcurementDepartment() {
                           onClick={() => {
                             const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
                             if (token) {
-                              const encodedToken = encodeURIComponent(token)
                               const username = user?.username || ''
-                              window.location.href = `/employee/dashboard?autoLogin=true&token=${encodedToken}&username=${encodeURIComponent(username)}&tab=profile`
+                              // Store token securely in sessionStorage instead of URL
+                              sessionStorage.setItem('nav_auth_token', JSON.stringify({
+                                token: token,
+                                username: username,
+                                timestamp: Date.now()
+                              }))
+                              window.location.href = `/employee/dashboard?autoLogin=true&tab=profile`
                             } else {
                               window.location.href = '/employee/dashboard?tab=profile'
                             }
