@@ -309,21 +309,43 @@ function LoginForm() {
       }
     }
 
-    // Regular token check
-    const existingToken = getStoredToken()
+    // Regular token check - only for admin tokens
+    const existingToken = getStoredToken(false) // false = admin token
     if (existingToken) {
       const payload = verifyToken(existingToken)
       if (payload && payload.department === departmentName) {
         setHasValidToken(true)
       } else {
+        // Don't clear tokens if they're for a different department
+        // Just don't show the continue button
         setHasValidToken(false)
-        clearTokens()
       }
     } else {
       setHasValidToken(false)
     }
     setIsInitializing(false)
   }, [departmentName, isValidDepartment, deptSlug, login, navigate])
+
+  // Listen for storage changes from other tabs (login/logout events)
+  useEffect(() => {
+    const handleStorageChange = (event) => {
+      if (event.key === 'auth_token' || event.key === 'jjc_session_sync') {
+        // Re-check token when storage changes
+        const existingToken = getStoredToken(false) // false = admin token
+        if (existingToken) {
+          const payload = verifyToken(existingToken)
+          if (payload && payload.department === departmentName) {
+            setHasValidToken(true)
+            return
+          }
+        }
+        setHasValidToken(false)
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [departmentName])
 
   const handleContinueWithToken = () => {
     // FIXED: Navigate to correct route

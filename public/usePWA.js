@@ -1,12 +1,18 @@
-import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
 
 export const usePWA = () => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const location = useLocation();
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  // Safe way to get current pathname without useLocation hook
+  const getCurrentPath = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      return window.location.pathname;
+    }
+    return '/';
+  }, []);
 
   useEffect(() => {
     // Check if running as PWA
@@ -19,8 +25,9 @@ export const usePWA = () => {
 
     // Listen for beforeinstallprompt
     const handleBeforeInstallPrompt = (e) => {
-      // Only capture prompt if on admin routes
-      if (location.pathname.startsWith('/jjcewgsaccess')) {
+      const currentPath = getCurrentPath();
+      // Capture prompt for admin routes or employee routes
+      if (currentPath.startsWith('/jjcewgsaccess') || currentPath.startsWith('/employee')) {
         e.preventDefault();
         setDeferredPrompt(e);
         setIsInstallable(true);
@@ -38,18 +45,30 @@ export const usePWA = () => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
+    // Handle location changes for SPAs
+    const handlePopState = () => {
+      // Re-check installability on route changes
+      if (deferredPrompt) {
+        const currentPath = getCurrentPath();
+        const shouldBeInstallable = currentPath.startsWith('/jjcewgsaccess') || currentPath.startsWith('/employee');
+        setIsInstallable(shouldBeInstallable);
+      }
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('popstate', handlePopState);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('popstate', handlePopState);
     };
-  }, [location.pathname]);
+  }, [getCurrentPath, deferredPrompt]);
 
   const installPWA = async () => {
     if (!deferredPrompt) return false;

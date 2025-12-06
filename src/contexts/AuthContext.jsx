@@ -1,7 +1,9 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect } from "react"
-import { getStoredToken, verifyToken, clearTokens, storeTokens } from "../utils/auth"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { getStoredToken, verifyToken, clearTokens, storeTokens, storeEmployeeToken } from "../utils/auth"
+import { clearLastRoute } from "../utils/sessionPersistence"
+import { initSessionSync, broadcastAdminLogout, broadcastEmployeeLogout, broadcastAdminLogin, broadcastEmployeeLogin, cleanupSessionSync } from "../utils/sessionSync"
 
 const AuthContext = createContext(null)
 
@@ -60,6 +62,124 @@ export function AuthProvider({ children }) {
     const saved = localStorage.getItem("darkMode")
     return saved ? JSON.parse(saved) : false
   })
+  
+  // Session timeout modal state
+  const [sessionTimeoutInfo, setSessionTimeoutInfo] = useState({
+    isOpen: false,
+    reason: '',
+    userType: 'employee'
+  })
+
+  // Handle logout from another tab (admin) - now clears BOTH sessions
+  const handleRemoteAdminLogout = useCallback((data) => {
+    console.log('🔐 Remote admin logout detected:', data)
+    // Clear BOTH sessions since login/logout is now unified
+    setUser(null)
+    setEmployee(null)
+    setSelectedDepartment(null)
+    // Don't clear tokens here - they're already cleared by the originating tab
+    // Show the session timeout modal
+    setSessionTimeoutInfo({
+      isOpen: true,
+      reason: data?.reason || "You've been logged out from another tab",
+      userType: 'admin'
+    })
+  }, [])
+
+  // Handle logout from another tab (employee) - now clears BOTH sessions
+  const handleRemoteEmployeeLogout = useCallback((data) => {
+    console.log('🔐 Remote employee logout detected:', data)
+    // Clear BOTH sessions since login/logout is now unified
+    setUser(null)
+    setEmployee(null)
+    setSelectedDepartment(null)
+    // Don't clear tokens here - they're already cleared by the originating tab
+    // Show the session timeout modal
+    setSessionTimeoutInfo({
+      isOpen: true,
+      reason: data?.reason || "You've been logged out from another tab",
+      userType: 'employee'
+    })
+  }, [])
+
+  // Handle login from another tab (admin) - update BOTH sessions
+  const handleRemoteAdminLogin = useCallback((data) => {
+    console.log('🔐 Remote admin login detected:', data)
+    // Re-check tokens and update BOTH sessions
+    const adminToken = getStoredToken(false)
+    if (adminToken) {
+      const payload = verifyToken(adminToken)
+      if (payload) {
+        // Set admin session
+        setUser({
+          id: resolveUserId(payload),
+          username: payload.username,
+          name: payload.name,
+          role: payload.role,
+          permissions: payload.permissions || [],
+          access_level: resolveAccessLevel(payload),
+          loginTime: payload.iat ? new Date(payload.iat * 1000).toISOString() : new Date().toISOString(),
+        })
+        setSelectedDepartment(resolveDepartment(payload))
+        
+        // Also set employee session
+        setEmployee({
+          id: resolveUserId(payload),
+          username: payload.username,
+          name: payload.name,
+          employeeId: payload.employeeId || `JJC-${resolveUserId(payload)}`,
+          department: resolveDepartment(payload),
+          position: payload.position || payload.access_level,
+          access_level: resolveAccessLevel(payload),
+          role: payload.role,
+          loginTime: payload.iat ? new Date(payload.iat * 1000).toISOString() : new Date().toISOString(),
+        })
+      }
+    }
+  }, [])
+
+  // Handle login from another tab (employee) - update BOTH sessions if admin
+  const handleRemoteEmployeeLogin = useCallback((data) => {
+    console.log('🔐 Remote employee login detected:', data)
+    // Re-check tokens and update state
+    const employeeToken = getStoredToken(true)
+    if (employeeToken) {
+      const payload = verifyToken(employeeToken)
+      if (payload) {
+        // Set employee session
+        setEmployee({
+          id: resolveUserId(payload),
+          username: payload.username,
+          name: payload.name,
+          employeeId: payload.employeeId || `JJC-${resolveUserId(payload)}`,
+          department: resolveDepartment(payload),
+          position: payload.position,
+          access_level: resolveAccessLevel(payload),
+          role: payload.role,
+          loginTime: payload.iat ? new Date(payload.iat * 1000).toISOString() : new Date().toISOString(),
+        })
+        
+        // Also set admin session if user has admin access
+        if (payload.role === 'admin' || payload.role === 'manager' || resolveAccessLevel(payload) === 'admin') {
+          setUser({
+            id: resolveUserId(payload),
+            username: payload.username,
+            name: payload.name,
+            role: payload.role,
+            permissions: payload.permissions || [],
+            access_level: resolveAccessLevel(payload),
+            loginTime: payload.iat ? new Date(payload.iat * 1000).toISOString() : new Date().toISOString(),
+          })
+          setSelectedDepartment(resolveDepartment(payload))
+        }
+      }
+    }
+  }, [])
+
+  // Close session timeout modal
+  const closeSessionTimeoutModal = useCallback(() => {
+    setSessionTimeoutInfo(prev => ({ ...prev, isOpen: false }))
+  }, [])
 
   // Check for existing valid token on app initialization
   useEffect(() => {
@@ -70,6 +190,14 @@ export function AuthProvider({ children }) {
           setIsLoading(false)
           return
         }
+
+        // Initialize session sync for cross-tab logout AND login
+        initSessionSync({
+          onAdminLogout: handleRemoteAdminLogout,
+          onEmployeeLogout: handleRemoteEmployeeLogout,
+          onAdminLogin: handleRemoteAdminLogin,
+          onEmployeeLogin: handleRemoteEmployeeLogin
+        })
 
         // Check for admin/department token
         const adminToken = getStoredToken(false)
@@ -120,7 +248,12 @@ export function AuthProvider({ children }) {
     }
 
     initializeAuth()
-  }, [])
+
+    // Cleanup on unmount
+    return () => {
+      cleanupSessionSync()
+    }
+  }, [handleRemoteAdminLogout, handleRemoteEmployeeLogout, handleRemoteAdminLogin, handleRemoteEmployeeLogin])
 
   useEffect(() => {
     localStorage.setItem("darkMode", JSON.stringify(isDarkMode))
@@ -148,30 +281,112 @@ export function AuthProvider({ children }) {
     console.log("🌓 AuthContext: Body classes:", document.body.className)
   }, [isDarkMode])
 
+  // Admin login - also sets up employee session with same credentials
   const login = (userData, department, token) => {
+    // Set admin session
     setUser(userData)
     setSelectedDepartment(department)
     if (token) {
-      storeTokens(token, false)
+      storeTokens(token)
+      // Also store as employee token for dual-session
+      storeEmployeeToken(token)
     }
+    
+    // Also set up employee session with the same user data
+    setEmployee({
+      id: userData.id,
+      name: userData.name,
+      username: userData.username,
+      employeeId: `JJC-${userData.id}`,
+      department: userData.department || department,
+      position: userData.access_level || userData.role,
+      role: userData.role,
+      permissions: userData.permissions,
+      access_level: userData.access_level,
+      loginTime: new Date().toISOString(),
+      hasValidToken: true
+    })
+    
+    // Broadcast admin login to other tabs
+    broadcastAdminLogin({ department, username: userData?.username })
+    broadcastEmployeeLogin({ username: userData?.username, name: userData?.name })
   }
 
+  // Employee login - also sets up admin session if user has admin access
   const employeeLogin = (employeeData, token) => {
+    // Set employee session
     setEmployee(employeeData)
     if (token) {
-      storeTokens(token, true)
+      storeEmployeeToken(token)
+      // Also store as admin token for dual-session
+      storeTokens(token)
+    }
+    
+    // Also set up admin session if user has admin/manager role
+    if (employeeData.role === 'admin' || employeeData.role === 'manager' || employeeData.access_level === 'admin') {
+      setUser({
+        id: employeeData.id,
+        name: employeeData.name,
+        username: employeeData.username,
+        department: employeeData.department,
+        role: employeeData.role,
+        permissions: employeeData.permissions,
+        access_level: employeeData.access_level,
+        loginTime: employeeData.loginTime || new Date().toISOString(),
+        hasValidToken: true
+      })
+      setSelectedDepartment(employeeData.department)
+    }
+    
+    // Broadcast employee login to other tabs
+    broadcastEmployeeLogin({ username: employeeData?.username, name: employeeData?.name })
+    if (employeeData.role === 'admin' || employeeData.role === 'manager' || employeeData.access_level === 'admin') {
+      broadcastAdminLogin({ department: employeeData.department, username: employeeData?.username })
     }
   }
 
-  const logout = () => {
+  // Logout now logs out BOTH sessions
+  const logout = (broadcast = true) => {
     setUser(null)
+    setEmployee(null)
     setSelectedDepartment(null)
     clearTokens()
+    localStorage.removeItem("employeeToken")
+    clearLastRoute()
+    // Broadcast logout for BOTH sessions
+    if (broadcast) {
+      broadcastAdminLogout('You have been logged out')
+      broadcastEmployeeLogout('You have been logged out')
+    }
   }
 
-  const employeeLogout = () => {
+  // Employee logout now also logs out admin session
+  const employeeLogout = (broadcast = true) => {
+    setUser(null)
     setEmployee(null)
+    setSelectedDepartment(null)
+    clearTokens()
     localStorage.removeItem("employeeToken")
+    clearLastRoute()
+    // Broadcast logout for BOTH sessions
+    if (broadcast) {
+      broadcastAdminLogout('You have been logged out')
+      broadcastEmployeeLogout('You have been logged out')
+    }
+  }
+
+  // Logout all sessions (both admin and employee) - use this for full sign out
+  const logoutAll = (broadcast = true) => {
+    setUser(null)
+    setEmployee(null)
+    setSelectedDepartment(null)
+    clearTokens()
+    localStorage.removeItem("employeeToken")
+    clearLastRoute()
+    if (broadcast) {
+      broadcastAdminLogout('You have been logged out')
+      broadcastEmployeeLogout('You have been logged out')
+    }
   }
 
   const toggleDarkMode = () => {
@@ -188,12 +403,16 @@ export function AuthProvider({ children }) {
     employeeLogin,
     logout,
     employeeLogout,
+    logoutAll,
     isAuthenticated: !!user,
     isEmployeeAuthenticated: !!employee,
     isDarkMode,
     toggleDarkMode,
     isSuperAdmin: user?.role === "admin",
     isLoading,
+    // Session timeout modal
+    sessionTimeoutInfo,
+    closeSessionTimeoutModal,
   }
 
   return <AuthContext.Provider value={authValue}>{children}</AuthContext.Provider>

@@ -132,13 +132,14 @@ export default function EmployeeDashboard() {
         
         // Fall back to stored token if no nav auth
         if (!token) {
-          token = getStoredToken()
+          token = getStoredToken(true) // true for employee token
         }
         
         if (!token) {
           console.warn("No token found")
           setLoading(false)
-          setError("Please log in to continue")
+          // Redirect to login instead of just showing error
+          navigate("/employee/login", { replace: true })
           return
         }
 
@@ -148,8 +149,10 @@ export default function EmployeeDashboard() {
         if (!payload || !payload.username) {
           console.warn("Invalid token payload")
           clearTokens()
+          localStorage.removeItem("employeeToken")
           setLoading(false)
-          setError("Session expired. Please log in again.")
+          // Redirect to login
+          navigate("/employee/login", { replace: true })
           return
         }
 
@@ -159,7 +162,9 @@ export default function EmployeeDashboard() {
 
         if (!uid) {
           setLoading(false)
-          setError("Invalid session: No user ID found")
+          // Redirect instead of showing error
+          localStorage.removeItem("employeeToken")
+          navigate("/employee/login", { replace: true })
           return
         }
 
@@ -389,10 +394,10 @@ export default function EmployeeDashboard() {
   }
 
   return (
-    <div className={`min-h-screen pb-20 lg:pb-0 ${isDarkMode ? "bg-zinc-950" : "bg-zinc-50"}`}>
+    <div className={`min-h-[100svh] pb-[env(safe-area-inset-bottom,80px)] lg:pb-0 ${isDarkMode ? "bg-zinc-950" : "bg-zinc-50"}`}>
       {/* Update Available Banner */}
       {updateAvailable && (
-        <div className="bg-zinc-900 text-white px-4 py-3 text-center text-sm">
+        <div className="bg-zinc-900 text-white px-4 py-2 sm:py-3 text-center text-xs sm:text-sm">
           <span>A new version is available. </span>
           <button onClick={updateServiceWorker} className="underline font-semibold">
             Update now
@@ -401,7 +406,7 @@ export default function EmployeeDashboard() {
       )}
 
       {/* Error Banner */}
-      {error && <div className="bg-red-500 text-white px-4 py-3 text-center text-sm">{error}</div>}
+      {error && <div className="bg-red-500 text-white px-4 py-2 sm:py-3 text-center text-xs sm:text-sm">{error}</div>}
 
       <StatusWarningBanner 
         status={employeeData?.status} 
@@ -412,33 +417,33 @@ export default function EmployeeDashboard() {
       <header
         className={`sticky top-0 z-40 backdrop-blur-lg`}
       >
-        <div className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+        <div className="max-w-9xl mx-auto px-3 sm:px-4 lg:px-8">
+          <div className="flex items-center justify-between h-14 sm:h-16">
             {/* Logo */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <img
                 src={logo || "/placeholder.svg"}
                 alt="JJC Engineering Works Logo"
-                className="w-12 h-12 rounded-xl object-cover shadow-md bg-primary"
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl object-cover shadow-md bg-primary"
               />
               <div className={`hidden md:flex justify-center text-white drop-shadow-lg`}>
                 <div className="flex gap-2 text-center items-center">
                   <h1
-                    className={`text-5xl font-extrabold califoniaFont tracking-wide ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
+                    className={`text-4xl lg:text-5xl font-extrabold califoniaFont tracking-wide ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
                       }`}
                   >
                     JJC
                   </h1>
                   <div className="text-left mt-2">
                     <p
-                      className={`text-sm font-semibold uppercase califoniaFont leading-tight ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
+                      className={`text-xs lg:text-sm font-semibold uppercase califoniaFont leading-tight ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
                         }`}
                     >
                       Engineering Works
                     </p>
                     <hr className="border-white/70" />
                     <p
-                      className={`text-sm califoniaFont font-semibold uppercase text-white ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
+                      className={`text-xs lg:text-sm califoniaFont font-semibold uppercase text-white ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"
                         }`}
                     >
                       & General Services
@@ -450,9 +455,9 @@ export default function EmployeeDashboard() {
 
             {/* Centered Desktop Navigation */}
             <div className="hidden lg:block border-t ${isDarkMode ? 'border-zinc-800' : 'border-zinc-200'}">
-              <div className="flex items-center justify-center py-3">
+              <div className="flex items-center justify-center py-2 sm:py-3">
                 <nav
-                  className={`inline-flex items-center gap-1 p-1 rounded-xl ${isDarkMode ? "bg-zinc-800" : "bg-zinc-200"}`}
+                  className={`inline-flex items-center gap-0.5 sm:gap-1 p-1 rounded-xl ${isDarkMode ? "bg-zinc-800" : "bg-zinc-200"}`}
                 >
                   {menuItems.map((item) => {
                     const Icon = item.icon
@@ -461,17 +466,17 @@ export default function EmployeeDashboard() {
                       <button
                         key={item.id}
                         onClick={() => setActiveTab(item.id)}
-                        className={`relative flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-medium text-sm ${isActive
+                        className={`relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-all font-medium text-xs sm:text-sm ${isActive
                           ? "bg-white text-zinc-900 shadow-md"
                           : isDarkMode
                             ? "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
                             : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-300/50"
                           }`}
                       >
-                        <Icon className="w-4 h-4" />
+                        <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         {isActive && <span>{item.label}</span>}
                         {isActive && item.badge > 0 && (
-                          <Badge className="ml-1 bg-red-500 text-white">{item.badge}</Badge>
+                          <Badge className="ml-1 bg-red-500 text-white text-[10px] sm:text-xs">{item.badge}</Badge>
                         )}
                       </button>
                     )
@@ -481,29 +486,29 @@ export default function EmployeeDashboard() {
             </div>
 
             {/* Right Side Actions */}
-            <div className="flex items-center gap-3">
-              <div className="absolute top-7 flex items-center right-44 lg:right-36">
-                <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? "bg-green-600" : "bg-red-500"}`}></span>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="absolute top-5 sm:top-7 flex items-center right-28 sm:right-44 lg:right-36">
+                <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${isOnline ? "bg-green-600" : "bg-red-500"}`}></span>
               </div>
 
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={toggleDarkMode}
-                className={isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}
+                className={`p-2 ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`}
               >
-                {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                {isDarkMode ? <Sun className="w-4 h-4 sm:w-5 sm:h-5" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5" />}
               </Button>
 
               <Button
                 variant="ghost"
                 size="icon"
-                className={`relative lg:hidden ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`}
+                className={`relative lg:hidden p-2 ${isDarkMode ? "text-zinc-400 hover:text-white" : "text-zinc-600 hover:text-zinc-900"}`}
                 onClick={() => setActiveTab("announcements")}
               >
-                <Bell className="w-5 h-5" />
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                  <span className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 w-4 h-4 sm:w-5 sm:h-5 bg-red-500 text-white text-[10px] sm:text-xs rounded-full flex items-center justify-center font-bold">
                     {unreadCount}
                   </span>
                 )}
@@ -513,7 +518,7 @@ export default function EmployeeDashboard() {
               <div className="relative" ref={profileMenuRef}>
                 <button onClick={() => setShowProfileMenu(!showProfileMenu)} className="focus:outline-none">
                   <Avatar
-                    className={`w-9 h-9 ring-2 cursor-pointer hover:ring-4 transition-all ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}
+                    className={`w-8 h-8 sm:w-9 sm:h-9 ring-2 cursor-pointer hover:ring-4 transition-all ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}
                   >
                     {profileImage ? (
                       <img
@@ -523,7 +528,7 @@ export default function EmployeeDashboard() {
                       />
                     ) : (
                       <AvatarFallback
-                        className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-sm font-semibold`}
+                        className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-xs sm:text-sm font-semibold`}
                       >
                         {employee?.name
                           ?.split(" ")
@@ -537,12 +542,12 @@ export default function EmployeeDashboard() {
                 {/* Dropdown Menu */}
                 {showProfileMenu && (
                   <div
-                    className={`absolute right-0 mt-2 w-64 rounded-xl shadow-xl border z-50 ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                    className={`absolute right-0 mt-2 w-56 sm:w-64 rounded-xl shadow-xl border z-50 ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
                       }`}
                   >
-                    <div className={`p-4 border-b ${isDarkMode ? "border-zinc-800" : "border-zinc-200"}`}>
-                      <div className="flex items-center gap-3">
-                        <Avatar className={`w-12 h-12 ring-2 ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}>
+                    <div className={`p-3 sm:p-4 border-b ${isDarkMode ? "border-zinc-800" : "border-zinc-200"}`}>
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <Avatar className={`w-10 h-10 sm:w-12 sm:h-12 ring-2 ${isDarkMode ? "ring-zinc-800" : "ring-zinc-200"}`}>
                           {profileImage ? (
                             <img
                               src={profileImage || "/placeholder.svg"}
@@ -551,7 +556,7 @@ export default function EmployeeDashboard() {
                             />
                           ) : (
                             <AvatarFallback
-                              className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-sm font-semibold`}
+                              className={`${isDarkMode ? "bg-zinc-800 text-white" : "bg-zinc-900 text-white"} text-xs sm:text-sm font-semibold`}
                             >
                               {employee?.name
                                 ?.split(" ")
@@ -561,26 +566,26 @@ export default function EmployeeDashboard() {
                           )}
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className={`font-semibold truncate ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
+                          <p className={`font-semibold truncate text-sm sm:text-base ${isDarkMode ? "text-white" : "text-zinc-900"}`}>
                             {employee?.name}
                           </p>
-                          <p className={`text-xs truncate ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+                          <p className={`text-[10px] sm:text-xs truncate ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
                             {employee?.position}
                           </p>
                         </div>
                       </div>
                     </div>
-                    <div className="p-2">
+                    <div className="p-1.5 sm:p-2">
                       <button
                         onClick={() => {
                           setShowProfileMenu(false)
                           setActiveTab("profile")
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
+                        className={`w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
                           }`}
                       >
-                        <User className="w-4 h-4" />
-                        <span className="text-sm font-medium">View Profile</span>
+                        <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span className="text-xs sm:text-sm font-medium">View Profile</span>
                       </button>
                       { (employeeData?.access_level === 'admin' || employee?.access_level === 'admin') && (
                         <button
@@ -588,10 +593,10 @@ export default function EmployeeDashboard() {
                             setShowProfileMenu(false)
                             navigate("/jjctoolbox")
                           }}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
+                          className={`w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
                             }`}
                         >
-                          <span className="text-sm font-medium">Go To Toolbox</span>
+                          <span className="text-xs sm:text-sm font-medium">Go To Toolbox</span>
                         </button>
                       )}
                       
@@ -602,10 +607,10 @@ export default function EmployeeDashboard() {
                             setShowProfileMenu(false)
                             handleDepartmentAccess()
                           }}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
+                          className={`w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-700"
                             }`}
                         >
-                          <span className="text-sm font-medium">{`Go to ${deptRoute.label}`}</span>
+                          <span className="text-xs sm:text-sm font-medium">{`Go to ${deptRoute.label}`}</span>
                         </button>
                       )}
                       
@@ -614,11 +619,11 @@ export default function EmployeeDashboard() {
                           setShowProfileMenu(false)
                           handleLogout()
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-red-400" : "hover:bg-zinc-100 text-red-600"
+                        className={`w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg transition-colors ${isDarkMode ? "hover:bg-zinc-800 text-red-400" : "hover:bg-zinc-100 text-red-600"
                           }`}
                       >
-                        <ArrowLeft className="w-4 h-4" />
-                        <span className="text-sm font-medium">Logout</span>
+                        <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span className="text-xs sm:text-sm font-medium">Logout</span>
                       </button>
                     </div>
                   </div>
@@ -630,7 +635,7 @@ export default function EmployeeDashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
         {activeTab === "dashboard" && (
           <DashboardHome
             employee={employee}
@@ -676,10 +681,10 @@ export default function EmployeeDashboard() {
 
       {/* Bottom Navigation - Mobile */}
       <nav
-        className={`fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t backdrop-blur-lg ${isDarkMode ? "bg-zinc-900/95 border-zinc-800" : "bg-white/95 border-zinc-200"
+        className={`fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t backdrop-blur-lg safe-area-pb ${isDarkMode ? "bg-zinc-900/95 border-zinc-800" : "bg-white/95 border-zinc-200"
           }`}
       >
-        <div className="flex items-center justify-around px-2 py-3 safe-area-inset-bottom">
+        <div className="flex items-center justify-around px-1 sm:px-2 py-2 sm:py-3">
           {menuItems.map((item) => {
             const Icon = item.icon
             const isActive = activeTab === item.id
@@ -687,11 +692,11 @@ export default function EmployeeDashboard() {
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className="relative flex flex-col items-center gap-1 px-3 py-2 min-w-0 flex-1"
+                className="relative flex flex-col items-center gap-0.5 sm:gap-1 px-2 sm:px-3 py-1.5 sm:py-2 min-w-0 flex-1"
               >
                 <div className="relative">
                   <Icon
-                    className={`w-6 h-6 transition-colors ${isActive
+                    className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors ${isActive
                       ? isDarkMode
                         ? "text-white"
                         : "text-zinc-900"
@@ -701,13 +706,13 @@ export default function EmployeeDashboard() {
                       }`}
                   />
                   {item.badge > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-red-500 text-white text-[9px] sm:text-xs rounded-full flex items-center justify-center font-bold">
                       {item.badge}
                     </span>
                   )}
                 </div>
                 <span
-                  className={`text-xs font-medium truncate w-full text-center ${isActive
+                  className={`text-[10px] sm:text-xs font-medium truncate w-full text-center ${isActive
                     ? isDarkMode
                       ? "text-white"
                       : "text-zinc-900"
@@ -720,7 +725,7 @@ export default function EmployeeDashboard() {
                 </span>
                 {isActive && (
                   <div
-                    className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-1 rounded-t-full ${isDarkMode ? "bg-white" : "bg-zinc-900"
+                    className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-8 sm:w-12 h-0.5 sm:h-1 rounded-t-full ${isDarkMode ? "bg-white" : "bg-zinc-900"
                       }`}
                   />
                 )}

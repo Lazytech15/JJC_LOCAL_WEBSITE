@@ -1,7 +1,9 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom"
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom"
 import { AuthProvider, useAuth } from "./contexts/AuthContext"
-import { lazy, Suspense, useEffect } from "react"
+import { lazy, Suspense, useEffect, useRef } from "react"
 import { registerAdminServiceWorker } from "../public/registerAdminServiceWorker"
+import { saveLastRoute, getRestoreRoute, isRunningAsPWA, clearLastRoute } from "./utils/sessionPersistence"
+import SessionTimeoutModal from "./components/SessionTimeoutModal"
 
 // Lazy-load heavier top-level components to improve initial load
 const DepartmentSelector = lazy(() => import("./components/DepartmentSelector"))
@@ -49,7 +51,7 @@ function App() {
 }
 
 function AppContent() {
-  const { isDarkMode, isLoading } = useAuth()
+  const { isDarkMode, isLoading, sessionTimeoutInfo, closeSessionTimeoutModal } = useAuth()
 
   // Ensure Tailwind dark mode class is applied at the document root
   useEffect(() => {
@@ -87,14 +89,83 @@ function AppContent() {
         <PWAStatusIndicator />
       </Suspense>
       <RoutesWrapper />
+      
+      {/* Session Timeout Modal - Shows when logged out from another tab */}
+      <SessionTimeoutModal
+        isOpen={sessionTimeoutInfo?.isOpen}
+        onClose={closeSessionTimeoutModal}
+        reason={sessionTimeoutInfo?.reason}
+        userType={sessionTimeoutInfo?.userType}
+        isDarkMode={isDarkMode}
+      />
     </Router>
   )
 }
 
 function RoutesWrapper() {
   const location = useLocation()
-  const { isDarkMode } = useAuth()
+  const navigate = useNavigate()
+  const { isDarkMode, isAuthenticated, isEmployeeAuthenticated, selectedDepartment, isSuperAdmin, isLoading } = useAuth()
   const isToolboxRoute = location.pathname === "/jjctoolbox"
+  
+  // Track if we've already handled initial session restore
+  const hasRestoredSession = useRef(false)
+
+  // Handle session restoration on app launch (PWA or regular)
+  useEffect(() => {
+    // Skip if still loading auth state
+    if (isLoading) return
+    
+    // Skip for toolbox route
+    if (isToolboxRoute) return
+    
+    // Only do session restore ONCE on initial load
+    if (hasRestoredSession.current) return
+
+    // Get the restore route based on current auth state
+    const { route, shouldRedirect } = getRestoreRoute({
+      isAuthenticated,
+      isEmployeeAuthenticated,
+      selectedDepartment,
+      isSuperAdmin
+    })
+
+    // Only redirect on INITIAL app load (page refresh/PWA open)
+    // NOT when on login pages - let the login component handle navigation
+    const isOnHomePage = location.pathname === '/'
+    const isOnAdminSelector = location.pathname === '/jjcewgsaccess'
+    const isOnLoginPage = location.pathname === '/employee/login' ||
+                          location.pathname.includes('/login')
+
+    // Mark as restored so we don't run this again
+    hasRestoredSession.current = true
+
+    // Only restore session if:
+    // 1. User is on home page or admin selector (not login pages)
+    // 2. User is authenticated
+    // 3. There's a valid route to restore to
+    if (shouldRedirect && (isOnHomePage || isOnAdminSelector) && !isOnLoginPage && (isAuthenticated || isEmployeeAuthenticated)) {
+      console.log(`🔄 Restoring session to: ${route}`)
+      navigate(route, { replace: true })
+    }
+  }, [isLoading, isAuthenticated, isEmployeeAuthenticated, selectedDepartment, isSuperAdmin, location.pathname])
+
+  // Track route changes for session persistence
+  useEffect(() => {
+    // Skip toolbox route
+    if (isToolboxRoute) return
+
+    // Determine user type for route tracking
+    let userType = 'guest'
+    if (isAuthenticated) {
+      userType = 'admin'
+    } else if (isEmployeeAuthenticated) {
+      userType = 'employee'
+    }
+
+    // Save the current route for session restoration
+    saveLastRoute(location.pathname, userType)
+  }, [location.pathname, isAuthenticated, isEmployeeAuthenticated, isToolboxRoute])
 
   // For toolbox route, don't apply main app styling
   if (isToolboxRoute) {

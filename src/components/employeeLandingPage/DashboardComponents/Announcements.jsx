@@ -36,7 +36,7 @@ function PaginationControls({
       startPage = Math.max(1, endPage - MAX_VISIBLE_PAGES + 1)
     }
 
-    const buttonClass = (isActive) => `min-w-[36px] h-9 px-2 text-sm rounded-lg transition-colors font-medium ${
+    const buttonClass = (isActive) => `min-w-[28px] sm:min-w-[36px] h-7 sm:h-9 px-1.5 sm:px-2 text-xs sm:text-sm rounded-lg transition-colors font-medium ${
       isActive
         ? "bg-amber-500 text-white"
         : isDarkMode 
@@ -44,7 +44,7 @@ function PaginationControls({
           : "hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"
     }`
 
-    const dotsClass = `px-1 ${isDarkMode ? "text-zinc-600" : "text-zinc-400"}`
+    const dotsClass = `px-0.5 sm:px-1 text-xs sm:text-sm ${isDarkMode ? "text-zinc-600" : "text-zinc-400"}`
 
     // First page + dots if needed
     if (startPage > 1) {
@@ -82,57 +82,60 @@ function PaginationControls({
     return pages
   }
 
-  const navButtonClass = `p-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+  const navButtonClass = `p-1.5 sm:p-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
     isDarkMode 
       ? "hover:bg-zinc-800 text-zinc-400 hover:text-white" 
       : "hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900"
   }`
 
   return (
-    <div className={`mt-6 p-4 rounded-xl border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-zinc-50 border-zinc-200"}`}>
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        {/* Items per page selector */}
-        <div className="flex items-center gap-2">
-          <span className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>Show</span>
-          <select
-            value={itemsPerPage}
-            onChange={(e) => setItemsPerPage(Number(e.target.value))}
-            className={`px-3 py-1.5 text-sm rounded-lg border cursor-pointer transition-colors ${
-              isDarkMode 
-                ? "bg-zinc-800 border-zinc-700 text-white hover:border-zinc-600" 
-                : "bg-white border-zinc-300 text-zinc-900 hover:border-zinc-400"
-            }`}
-          >
-            {ITEMS_PER_PAGE_OPTIONS.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-          <span className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>per page</span>
+    <div className={`mt-4 sm:mt-6 p-3 sm:p-4 rounded-xl border ${isDarkMode ? "bg-zinc-900 border-zinc-800" : "bg-zinc-50 border-zinc-200"}`}>
+      <div className="flex flex-col gap-3 sm:gap-4">
+        {/* Mobile: Stack everything, Desktop: Row layout */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+          {/* Items per page selector */}
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-start">
+            <span className={`text-xs sm:text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>Show</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => setItemsPerPage(Number(e.target.value))}
+              className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-lg border cursor-pointer transition-colors ${
+                isDarkMode 
+                  ? "bg-zinc-800 border-zinc-700 text-white hover:border-zinc-600" 
+                  : "bg-white border-zinc-300 text-zinc-900 hover:border-zinc-400"
+              }`}
+            >
+              {ITEMS_PER_PAGE_OPTIONS.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+            <span className={`text-xs sm:text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>per page</span>
+          </div>
+
+          {/* Page info */}
+          <div className={`text-xs sm:text-sm text-center ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
+            {startIndex + 1} - {Math.min(endIndex, totalItems)} of {totalItems}
+          </div>
         </div>
 
-        {/* Page info */}
-        <div className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-600"}`}>
-          Showing {startIndex + 1} - {Math.min(endIndex, totalItems)} of {totalItems} announcements
-        </div>
-
-        {/* Page navigation */}
-        <div className="flex items-center gap-1">
+        {/* Page navigation - always at bottom on mobile */}
+        <div className="flex items-center justify-center gap-0.5 sm:gap-1">
           <button onClick={goToFirstPage} disabled={currentPage === 1} className={navButtonClass} title="First page">
-            <ChevronsLeft className="w-4 h-4" />
+            <ChevronsLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
           <button onClick={goToPrevPage} disabled={currentPage === 1} className={navButtonClass} title="Previous page">
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
-          <div className="flex items-center gap-1 mx-2">
+          <div className="flex items-center gap-0.5 sm:gap-1 mx-1 sm:mx-2">
             {renderPageNumbers()}
           </div>
 
           <button onClick={goToNextPage} disabled={currentPage === totalPages} className={navButtonClass} title="Next page">
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
           <button onClick={goToLastPage} disabled={currentPage === totalPages} className={navButtonClass} title="Last page">
-            <ChevronsRight className="w-4 h-4" />
+            <ChevronsRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
         </div>
       </div>
