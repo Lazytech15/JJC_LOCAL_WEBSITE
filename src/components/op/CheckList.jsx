@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef } from "react";
 import {
   Clock,
   User,
@@ -17,53 +17,28 @@ import {
   Edit2,
   Plus,
   Trash2,
-  AlertTriangle
-} from "lucide-react"
-import { useAuth } from "../../contexts/AuthContext"
-import { pollingManager } from "../../utils/api/websocket/polling-manager.jsx"
+  AlertTriangle,
+} from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { pollingManager } from "../../utils/api/websocket/polling-manager.jsx";
 
 function Checklist({
   items,
   setItems,
   expandedItems,
   expandedPhases,
-  scanningFor,
-  barcodeInput,
-  setBarcodeInput,
   calculateItemProgress,
   calculatePhaseProgress,
   toggleItemExpansion,
   togglePhaseExpansion,
   handleBarcodeScan,
-  submitBarcode,
-  setScanningFor,
   apiService,
   formatTime,
   loadData,
 
   openTransferModal,
-  transferModalOpen,
-  setTransferModalOpen,
-  selectedSubphaseForTransfer,
-  selectedItemForTransfer,
-  selectedPhaseForTransfer,
   newClient,
-  setNewClient,
-  transferQuantity,
-  setTransferQuantity,
-  transferRemarks,
-  setTransferRemarks,
-  clientItems,
-  showClientDropdown,
   setShowClientDropdown,
-  selectedTargetItem,
-  setSelectedTargetItem,
-  selectedTargetPhase,
-  setSelectedTargetPhase,
-  selectedTargetSubphase,
-  setSelectedTargetSubphase,
-  handleTransferClient,
-  getBasePartNumber,
   // ADD THESE NEW PROPS:
   setShowEditItemModal,
   setShowEditPhaseModal,
@@ -77,46 +52,50 @@ function Checklist({
   setSelectedItemsForBulk,
   clients,
 }) {
-  const { isDarkMode } = useAuth()
-  const pollingSubscriptionsRef = useRef([])
-  const isMountedRef = useRef(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [filterClient, setFilterClient] = useState("")
-  const [filterPriority, setFilterPriority] = useState("")
-  const [showFilters, setShowFilters] = useState(false)
-  const [sortBy, setSortBy] = useState("name-asc")
-  const [filterStatus, setFilterStatus] = useState("")
-  const [selectedSubphase, setSelectedSubphase] = useState(null)
-  const [selectedItem, setSelectedItem] = useState(null)
-  const [selectedPhase, setSelectedPhase] = useState(null)
-  const [quantityModalOpen, setQuantityModalOpen] = useState(false)
-  const [quantityModalData, setQuantityModalData] = useState(null)
-  const [tempQuantity, setTempQuantity] = useState("")
-  const [, forceUpdate] = useState(0)
-  const [itemCheckboxes, setItemCheckboxes] = useState({})
+  const { isDarkMode } = useAuth();
+  const pollingSubscriptionsRef = useRef([]);
+  const isMountedRef = useRef(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterClient, setFilterClient] = useState("");
+  const [filterPriority, setFilterPriority] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [sortBy, setSortBy] = useState("name-asc");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [quantityModalOpen, setQuantityModalOpen] = useState(false);
+  const [quantityModalData, setQuantityModalData] = useState(null);
+  const [tempQuantity, setTempQuantity] = useState("");
+  const [, forceUpdate] = useState(0);
+  const [itemCheckboxes, setItemCheckboxes] = useState({});
 
-  const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(20)
-  const [totalPages, setTotalPages] = useState(1)
-  const [isFiltering, setIsFiltering] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
+  const [isFiltering, setIsFiltering] = useState(false);
   const [pagination, setPagination] = useState({
     current_page: 1,
     per_page: 20,
     total_items: 0,
     total_pages: 0,
     has_next: false,
-    has_previous: false
-  })
-
+    has_previous: false,
+  });
 
   // Optimistic update helpers - update local state without full reload
   const updateItemInState = (partNumber, updates) => {
-    setItems((prevItems) => prevItems.map((item) => (item.part_number === partNumber ? { ...item, ...updates } : item)))
-  }
+    setItems((prevItems) =>
+      prevItems.map((item) =>
+        item.part_number === partNumber ? { ...item, ...updates } : item
+      )
+    );
+  };
 
   const formatMySQLDateTime = (date = new Date()) => {
-    const pad = (num) => String(num).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    const pad = (num) => String(num).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+      date.getDate()
+    )} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
+      date.getSeconds()
+    )}`;
   };
 
   const updatePhaseInState = (partNumber, phaseId, updates) => {
@@ -125,13 +104,15 @@ function Checklist({
         if (item.part_number === partNumber && item.phases) {
           return {
             ...item,
-            phases: item.phases.map((phase) => (phase.id === phaseId ? { ...phase, ...updates } : phase)),
-          }
+            phases: item.phases.map((phase) =>
+              phase.id === phaseId ? { ...phase, ...updates } : phase
+            ),
+          };
         }
-        return item
-      }),
-    )
-  }
+        return item;
+      })
+    );
+  };
 
   const updateSubphaseInState = (partNumber, phaseId, subphaseId, updates) => {
     setItems((prevItems) =>
@@ -144,90 +125,199 @@ function Checklist({
                 return {
                   ...phase,
                   subphases: phase.subphases.map((subphase) =>
-                    subphase.id === subphaseId ? { ...subphase, ...updates } : subphase,
+                    subphase.id === subphaseId
+                      ? { ...subphase, ...updates }
+                      : subphase
                   ),
-                }
+                };
               }
-              return phase
+              return phase;
             }),
-          }
+          };
         }
-        return item
-      }),
-    )
-  }
+        return item;
+      })
+    );
+  };
+
+ useEffect(() => {
+  // When items change, ensure materials are loaded for visible subphases
+  items.forEach((item) => {
+    if (expandedItems[item.part_number] && item.phases) {
+      item.phases.forEach((phase) => {
+        if (expandedPhases[phase.id] && phase.subphases) {
+          phase.subphases.forEach(async (subphase) => {
+            if (
+              !subphase._materialsLoaded ||
+              !subphase.materials ||
+              subphase.materials.length === 0
+            ) {
+              try {
+                console.log(
+                  `🔄 Loading materials for subphase ${subphase.id}`
+                );
+                const response =
+                  await apiService.operations.getSubphaseMaterials(
+                    subphase.id
+                  );
+
+                // ✅ Handle response format
+                let materials = [];
+                if (response?.success && Array.isArray(response.data)) {
+                  materials = response.data;
+                } else if (Array.isArray(response)) {
+                  materials = response;
+                }
+
+                // ✅ CRITICAL FIX: Filter out scrap materials for checklist display
+                const activeMaterials = materials.filter(
+                  (m) => m.status !== 'scrap' // ✅ Hide scrap materials in checklist
+                );
+
+                console.log(
+                  `✅ Subphase ${subphase.id}: ${
+                    activeMaterials.length
+                  } active (${
+                    materials.length - activeMaterials.length
+                  } scrap filtered)`
+                );
+
+                setItems((prevItems) =>
+                  prevItems.map((i) =>
+                    i.part_number === item.part_number && i.phases
+                      ? {
+                          ...i,
+                          phases: i.phases.map((p) =>
+                            p.id === phase.id && p.subphases
+                              ? {
+                                  ...p,
+                                  subphases: p.subphases.map((s) =>
+                                    s.id === subphase.id
+                                      ? {
+                                          ...s,
+                                          materials: activeMaterials,
+                                          _materialsLoaded: true,
+                                        }
+                                      : s
+                                  ),
+                                }
+                              : p
+                          ),
+                        }
+                      : i
+                  )
+                );
+              } catch (error) {
+                console.error(
+                  `❌ Failed to load materials for subphase ${subphase.id}:`,
+                  error
+                );
+              }
+            }
+          });
+        }
+      });
+    }
+  });
+}, [expandedItems, expandedPhases, items.length]);
 
   useEffect(() => {
-    isMountedRef.current = true
+    isMountedRef.current = true;
 
     // Setup polling listeners
-    setupPollingListeners()
+    setupPollingListeners();
 
     return () => {
-      isMountedRef.current = false
+      isMountedRef.current = false;
       // Cleanup polling subscriptions
-      pollingSubscriptionsRef.current.forEach(unsubscribe => unsubscribe())
-      pollingSubscriptionsRef.current = []
-    }
-  }, [])
+      pollingSubscriptionsRef.current.forEach((unsubscribe) => unsubscribe());
+      pollingSubscriptionsRef.current = [];
+    };
+  }, []);
 
   const setupPollingListeners = () => {
-    console.log('📡 Setting up Checklist polling listeners...')
+    console.log("📡 Setting up Checklist polling listeners...");
 
     // Subscribe to all operations refresh events
-    const unsubRefresh = pollingManager.subscribeToUpdates('operations:refresh', (event) => {
-      console.log('🔄 Checklist refresh event:', event.type)
-      handleOperationsRefresh(event)
-    })
+    const unsubRefresh = pollingManager.subscribeToUpdates(
+      "operations:refresh",
+      (event) => {
+        console.log("🔄 Checklist refresh event:", event.type);
+        handleOperationsRefresh(event);
+      }
+    );
 
     // Subscribe to specific item events
-    const unsubItemCreated = pollingManager.subscribeToUpdates('operations:item_created', (data) => {
-      console.log('✨ New item created:', data.part_number)
-      showNotification(`New item created: ${data.part_number}`)
-      loadData() // Reload all data
-    })
-
-    const unsubItemUpdated = pollingManager.subscribeToUpdates('operations:item_updated', (data) => {
-      console.log('🔄 Item updated:', data.part_number)
-      loadItemDetails(data.part_number) // Reload specific item
-    })
-
-    const unsubItemDeleted = pollingManager.subscribeToUpdates('operations:item_deleted', (data) => {
-      console.log('🗑️ Item deleted:', data.part_number)
-      showNotification(`Item deleted: ${data.part_number}`)
-
-      // Optimistically remove from UI
-      if (isMountedRef.current) {
-        setItems(prevItems => prevItems.filter(item => item.part_number !== data.part_number))
+    const unsubItemCreated = pollingManager.subscribeToUpdates(
+      "operations:item_created",
+      (data) => {
+        console.log("✨ New item created:", data.part_number);
+        showNotification(`New item created: ${data.part_number}`);
+        loadData(); // Reload all data
       }
-    })
+    );
 
-    const unsubPhaseUpdated = pollingManager.subscribeToUpdates('operations:phase_updated', (data) => {
-      console.log('🔄 Phase updated:', data.phase_id)
-      if (data.part_number) {
-        loadItemDetails(data.part_number)
+    const unsubItemUpdated = pollingManager.subscribeToUpdates(
+      "operations:item_updated",
+      (data) => {
+        console.log("🔄 Item updated:", data.part_number);
+        loadItemDetails(data.part_number); // Reload specific item
       }
-    })
+    );
 
-    const unsubSubphaseCompleted = pollingManager.subscribeToUpdates('operations:subphase_completed', (data) => {
-      console.log('✅ Subphase completed:', data.subphase_id)
-      if (data.part_number) {
-        loadItemDetails(data.part_number)
+    const unsubItemDeleted = pollingManager.subscribeToUpdates(
+      "operations:item_deleted",
+      (data) => {
+        console.log("🗑️ Item deleted:", data.part_number);
+        showNotification(`Item deleted: ${data.part_number}`);
+
+        // Optimistically remove from UI
+        if (isMountedRef.current) {
+          setItems((prevItems) =>
+            prevItems.filter((item) => item.part_number !== data.part_number)
+          );
+        }
       }
-    })
+    );
 
-    const unsubEmployeeAssigned = pollingManager.subscribeToUpdates('operations:employee_assigned', (data) => {
-      console.log('👤 Employee assigned:', data.employee_barcode)
-      if (data.part_number) {
-        loadItemDetails(data.part_number)
+    const unsubPhaseUpdated = pollingManager.subscribeToUpdates(
+      "operations:phase_updated",
+      (data) => {
+        console.log("🔄 Phase updated:", data.phase_id);
+        if (data.part_number) {
+          loadItemDetails(data.part_number);
+        }
       }
-    })
+    );
 
-    const unsubGoogleSheets = pollingManager.subscribeToUpdates('operations:google_sheets_import', (data) => {
-      console.log('📊 Google Sheets import:', data.part_number)
-      showNotification(`New item imported: ${data.part_number}`)
-      loadData() // Reload all data
-    })
+    const unsubSubphaseCompleted = pollingManager.subscribeToUpdates(
+      "operations:subphase_completed",
+      (data) => {
+        console.log("✅ Subphase completed:", data.subphase_id);
+        if (data.part_number) {
+          loadItemDetails(data.part_number);
+        }
+      }
+    );
+
+    const unsubEmployeeAssigned = pollingManager.subscribeToUpdates(
+      "operations:employee_assigned",
+      (data) => {
+        console.log("👤 Employee assigned:", data.employee_barcode);
+        if (data.part_number) {
+          loadItemDetails(data.part_number);
+        }
+      }
+    );
+
+    const unsubGoogleSheets = pollingManager.subscribeToUpdates(
+      "operations:google_sheets_import",
+      (data) => {
+        console.log("📊 Google Sheets import:", data.part_number);
+        showNotification(`New item imported: ${data.part_number}`);
+        loadData(); // Reload all data
+      }
+    );
 
     // Store unsubscribe functions
     pollingSubscriptionsRef.current = [
@@ -238,12 +328,12 @@ function Checklist({
       unsubPhaseUpdated,
       unsubSubphaseCompleted,
       unsubEmployeeAssigned,
-      unsubGoogleSheets
-    ]
+      unsubGoogleSheets,
+    ];
 
     // Join operations room
-    pollingManager.joinRoom('operations')
-  }
+    pollingManager.joinRoom("operations");
+  };
 
   // Auto-stop item when it reaches 100%
   useEffect(() => {
@@ -253,89 +343,103 @@ function Checklist({
 
       if (item.phases) {
         item.phases.forEach((phase) => {
-          const phaseProgress = calculatePhaseProgress(phase)
+          const phaseProgress = calculatePhaseProgress(phase);
           // Auto-stop phase when all subphases are complete
-          if (phaseProgress === 100 && phase.start_time && !phase.end_time && !phase.pause_time) {
+          if (
+            phaseProgress === 100 &&
+            phase.start_time &&
+            !phase.end_time &&
+            !phase.pause_time
+          ) {
             // Use silent completion (no reload) and auto-start next phase
-            handleStopPhase(item.part_number, phase.id)
+            handleStopPhase(item.part_number, phase.id);
           }
-        })
+        });
       }
-    })
-  }, [items])
+    });
+  }, [items]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       const hasActivePhases = items.some((item) =>
         item.phases?.some(
-          (phase) => phase.start_time && !phase.end_time && !phase.pause_time, // Only active, not paused
-        ),
-      )
+          (phase) => phase.start_time && !phase.end_time && !phase.pause_time // Only active, not paused
+        )
+      );
 
       if (hasActivePhases) {
-        forceUpdate((prev) => prev + 1) // Force component to re-render
+        forceUpdate((prev) => prev + 1); // Force component to re-render
       }
-    }, 1000)
+    }, 1000);
 
-    return () => clearInterval(interval)
-  }, [items])
+    return () => clearInterval(interval);
+  }, [items]);
 
   // Auto-stop item when it reaches 100%
   useEffect(() => {
     items.forEach((item) => {
       if (item.phases) {
         item.phases.forEach((phase) => {
-          const phaseProgress = calculatePhaseProgress(phase)
+          const phaseProgress = calculatePhaseProgress(phase);
           // Auto-stop phase when all subphases are complete
-          if (phaseProgress === 100 && phase.start_time && !phase.end_time && !phase.pause_time) {
+          if (
+            phaseProgress === 100 &&
+            phase.start_time &&
+            !phase.end_time &&
+            !phase.pause_time
+          ) {
             // Use silent completion (no reload)
-            handleStopPhase(item.part_number, phase.id)
+            handleStopPhase(item.part_number, phase.id);
           }
-        })
+        });
       }
-    })
-  }, [items])
+    });
+  }, [items]);
 
   // Filter clients for dropdown
   useEffect(() => {
     if (!Array.isArray(clients)) {
-      setShowClientDropdown(false)
-      return
+      setShowClientDropdown(false);
+      return;
     }
 
-    const searchValue = newClient.trim().toLowerCase()
+    const searchValue = newClient.trim().toLowerCase();
     if (searchValue.length >= 1) {
       const matches = clients.filter(
-        (client) => client.toLowerCase().includes(searchValue) && client !== selectedItem?.client_name,
-      )
-      setShowClientDropdown(matches.length > 0)
+        (client) =>
+          client.toLowerCase().includes(searchValue) &&
+          client !== selectedItem?.client_name
+      );
+      setShowClientDropdown(matches.length > 0);
     } else {
-      setShowClientDropdown(false)
+      setShowClientDropdown(false);
     }
-  }, [newClient, clients, selectedItem])
+  }, [newClient, clients, selectedItem]);
 
   const openQuantityModal = (item, phase, subphase) => {
-    setQuantityModalData({ item, phase, subphase })
-    setTempQuantity(subphase.current_completed_quantity || "")
-    setQuantityModalOpen(true)
-  }
+    setQuantityModalData({ item, phase, subphase });
+    setTempQuantity(subphase.current_completed_quantity || "");
+    setQuantityModalOpen(true);
+  };
 
   const handleUpdateCompletedQuantity = async () => {
-    if (!quantityModalData) return
+    if (!quantityModalData) return;
 
     try {
-      const { item, phase, subphase } = quantityModalData
-      const newQuantity = Number.parseInt(tempQuantity) || 0
+      const { item, phase, subphase } = quantityModalData;
+      const newQuantity = Number.parseInt(tempQuantity) || 0;
 
       if (newQuantity > subphase.expected_quantity) {
-        alert(`Cannot exceed expected quantity of ${subphase.expected_quantity}`)
-        return
+        alert(
+          `Cannot exceed expected quantity of ${subphase.expected_quantity}`
+        );
+        return;
       }
 
       // Optimistic update
       updateSubphaseInState(item.part_number, phase.id, subphase.id, {
         current_completed_quantity: newQuantity,
-      })
+      });
 
       // ADD THIS NEW CODE:
       // Auto-uncheck if quantity drops below expected
@@ -344,253 +448,307 @@ function Checklist({
           current_completed_quantity: newQuantity,
           completed: 0,
           completed_at: null,
-        })
+        });
       }
 
       // Close modal immediately
-      setQuantityModalOpen(false)
-      setQuantityModalData(null)
-      setTempQuantity("")
+      setQuantityModalOpen(false);
+      setQuantityModalData(null);
+      setTempQuantity("");
 
       // API call in background
-      await apiService.operations.updateSubphaseCompletedQuantity(subphase.id, newQuantity)
+      await apiService.operations.updateSubphaseCompletedQuantity(
+        subphase.id,
+        newQuantity
+      );
 
       // ADD THIS NEW CODE:
       // If auto-unchecked, update via API
       if (subphase.completed == 1 && newQuantity < subphase.expected_quantity) {
-        await apiService.operations.completeSubphaseWithDuration(subphase.id, false)
+        await apiService.operations.completeSubphaseWithDuration(
+          subphase.id,
+          false
+        );
       }
     } catch (error) {
-      console.error("Error updating completed quantity:", error)
-      alert("Failed to update completed quantity: " + error.message)
-      await loadData()
+      console.error("Error updating completed quantity:", error);
+      alert("Failed to update completed quantity: " + error.message);
+      await loadData();
     }
-  }
+  };
 
   const handleOperationsRefresh = async (event) => {
-    if (!isMountedRef.current) return
+    if (!isMountedRef.current) return;
 
-    const { type, data } = event
+    const { type, data } = event;
 
     switch (type) {
-      case 'item_created':
-      case 'item_deleted':
-      case 'google_sheets_import':
+      case "item_created":
+      case "item_deleted":
+      case "google_sheets_import":
         // Full reload for these events
-        await loadData()
-        break
+        await loadData();
+        break;
 
-      case 'item_updated':
-      case 'phase_created':
-      case 'phase_updated':
-      case 'phase_status':
-      case 'subphase_completed':
-      case 'employee_assigned':
+      case "item_updated":
+      case "phase_created":
+      case "phase_updated":
+      case "phase_status":
+      case "subphase_completed":
+      case "employee_assigned":
         // Reload specific item
         if (data.part_number) {
-          await loadItemDetails(data.part_number)
+          await loadItemDetails(data.part_number);
         }
-        break
+        break;
 
       default:
-        console.log('Unknown refresh type:', type)
+        console.log("Unknown refresh type:", type);
     }
-  }
+  };
 
   const loadItemDetails = async (partNumber) => {
-    if (!isMountedRef.current) return
+  try {
+    console.log("🔄 Loading details for item:", partNumber);
+    const fullItem = await apiService.operations.getItem(partNumber);
 
-    try {
-      console.log('🔄 Loading details for item:', partNumber)
-      const fullItem = await apiService.operations.getItem(partNumber)
+    // ✅ Load materials for each subphase
+    if (fullItem.phases) {
+      for (const phase of fullItem.phases) {
+        if (phase.subphases) {
+          for (const subphase of phase.subphases) {
+            try {
+              console.log(`🔄 Loading materials for subphase ${subphase.id}`);
+              const materialsResponse =
+                await apiService.operations.getSubphaseMaterials(subphase.id);
 
-      if (isMountedRef.current) {
-        setItems(prevItems => {
-          return prevItems.map(item =>
-            item.part_number === partNumber ? fullItem : item
-          )
-        })
+              // ✅ Handle response format
+              let materials = [];
+              if (materialsResponse?.success && Array.isArray(materialsResponse.data)) {
+                materials = materialsResponse.data;
+              } else if (Array.isArray(materialsResponse)) {
+                materials = materialsResponse;
+              }
+
+              // ✅ CRITICAL: Filter out scrap materials for checklist
+              const activeMaterials = materials.filter(
+                (m) => m.status !== 'scrap' // ✅ Hide scrap in checklist
+              );
+
+              // Attach active materials to subphase
+              subphase.materials = activeMaterials;
+
+              console.log(
+                `✅ Loaded ${activeMaterials.length} active materials (${
+                  materials.length - activeMaterials.length
+                } scrap filtered) for subphase ${subphase.id}`
+              );
+            } catch (error) {
+              console.warn(
+                `⚠️ Failed to load materials for subphase ${subphase.id}:`,
+                error
+              );
+              subphase.materials = [];
+            }
+          }
+        }
       }
-    } catch (error) {
-      console.error('❌ Failed to load item details:', error)
     }
-  }
 
-  const showNotification = (message, type = 'info') => {
-    console.log('📢 Notification:', message)
+    console.log("✅ Full item loaded with materials:", fullItem);
+
+    if (isMountedRef.current) {
+      setItems((prevItems) => {
+        const newItems = prevItems.map((item) =>
+          item.part_number === partNumber ? fullItem : item
+        );
+        console.log("✅ Updated items state");
+        return newItems;
+      });
+    }
+
+    return fullItem;
+  } catch (err) {
+    console.error("❌ Failed to load item details:", err);
+    return null;
+  }
+};
+
+  const showNotification = (message, type = "info") => {
+    console.log("📢 Notification:", message);
 
     // Show browser notification if permitted
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('Operations Update', {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("Operations Update", {
         body: message,
-        icon: '/icons/icon-192.jpg',
-        tag: 'operations-update',
-        badge: '/icons/icon-192.jpg'
-      })
+        icon: "/icons/icon-192.jpg",
+        tag: "operations-update",
+        badge: "/icons/icon-192.jpg",
+      });
     }
 
     // You can also integrate a toast library here
-    const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : '📢'
-    console.log(`${emoji} ${message}`)
-  }
+    const emoji = type === "success" ? "✅" : type === "error" ? "❌" : "📢";
+    console.log(`${emoji} ${message}`);
+  };
 
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().then(permission => {
-        console.log('Notification permission:', permission)
-      })
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().then((permission) => {
+        console.log("Notification permission:", permission);
+      });
     }
-  }, [])
+  }, []);
 
   const handleUpdatePriority = async (partNumber, newPriority) => {
     try {
       // Optimistic update
-      updateItemInState(partNumber, { priority: newPriority })
+      updateItemInState(partNumber, { priority: newPriority });
 
       await apiService.operations.updateItem(partNumber, {
         priority: newPriority,
-      })
+      });
     } catch (error) {
-      console.error("Error updating priority:", error)
-      alert("Failed to update priority: " + error.message)
-      await loadData()
+      console.error("Error updating priority:", error);
+      alert("Failed to update priority: " + error.message);
+      await loadData();
     }
-  }
+  };
 
   const formatDuration = (minutes) => {
     // Input is already in minutes
-    const h = Math.floor(minutes / 60)
-    const m = Math.round(minutes % 60)
+    const h = Math.floor(minutes / 60);
+    const m = Math.round(minutes % 60);
 
-    if (h > 0 && m > 0) return `${h}h ${m}m`
-    if (h > 0) return `${h} hour${h > 1 ? "s" : ""}`
-    if (m > 0) return `${m} minute${m !== 1 ? "s" : ""}`
-    return "0 minutes"
-  }
+    if (h > 0 && m > 0) return `${h}h ${m}m`;
+    if (h > 0) return `${h} hour${h > 1 ? "s" : ""}`;
+    if (m > 0) return `${m} minute${m !== 1 ? "s" : ""}`;
+    return "0 minutes";
+  };
 
   function getPhaseElapsedTime(phase) {
-    if (!phase.start_time) return 0
+    if (!phase.start_time) return 0;
 
-    const start = new Date(phase.start_time)
+    const start = new Date(phase.start_time);
 
     // If phase is completed, calculate total time minus pauses
     if (phase.end_time) {
-      const end = new Date(phase.end_time)
-      let elapsed = Math.floor((end - start) / 1000)
+      const end = new Date(phase.end_time);
+      let elapsed = Math.floor((end - start) / 1000);
 
       // Subtract accumulated paused duration
       if (phase.paused_duration) {
-        elapsed -= Number.parseInt(phase.paused_duration)
+        elapsed -= Number.parseInt(phase.paused_duration);
       }
 
-      return Math.max(0, elapsed)
+      return Math.max(0, elapsed);
     }
 
     // If phase is currently paused, show time up to pause (frozen)
     if (phase.pause_time) {
-      const pause = new Date(phase.pause_time)
-      let elapsed = Math.floor((pause - start) / 1000)
+      const pause = new Date(phase.pause_time);
+      let elapsed = Math.floor((pause - start) / 1000);
 
       // Subtract accumulated paused duration from BEFORE this pause
       if (phase.paused_duration) {
-        elapsed -= Number.parseInt(phase.paused_duration)
+        elapsed -= Number.parseInt(phase.paused_duration);
       }
 
-      return Math.max(0, elapsed)
+      return Math.max(0, elapsed);
     }
 
     // Phase is running - calculate from start to now minus ALL pauses
-    const now = new Date()
-    let elapsed = Math.floor((now - start) / 1000)
+    const now = new Date();
+    let elapsed = Math.floor((now - start) / 1000);
 
     // Subtract accumulated paused duration
     if (phase.paused_duration) {
-      elapsed -= Number.parseInt(phase.paused_duration)
+      elapsed -= Number.parseInt(phase.paused_duration);
     }
 
-    return Math.max(0, elapsed)
+    return Math.max(0, elapsed);
   }
 
   const handleStartPhase = async (partNumber, phaseId) => {
     try {
-      const now = new Date().toISOString()
+      const now = new Date().toISOString();
       // Optimistic update
       updatePhaseInState(partNumber, phaseId, {
         start_time: now,
         pause_time: null,
-      })
+      });
 
-      await apiService.operations.startPhaseProcess(partNumber, phaseId)
+      await apiService.operations.startPhaseProcess(partNumber, phaseId);
       // Only reload if there's an error in the optimistic update
     } catch (error) {
-      console.error("Error starting phase:", error)
-      alert("Failed to start phase: " + error.message)
-      await loadData() // Reload to fix state
+      console.error("Error starting phase:", error);
+      alert("Failed to start phase: " + error.message);
+      await loadData(); // Reload to fix state
     }
-  }
+  };
 
   const handleStopPhase = async (partNumber, phaseId) => {
     try {
-      const now = new Date().toISOString()
+      const now = new Date().toISOString();
       // Optimistic update
       updatePhaseInState(partNumber, phaseId, {
         end_time: now,
-      })
+      });
 
-      await apiService.operations.stopPhaseProcess(partNumber, phaseId)
+      await apiService.operations.stopPhaseProcess(partNumber, phaseId);
 
       // *** ADD THIS LINE: Auto-start next phase ***
-      await handleAutoStartNextPhase(partNumber, phaseId)
+      await handleAutoStartNextPhase(partNumber, phaseId);
     } catch (error) {
-      console.error("Error stopping phase:", error)
-      alert("Failed to stop phase: " + error.message)
-      await loadData()
+      console.error("Error stopping phase:", error);
+      alert("Failed to stop phase: " + error.message);
+      await loadData();
     }
-  }
+  };
 
   const handlePausePhase = async (partNumber, phaseId) => {
     try {
-      const now = new Date().toISOString()
+      const now = new Date().toISOString();
       // Optimistic update
       updatePhaseInState(partNumber, phaseId, {
         pause_time: now,
-      })
+      });
 
-      await apiService.operations.pausePhaseProcess(partNumber, phaseId)
+      await apiService.operations.pausePhaseProcess(partNumber, phaseId);
     } catch (error) {
-      console.error("Error pausing phase:", error)
-      alert("Failed to pause phase: " + error.message)
-      await loadData()
+      console.error("Error pausing phase:", error);
+      alert("Failed to pause phase: " + error.message);
+      await loadData();
     }
-  }
+  };
 
   const handleResumePhase = async (partNumber, phaseId) => {
     try {
-      const item = items.find((i) => i.part_number === partNumber)
-      const phase = item?.phases?.find((p) => p.id === phaseId)
+      const item = items.find((i) => i.part_number === partNumber);
+      const phase = item?.phases?.find((p) => p.id === phaseId);
 
-      if (!phase || !phase.pause_time) return
+      if (!phase || !phase.pause_time) return;
 
       // Calculate pause duration
-      const pauseStart = new Date(phase.pause_time)
-      const now = new Date()
-      const pauseDurationSeconds = Math.floor((now - pauseStart) / 1000)
-      const currentPausedDuration = Number.parseInt(phase.paused_duration) || 0
-      const newPausedDuration = currentPausedDuration + pauseDurationSeconds
+      const pauseStart = new Date(phase.pause_time);
+      const now = new Date();
+      const pauseDurationSeconds = Math.floor((now - pauseStart) / 1000);
+      const currentPausedDuration = Number.parseInt(phase.paused_duration) || 0;
+      const newPausedDuration = currentPausedDuration + pauseDurationSeconds;
 
       // Optimistic update - clear pause_time and update paused_duration
       updatePhaseInState(partNumber, phaseId, {
         pause_time: null,
         paused_duration: newPausedDuration,
-      })
+      });
 
-      await apiService.operations.resumePhaseProcess(partNumber, phaseId)
+      await apiService.operations.resumePhaseProcess(partNumber, phaseId);
     } catch (error) {
-      console.error("Error resuming phase:", error)
-      alert("Failed to resume phase: " + error.message)
-      await loadData()
+      console.error("Error resuming phase:", error);
+      alert("Failed to resume phase: " + error.message);
+      await loadData();
     }
-  }
+  };
 
   const handleResetPhase = async (partNumber, phaseId) => {
     if (window.confirm("Reset process times for this phase?")) {
@@ -600,57 +758,62 @@ function Checklist({
           start_time: null,
           pause_time: null,
           end_time: null,
-        })
+        });
 
-        await apiService.operations.resetPhaseProcess(partNumber, phaseId)
+        await apiService.operations.resetPhaseProcess(partNumber, phaseId);
       } catch (error) {
-        console.error("Error resetting phase:", error)
-        alert("Failed to reset phase: " + error.message)
-        await loadData()
+        console.error("Error resetting phase:", error);
+        alert("Failed to reset phase: " + error.message);
+        await loadData();
       }
     }
-  }
+  };
 
   const handleAutoStartNextPhase = async (partNumber, currentPhaseId) => {
     try {
-      const item = items.find((i) => i.part_number === partNumber)
-      if (!item || !item.phases) return
+      const item = items.find((i) => i.part_number === partNumber);
+      if (!item || !item.phases) return;
 
-      const currentPhaseIndex = item.phases.findIndex((p) => p.id === currentPhaseId)
-      if (currentPhaseIndex === -1 || currentPhaseIndex === item.phases.length - 1) {
+      const currentPhaseIndex = item.phases.findIndex(
+        (p) => p.id === currentPhaseId
+      );
+      if (
+        currentPhaseIndex === -1 ||
+        currentPhaseIndex === item.phases.length - 1
+      ) {
         // No next phase exists
-        return
+        return;
       }
 
-      const nextPhase = item.phases[currentPhaseIndex + 1]
+      const nextPhase = item.phases[currentPhaseIndex + 1];
 
       // Check if next phase hasn't been started yet
       if (!nextPhase.start_time) {
-        const now = new Date().toISOString()
+        const now = new Date().toISOString();
 
         // Optimistic update for next phase
         updatePhaseInState(partNumber, nextPhase.id, {
           start_time: now,
           pause_time: null,
-        })
+        });
 
         // API call to start next phase
-        await apiService.operations.startPhaseProcess(partNumber, nextPhase.id)
+        await apiService.operations.startPhaseProcess(partNumber, nextPhase.id);
       }
     } catch (error) {
-      console.error("Error auto-starting next phase:", error)
-      await loadData()
+      console.error("Error auto-starting next phase:", error);
+      await loadData();
     }
-  }
+  };
 
   const getItemElapsedTime = (item) => {
-    if (!item.start_time) return 0
-    const start = new Date(item.start_time)
-    const end = item.end_time ? new Date(item.end_time) : new Date()
-    return Math.floor((end - start) / 1000)
-  }
+    if (!item.start_time) return 0;
+    const start = new Date(item.start_time);
+    const end = item.end_time ? new Date(item.end_time) : new Date();
+    return Math.floor((end - start) / 1000);
+  };
   const formatDateTime = (isoString) => {
-    if (!isoString) return "Not started"
+    if (!isoString) return "Not started";
     return new Date(isoString).toLocaleString("en-PH", {
       timeZone: "Asia/Manila",
       year: "numeric",
@@ -660,854 +823,1090 @@ function Checklist({
       minute: "2-digit",
       second: "2-digit",
       hour12: true,
-    })
-  }
+    });
+  };
 
   const getPriorityColor = (priority) => {
     switch (priority) {
       case "High":
-        return "text-red-500 bg-red-500/10 border-red-500"
+        return "text-red-500 bg-red-500/10 border-red-500";
       case "Medium":
-        return "text-yellow-500 bg-yellow-500/10 border-yellow-500"
+        return "text-yellow-500 bg-yellow-500/10 border-yellow-500";
       case "Low":
-        return "text-green-500 bg-green-500/10 border-green-500"
+        return "text-green-500 bg-green-500/10 border-green-500";
       default:
-        return "text-gray-500 bg-gray-500/10 border-gray-500"
+        return "text-gray-500 bg-gray-500/10 border-gray-500";
     }
-  }
+  };
 
   const applyFilters = async (page = 1) => {
-    setIsFiltering(true)
+    setIsFiltering(true);
     try {
       // Build filter params
       const params = {
         page,
-        limit: itemsPerPage
-      }
+        limit: itemsPerPage,
+      };
 
       // Map dashboard filters to API filters - FIX status mapping
-      if (filterStatus && filterStatus !== 'all') {
-        if (filterStatus === 'completed') {
-          params.status = 'completed'
-        } else if (filterStatus === 'in-progress') {
-          params.status = 'in_progress'
-        } else if (filterStatus === 'not-started') {
-          params.status = 'not_started'
+      if (filterStatus && filterStatus !== "all") {
+        if (filterStatus === "completed") {
+          params.status = "completed";
+        } else if (filterStatus === "in-progress") {
+          params.status = "in_progress";
+        } else if (filterStatus === "not-started") {
+          params.status = "not_started";
         }
       }
 
-      if (filterPriority && filterPriority !== 'all') {
-        params.priority = filterPriority
+      if (filterPriority && filterPriority !== "all") {
+        params.priority = filterPriority;
       }
 
-      if (filterClient && filterClient !== 'all') {
-        params.client_name = filterClient
+      if (filterClient && filterClient !== "all") {
+        params.client_name = filterClient;
       }
 
       if (searchTerm && searchTerm.trim()) {
-        params.search = searchTerm.trim()
+        params.search = searchTerm.trim();
       }
 
-      const response = await apiService.operations.getItemsPaginated(page, itemsPerPage, params)
+      const response = await apiService.operations.getItemsPaginated(
+        page,
+        itemsPerPage,
+        params
+      );
 
-      setItems(response.items || [])
-      setPagination(response.pagination || {
-        current_page: page,
-        per_page: itemsPerPage,
-        total_items: 0,
-        total_pages: 0,
-        has_next: false,
-        has_previous: false
-      })
+      setItems(response.items || []);
+      setPagination(
+        response.pagination || {
+          current_page: page,
+          per_page: itemsPerPage,
+          total_items: 0,
+          total_pages: 0,
+          has_next: false,
+          has_previous: false,
+        }
+      );
     } catch (error) {
-      console.error('Failed to apply filters:', error)
-      setItems([])
+      console.error("Failed to apply filters:", error);
+      setItems([]);
     } finally {
-      setIsFiltering(false)
+      setIsFiltering(false);
     }
-  }
+  };
 
   useEffect(() => {
-    applyFilters(1) // Reset to page 1 when filters change
-  }, [filterStatus, filterPriority, filterClient, searchTerm])
+    applyFilters(1); // Reset to page 1 when filters change
+  }, [filterStatus, filterPriority, filterClient, searchTerm]);
 
   const completedItems = items.filter((item) => {
-    if (!item) return false
+    if (!item) return false;
     try {
-      return calculateItemProgress(item) === 100
+      return calculateItemProgress(item) === 100;
     } catch (err) {
-      console.warn('Error calculating progress for item:', item?.part_number, err)
-      return false
+      console.warn(
+        "Error calculating progress for item:",
+        item?.part_number,
+        err
+      );
+      return false;
     }
-  })
+  });
 
   const inProgressItems = items.filter((item) => {
-    if (!item) return false
+    if (!item) return false;
     try {
-      return calculateItemProgress(item) < 100
+      return calculateItemProgress(item) < 100;
     } catch (err) {
-      console.warn('Error calculating progress for item:', item?.part_number, err)
-      return true
+      console.warn(
+        "Error calculating progress for item:",
+        item?.part_number,
+        err
+      );
+      return true;
     }
-  })
+  });
 
   // Sort in-progress items (keep existing sorting logic)
   const sortedInProgressItems = [...inProgressItems].sort((a, b) => {
-    if (sortBy === "name-asc") return (a.name || "").localeCompare(b.name || "")
-    if (sortBy === "name-desc") return (b.name || "").localeCompare(a.name || "")
-    if (sortBy === "date-newest") return new Date(b.created_at || 0) - new Date(a.created_at || 0)
-    if (sortBy === "date-oldest") return new Date(a.created_at || 0) - new Date(b.created_at || 0)
+    if (sortBy === "name-asc")
+      return (a.name || "").localeCompare(b.name || "");
+    if (sortBy === "name-desc")
+      return (b.name || "").localeCompare(a.name || "");
+    if (sortBy === "date-newest")
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    if (sortBy === "date-oldest")
+      return new Date(a.created_at || 0) - new Date(b.created_at || 0);
 
-    const priorityOrder = { High: 0, Medium: 1, Low: 2 }
-    return priorityOrder[a.priority || "Medium"] - priorityOrder[b.priority || "Medium"]
-  })
+    const priorityOrder = { High: 0, Medium: 1, Low: 2 };
+    return (
+      priorityOrder[a.priority || "Medium"] -
+      priorityOrder[b.priority || "Medium"]
+    );
+  });
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= pagination.total_pages) {
-      setCurrentPage(newPage) // ADD THIS LINE
-      applyFilters(newPage)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      setCurrentPage(newPage); // ADD THIS LINE
+      applyFilters(newPage);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
-  }
+  };
   const handlePreviousPage = () => {
     if (pagination.has_previous) {
-      handlePageChange(currentPage - 1)
+      handlePageChange(currentPage - 1);
     }
-  }
+  };
 
   const handleNextPage = () => {
     if (pagination.has_next) {
-      handlePageChange(currentPage + 1)
+      handlePageChange(currentPage + 1);
     }
-  }
+  };
 
   // Get unique clients for filter
-  const uniqueClients = [...new Set(
-    items
-      .filter(item => item && item.client_name)
-      .map((item) => item.client_name)
-  )]
+  const uniqueClients = [
+    ...new Set(
+      items
+        .filter((item) => item && item.client_name)
+        .map((item) => item.client_name)
+    ),
+  ];
 
   // Helper function to check if previous subphase is completed
   const isPreviousSubphaseCompleted = (item, phase, currentSubphaseIndex) => {
-    if (currentSubphaseIndex === 0) return true // First subphase is always available
+    if (currentSubphaseIndex === 0) return true; // First subphase is always available
 
-    const previousSubphase = phase.subphases[currentSubphaseIndex - 1]
-    return previousSubphase && previousSubphase.completed == 1
-  }
+    const previousSubphase = phase.subphases[currentSubphaseIndex - 1];
+    return previousSubphase && previousSubphase.completed == 1;
+  };
 
   // Helper function to check if condition is met
   const isSubphaseConditionMet = (item, phase, subphase, subphaseIndex) => {
     // Check if previous subphase is completed
     if (!isPreviousSubphaseCompleted(item, phase, subphaseIndex)) {
-      return false
+      return false;
     }
 
     // *** NEW: If subphase has quantity tracking, only check quantity requirement ***
     if (subphase.expected_quantity > 0) {
-      const currentQty = subphase.current_completed_quantity || 0
+      const currentQty = subphase.current_completed_quantity || 0;
       if (currentQty < subphase.expected_quantity) {
-        return false
+        return false;
       }
 
       // For quantity-based subphases, employee assignment is still required
       if (!subphase.employee_barcode) {
-        return false
+        return false;
       }
 
       // ✅ Quantity-based subphases don't need phase to be started
-      return true
+      return true;
     }
 
     // *** For time-based subphases (no quantity), require phase to be running ***
     // Check if phase is started and not paused/stopped
     if (!phase.start_time || phase.pause_time || phase.end_time) {
-      return false
+      return false;
     }
 
     // Check if employee is assigned
     if (!subphase.employee_barcode) {
-      return false
+      return false;
     }
 
-    return true
-  }
+    return true;
+  };
 
-  const handleToggleSubPhase = async (partNumber, phaseId, subphaseId, currentStatus) => {
-    const item = items.find((i) => i.part_number === partNumber)
-    const phase = item?.phases?.find((p) => p.id === phaseId)
-    const subphase = phase?.subphases?.find((s) => s.id === subphaseId)
+  const handleToggleSubPhase = async (
+    partNumber,
+    phaseId,
+    subphaseId,
+    currentStatus
+  ) => {
+    const item = items.find((i) => i.part_number === partNumber);
+    const phase = item?.phases?.find((p) => p.id === phaseId);
+    const subphase = phase?.subphases?.find((s) => s.id === subphaseId);
 
     if (!currentStatus) {
       // If trying to mark as complete
       // Check if it's a quantity-based subphase
-      const isQuantityBased = subphase && subphase.expected_quantity > 0
+      const isQuantityBased = subphase && subphase.expected_quantity > 0;
 
       // For TIME-BASED subphases only, check phase conditions
       if (!isQuantityBased) {
         // Prevent completing subphases while phase is paused
         if (phase && phase.pause_time && !phase.end_time) {
-          alert("Cannot mark subphase as complete while the phase is paused. Please resume the phase first.")
-          return
+          alert(
+            "Cannot mark subphase as complete while the phase is paused. Please resume the phase first."
+          );
+          return;
         }
 
         // Prevent completing subphases if phase hasn't started
         if (phase && !phase.start_time) {
-          alert("Cannot mark subphase as complete. Please start the phase first.")
-          return
+          alert(
+            "Cannot mark subphase as complete. Please start the phase first."
+          );
+          return;
         }
 
         // Prevent completing subphases if phase is already completed
         if (phase && phase.end_time) {
-          alert("Cannot mark subphase as complete. This phase is already completed.")
-          return
+          alert(
+            "Cannot mark subphase as complete. This phase is already completed."
+          );
+          return;
         }
       }
 
       // For QUANTITY-BASED subphases, only check quantity requirement
       if (isQuantityBased) {
-        const currentQty = subphase.current_completed_quantity || 0
+        const currentQty = subphase.current_completed_quantity || 0;
         if (currentQty < subphase.expected_quantity) {
           alert(
-            `Cannot mark as complete. Current quantity (${currentQty}) is less than expected quantity (${subphase.expected_quantity}).`,
-          )
-          return
+            `Cannot mark as complete. Current quantity (${currentQty}) is less than expected quantity (${subphase.expected_quantity}).`
+          );
+          return;
         }
       }
     }
 
     try {
-      const now = new Date().toISOString()
+      const now = formatMySQLDateTime(new Date());
 
       // Re-check if it's quantity-based for the try block
-      const isQuantityBased = subphase && subphase.expected_quantity > 0
+      const isQuantityBased = subphase && subphase.expected_quantity > 0;
 
       // Check if phase has time tracking (for duration calculation)
-      const hasPhaseTimeTracking = phase && phase.start_time && !isQuantityBased
+      const hasPhaseTimeTracking =
+        phase && phase.start_time && !isQuantityBased;
 
       if (hasPhaseTimeTracking) {
         // Get current subphase index
-        const currentSubphaseIndex = phase.subphases.findIndex((sp) => sp.id === subphaseId)
+        const currentSubphaseIndex = phase.subphases.findIndex(
+          (sp) => sp.id === subphaseId
+        );
 
         // Calculate time_duration for THIS subphase when marking as complete
         if (!currentStatus) {
           // If marking as complete
           // Get the current phase elapsed time in SECONDS (from the stopwatch)
-          const currentPhaseElapsedSeconds = getPhaseElapsedTime(phase)
+          const currentPhaseElapsedSeconds = getPhaseElapsedTime(phase);
 
           // Calculate the CUMULATIVE time of ALL previous completed subphases (convert minutes back to seconds for calculation)
-          let allPreviousCumulativeSeconds = 0
+          let allPreviousCumulativeSeconds = 0;
           for (let i = 0; i < currentSubphaseIndex; i++) {
-            const prevSubphase = phase.subphases[i]
+            const prevSubphase = phase.subphases[i];
             if (prevSubphase.time_duration) {
               // time_duration is stored in minutes, convert to seconds for calculation
-              const prevMinutes = Number.parseInt(prevSubphase.time_duration) || 0
-              allPreviousCumulativeSeconds += prevMinutes * 60
+              const prevMinutes =
+                Number.parseInt(prevSubphase.time_duration) || 0;
+              allPreviousCumulativeSeconds += prevMinutes * 60;
             }
           }
 
           // This subphase duration = current total elapsed time - sum of all previous durations
-          const thisSubphaseSeconds = Math.max(0, currentPhaseElapsedSeconds - allPreviousCumulativeSeconds)
-          const thisSubphaseMinutes = Math.round(thisSubphaseSeconds / 60) // Convert to minutes
+          const thisSubphaseSeconds = Math.max(
+            0,
+            currentPhaseElapsedSeconds - allPreviousCumulativeSeconds
+          );
+          const thisSubphaseMinutes = Math.round(thisSubphaseSeconds / 60); // Convert to minutes
 
           // Update this subphase with its time_duration IN MINUTES
           updateSubphaseInState(partNumber, phaseId, subphaseId, {
             completed: 1,
             completed_at: now,
             time_duration: thisSubphaseMinutes, // Store as integer minutes
-          })
+          });
         } else {
           // If unchecking, clear the time_duration for this subphase
           updateSubphaseInState(partNumber, phaseId, subphaseId, {
             completed: 0,
             completed_at: null,
             time_duration: 0,
-          })
+          });
         }
       } else {
         // If phase not started OR quantity-based, just toggle completion without duration
         updateSubphaseInState(partNumber, phaseId, subphaseId, {
           completed: currentStatus ? 0 : 1,
           completed_at: currentStatus ? null : now,
-        })
+        });
       }
 
       // API call in background
       if (!currentStatus && hasPhaseTimeTracking) {
         // If marking as complete and phase has started, calculate and send time_duration IN SECONDS
-        const currentPhaseElapsedSeconds = getPhaseElapsedTime(phase)
-        const currentSubphaseIndex = phase.subphases.findIndex((sp) => sp.id === subphaseId)
+        const currentPhaseElapsedSeconds = getPhaseElapsedTime(phase);
+        const currentSubphaseIndex = phase.subphases.findIndex(
+          (sp) => sp.id === subphaseId
+        );
 
         // Calculate cumulative time of ALL previous subphases (convert minutes back to seconds)
-        let allPreviousCumulativeSeconds = 0
+        let allPreviousCumulativeSeconds = 0;
         for (let i = 0; i < currentSubphaseIndex; i++) {
-          const prevSubphase = phase.subphases[i]
+          const prevSubphase = phase.subphases[i];
           if (prevSubphase.time_duration) {
             // time_duration is stored in minutes, convert to seconds for calculation
-            const prevMinutes = Number.parseInt(prevSubphase.time_duration) || 0
-            allPreviousCumulativeSeconds += prevMinutes * 60
+            const prevMinutes =
+              Number.parseInt(prevSubphase.time_duration) || 0;
+            allPreviousCumulativeSeconds += prevMinutes * 60;
           }
         }
 
-        const thisSubphaseSeconds = Math.max(0, currentPhaseElapsedSeconds - allPreviousCumulativeSeconds)
-        const thisSubphaseMinutes = Math.round(thisSubphaseSeconds / 60) // Convert to minutes
+        const thisSubphaseSeconds = Math.max(
+          0,
+          currentPhaseElapsedSeconds - allPreviousCumulativeSeconds
+        );
+        const thisSubphaseMinutes = Math.round(thisSubphaseSeconds / 60); // Convert to minutes
 
         // Complete subphase with calculated time_duration IN MINUTES
-        await apiService.operations.completeSubphaseWithDuration(subphaseId, true, thisSubphaseMinutes)
+        await apiService.operations.completeSubphaseWithDuration(
+          subphaseId,
+          true,
+          thisSubphaseMinutes
+        );
       } else {
         // Just toggle completion status without duration
-        await apiService.operations.completeSubphaseWithDuration(subphaseId, !currentStatus)
+        await apiService.operations.completeSubphaseWithDuration(
+          subphaseId,
+          !currentStatus
+        );
       }
     } catch (error) {
-      console.error("Error toggling subphase:", error)
-      alert("Failed to toggle subphase: " + error.message)
-      await loadData()
+      console.error("Error toggling subphase:", error);
+      alert("Failed to toggle subphase: " + error.message);
+      await loadData();
     }
-  }
-
+  };
 
   /**
    * Format multiple materials into a readable string for employee logs
    * Example: "Checkout: 3 items - Common Nail #4 x2 (pcs), Wire 18AWG x50 (meters), Bolt M8 x10 (pcs)"
    */
-const formatMaterialsCheckoutDetails = (materials) => {
-  if (!materials || materials.length === 0) {
-    return "Checkout: 0 items"
-  }
+  const formatMaterialsCheckoutDetails = (materials) => {
+    if (!materials || materials.length === 0) {
+      return "Checkout: 0 items";
+    }
 
-  const itemCount = materials.length
-  const itemsList = materials.map(m =>
-    `${m.item_name} x${m.quantity} (${m.unit || 'pcs'})`
-  ).join(', ')
+    const itemCount = materials.length;
+    const itemsList = materials
+      .map((m) => `${m.item_name} x${m.quantity} (${m.unit || "pcs"})`)
+      .join(", ");
 
-  return `Checkout: ${itemCount} item${itemCount > 1 ? 's' : ''} - ${itemsList}`
-}
+    return `Checkout: ${itemCount} item${
+      itemCount > 1 ? "s" : ""
+    } - ${itemsList}`;
+  };
 
   const getEmployeeData = async (employeeUid, apiService) => {
-  try {
-    console.log("🔍 Fetching employee data for UID:", employeeUid)
-    const response = await apiService.employees.getEmployee(employeeUid)
-    console.log("📦 Employee API response:", response)
-    
-    if (response.success) {
-      // ✅ CORRECT MAPPING to match employee_logs table structure
-      return {
-        // username column = username from API
-        username: response.username || 'unknown',
-        
-        // id_number column = idNumber from API
-        id_number: response.idNumber || 'UNKNOWN',
-        
-        // id_barcode column = idBarcode from API  
-        id_barcode: response.idBarcode || 'UNKNOWN',
-        
-        // Additional fields for display (not in employee_logs table)
-        fullName: response.fullName || 'Unknown',
-        department: response.department,
-        position: response.position,
-        uid: String(employeeUid) // Keep UID for reference
+    try {
+      console.log("🔍 Fetching employee data for UID:", employeeUid);
+      const response = await apiService.employees.getEmployee(employeeUid);
+      console.log("📦 Employee API response:", response);
+
+      if (response.success) {
+        // ✅ CORRECT MAPPING to match employee_logs table structure
+        return {
+          // username column = username from API
+          username: response.username || "unknown",
+
+          // id_number column = idNumber from API
+          id_number: response.idNumber || "UNKNOWN",
+
+          // id_barcode column = idBarcode from API
+          id_barcode: response.idBarcode || "UNKNOWN",
+
+          // Additional fields for display (not in employee_logs table)
+          fullName: response.fullName || "Unknown",
+          department: response.department,
+          position: response.position,
+          uid: String(employeeUid), // Keep UID for reference
+        };
       }
-    }
-    
-    throw new Error('Invalid employee response')
-  } catch (error) {
-    console.error('❌ Failed to fetch employee data:', error)
-    // Return minimal fallback data matching table structure
-    return {
-      username: 'unknown',
-      id_number: 'UNKNOWN',
-      id_barcode: 'UNKNOWN',
-      fullName: 'Unknown Employee',
-      department: null,
-      position: null,
-      uid: String(employeeUid)
-    }
-  }
-}
 
- const createMaterialCheckoutLog = async (
-  materials,          
-  employeeData,        
-  operationContext,    
-  apiService
-) => {
-  try {
-    // Format the details text
-    const detailsText = formatMaterialsCheckoutDetails(materials)
-    
-    // Build the purpose string
-    const purpose = operationContext.subphase_name 
-      ? `Material Checkout for ${operationContext.item_name} - ${operationContext.phase_name} - ${operationContext.subphase_name}`
-      : operationContext.phase_name
-      ? `Material Checkout for ${operationContext.item_name} - ${operationContext.phase_name}`
-      : `Material Checkout for ${operationContext.item_name}`
-    
-    // Prepare items_json with full context
-    const itemsJson = materials.map(m => ({
-      item_no: m.item_no,
-      item_name: m.item_name,
-      quantity: m.quantity,
-      unit: m.unit || 'pcs',
-      operation_item: operationContext.part_number,
-      operation_phase: operationContext.phase_name,
-      operation_subphase: operationContext.subphase_name
-    }))
-    
-    // ✅ CORRECT: Map to actual employee_logs table columns
-    const logData = {
-      // Column: username (varchar 100) = username from employee
-      username: employeeData.username,
-      
-      // Column: id_number (varchar 50) = idNumber from employee  
-      id_number: employeeData.id_number,
-      
-      // Column: id_barcode (varchar 100) = idBarcode from employee
-      id_barcode: employeeData.id_barcode,
-      
-      // Column: details (text) = formatted checkout details
-      details: detailsText,
-      
-      // Column: purpose (text) = operation context
-      purpose: purpose,
-      
-      // Column: item_no (varchar 50) = first material's item_no
-      item_no: materials[0]?.item_no,
-      
-      // Column: items_json (text) = JSON array of all materials
-      items_json: JSON.stringify(itemsJson)
-      
-      // Note: log_date and log_time are set by PHP backend using server time
-      // Note: created_at has DEFAULT current_timestamp()
+      throw new Error("Invalid employee response");
+    } catch (error) {
+      console.error("❌ Failed to fetch employee data:", error);
+      // Return minimal fallback data matching table structure
+      return {
+        username: "unknown",
+        id_number: "UNKNOWN",
+        id_barcode: "UNKNOWN",
+        fullName: "Unknown Employee",
+        department: null,
+        position: null,
+        uid: String(employeeUid),
+      };
     }
+  };
 
-    console.log("📝 Creating employee log with correct column mapping:", logData)
-    
-    const result = await apiService.employeeLogs.createEmployeeLog(logData)
-    console.log("✅ Employee log created successfully:", result)
-    
-    return {
-      success: true,
-      logId: result.id,
-      data: result
+  const createMaterialCheckoutLog = async (
+    materials,
+    employeeData,
+    operationContext,
+    apiService
+  ) => {
+    try {
+      // Format the details text
+      const detailsText = formatMaterialsCheckoutDetails(materials);
+
+      // Build the purpose string
+      const purpose = operationContext.subphase_name
+        ? `Material Checkout for ${operationContext.item_name} - ${operationContext.phase_name} - ${operationContext.subphase_name}`
+        : operationContext.phase_name
+        ? `Material Checkout for ${operationContext.item_name} - ${operationContext.phase_name}`
+        : `Material Checkout for ${operationContext.item_name}`;
+
+      // Prepare items_json with full context
+      const itemsJson = materials.map((m) => ({
+        item_no: m.item_no,
+        item_name: m.item_name,
+        quantity: m.quantity,
+        unit: m.unit || "pcs",
+        operation_item: operationContext.part_number,
+        operation_phase: operationContext.phase_name,
+        operation_subphase: operationContext.subphase_name,
+      }));
+
+      // ✅ CORRECT: Map to actual employee_logs table columns
+      const logData = {
+        // Column: username (varchar 100) = username from employee
+        username: employeeData.username,
+
+        // Column: id_number (varchar 50) = idNumber from employee
+        id_number: employeeData.id_number,
+
+        // Column: id_barcode (varchar 100) = idBarcode from employee
+        id_barcode: employeeData.id_barcode,
+
+        // Column: details (text) = formatted checkout details
+        details: detailsText,
+
+        // Column: purpose (text) = operation context
+        purpose: purpose,
+
+        // Column: item_no (varchar 50) = first material's item_no
+        item_no: materials[0]?.item_no,
+
+        // Column: items_json (text) = JSON array of all materials
+        items_json: JSON.stringify(itemsJson),
+
+        // Note: log_date and log_time are set by PHP backend using server time
+        // Note: created_at has DEFAULT current_timestamp()
+      };
+
+      console.log(
+        "📝 Creating employee log with correct column mapping:",
+        logData
+      );
+
+      const result = await apiService.employeeLogs.createEmployeeLog(logData);
+      console.log("✅ Employee log created successfully:", result);
+
+      return {
+        success: true,
+        logId: result.id,
+        data: result,
+      };
+    } catch (error) {
+      console.error("❌ Failed to create employee log:", error);
+      return {
+        success: false,
+        error: error.message,
+      };
     }
-    
-  } catch (error) {
-    console.error("❌ Failed to create employee log:", error)
-    return {
-      success: false,
-      error: error.message
-    }
-  }
-}
+  };
+
+  // ============================================================================
+  // FIXED: handleCheckoutSubphaseMaterials in Checklist.jsx
+  // This fixes the "materialsResponse.filter is not a function" error
+  // ============================================================================
 
   const handleCheckoutSubphaseMaterials = async (item, phase, subphase) => {
-  // NEW: Check if using new materials array format
-  if (subphase.materials) {
-    let materials = []
     try {
-      materials = typeof subphase.materials === 'string' 
-        ? JSON.parse(subphase.materials) 
-        : subphase.materials || []
-    } catch (error) {
-      console.error("Failed to parse materials:", error)
-      alert("Error reading materials data")
-      return
-    }
+      // ✅ Get assigned employee from subphase (REQUIRED)
+      if (
+        !subphase.employee_uid ||
+        !subphase.employee_barcode ||
+        !subphase.employee_name
+      ) {
+        throw new Error(
+          "No employee assigned to this subphase. Please assign an employee first."
+        );
+      }
 
-    if (materials.length > 0) {
-      // Use multi-material checkout flow
-      const uncheckedMaterials = materials.filter(m => !m.checked_out)
-      
+      const checkoutByUid = subphase.employee_uid;
+      const checkoutBy = subphase.employee_barcode;
+      const checkoutByName = subphase.employee_name;
+
+      console.log(
+        `✅ Using assigned employee: ${checkoutByName} (UID: ${checkoutByUid}, Barcode: ${checkoutBy})`
+      );
+
+      // ✅ Load fresh materials from database
+      console.log("📥 Loading materials for subphase:", subphase.id);
+      const materialsResponse =
+        await apiService.operations.getSubphaseMaterials(subphase.id);
+
+      // ✅ FIXED: Robust response parsing to handle different formats
+      let materialsArray = [];
+
+      if (Array.isArray(materialsResponse)) {
+        // Direct array response
+        materialsArray = materialsResponse;
+      } else if (
+        materialsResponse?.success &&
+        Array.isArray(materialsResponse.data)
+      ) {
+        // Success wrapper with data array
+        materialsArray = materialsResponse.data;
+      } else if (
+        materialsResponse?.data &&
+        Array.isArray(materialsResponse.data)
+      ) {
+        // Data wrapper
+        materialsArray = materialsResponse.data;
+      } else if (
+        materialsResponse?.materials &&
+        Array.isArray(materialsResponse.materials)
+      ) {
+        // Materials wrapper
+        materialsArray = materialsResponse.materials;
+      } else {
+        console.warn(
+          "⚠️ Unexpected materials response format:",
+          materialsResponse
+        );
+        materialsArray = [];
+      }
+
+      console.log(`✅ Parsed ${materialsArray.length} materials from response`);
+
+      if (materialsArray.length === 0) {
+        alert("No materials found for this subphase");
+        return;
+      }
+
+      // ✅ Filter unchecked materials
+      const uncheckedMaterials = materialsArray.filter(
+        (m) => !m.is_checked_out
+      );
+
       if (uncheckedMaterials.length === 0) {
-        alert("All materials have already been checked out")
-        return
+        alert("All materials have already been checked out");
+        return;
       }
 
-      // Checkout all unchecked materials
-      for (let i = 0; i < materials.length; i++) {
-        if (!materials[i].checked_out) {
-          await handleCheckoutSingleMaterial(item, phase, subphase, i)
-        }
-      }
-      return
-    }
-  }
-  if (!subphase.material_raw || !subphase.material_quantity) {
-    console.log("No materials to checkout for this subphase")
-    return null
-  }
-
-  try {
-    // STEP 1: Determine who is checking out
-    let checkoutBy = null
-    let checkoutByName = null
-    let checkoutByUid = null
-
-    if (subphase.employee_uid && subphase.employee_name) {
-      // Use the assigned employee's UID
-      checkoutByUid = subphase.employee_uid
-      checkoutBy = subphase.employee_barcode
-      checkoutByName = subphase.employee_name
-      console.log(`✅ Using assigned employee: ${checkoutByName} (UID: ${checkoutByUid})`)
-    } else {
-      throw new Error("No employee assigned to this subphase. Please assign an employee first.")
-    }
-
-    // STEP 2: Find material in inventory
-    console.log(`🔍 Searching for material: ${subphase.material_raw}`)
-    const materialsResponse = await apiService.items.getItems({
-      item_type: "OPERATION PARTICULARS",
-      search: subphase.material_raw,
-      limit: 10
-    })
-
-    let materials = []
-    if (materialsResponse.data && Array.isArray(materialsResponse.data)) {
-      materials = materialsResponse.data
-    } else if (materialsResponse.items && Array.isArray(materialsResponse.items)) {
-      materials = materialsResponse.items
-    } else if (Array.isArray(materialsResponse)) {
-      materials = materialsResponse
-    }
-
-    const material = materials.find(m =>
-      m.item_name?.toLowerCase() === subphase.material_raw.toLowerCase()
-    )
-
-    if (!material) {
-      throw new Error(`Material "${subphase.material_raw}" not found in inventory`)
-    }
-
-    const requestedQty = parseFloat(subphase.material_quantity)
-
-    // STEP 3: Check stock availability
-    if (material.balance < requestedQty) {
-      const proceed = window.confirm(
-        `⚠️ Insufficient stock for ${material.item_name}\n\n` +
-        `Requested: ${requestedQty} ${material.unit_of_measure || 'units'}\n` +
-        `Available: ${material.balance} ${material.unit_of_measure || 'units'}\n\n` +
-        `Proceed with checkout anyway?`
-      )
-      if (!proceed) return null
-    }
-
-    // STEP 4: Confirm checkout
-    const confirmMsg =
-      `Checkout materials for subphase:\n\n` +
-      `Item: ${item.name}\n` +
-      `Phase: ${phase.name}\n` +
-      `Subphase: ${subphase.name}\n\n` +
-      `Material: ${material.item_name}\n` +
-      `Quantity: ${requestedQty} ${material.unit_of_measure || 'units'}\n` +
-      `Available: ${material.balance} ${material.unit_of_measure || 'units'}\n\n` +
-      `✅ Checked out by: ${checkoutByName} (${checkoutBy})\n\n` +
-      `Proceed?`
-
-    if (!window.confirm(confirmMsg)) return null
-
-    // STEP 5: Process checkout
-    console.log(`🔄 Processing checkout by ${checkoutByName}...`)
-    const checkoutResult = await apiService.items.removeStock(
-      material.item_no,
-      requestedQty,
-      `Operations Material Checkout\n` +
-      `Item: ${item.name} (${item.part_number})\n` +
-      `Phase: ${phase.name}\n` +
-      `Subphase: ${subphase.name}\n` +
-      `Checked out by: ${checkoutByName}`,
-      checkoutBy
-    )
-
-    console.log("✅ Checkout result:", checkoutResult)
-
-    const isSuccess = checkoutResult.success ||
-      (checkoutResult.successful && checkoutResult.successful > 0) ||
-      (checkoutResult.results && checkoutResult.results.some(r => r.success))
-
-    if (isSuccess) {
-      // STEP 6: Update subphase with checkout info
-      await apiService.operations.updateSubphase(subphase.id, {
-        material_checked_out: true,
-        material_checkout_date: formatMySQLDateTime(),
-        material_checkout_by: checkoutBy,
-        material_checkout_by_name: checkoutByName,
-        material_checkout_by_uid: checkoutByUid
-      })
-
-      // STEP 7: Create employee log with CORRECT column mapping
-      try {
-        console.log("📝 Creating employee log for UID:", checkoutByUid)
-
-        // ✅ Get full employee data with correct mapping
-        const fullEmployeeData = await getEmployeeData(checkoutByUid, apiService)
-        console.log("👤 Full employee data (correctly mapped):", fullEmployeeData)
-
-        // Prepare materials array
-        const materialsArray = [{
-          item_no: material.item_no,
-          item_name: material.item_name,
-          quantity: requestedQty,
-          unit: material.unit_of_measure || 'pcs'
-        }]
-
-        // Prepare operation context
-        const operationContext = {
-          item_name: item.name,
-          part_number: item.part_number,
-          phase_name: phase.name,
-          subphase_name: subphase.name
-        }
-
-        // ✅ Create the log with correct column mapping
-        const logResult = await createMaterialCheckoutLog(
-          materialsArray,
-          fullEmployeeData,
-          operationContext,
-          apiService
+      // ✅ Confirm checkout
+      const materialsList = uncheckedMaterials
+        .map(
+          (m) =>
+            `• ${m.material_name}: ${m.material_quantity} ${
+              m.unit_of_measure || "pcs"
+            }`
         )
+        .join("\n");
 
-        if (logResult.success) {
-          console.log("✅ Employee log created successfully:", logResult.logId)
-        } else {
-          console.warn("⚠️ Employee log creation failed:", logResult.error)
+      const confirmMsg =
+        `Checkout ${uncheckedMaterials.length} material(s):\n\n${materialsList}\n\n` +
+        `For: ${item.name} → ${phase.name} → ${subphase.name}\n` +
+        `✅ Checked out by: ${checkoutByName} (${checkoutBy})\n\n` +
+        `Proceed?`;
+
+      if (!window.confirm(confirmMsg)) return;
+
+      // ✅ Process each material
+      let successCount = 0;
+      let failCount = 0;
+      const errors = [];
+
+      for (const material of uncheckedMaterials) {
+        try {
+          console.log(`🔄 Processing material: ${material.material_name}`);
+
+          // ✅ Find material in inventory
+          const inventoryResponse = await apiService.items.getItems({
+            item_type: "OPERATION PARTICULARS",
+            search: material.material_name,
+            limit: 10,
+          });
+
+          // ✅ FIXED: Robust inventory response parsing
+          let inventoryItems = [];
+          if (Array.isArray(inventoryResponse)) {
+            inventoryItems = inventoryResponse;
+          } else if (
+            inventoryResponse?.items &&
+            Array.isArray(inventoryResponse.items)
+          ) {
+            inventoryItems = inventoryResponse.items;
+          } else if (
+            inventoryResponse?.data &&
+            Array.isArray(inventoryResponse.data)
+          ) {
+            inventoryItems = inventoryResponse.data;
+          } else if (
+            inventoryResponse?.success &&
+            Array.isArray(inventoryResponse.data)
+          ) {
+            inventoryItems = inventoryResponse.data;
+          } else {
+            console.warn(
+              "⚠️ Unexpected inventory response format:",
+              inventoryResponse
+            );
+            inventoryItems = [];
+          }
+
+          console.log(
+            `📋 Found ${inventoryItems.length} inventory items for "${material.material_name}"`
+          );
+
+          const inventoryItem = inventoryItems.find(
+            (m) =>
+              m.item_name?.toLowerCase() ===
+              material.material_name.toLowerCase()
+          );
+
+          if (!inventoryItem) {
+            throw new Error(
+              `Material "${material.material_name}" not found in inventory`
+            );
+          }
+
+          const requestedQty = parseFloat(material.material_quantity);
+
+          // ✅ Check stock availability (warning only)
+          if (inventoryItem.balance < requestedQty) {
+            console.warn(
+              `⚠️ Insufficient stock: ${inventoryItem.item_name} (${inventoryItem.balance} < ${requestedQty})`
+            );
+          }
+
+          // ✅ Deduct from inventory
+          console.log(
+            `📦 Deducting ${requestedQty} ${material.unit_of_measure} from inventory...`
+          );
+
+          const deductResult = await apiService.items.removeStock(
+            inventoryItem.item_no,
+            requestedQty,
+            `Material checkout for operations\n` +
+              `Item: ${item.name} (${item.part_number})\n` +
+              `Phase: ${phase.name}\n` +
+              `Subphase: ${subphase.name}\n` +
+              `Material: ${material.material_name}\n` +
+              `Checked out by: ${checkoutByName}`,
+            checkoutBy
+          );
+
+          console.log(`✅ Inventory deducted:`, deductResult);
+
+          // ✅ Update material record in operations_subphase_materials
+          await apiService.operations.updateMaterial(material.id, {
+            is_checked_out: true,
+            checkout_date: formatMySQLDateTime(new Date()),
+            checked_out_by: checkoutBy,
+            checked_out_by_name: checkoutByName,
+            checked_out_by_uid: checkoutByUid,
+            status: "checked_out",
+          });
+
+          console.log(`✅ Material ${material.id} updated in database`);
+
+          // ✅ Create employee log
+          try {
+            const fullEmployeeData = await getEmployeeData(
+              checkoutByUid,
+              apiService
+            );
+
+            const materialsArray = [
+              {
+                item_no: inventoryItem.item_no,
+                item_name: inventoryItem.item_name,
+                quantity: requestedQty,
+                unit: material.unit_of_measure || "pcs",
+              },
+            ];
+
+            const operationContext = {
+              item_name: item.name,
+              part_number: item.part_number,
+              phase_name: phase.name,
+              subphase_name: subphase.name,
+            };
+
+            const logResult = await createMaterialCheckoutLog(
+              materialsArray,
+              fullEmployeeData,
+              operationContext,
+              apiService
+            );
+
+            if (logResult.success) {
+              console.log("✅ Employee log created:", logResult.logId);
+            }
+          } catch (logError) {
+            console.warn(
+              "⚠️ Failed to create employee log (non-critical):",
+              logError
+            );
+          }
+
+          successCount++;
+        } catch (matError) {
+          console.error(
+            `❌ Failed to checkout ${material.material_name}:`,
+            matError
+          );
+          failCount++;
+          errors.push(`${material.material_name}: ${matError.message}`);
         }
-      } catch (logError) {
-        console.error("⚠️ Failed to create employee log (non-critical):", logError)
       }
 
-      alert(
-        `✅ Successfully checked out:\n\n` +
-        `${material.item_name}: ${requestedQty} ${material.unit_of_measure || 'units'}\n\n` +
-        `Checked out by: ${checkoutByName} (${checkoutBy})\n\n` +
-        `Employee log has been recorded.`
-      )
-
-      return checkoutResult
-    } else {
-      throw new Error(checkoutResult.error || "Checkout failed")
-    }
-
-  } catch (error) {
-    console.error("❌ Failed to checkout materials:", error)
-    alert(`Failed to checkout materials:\n\n${error.message}`)
-    throw error
-  }
-}
-
-const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex) => {
-  // Parse materials array
-  let materials = []
-  try {
-    materials = typeof subphase.materials === 'string' 
-      ? JSON.parse(subphase.materials) 
-      : subphase.materials || []
-  } catch (error) {
-    console.error("Failed to parse materials:", error)
-    alert("Error reading materials data")
-    return
-  }
-
-  const material = materials[materialIndex]
-  if (!material || material.checked_out) {
-    alert("Material already checked out or not found")
-    return
-  }
-
-  try {
-    // STEP 1: Determine who is checking out
-    let checkoutByUid = null
-    let checkoutBy = null
-    let checkoutByName = null
-
-    if (subphase.employee_uid && subphase.employee_name) {
-      checkoutByUid = subphase.employee_uid
-      checkoutBy = subphase.employee_barcode
-      checkoutByName = subphase.employee_name
-    } else {
-      throw new Error("No employee assigned to this subphase. Please assign an employee first.")
-    }
-
-    // STEP 2: Find material in inventory
-    const materialsResponse = await apiService.items.getItems({
-      item_type: "OPERATION PARTICULARS",
-      search: material.name,
-      limit: 10
-    })
-
-    let inventoryItems = []
-    if (materialsResponse.data && Array.isArray(materialsResponse.data)) {
-      inventoryItems = materialsResponse.data
-    } else if (materialsResponse.items && Array.isArray(materialsResponse.items)) {
-      inventoryItems = materialsResponse.items
-    } else if (Array.isArray(materialsResponse)) {
-      inventoryItems = materialsResponse
-    }
-
-    const inventoryItem = inventoryItems.find(m =>
-      m.item_name?.toLowerCase() === material.name.toLowerCase()
-    )
-
-    if (!inventoryItem) {
-      throw new Error(`Material "${material.name}" not found in inventory`)
-    }
-
-    const requestedQty = parseFloat(material.quantity)
-
-    // STEP 3: Check stock availability
-    if (inventoryItem.balance < requestedQty) {
-      const proceed = window.confirm(
-        `⚠️ Insufficient stock for ${inventoryItem.item_name}\n\n` +
-        `Requested: ${requestedQty} ${material.unit || 'units'}\n` +
-        `Available: ${inventoryItem.balance} ${inventoryItem.unit_of_measure || 'units'}\n\n` +
-        `Proceed with checkout anyway?`
-      )
-      if (!proceed) return
-    }
-
-    // STEP 4: Confirm checkout
-    const confirmMsg =
-      `Checkout material:\n\n` +
-      `Material: ${inventoryItem.item_name}\n` +
-      `Quantity: ${requestedQty} ${material.unit || 'units'}\n` +
-      `Available: ${inventoryItem.balance} ${inventoryItem.unit_of_measure || 'units'}\n\n` +
-      `For: ${item.name} → ${phase.name} → ${subphase.name}\n` +
-      `✅ Checked out by: ${checkoutByName} (${checkoutBy})\n\n` +
-      `Proceed?`
-
-    if (!window.confirm(confirmMsg)) return
-
-    // STEP 5: Process checkout
-    const checkoutResult = await apiService.items.removeStock(
-      inventoryItem.item_no,
-      requestedQty,
-      `Operations Material Checkout\n` +
-      `Item: ${item.name} (${item.part_number})\n` +
-      `Phase: ${phase.name}\n` +
-      `Subphase: ${subphase.name}\n` +
-      `Material: ${material.name}\n` +
-      `Checked out by: ${checkoutByName}`,
-      checkoutBy
-    )
-
-    const isSuccess = checkoutResult.success ||
-      (checkoutResult.successful && checkoutResult.successful > 0) ||
-      (checkoutResult.results && checkoutResult.results.some(r => r.success))
-
-    if (isSuccess) {
-      // STEP 6: Update materials array with checkout info
-      materials[materialIndex] = {
-        ...material,
-        checked_out: true,
-        checkout_date: formatMySQLDateTime(),
-        checkout_by: checkoutBy,
-        checkout_by_name: checkoutByName,
-        checkout_by_uid: checkoutByUid
+      // ✅ Show results
+      let resultMsg = "";
+      if (successCount > 0) {
+        resultMsg += `✅ Successfully checked out ${successCount} material(s)\n`;
+      }
+      if (failCount > 0) {
+        resultMsg += `\n❌ Failed to checkout ${failCount} material(s):\n${errors.join(
+          "\n"
+        )}`;
       }
 
-      // Save updated materials array
-      await apiService.operations.updateSubphase(subphase.id, {
-        materials: JSON.stringify(materials)
-      })
+      alert(resultMsg);
 
-      // STEP 7: Create employee log
-      try {
-        const fullEmployeeData = await getEmployeeData(checkoutByUid, apiService)
-        
-        const materialsArray = [{
-          item_no: inventoryItem.item_no,
-          item_name: inventoryItem.item_name,
-          quantity: requestedQty,
-          unit: material.unit || 'pcs'
-        }]
+      // ✅ Reload item details to show updated materials
+      await loadItemDetails(item.part_number);
+    } catch (error) {
+      console.error("❌ Failed to checkout materials:", error);
+      alert(`Failed to checkout materials:\n\n${error.message}`);
+    }
+  };
 
-        const operationContext = {
-          item_name: item.name,
-          part_number: item.part_number,
-          phase_name: phase.name,
-          subphase_name: subphase.name
+  // ============================================================================
+  // ALSO FIX: handleCheckoutSingleMaterial
+  // ============================================================================
+
+  const handleCheckoutSingleMaterial = async (
+    item,
+    phase,
+    subphase,
+    materialIndex
+  ) => {
+    // Parse materials array
+    let materials = [];
+    try {
+      materials =
+        typeof subphase.materials === "string"
+          ? JSON.parse(subphase.materials)
+          : subphase.materials || [];
+    } catch (error) {
+      console.error("Failed to parse materials:", error);
+      alert("Error reading materials data");
+      return;
+    }
+
+    const material = materials[materialIndex];
+    if (!material || material.checked_out) {
+      alert("Material already checked out or not found");
+      return;
+    }
+
+    try {
+      // STEP 1: Determine who is checking out
+      let checkoutByUid = null;
+      let checkoutBy = null;
+      let checkoutByName = null;
+
+      if (subphase.employee_uid && subphase.employee_name) {
+        checkoutByUid = subphase.employee_uid;
+        checkoutBy = subphase.employee_barcode;
+        checkoutByName = subphase.employee_name;
+      } else {
+        throw new Error(
+          "No employee assigned to this subphase. Please assign an employee first."
+        );
+      }
+
+      // STEP 2: Find material in inventory
+      const materialsResponse = await apiService.items.getItems({
+        item_type: "OPERATION PARTICULARS",
+        search: material.name,
+        limit: 10,
+      });
+
+      // ✅ FIXED: Robust response parsing
+      let inventoryItems = [];
+      if (Array.isArray(materialsResponse)) {
+        inventoryItems = materialsResponse;
+      } else if (
+        materialsResponse?.items &&
+        Array.isArray(materialsResponse.items)
+      ) {
+        inventoryItems = materialsResponse.items;
+      } else if (
+        materialsResponse?.data &&
+        Array.isArray(materialsResponse.data)
+      ) {
+        inventoryItems = materialsResponse.data;
+      } else if (
+        materialsResponse?.success &&
+        Array.isArray(materialsResponse.data)
+      ) {
+        inventoryItems = materialsResponse.data;
+      } else {
+        console.warn("⚠️ Unexpected response format:", materialsResponse);
+        inventoryItems = [];
+      }
+
+      console.log(`📋 Found ${inventoryItems.length} inventory items`);
+
+      const inventoryItem = inventoryItems.find(
+        (m) => m.item_name?.toLowerCase() === material.name.toLowerCase()
+      );
+
+      if (!inventoryItem) {
+        throw new Error(`Material "${material.name}" not found in inventory`);
+      }
+
+      const requestedQty = parseFloat(material.quantity);
+
+      // STEP 3: Check stock availability
+      if (inventoryItem.balance < requestedQty) {
+        const proceed = window.confirm(
+          `⚠️ Insufficient stock for ${inventoryItem.item_name}\n\n` +
+            `Requested: ${requestedQty} ${material.unit || "units"}\n` +
+            `Available: ${inventoryItem.balance} ${
+              inventoryItem.unit_of_measure || "units"
+            }\n\n` +
+            `Proceed with checkout anyway?`
+        );
+        if (!proceed) return;
+      }
+
+      // STEP 4: Confirm checkout
+      const confirmMsg =
+        `Checkout material:\n\n` +
+        `Material: ${inventoryItem.item_name}\n` +
+        `Quantity: ${requestedQty} ${material.unit || "units"}\n` +
+        `Available: ${inventoryItem.balance} ${
+          inventoryItem.unit_of_measure || "units"
+        }\n\n` +
+        `For: ${item.name} → ${phase.name} → ${subphase.name}\n` +
+        `✅ Checked out by: ${checkoutByName} (${checkoutBy})\n\n` +
+        `Proceed?`;
+
+      if (!window.confirm(confirmMsg)) return;
+
+      // STEP 5: Deduct from inventory
+      console.log(
+        `📦 Deducting ${requestedQty} ${material.unit} from inventory...`
+      );
+
+      const checkoutResult = await apiService.items.removeStock(
+        inventoryItem.item_no,
+        requestedQty,
+        `Material checkout for operations\n` +
+          `Item: ${item.name} (${item.part_number})\n` +
+          `Phase: ${phase.name}\n` +
+          `Subphase: ${subphase.name}\n` +
+          `Material: ${material.name}\n` +
+          `Checked out by: ${checkoutByName}`,
+        checkoutBy
+      );
+
+      console.log(`✅ Inventory deducted successfully:`, checkoutResult);
+
+      const isSuccess =
+        checkoutResult.success ||
+        (checkoutResult.successful && checkoutResult.successful > 0) ||
+        (checkoutResult.results &&
+          checkoutResult.results.some((r) => r.success));
+
+      if (isSuccess) {
+        // STEP 6: Create material record in database
+        try {
+          const materialRecord = await apiService.operations.createMaterial({
+            subphase_id: subphase.id,
+            item_part_number: item.part_number,
+            phase_id: phase.id,
+            material_name: material.name,
+            material_quantity: requestedQty,
+            unit_of_measure: material.unit || "pcs",
+            is_checked_out: true,
+            checkout_date: new Date().toISOString(),
+            checked_out_by: checkoutBy,
+            checked_out_by_name: checkoutByName,
+            checked_out_by_uid: checkoutByUid,
+            status: "checked_out",
+            notes: `Checked out from inventory: ${inventoryItem.item_no}`,
+          });
+
+          console.log(
+            `✅ Material record created in database:`,
+            materialRecord
+          );
+
+          // Also update local materials array
+          materials[materialIndex] = {
+            ...material,
+            id: materialRecord.id,
+            checked_out: true,
+            checkout_date: new Date().toISOString(),
+            checkout_by: checkoutBy,
+            checkout_by_name: checkoutByName,
+            checkout_by_uid: checkoutByUid,
+          };
+
+          // Save updated materials array
+          await apiService.operations.updateSubphase(subphase.id, {
+            materials: JSON.stringify(materials),
+          });
+        } catch (materialError) {
+          console.error("Failed to create material record:", materialError);
+          throw new Error(
+            "Material checked out but failed to create record: " +
+              materialError.message
+          );
         }
 
-        await createMaterialCheckoutLog(
-          materialsArray,
-          fullEmployeeData,
-          operationContext,
-          apiService
-        )
-      } catch (logError) {
-        console.error("⚠️ Failed to create employee log (non-critical):", logError)
+        // STEP 7: Create employee log
+        try {
+          console.log("📝 Creating employee log for material checkout...");
+
+          const fullEmployeeData = await getEmployeeData(
+            checkoutByUid,
+            apiService
+          );
+          console.log("👤 Full employee data:", fullEmployeeData);
+
+          const materialsArray = [
+            {
+              item_no: inventoryItem.item_no,
+              item_name: inventoryItem.item_name,
+              quantity: requestedQty,
+              unit: material.unit || "pcs",
+            },
+          ];
+
+          const operationContext = {
+            item_name: item.name,
+            part_number: item.part_number,
+            phase_name: phase.name,
+            subphase_name: subphase.name,
+          };
+
+          const logResult = await createMaterialCheckoutLog(
+            materialsArray,
+            fullEmployeeData,
+            operationContext,
+            apiService
+          );
+
+          if (logResult.success) {
+            console.log(
+              "✅ Employee log created successfully:",
+              logResult.logId
+            );
+          } else {
+            console.warn("⚠️ Employee log creation failed:", logResult.error);
+          }
+        } catch (logError) {
+          console.error(
+            "⚠️ Failed to create employee log (non-critical):",
+            logError
+          );
+        }
+
+        // Reload to show updates
+        await loadItemDetails(item.part_number);
+
+        alert(
+          `✅ Material checked out successfully!\n\n` +
+            `${material.name}: ${requestedQty} ${material.unit}\n` +
+            `Checked out by: ${checkoutByName}`
+        );
+      } else {
+        throw new Error(checkoutResult.error || "Checkout failed");
       }
-
-      alert(
-        `✅ Successfully checked out:\n\n` +
-        `${inventoryItem.item_name}: ${requestedQty} ${material.unit || 'units'}\n\n` +
-        `Checked out by: ${checkoutByName} (${checkoutBy})`
-      )
-
-      // Reload data to show updated checkout status
-      await loadItemDetails(item.part_number)
-    } else {
-      throw new Error(checkoutResult.error || "Checkout failed")
+    } catch (error) {
+      console.error("❌ Failed to checkout material:", error);
+      alert(`Failed to checkout material:\n\n${error.message}`);
     }
-
-  } catch (error) {
-    console.error("❌ Failed to checkout material:", error)
-    alert(`Failed to checkout material:\n\n${error.message}`)
-  }
-}
+  };
 
   // Helper function to check if previous phase is completed
   const isPreviousPhaseCompleted = (item, currentPhaseIndex) => {
-    if (currentPhaseIndex === 0) return true // First phase is always available
+    if (currentPhaseIndex === 0) return true; // First phase is always available
 
-    const previousPhase = item.phases[currentPhaseIndex - 1]
-    if (!previousPhase) return true
+    const previousPhase = item.phases[currentPhaseIndex - 1];
+    if (!previousPhase) return true;
 
     // Previous phase must be completed (100% progress)
-    return calculatePhaseProgress(previousPhase) === 100 && previousPhase.end_time
-  }
+    return (
+      calculatePhaseProgress(previousPhase) === 100 && previousPhase.end_time
+    );
+  };
 
   // Toggle Item Checkbox
   const toggleItemCheckbox = (partNumber) => {
-    setItemCheckboxes(prev => ({
+    setItemCheckboxes((prev) => ({
       ...prev,
-      [partNumber]: !prev[partNumber]
-    }))
-  }
+      [partNumber]: !prev[partNumber],
+    }));
+  };
 
   // Get checked items count
   const getCheckedItemsCount = () => {
-    return Object.values(itemCheckboxes).filter(Boolean).length
-  }
+    return Object.values(itemCheckboxes).filter(Boolean).length;
+  };
 
   return (
     <div className="pb-20 sm:pb-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
-        <h2 className={`text-xl sm:text-2xl font-bold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+        <h2
+          className={`text-xl sm:text-2xl font-bold ${
+            isDarkMode ? "text-gray-200" : "text-gray-800"
+          }`}
+        >
           Progress Checklist
         </h2>
       </div>
 
       {/* Search and Filter Bar - Mobile Optimized */}
       <div
-        className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 border transition-all shadow-sm ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-          }`}
+        className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 border transition-all shadow-sm ${
+          isDarkMode
+            ? "bg-gray-800/60 border-gray-700/50"
+            : "bg-white/30 border-white/40"
+        }`}
       >
         <div className="flex flex-col gap-3">
           {/* Search - Full width on mobile */}
           <div className="relative">
-            <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none z-10"
+            />
             <input
               type="text"
               placeholder="Search..."
               value={searchTerm}
               onChange={(e) => {
-                setSearchTerm(e.target.value)
-                setCurrentPage(1)
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
               }}
-              className={`w-full pl-10 pr-4 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${isDarkMode
-                ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                }`}
+              className={`w-full pl-10 pr-4 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
+                isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+              }`}
             />
           </div>
 
@@ -1519,7 +1918,11 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
             <Filter size={18} />
             <span>Filters</span>
             {(filterClient || filterPriority || filterStatus || sortBy) &&
-              ` (${[filterClient, filterPriority, filterStatus, sortBy].filter(Boolean).length})`}
+              ` (${
+                [filterClient, filterPriority, filterStatus, sortBy].filter(
+                  Boolean
+                ).length
+              })`}
           </button>
         </div>
 
@@ -1533,10 +1936,11 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
               <select
                 value={filterClient}
                 onChange={(e) => setFilterClient(e.target.value)}
-                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800"
-                  }`}
+                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
+                  isDarkMode
+                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                    : "bg-white/50 border border-gray-300/30 text-gray-800"
+                }`}
               >
                 <option value="">All Clients</option>
                 {uniqueClients.map((client) => (
@@ -1554,10 +1958,11 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value)}
-                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800"
-                  }`}
+                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
+                  isDarkMode
+                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                    : "bg-white/50 border border-gray-300/30 text-gray-800"
+                }`}
               >
                 <option value="">All Priorities</option>
                 <option value="High">High</option>
@@ -1573,10 +1978,11 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800"
-                  }`}
+                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
+                  isDarkMode
+                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                    : "bg-white/50 border border-gray-300/30 text-gray-800"
+                }`}
               >
                 <option value="">All Statuses</option>
                 <option value="not-started">Not Started</option>
@@ -1592,10 +1998,11 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800"
-                  }`}
+                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
+                  isDarkMode
+                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                    : "bg-white/50 border border-gray-300/30 text-gray-800"
+                }`}
               >
                 <option value="">Default</option>
                 <option value="name-asc">Name (A-Z)</option>
@@ -1609,11 +2016,11 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
               <div className="sm:col-span-2 lg:col-span-4">
                 <button
                   onClick={() => {
-                    setFilterClient("")
-                    setFilterPriority("")
-                    setFilterStatus("")
-                    setSortBy("")
-                    setCurrentPage(1)
+                    setFilterClient("");
+                    setFilterPriority("");
+                    setFilterStatus("");
+                    setSortBy("");
+                    setCurrentPage(1);
                   }}
                   className="text-sm text-blue-600 dark:text-blue-400 hover:underline active:text-blue-700 py-2"
                 >
@@ -1628,10 +2035,15 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
       {isFiltering && (
         <div className="text-center py-8">
           <div
-            className={`animate-spin rounded-full h-8 w-8 border-b-2 mx-auto ${isDarkMode ? "border-slate-400" : "border-slate-600"
-              }`}
+            className={`animate-spin rounded-full h-8 w-8 border-b-2 mx-auto ${
+              isDarkMode ? "border-slate-400" : "border-slate-600"
+            }`}
           ></div>
-          <p className={`mt-4 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+          <p
+            className={`mt-4 text-sm ${
+              isDarkMode ? "text-gray-400" : "text-gray-600"
+            }`}
+          >
             Filtering items...
           </p>
         </div>
@@ -1640,11 +2052,18 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
       {/* Bulk Edit Section - Mobile Optimized */}
       {getCheckedItemsCount() > 0 && (
         <div
-          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mb-4 border transition-all shadow-sm ${isDarkMode ? "bg-purple-500/10 border-purple-500/30" : "bg-purple-500/10 border-purple-500/30"
-            }`}
+          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mb-4 border transition-all shadow-sm ${
+            isDarkMode
+              ? "bg-purple-500/10 border-purple-500/30"
+              : "bg-purple-500/10 border-purple-500/30"
+          }`}
         >
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <span className={`text-sm font-medium ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
+            <span
+              className={`text-sm font-medium ${
+                isDarkMode ? "text-purple-300" : "text-purple-700"
+              }`}
+            >
               {getCheckedItemsCount()} item(s) selected
             </span>
             <div className="flex gap-2">
@@ -1652,10 +2071,12 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                 onClick={() => {
                   const selected = Object.keys(itemCheckboxes)
                     .filter((partNumber) => itemCheckboxes[partNumber])
-                    .map((partNumber) => items.find((item) => item.part_number === partNumber))
-                    .filter(Boolean)
-                  setSelectedItemsForBulk(selected)
-                  setShowBulkEditModal(true)
+                    .map((partNumber) =>
+                      items.find((item) => item.part_number === partNumber)
+                    )
+                    .filter(Boolean);
+                  setSelectedItemsForBulk(selected);
+                  setShowBulkEditModal(true);
                 }}
                 className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white px-4 py-2.5 sm:py-2 rounded-lg transition-colors text-sm font-medium"
               >
@@ -1676,30 +2097,50 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
       {/* Summary Stats - Mobile Optimized */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div
-          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border transition-all shadow-sm ${isDarkMode ? "bg-blue-500/10 border-blue-500/30" : "bg-gradient-to-r from-blue-500/10 to-blue-400/10 border-blue-500/30"
-            }`}
+          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border transition-all shadow-sm ${
+            isDarkMode
+              ? "bg-blue-500/10 border-blue-500/30"
+              : "bg-gradient-to-r from-blue-500/10 to-blue-400/10 border-blue-500/30"
+          }`}
         >
-          <h3 className={`text-sm sm:text-lg font-semibold ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
+          <h3
+            className={`text-sm sm:text-lg font-semibold ${
+              isDarkMode ? "text-blue-300" : "text-blue-700"
+            }`}
+          >
             In Progress
           </h3>
-          <p className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
+          <p
+            className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 ${
+              isDarkMode ? "text-blue-400" : "text-blue-600"
+            }`}
+          >
             {inProgressItems.length}
           </p>
         </div>
         <div
-          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border transition-all shadow-sm ${isDarkMode ? "bg-green-500/10 border-green-500/30" : "bg-gradient-to-r from-green-500/10 to-green-400/10 border-green-500/30"
-            }`}
+          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border transition-all shadow-sm ${
+            isDarkMode
+              ? "bg-green-500/10 border-green-500/30"
+              : "bg-gradient-to-r from-green-500/10 to-green-400/10 border-green-500/30"
+          }`}
         >
-          <h3 className={`text-sm sm:text-lg font-semibold ${isDarkMode ? "text-green-300" : "text-green-700"}`}>
+          <h3
+            className={`text-sm sm:text-lg font-semibold ${
+              isDarkMode ? "text-green-300" : "text-green-700"
+            }`}
+          >
             Completed
           </h3>
-          <p className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
+          <p
+            className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 ${
+              isDarkMode ? "text-green-400" : "text-green-600"
+            }`}
+          >
             {completedItems.length}
           </p>
         </div>
       </div>
-
-
 
       {!isFiltering && items.length > 0 ? (
         <div className="space-y-6 sm:space-y-8">
@@ -1707,24 +2148,28 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
           {inProgressItems.length > 0 && (
             <div>
               <h3
-                className={`text-xl sm:text-2xl font-bold mb-3 sm:mb-4 flex items-center gap-2 ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                  }`}
+                className={`text-xl sm:text-2xl font-bold mb-3 sm:mb-4 flex items-center gap-2 ${
+                  isDarkMode ? "text-gray-200" : "text-gray-800"
+                }`}
               >
                 <Clock size={20} />
                 In Progress ({inProgressItems.length})
               </h3>
               <div className="space-y-3 sm:space-y-4">
                 {sortedInProgressItems.map((item) => {
-                  const itemKey = item.part_number || item.id
-                  const priority = item.priority || "Medium"
-                  const elapsedSeconds = getItemElapsedTime(item)
-                  const progress = calculateItemProgress(item)
+                  const itemKey = item.part_number || item.id;
+                  const priority = item.priority || "Medium";
+                  const elapsedSeconds = getItemElapsedTime(item);
+                  const progress = calculateItemProgress(item);
 
                   return (
                     <div
                       key={itemKey}
-                      className={`backdrop-blur-md rounded-lg border overflow-hidden transition-all shadow-sm ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-                        }`}
+                      className={`backdrop-blur-md rounded-lg border overflow-hidden transition-all shadow-sm ${
+                        isDarkMode
+                          ? "bg-gray-800/60 border-gray-700/50"
+                          : "bg-white/30 border-white/40"
+                      }`}
                     >
                       {/* Item Header - Mobile Optimized */}
                       <div className="p-3 sm:p-4">
@@ -1732,25 +2177,38 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                           {/* Top Row: Expand + Title + Progress */}
                           <div className="flex items-start gap-3">
                             <button
-                              onClick={() => toggleItemExpansion(item.part_number)}
+                              onClick={() =>
+                                toggleItemExpansion(item.part_number)
+                              }
                               className="shrink-0 p-1 hover:bg-gray-200/20 active:bg-gray-200/30 rounded transition-colors mt-0.5"
                             >
-                              <span className="text-xl">{expandedItems[item.part_number] ? "▼" : "▶"}</span>
+                              <span className="text-xl">
+                                {expandedItems[item.part_number] ? "▼" : "▶"}
+                              </span>
                             </button>
 
                             <div className="flex-1 min-w-0">
                               <h3
-                                className={`font-semibold text-base sm:text-lg lg:text-xl ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                  } break-words`}
+                                className={`font-semibold text-base sm:text-lg lg:text-xl ${
+                                  isDarkMode ? "text-gray-200" : "text-gray-800"
+                                } break-words`}
                               >
                                 {item.name}
                               </h3>
-                              <p className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"} mt-1`}>
+                              <p
+                                className={`text-xs sm:text-sm ${
+                                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                                } mt-1`}
+                              >
                                 Part #: {item.part_number}
                               </p>
                             </div>
 
-                            <span className={`text-lg sm:text-xl font-bold shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                            <span
+                              className={`text-lg sm:text-xl font-bold shrink-0 ${
+                                isDarkMode ? "text-gray-200" : "text-gray-800"
+                              }`}
+                            >
                               {progress}%
                             </span>
                           </div>
@@ -1758,7 +2216,9 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                           {/* Badges Row */}
                           <div className="flex flex-wrap gap-2 pl-10">
                             <div
-                              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs border ${getPriorityColor(priority)}`}
+                              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs border ${getPriorityColor(
+                                priority
+                              )}`}
                             >
                               <Flag size={12} />
                               {priority}
@@ -1766,7 +2226,9 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                             {item.client_name && (
                               <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500">
                                 <User size={12} />
-                                <span className="max-w-[150px] sm:max-w-none truncate">{item.client_name}</span>
+                                <span className="max-w-[150px] sm:max-w-none truncate">
+                                  {item.client_name}
+                                </span>
                               </div>
                             )}
                             {item.quantity && item.quantity > 1 && (
@@ -1780,17 +2242,23 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                           {/* Action Buttons Row */}
                           <div className="flex flex-wrap items-center gap-2 pl-10">
                             {/* Priority Buttons */}
-                            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                            <div
+                              className="flex gap-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               {["High", "Medium", "Low"].map((p) => (
                                 <button
                                   key={p}
-                                  onClick={() => handleUpdatePriority(item.part_number, p)}
-                                  className={`p-2 text-xs rounded transition-colors active:scale-95 ${priority === p
-                                    ? getPriorityColor(p)
-                                    : isDarkMode
+                                  onClick={() =>
+                                    handleUpdatePriority(item.part_number, p)
+                                  }
+                                  className={`p-2 text-xs rounded transition-colors active:scale-95 ${
+                                    priority === p
+                                      ? getPriorityColor(p)
+                                      : isDarkMode
                                       ? "text-gray-400 hover:text-gray-300 active:bg-gray-700"
                                       : "text-gray-400 hover:text-gray-600 active:bg-gray-200"
-                                    }`}
+                                  }`}
                                   title={`Set ${p} priority`}
                                 >
                                   <Flag size={16} />
@@ -1799,11 +2267,18 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                             </div>
 
                             {/* Checkbox */}
-                            <label className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                            <label
+                              className="flex items-center"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <input
                                 type="checkbox"
-                                checked={itemCheckboxes[item.part_number] || false}
-                                onChange={() => toggleItemCheckbox(item.part_number)}
+                                checked={
+                                  itemCheckboxes[item.part_number] || false
+                                }
+                                onChange={() =>
+                                  toggleItemCheckbox(item.part_number)
+                                }
                                 className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                                 title="Select for bulk edit"
                               />
@@ -1812,9 +2287,9 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                             {/* Action Buttons */}
                             <button
                               onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedItemForEdit(item)
-                                setShowEditItemModal(true)
+                                e.stopPropagation();
+                                setSelectedItemForEdit(item);
+                                setShowEditItemModal(true);
                               }}
                               className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 active:bg-blue-500/20 rounded transition-colors"
                               title="Edit item"
@@ -1824,9 +2299,9 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
 
                             <button
                               onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedItemForEdit(item)
-                                setShowAddPhaseModal(true)
+                                e.stopPropagation();
+                                setSelectedItemForEdit(item);
+                                setShowAddPhaseModal(true);
                               }}
                               className="p-2 text-green-600 dark:text-green-400 hover:bg-green-500/10 active:bg-green-500/20 rounded transition-colors"
                               title="Add phase"
@@ -1836,20 +2311,34 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
 
                             <button
                               onClick={async (e) => {
-                                e.stopPropagation()
+                                e.stopPropagation();
                                 if (
                                   window.confirm(
                                     `Delete "${item.name}" (${item.part_number})?\n\nThis will permanently delete all phases and subphases. This action cannot be undone.`
                                   )
                                 ) {
                                   try {
-                                    setItems((prevItems) => prevItems.filter((i) => i.part_number !== item.part_number))
-                                    await apiService.operations.deleteItem(item.part_number)
-                                    alert(`"${item.name}" has been deleted successfully.`)
+                                    setItems((prevItems) =>
+                                      prevItems.filter(
+                                        (i) =>
+                                          i.part_number !== item.part_number
+                                      )
+                                    );
+                                    await apiService.operations.deleteItem(
+                                      item.part_number
+                                    );
+                                    alert(
+                                      `"${item.name}" has been deleted successfully.`
+                                    );
                                   } catch (error) {
-                                    console.error("Error deleting item:", error)
-                                    alert("Failed to delete item: " + error.message)
-                                    await loadData()
+                                    console.error(
+                                      "Error deleting item:",
+                                      error
+                                    );
+                                    alert(
+                                      "Failed to delete item: " + error.message
+                                    );
+                                    await loadData();
                                   }
                                 }
                               }}
@@ -1861,8 +2350,8 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
 
                             <button
                               onClick={(e) => {
-                                e.stopPropagation()
-                                openTransferModal(item)
+                                e.stopPropagation();
+                                openTransferModal(item);
                               }}
                               className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 active:bg-blue-500/20 rounded transition-colors"
                               title="Transfer"
@@ -1875,11 +2364,17 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                           {item.remarks && (
                             <div className="pl-10">
                               <p
-                                className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"
-                                  } italic flex items-start gap-1`}
+                                className={`text-xs ${
+                                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                                } italic flex items-start gap-1`}
                               >
-                                <FileText size={12} className="mt-0.5 shrink-0" />
-                                <span className="line-clamp-2">{item.remarks}</span>
+                                <FileText
+                                  size={12}
+                                  className="mt-0.5 shrink-0"
+                                />
+                                <span className="line-clamp-2">
+                                  {item.remarks}
+                                </span>
                               </p>
                             </div>
                           )}
@@ -1891,28 +2386,32 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                         <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-3">
                           {item.phases && item.phases.length > 0 ? (
                             item.phases.map((phase, phaseIndex) => {
-                              const phaseKey = phase.id
-                              const isFirstPhase = phaseIndex === 0
-                              const isPreviousPhaseComplete = isPreviousPhaseCompleted(item, phaseIndex)
-                              const isPhaseDisabled = !isFirstPhase && !isPreviousPhaseComplete
+                              const phaseKey = phase.id;
+                              const isFirstPhase = phaseIndex === 0;
+                              const isPreviousPhaseComplete =
+                                isPreviousPhaseCompleted(item, phaseIndex);
+                              const isPhaseDisabled =
+                                !isFirstPhase && !isPreviousPhaseComplete;
 
                               return (
                                 <div
                                   key={phaseKey}
-                                  className={`rounded-lg border ${isPhaseDisabled
-                                    ? "border-yellow-500/30 opacity-60"
-                                    : isDarkMode
+                                  className={`rounded-lg border ${
+                                    isPhaseDisabled
+                                      ? "border-yellow-500/30 opacity-60"
+                                      : isDarkMode
                                       ? "border-gray-700/10"
                                       : "border-gray-300/10"
-                                    }`}
+                                  }`}
                                 >
                                   {isPhaseDisabled && (
                                     <div className="px-3 pt-3">
                                       <div
-                                        className={`p-2 rounded text-xs ${isDarkMode
-                                          ? "text-yellow-400 bg-yellow-500/10 border border-yellow-500/30"
-                                          : "text-yellow-700 bg-yellow-500/10 border border-yellow-500/30"
-                                          }`}
+                                        className={`p-2 rounded text-xs ${
+                                          isDarkMode
+                                            ? "text-yellow-400 bg-yellow-500/10 border border-yellow-500/30"
+                                            : "text-yellow-700 bg-yellow-500/10 border border-yellow-500/30"
+                                        }`}
                                       >
                                         ⚠️ Complete previous phase first
                                       </div>
@@ -1925,17 +2424,26 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                                       {/* Phase Title Row */}
                                       <div className="flex items-start gap-2">
                                         <button
-                                          onClick={() => togglePhaseExpansion(phase.id)}
+                                          onClick={() =>
+                                            togglePhaseExpansion(phase.id)
+                                          }
                                           className="shrink-0 p-1 hover:bg-gray-200/20 active:bg-gray-200/30 rounded transition-colors"
                                         >
-                                          <span className="text-base">{expandedPhases[phase.id] ? "▼" : "▶"}</span>
+                                          <span className="text-base">
+                                            {expandedPhases[phase.id]
+                                              ? "▼"
+                                              : "▶"}
+                                          </span>
                                         </button>
 
                                         <div className="flex-1 min-w-0">
                                           <div className="flex flex-wrap items-center gap-2">
                                             <span
-                                              className={`font-medium text-base sm:text-lg ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                                }`}
+                                              className={`font-medium text-base sm:text-lg ${
+                                                isDarkMode
+                                                  ? "text-gray-200"
+                                                  : "text-gray-800"
+                                              }`}
                                             >
                                               {phase.name}
                                             </span>
@@ -1944,19 +2452,29 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                                                 Phase 1
                                               </span>
                                             )}
-                                            <span className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                                              ({phase.subphases?.length || 0} sub)
+                                            <span
+                                              className={`text-xs sm:text-sm ${
+                                                isDarkMode
+                                                  ? "text-gray-400"
+                                                  : "text-gray-600"
+                                              }`}
+                                            >
+                                              ({phase.subphases?.length || 0}{" "}
+                                              sub)
                                             </span>
                                           </div>
                                         </div>
 
                                         {/* Edit/Add Buttons */}
-                                        <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                        <div
+                                          className="flex gap-1 shrink-0"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
                                           <button
                                             onClick={() => {
-                                              setSelectedItemForEdit(item)
-                                              setSelectedPhaseForEdit(phase)
-                                              setShowEditPhaseModal(true)
+                                              setSelectedItemForEdit(item);
+                                              setSelectedPhaseForEdit(phase);
+                                              setShowEditPhaseModal(true);
                                             }}
                                             className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 active:bg-blue-500/20 rounded transition-colors"
                                             title="Edit phase"
@@ -1965,9 +2483,9 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                                           </button>
                                           <button
                                             onClick={() => {
-                                              setSelectedItemForEdit(item)
-                                              setSelectedPhaseForEdit(phase)
-                                              setShowAddSubphaseModal(true)
+                                              setSelectedItemForEdit(item);
+                                              setSelectedPhaseForEdit(phase);
+                                              setShowAddSubphaseModal(true);
                                             }}
                                             className="p-1.5 text-green-600 dark:text-green-400 hover:bg-green-500/10 active:bg-green-500/20 rounded transition-colors"
                                             title="Add subphase"
@@ -1980,19 +2498,27 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                                       {/* Progress Bar */}
                                       <div className="flex items-center gap-3">
                                         <div
-                                          className={`flex-1 rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"
-                                            }`}
+                                          className={`flex-1 rounded-full h-2 ${
+                                            isDarkMode
+                                              ? "bg-gray-700"
+                                              : "bg-gray-300"
+                                          }`}
                                         >
                                           <div
                                             className="bg-slate-600 dark:bg-slate-400 h-2 rounded-full transition-all duration-300"
                                             style={{
-                                              width: `${calculatePhaseProgress(phase)}%`,
+                                              width: `${calculatePhaseProgress(
+                                                phase
+                                              )}%`,
                                             }}
                                           ></div>
                                         </div>
                                         <span
-                                          className={`text-sm font-semibold w-12 text-right ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                            }`}
+                                          className={`text-sm font-semibold w-12 text-right ${
+                                            isDarkMode
+                                              ? "text-gray-200"
+                                              : "text-gray-800"
+                                          }`}
                                         >
                                           {calculatePhaseProgress(phase)}%
                                         </span>
@@ -2001,102 +2527,201 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
 
                                     {/* Phase Duration Tracker - Mobile Optimized */}
                                     <div
-                                      className={`rounded-lg p-3 mt-3 ${isDarkMode ? "bg-slate-500/20" : "bg-slate-500/10"
-                                        }`}
+                                      className={`rounded-lg p-3 mt-3 ${
+                                        isDarkMode
+                                          ? "bg-slate-500/20"
+                                          : "bg-slate-500/10"
+                                      }`}
                                     >
                                       <div className="flex flex-col gap-2 mb-3">
                                         <div className="flex items-center justify-between">
                                           <span
-                                            className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-                                              }`}
+                                            className={`text-sm font-semibold flex items-center gap-2 ${
+                                              isDarkMode
+                                                ? "text-gray-300"
+                                                : "text-gray-700"
+                                            }`}
                                           >
                                             <Calendar size={16} />
                                             Duration
                                           </span>
                                           {phase.expected_hours && (
                                             <span
-                                              className={`text-xs px-2 py-1 rounded ${isDarkMode
-                                                ? "bg-purple-500/20 text-purple-300"
-                                                : "bg-purple-500/20 text-purple-700"
-                                                }`}
+                                              className={`text-xs px-2 py-1 rounded ${
+                                                isDarkMode
+                                                  ? "bg-purple-500/20 text-purple-300"
+                                                  : "bg-purple-500/20 text-purple-700"
+                                              }`}
                                             >
-                                              Expected: {Number.parseFloat(phase.expected_hours).toFixed(1)}h
+                                              Expected:{" "}
+                                              {Number.parseFloat(
+                                                phase.expected_hours
+                                              ).toFixed(1)}
+                                              h
                                             </span>
                                           )}
                                         </div>
 
                                         <div className="flex items-center justify-between">
-                                          <Clock size={18} className="text-slate-600 dark:text-slate-400" />
+                                          <Clock
+                                            size={18}
+                                            className="text-slate-600 dark:text-slate-400"
+                                          />
                                           <span
-                                            className={`text-lg sm:text-xl font-mono font-bold ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                              }`}
+                                            className={`text-lg sm:text-xl font-mono font-bold ${
+                                              isDarkMode
+                                                ? "text-gray-200"
+                                                : "text-gray-800"
+                                            }`}
                                           >
-                                            {formatTime(getPhaseElapsedTime(phase))}
+                                            {formatTime(
+                                              getPhaseElapsedTime(phase)
+                                            )}
                                           </span>
-                                          {phase.end_time && phase.expected_hours && phase.actual_hours && (
-                                            <span
-                                              className={`text-xs px-2 py-1 rounded font-medium ${phase.actual_hours > phase.expected_hours
-                                                ? "bg-red-500/20 text-red-700 dark:text-red-300"
-                                                : "bg-green-500/20 text-green-700 dark:text-green-300"
+                                          {phase.end_time &&
+                                            phase.expected_hours &&
+                                            phase.actual_hours && (
+                                              <span
+                                                className={`text-xs px-2 py-1 rounded font-medium ${
+                                                  phase.actual_hours >
+                                                  phase.expected_hours
+                                                    ? "bg-red-500/20 text-red-700 dark:text-red-300"
+                                                    : "bg-green-500/20 text-green-700 dark:text-green-300"
                                                 }`}
-                                            >
-                                              {phase.actual_hours > phase.expected_hours ? "+" : ""}
-                                              {(phase.actual_hours - phase.expected_hours).toFixed(1)}h
-                                            </span>
-                                          )}
+                                              >
+                                                {phase.actual_hours >
+                                                phase.expected_hours
+                                                  ? "+"
+                                                  : ""}
+                                                {(
+                                                  phase.actual_hours -
+                                                  phase.expected_hours
+                                                ).toFixed(1)}
+                                                h
+                                              </span>
+                                            )}
                                         </div>
                                       </div>
 
                                       {/* Progress vs Expected */}
-                                      {phase.expected_hours && phase.start_time && !phase.end_time && (
-                                        <div className="mb-3">
-                                          <div className="flex justify-between text-xs mb-1">
-                                            <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
-                                              Progress vs Expected
-                                            </span>
-                                            <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
-                                              {(((getPhaseElapsedTime(phase) / 3600) / phase.expected_hours) * 100).toFixed(0)}%
-                                            </span>
-                                          </div>
-                                          <div
-                                            className={`w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"
-                                              }`}
-                                          >
+                                      {phase.expected_hours &&
+                                        phase.start_time &&
+                                        !phase.end_time && (
+                                          <div className="mb-3">
+                                            <div className="flex justify-between text-xs mb-1">
+                                              <span
+                                                className={
+                                                  isDarkMode
+                                                    ? "text-gray-400"
+                                                    : "text-gray-600"
+                                                }
+                                              >
+                                                Progress vs Expected
+                                              </span>
+                                              <span
+                                                className={
+                                                  isDarkMode
+                                                    ? "text-gray-400"
+                                                    : "text-gray-600"
+                                                }
+                                              >
+                                                {(
+                                                  (getPhaseElapsedTime(phase) /
+                                                    3600 /
+                                                    phase.expected_hours) *
+                                                  100
+                                                ).toFixed(0)}
+                                                %
+                                              </span>
+                                            </div>
                                             <div
-                                              className={`h-2 rounded-full transition-all duration-300 ${getPhaseElapsedTime(phase) / 3600 > phase.expected_hours
-                                                ? "bg-red-500"
-                                                : "bg-purple-500"
+                                              className={`w-full rounded-full h-2 ${
+                                                isDarkMode
+                                                  ? "bg-gray-700"
+                                                  : "bg-gray-300"
+                                              }`}
+                                            >
+                                              <div
+                                                className={`h-2 rounded-full transition-all duration-300 ${
+                                                  getPhaseElapsedTime(phase) /
+                                                    3600 >
+                                                  phase.expected_hours
+                                                    ? "bg-red-500"
+                                                    : "bg-purple-500"
                                                 }`}
-                                              style={{
-                                                width: `${Math.min(
-                                                  100,
-                                                  ((getPhaseElapsedTime(phase) / 3600) / phase.expected_hours) * 100
-                                                )}%`,
-                                              }}
-                                            ></div>
+                                                style={{
+                                                  width: `${Math.min(
+                                                    100,
+                                                    (getPhaseElapsedTime(
+                                                      phase
+                                                    ) /
+                                                      3600 /
+                                                      phase.expected_hours) *
+                                                      100
+                                                  )}%`,
+                                                }}
+                                              ></div>
+                                            </div>
+                                            <p
+                                              className={`text-xs mt-1 ${
+                                                isDarkMode
+                                                  ? "text-gray-400"
+                                                  : "text-gray-600"
+                                              }`}
+                                            >
+                                              {(
+                                                getPhaseElapsedTime(phase) /
+                                                3600
+                                              ).toFixed(2)}
+                                              h of {phase.expected_hours}h
+                                            </p>
                                           </div>
-                                          <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                                            {(getPhaseElapsedTime(phase) / 3600).toFixed(2)}h of {phase.expected_hours}h
-                                          </p>
-                                        </div>
-                                      )}
+                                        )}
 
                                       {/* Start/End Times - Mobile Optimized */}
                                       <div className="space-y-1 text-xs mb-3">
                                         <div className="flex justify-between">
-                                          <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Start:</span>
-                                          <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                          <span
+                                            className={
+                                              isDarkMode
+                                                ? "text-gray-400"
+                                                : "text-gray-600"
+                                            }
+                                          >
+                                            Start:
+                                          </span>
+                                          <span
+                                            className={`font-medium ${
+                                              isDarkMode
+                                                ? "text-gray-200"
+                                                : "text-gray-800"
+                                            }`}
+                                          >
                                             {formatDateTime(phase.start_time)}
                                           </span>
                                         </div>
                                         <div className="flex justify-between">
-                                          <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>End:</span>
-                                          <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                          <span
+                                            className={
+                                              isDarkMode
+                                                ? "text-gray-400"
+                                                : "text-gray-600"
+                                            }
+                                          >
+                                            End:
+                                          </span>
+                                          <span
+                                            className={`font-medium ${
+                                              isDarkMode
+                                                ? "text-gray-200"
+                                                : "text-gray-800"
+                                            }`}
+                                          >
                                             {phase.end_time
                                               ? formatDateTime(phase.end_time)
                                               : phase.pause_time
-                                                ? "Paused"
-                                                : "In progress"}
+                                              ? "Paused"
+                                              : "In progress"}
                                           </span>
                                         </div>
                                       </div>
@@ -2106,19 +2731,26 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                                         {!phase.start_time ? (
                                           <button
                                             onClick={(e) => {
-                                              e.stopPropagation()
-                                              handleStartPhase(item.part_number, phase.id)
+                                              e.stopPropagation();
+                                              handleStartPhase(
+                                                item.part_number,
+                                                phase.id
+                                              );
                                             }}
                                             className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
                                           >
                                             <Play size={16} />
                                             Start Phase
                                           </button>
-                                        ) : phase.pause_time && !phase.end_time ? (
+                                        ) : phase.pause_time &&
+                                          !phase.end_time ? (
                                           <button
                                             onClick={(e) => {
-                                              e.stopPropagation()
-                                              handleResumePhase(item.part_number, phase.id)
+                                              e.stopPropagation();
+                                              handleResumePhase(
+                                                item.part_number,
+                                                phase.id
+                                              );
                                             }}
                                             className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
                                           >
@@ -2129,8 +2761,11 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                                           <div className="grid grid-cols-2 gap-2">
                                             <button
                                               onClick={(e) => {
-                                                e.stopPropagation()
-                                                handlePausePhase(item.part_number, phase.id)
+                                                e.stopPropagation();
+                                                handlePausePhase(
+                                                  item.part_number,
+                                                  phase.id
+                                                );
                                               }}
                                               className="flex items-center justify-center gap-2 bg-yellow-600 hover:bg-yellow-700 active:bg-yellow-800 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
                                             >
@@ -2139,14 +2774,23 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                                             </button>
                                             <button
                                               onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleStopPhase(item.part_number, phase.id)
+                                                e.stopPropagation();
+                                                handleStopPhase(
+                                                  item.part_number,
+                                                  phase.id
+                                                );
                                               }}
                                               className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                                              disabled={calculatePhaseProgress(phase) < 100}
+                                              disabled={
+                                                calculatePhaseProgress(phase) <
+                                                100
+                                              }
                                             >
                                               <StopCircle size={16} />
-                                              {calculatePhaseProgress(phase) === 100 ? "Stop" : "Complete First"}
+                                              {calculatePhaseProgress(phase) ===
+                                              100
+                                                ? "Stop"
+                                                : "Complete First"}
                                             </button>
                                           </div>
                                         ) : (
@@ -2159,8 +2803,11 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                                         {phase.start_time && (
                                           <button
                                             onClick={(e) => {
-                                              e.stopPropagation()
-                                              handleResetPhase(item.part_number, phase.id)
+                                              e.stopPropagation();
+                                              handleResetPhase(
+                                                item.part_number,
+                                                phase.id
+                                              );
                                             }}
                                             className="px-3 py-2.5 bg-gray-600 hover:bg-gray-700 active:bg-gray-800 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                                           >
@@ -2175,520 +2822,768 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                                   {/* Sub-Phases - Mobile Optimized */}
                                   {expandedPhases[phase.id] && (
                                     <div className="px-3 pb-3 space-y-2">
-                                      {phase.subphases && phase.subphases.length > 0 ? (
-                                        phase.subphases.map((subphase, subphaseIndex) => {
-                                          const subPhaseKey = subphase.id
-                                          const conditionMet = isSubphaseConditionMet(item, phase, subphase, subphaseIndex)
-                                          const isDisabled = !conditionMet && subphase.completed != 1
+                                      {phase.subphases &&
+                                      phase.subphases.length > 0 ? (
+                                        phase.subphases.map(
+                                          (subphase, subphaseIndex) => {
+                                            const subPhaseKey = subphase.id;
+                                            const conditionMet =
+                                              isSubphaseConditionMet(
+                                                item,
+                                                phase,
+                                                subphase,
+                                                subphaseIndex
+                                              );
+                                            const isDisabled =
+                                              !conditionMet &&
+                                              subphase.completed != 1;
 
-                                          return (
-                                            <div
-                                              key={subPhaseKey}
-                                              className={`p-3 rounded-lg border ${isDarkMode ? "bg-black/10 border-gray-700/10" : "bg-white/5 border-gray-300/10"
+                                            return (
+                                              <div
+                                                key={subPhaseKey}
+                                                className={`p-3 rounded-lg border ${
+                                                  isDarkMode
+                                                    ? "bg-black/10 border-gray-700/10"
+                                                    : "bg-white/5 border-gray-300/10"
                                                 }`}
-                                            >
-                                              <div className="flex items-start gap-3">
-                                                {/* Checkbox - Larger touch target */}
-                                                <div className="relative shrink-0 pt-0.5">
-                                                  <input
-                                                    type="checkbox"
-                                                    checked={subphase.completed == 1}
-                                                    disabled={isDisabled}
-                                                    onChange={() => {
-                                                      if (!isDisabled) {
-                                                        const action = subphase.completed != 1 ? "complete" : "incomplete"
-                                                        if (window.confirm(`Mark "${subphase.name}" as ${action}?`)) {
-                                                          handleToggleSubPhase(
-                                                            item.part_number,
-                                                            phase.id,
-                                                            subphase.id,
-                                                            subphase.completed == 1
-                                                          )
-                                                        }
+                                              >
+                                                <div className="flex items-start gap-3">
+                                                  {/* Checkbox - Larger touch target */}
+                                                  <div className="relative shrink-0 pt-0.5">
+                                                    <input
+                                                      type="checkbox"
+                                                      checked={
+                                                        subphase.completed == 1
                                                       }
-                                                    }}
-                                                    className={`w-6 h-6 rounded border-gray-300 dark:border-gray-600 text-slate-600 focus:ring-slate-500 focus:ring-2 ${isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+                                                      disabled={isDisabled}
+                                                      onChange={() => {
+                                                        if (!isDisabled) {
+                                                          const action =
+                                                            subphase.completed !=
+                                                            1
+                                                              ? "complete"
+                                                              : "incomplete";
+                                                          if (
+                                                            window.confirm(
+                                                              `Mark "${subphase.name}" as ${action}?`
+                                                            )
+                                                          ) {
+                                                            handleToggleSubPhase(
+                                                              item.part_number,
+                                                              phase.id,
+                                                              subphase.id,
+                                                              subphase.completed ==
+                                                                1
+                                                            );
+                                                          }
+                                                        }
+                                                      }}
+                                                      className={`w-6 h-6 rounded border-gray-300 dark:border-gray-600 text-slate-600 focus:ring-slate-500 focus:ring-2 ${
+                                                        isDisabled
+                                                          ? "cursor-not-allowed opacity-50"
+                                                          : "cursor-pointer"
                                                       }`}
-                                                    title={
-                                                      isDisabled
-                                                        ? !phase.start_time
-                                                          ? "Phase not started"
-                                                          : phase.pause_time
+                                                      title={
+                                                        isDisabled
+                                                          ? !phase.start_time
+                                                            ? "Phase not started"
+                                                            : phase.pause_time
                                                             ? "Phase paused"
                                                             : phase.end_time
-                                                              ? "Phase completed"
-                                                              : !subphase.employee_barcode
-                                                                ? "Assign employee first"
-                                                                : "Conditions not met"
-                                                        : subphase.completed == 1
+                                                            ? "Phase completed"
+                                                            : !subphase.employee_barcode
+                                                            ? "Assign employee first"
+                                                            : "Conditions not met"
+                                                          : subphase.completed ==
+                                                            1
                                                           ? "Mark incomplete"
                                                           : "Mark complete"
-                                                    }
-                                                  />
-                                                  {isDisabled && (
-                                                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white dark:border-gray-800" />
-                                                  )}
-                                                </div>
-
-                                                <div className="flex-1 min-w-0">
-                                                  <div className="flex items-start justify-between gap-2 mb-2">
-                                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                      <p
-                                                        className={`font-medium text-sm sm:text-base break-words ${subphase.completed == 1
-                                                          ? "line-through opacity-60"
-                                                          : isDisabled
-                                                            ? "opacity-50"
-                                                            : ""
-                                                          } ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}
-                                                      >
-                                                        {subphase.name}
-                                                      </p>
-                                                      <button
-                                                        onClick={() => {
-                                                          setSelectedItemForEdit(item)
-                                                          setSelectedPhaseForEdit(phase)
-                                                          setSelectedSubphaseForEdit(subphase)
-                                                          setShowEditSubphaseModal(true)
-                                                        }}
-                                                        className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 active:bg-blue-500/20 rounded transition-colors shrink-0"
-                                                        title="Edit"
-                                                      >
-                                                        <Edit2 size={14} />
-                                                      </button>
-                                                    </div>
-                                                    {subphase.completed == 1 && (
-                                                      <CheckCircle size={18} className="text-green-500 shrink-0" />
+                                                      }
+                                                    />
+                                                    {isDisabled && (
+                                                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white dark:border-gray-800" />
                                                     )}
                                                   </div>
 
-                                                  {/* Condition Warning */}
-                                                  {isDisabled && (
-                                                    <div
-                                                      className={`mb-2 p-2 rounded text-xs ${isDarkMode
-                                                        ? "text-yellow-400 bg-yellow-500/10 border border-yellow-500/30"
-                                                        : "text-yellow-700 bg-yellow-500/10 border border-yellow-500/30"
-                                                        }`}
-                                                    >
-                                                      {!subphase.employee_barcode ? (
-                                                        <>⚠️ Assign employee first</>
-                                                      ) : subphaseIndex > 0 &&
-                                                        !isPreviousSubphaseCompleted(item, phase, subphaseIndex) ? (
-                                                        <>⚠️ Complete previous first</>
-                                                      ) : subphase.expected_quantity > 0 &&
-                                                        (subphase.current_completed_quantity || 0) < subphase.expected_quantity ? (
-                                                        <>
-                                                          ⚠️ Need {subphase.expected_quantity} units (have:{" "}
-                                                          {subphase.current_completed_quantity || 0})
-                                                        </>
-                                                      ) : !phase.start_time ? (
-                                                        <>⚠️ Start phase first</>
-                                                      ) : phase.pause_time ? (
-                                                        <>⚠️ Phase paused</>
-                                                      ) : phase.end_time ? (
-                                                        <>⚠️ Phase completed</>
-                                                      ) : (
-                                                        <>⚠️ Conditions not met</>
-                                                      )}
-                                                    </div>
-                                                  )}
-
-                                                  {/* Time Duration */}
-                                                  {subphase.time_duration > 0 && (
-                                                    <p className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"} italic flex items-center gap-1 mb-2`}>
-                                                      <Clock size={12} />
-                                                      {formatDuration(subphase.time_duration / 60)} {/* Convert seconds to minutes */}
-                                                    </p>
-                                                  )}
-
-                                                  {/* Expected Duration & Quantity */}
-                                                  <div className="flex flex-wrap gap-2 items-center mb-2">
-                                                    <span className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded flex items-center gap-1">
-                                                      <Clock size={12} />
-                                                      {formatDuration(subphase.expected_duration)} {/* Convert seconds to minutes */}
-                                                    </span>
-
-                                                    {/* Quantity Tracking */}
-                                                    {subphase.expected_quantity !== undefined &&
-                                                      subphase.expected_quantity !== null &&
-                                                      subphase.expected_quantity > 0 && (
-                                                        <>
-                                                          <span className="text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 px-2 py-1 rounded flex items-center gap-1">
-                                                            <Package size={12} />
-                                                            {subphase.current_completed_quantity || 0} /{" "}
-                                                            {subphase.expected_quantity}
-                                                          </span>
-                                                          <button
-                                                            onClick={() => openQuantityModal(item, phase, subphase)}
-                                                            className="text-xs bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white px-3 py-1.5 rounded transition-colors"
-                                                          >
-                                                            Update
-                                                          </button>
-                                                          <button
-                                                            onClick={() => openTransferModal(item, phase, subphase)}
-                                                            className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-3 py-1.5 rounded transition-colors"
-                                                          >
-                                                            <ArrowRightLeft size={12} />
-                                                            Transfer
-                                                          </button>
-                                                        </>
-                                                      )}
-                                                  </div>
-
-                                                  {/* ✅ Multiple Materials Display */}
-{(() => {
-  // Safely parse and validate materials
-  let materialsArray = []
-  
-  try {
-    if (subphase.materials) {
-      // Parse if string
-      const parsed = typeof subphase.materials === 'string' 
-        ? JSON.parse(subphase.materials) 
-        : subphase.materials
-      
-      // Ensure it's an array
-      if (Array.isArray(parsed)) {
-        materialsArray = parsed
-      } else {
-        console.warn('Materials is not an array:', parsed)
-        materialsArray = []
-      }
-    }
-  } catch (error) {
-    console.error('Failed to parse materials:', error)
-    materialsArray = []
-  }
-
-  // If we have materials array, display them
-  if (materialsArray.length > 0) {
-    return (
-      <div className="space-y-2 mb-2">
-        <div className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-          Required Materials:
-        </div>
-        {materialsArray.map((material, idx) => (
-          <div key={idx} className="space-y-2">
-            <div className="flex flex-wrap gap-2 items-center">
-              <span className="text-xs bg-teal-500/20 text-teal-700 dark:text-teal-300 px-2 py-1 rounded flex items-center gap-1">
-                <Package size={12} />
-                {material.name || 'Unknown Material'}
-              </span>
-              
-              <span className="text-xs bg-orange-500/20 text-orange-700 dark:text-orange-300 px-2 py-1 rounded flex items-center gap-1">
-                <Package size={12} />
-                Qty: {material.quantity || 0} {material.unit || 'pcs'}
-              </span>
-
-              {/* Individual Material Checkout Status */}
-              {material.checked_out ? (
-                <span className="text-xs bg-green-500/20 text-green-700 dark:text-green-300 px-2 py-1 rounded flex items-center gap-1">
-                  <CheckCircle size={12} />
-                  Checked Out
-                </span>
-              ) : (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleCheckoutSingleMaterial(item, phase, subphase, idx)
-                  }}
-                  className="text-xs bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white px-3 py-1.5 rounded transition-colors flex items-center gap-1"
-                >
-                  <Package size={12} />
-                  Checkout
-                </button>
-              )}
-            </div>
-
-            {/* Show checkout details if checked out */}
-            {material.checked_out && material.checkout_by_name && (
-              <div className={`text-xs p-2 rounded-lg border ${
-                isDarkMode
-                  ? "bg-green-500/10 border-green-500/30 text-green-300"
-                  : "bg-green-500/10 border-green-500/30 text-green-700"
-              }`}>
-                <div className="flex flex-col gap-1">
-                  {material.checkout_date && (
-                    <div className="flex items-center gap-1">
-                      <Clock size={12} />
-                      <span>
-                        {new Date(material.checkout_date).toLocaleString('en-PH', {
-                          timeZone: 'Asia/Manila',
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1">
-                    <User size={12} />
-                    <span>
-                      By: {material.checkout_by_name}
-                      {material.checkout_by && ` (${material.checkout_by})`}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-
-        {/* Show warning if no employee assigned */}
-        {!subphase.employee_barcode && materialsArray.some(m => !m.checked_out) && (
-          <div className={`text-xs p-2 rounded-lg border ${
-            isDarkMode
-              ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-300"
-              : "bg-yellow-500/10 border-yellow-500/30 text-yellow-700"
-          }`}>
-            <div className="flex items-center gap-1">
-              <AlertTriangle size={12} />
-              <span>No employee assigned - checkout will use current user</span>
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // Fallback to old single-material format
-  if (subphase.material_raw || subphase.material_quantity) {
-    return (
-      <div className="space-y-2 mb-2">
-        <div className="flex flex-wrap gap-2 items-center">
-          {subphase.material_raw && (
-            <span className="text-xs bg-teal-500/20 text-teal-700 dark:text-teal-300 px-2 py-1 rounded flex items-center gap-1">
-              <Package size={12} />
-              Material: {subphase.material_raw}
-            </span>
-          )}
-
-          {subphase.material_quantity && (
-            <span className="text-xs bg-orange-500/20 text-orange-700 dark:text-orange-300 px-2 py-1 rounded flex items-center gap-1">
-              <Package size={12} />
-              Qty: {subphase.material_quantity}
-            </span>
-          )}
-
-          {/* ✅ Checkout Status with User Info */}
-          {subphase.material_checked_out ? (
-            <span className="text-xs bg-green-500/20 text-green-700 dark:text-green-300 px-2 py-1 rounded flex items-center gap-1">
-              <CheckCircle size={12} />
-              Checked Out
-            </span>
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleCheckoutSubphaseMaterials(item, phase, subphase)
-              }}
-              disabled={!subphase.material_raw || !subphase.material_quantity}
-              className="text-xs bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white px-3 py-1.5 rounded transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Package size={12} />
-              Checkout Materials
-            </button>
-          )}
-        </div>
-
-        {/* ✅ Show checkout details if checked out */}
-        {subphase.material_checked_out && (
-          <div className={`text-xs p-2 rounded-lg border ${isDarkMode
-            ? "bg-green-500/10 border-green-500/30 text-green-300"
-            : "bg-green-500/10 border-green-500/30 text-green-700"
-          }`}>
-            <div className="flex flex-col gap-1">
-              {/* Date */}
-              {subphase.material_checkout_date && (
-                <div className="flex items-center gap-1">
-                  <Clock size={12} />
-                  <span>
-                    {new Date(subphase.material_checkout_date).toLocaleString('en-PH', {
-                      timeZone: 'Asia/Manila',
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </span>
-                </div>
-              )}
-
-              {/* User who checked out */}
-              {subphase.material_checkout_by_name && (
-                <div className="flex items-center gap-1">
-                  <User size={12} />
-                  <span>
-                    By: {subphase.material_checkout_by_name}
-                    {subphase.material_checkout_by && ` (${subphase.material_checkout_by})`}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ✅ Show warning if no employee assigned */}
-        {!subphase.material_checked_out && !subphase.employee_barcode && (
-          <div className={`text-xs p-2 rounded-lg border ${isDarkMode
-            ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-300"
-            : "bg-yellow-500/10 border-yellow-500/30 text-yellow-700"
-          }`}>
-            <div className="flex items-center gap-1">
-              <AlertTriangle size={12} />
-              <span>No employee assigned - checkout will use current user</span>
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // No materials at all
-  return null
-})()}
-
-                                                  {/* Quantity Update Modal - Mobile Optimized */}
-                                                  {quantityModalOpen && quantityModalData && (
-                                                    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-                                                      <div
-                                                        className={`rounded-t-2xl sm:rounded-lg w-full sm:max-w-md sm:w-full p-4 sm:p-6 ${isDarkMode ? "bg-gray-800" : "bg-white"
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                        <p
+                                                          className={`font-medium text-sm sm:text-base break-words ${
+                                                            subphase.completed ==
+                                                            1
+                                                              ? "line-through opacity-60"
+                                                              : isDisabled
+                                                              ? "opacity-50"
+                                                              : ""
+                                                          } ${
+                                                            isDarkMode
+                                                              ? "text-gray-200"
+                                                              : "text-gray-800"
                                                           }`}
-                                                      >
-                                                        <h3
-                                                          className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${isDarkMode ? "text-gray-200" : "text-gray-800"
-                                                            }`}
                                                         >
-                                                          <Package size={20} />
-                                                          Update Quantity
-                                                        </h3>
-
-                                                        <div
-                                                          className={`mb-4 p-3 rounded-lg space-y-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-100"
-                                                            }`}
+                                                          {subphase.name}
+                                                        </p>
+                                                        <button
+                                                          onClick={() => {
+                                                            setSelectedItemForEdit(
+                                                              item
+                                                            );
+                                                            setSelectedPhaseForEdit(
+                                                              phase
+                                                            );
+                                                            setSelectedSubphaseForEdit(
+                                                              subphase
+                                                            );
+                                                            setShowEditSubphaseModal(
+                                                              true
+                                                            );
+                                                          }}
+                                                          className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 active:bg-blue-500/20 rounded transition-colors shrink-0"
+                                                          title="Edit"
                                                         >
-                                                          <div>
-                                                            <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                                                              Item:
-                                                            </p>
-                                                            <p className={`font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                                                              {quantityModalData.item.name}
-                                                            </p>
-                                                          </div>
-                                                          <div>
-                                                            <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                                                              Phase / Subphase:
-                                                            </p>
-                                                            <p className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                                                              {quantityModalData.phase.name} → {quantityModalData.subphase.name}
-                                                            </p>
-                                                          </div>
-                                                          <div>
-                                                            <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                                                              Expected:
-                                                            </p>
-                                                            <p className={`font-bold ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
-                                                              {quantityModalData.subphase.expected_quantity}
-                                                            </p>
-                                                          </div>
-                                                        </div>
-
-                                                        <div className="mb-4">
-                                                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                            Completed Quantity
-                                                          </label>
-                                                          <input
-                                                            type="number"
-                                                            min="0"
-                                                            max={quantityModalData.subphase.expected_quantity}
-                                                            value={tempQuantity}
-                                                            onChange={(e) => setTempQuantity(e.target.value)}
-                                                            onKeyPress={(e) => e.key === "Enter" && handleUpdateCompletedQuantity()}
-                                                            autoFocus
-                                                            className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${isDarkMode
-                                                              ? "bg-gray-700 border-gray-600 text-gray-200"
-                                                              : "bg-gray-100 border-gray-300 text-gray-800"
-                                                              }`}
-                                                          />
-                                                        </div>
-
-                                                        <div className="flex flex-col sm:flex-row gap-3">
-                                                          <button
-                                                            onClick={handleUpdateCompletedQuantity}
-                                                            className="flex-1 bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
-                                                          >
-                                                            Update
-                                                          </button>
-                                                          <button
-                                                            onClick={() => {
-                                                              setQuantityModalOpen(false)
-                                                              setQuantityModalData(null)
-                                                              setTempQuantity("")
-                                                            }}
-                                                            className="flex-1 bg-gray-500 hover:bg-gray-600 active:bg-gray-700 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
-                                                          >
-                                                            Cancel
-                                                          </button>
-                                                        </div>
+                                                          <Edit2 size={14} />
+                                                        </button>
                                                       </div>
+                                                      {subphase.completed ==
+                                                        1 && (
+                                                        <CheckCircle
+                                                          size={18}
+                                                          className="text-green-500 shrink-0"
+                                                        />
+                                                      )}
                                                     </div>
-                                                  )}
 
-                                                  {/* Employee Badge */}
-                                                  {subphase.employee_barcode && (
-                                                    <div
-                                                      className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 mb-2 ${isDarkMode ? "bg-slate-500/20 text-slate-300" : "bg-slate-500/20 text-slate-700"
+                                                    {/* Condition Warning */}
+                                                    {isDisabled && (
+                                                      <div
+                                                        className={`mb-2 p-2 rounded text-xs ${
+                                                          isDarkMode
+                                                            ? "text-yellow-400 bg-yellow-500/10 border border-yellow-500/30"
+                                                            : "text-yellow-700 bg-yellow-500/10 border border-yellow-500/30"
                                                         }`}
-                                                    >
-                                                      <User size={12} />
-                                                      {subphase.employee_name || "Unknown"} ({subphase.employee_barcode})
-                                                    </div>
-                                                  )}
+                                                      >
+                                                        {!subphase.employee_barcode ? (
+                                                          <>
+                                                            ⚠️ Assign employee
+                                                            first
+                                                          </>
+                                                        ) : subphaseIndex > 0 &&
+                                                          !isPreviousSubphaseCompleted(
+                                                            item,
+                                                            phase,
+                                                            subphaseIndex
+                                                          ) ? (
+                                                          <>
+                                                            ⚠️ Complete previous
+                                                            first
+                                                          </>
+                                                        ) : subphase.expected_quantity >
+                                                            0 &&
+                                                          (subphase.current_completed_quantity ||
+                                                            0) <
+                                                            subphase.expected_quantity ? (
+                                                          <>
+                                                            ⚠️ Need{" "}
+                                                            {
+                                                              subphase.expected_quantity
+                                                            }{" "}
+                                                            units (have:{" "}
+                                                            {subphase.current_completed_quantity ||
+                                                              0}
+                                                            )
+                                                          </>
+                                                        ) : !phase.start_time ? (
+                                                          <>
+                                                            ⚠️ Start phase first
+                                                          </>
+                                                        ) : phase.pause_time ? (
+                                                          <>⚠️ Phase paused</>
+                                                        ) : phase.end_time ? (
+                                                          <>
+                                                            ⚠️ Phase completed
+                                                          </>
+                                                        ) : (
+                                                          <>
+                                                            ⚠️ Conditions not
+                                                            met
+                                                          </>
+                                                        )}
+                                                      </div>
+                                                    )}
 
-                                                  {/* Assign Employee Button - Full Width on Mobile */}
-                                                  <button
-                                                    onClick={() => handleBarcodeScan(item.part_number, phase.id, subphase.id)}
-                                                    className="w-full px-3 py-2.5 text-sm bg-slate-600 hover:bg-slate-700 active:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded transition-colors flex items-center justify-center gap-2 mt-2"
-                                                  >
-                                                    <User size={14} />
-                                                    Assign Employee
-                                                  </button>
-
-                                                  {/* Completion Time */}
-                                                  {subphase.completed_at && (
-                                                    <div className={`text-xs mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                                                      <p className="flex items-center gap-1">
-                                                        <CheckCircle size={12} />
-                                                        {new Date(subphase.completed_at).toLocaleString()}
+                                                    {/* Time Duration */}
+                                                    {subphase.time_duration >
+                                                      0 && (
+                                                      <p
+                                                        className={`text-xs sm:text-sm ${
+                                                          isDarkMode
+                                                            ? "text-gray-400"
+                                                            : "text-gray-600"
+                                                        } italic flex items-center gap-1 mb-2`}
+                                                      >
+                                                        <Clock size={12} />
+                                                        {formatDuration(
+                                                          subphase.time_duration /
+                                                            60
+                                                        )}{" "}
+                                                        {/* Convert seconds to minutes */}
                                                       </p>
+                                                    )}
+
+                                                    {/* Expected Duration & Quantity */}
+                                                    <div className="flex flex-wrap gap-2 items-center mb-2">
+                                                      <span className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded flex items-center gap-1">
+                                                        <Clock size={12} />
+                                                        {formatDuration(
+                                                          subphase.expected_duration
+                                                        )}{" "}
+                                                        {/* Convert seconds to minutes */}
+                                                      </span>
+
+                                                      {/* Quantity Tracking */}
+                                                      {subphase.expected_quantity !==
+                                                        undefined &&
+                                                        subphase.expected_quantity !==
+                                                          null &&
+                                                        subphase.expected_quantity >
+                                                          0 && (
+                                                          <>
+                                                            <span className="text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 px-2 py-1 rounded flex items-center gap-1">
+                                                              <Package
+                                                                size={12}
+                                                              />
+                                                              {subphase.current_completed_quantity ||
+                                                                0}{" "}
+                                                              /{" "}
+                                                              {
+                                                                subphase.expected_quantity
+                                                              }
+                                                            </span>
+                                                            <button
+                                                              onClick={() =>
+                                                                openQuantityModal(
+                                                                  item,
+                                                                  phase,
+                                                                  subphase
+                                                                )
+                                                              }
+                                                              className="text-xs bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white px-3 py-1.5 rounded transition-colors"
+                                                            >
+                                                              Update
+                                                            </button>
+                                                            <button
+                                                              onClick={() =>
+                                                                openTransferModal(
+                                                                  item,
+                                                                  phase,
+                                                                  subphase
+                                                                )
+                                                              }
+                                                              className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-3 py-1.5 rounded transition-colors"
+                                                            >
+                                                              <ArrowRightLeft
+                                                                size={12}
+                                                              />
+                                                              Transfer
+                                                            </button>
+                                                          </>
+                                                        )}
                                                     </div>
-                                                  )}
+
+                                                    {/* ✅ Enhanced Materials Display - Check multiple sources */}
+                                                    {(() => {
+                                                      // ✅ Try to get materials from multiple sources
+                                                      let materialsArray = [];
+
+                                                      // Source 1: Loaded materials
+                                                      if (
+                                                        subphase.materials &&
+                                                        Array.isArray(
+                                                          subphase.materials
+                                                        )
+                                                      ) {
+                                                        materialsArray =
+                                                          subphase.materials;
+                                                      }
+                                                      // Source 2: Parsed from database (fallback)
+                                                      else if (
+                                                        subphase.material_raw &&
+                                                        subphase.material_quantity
+                                                      ) {
+                                                        materialsArray = [
+                                                          {
+                                                            name: subphase.material_raw,
+                                                            quantity:
+                                                              parseFloat(
+                                                                subphase.material_quantity
+                                                              ) || 0,
+                                                            unit: "pcs",
+                                                            checked_out:
+                                                              subphase.material_checked_out ||
+                                                              false,
+                                                            checkout_date:
+                                                              subphase.material_checkout_date ||
+                                                              null,
+                                                            checkout_by:
+                                                              subphase.material_checkout_by ||
+                                                              null,
+                                                            checkout_by_name:
+                                                              subphase.material_checkout_by_name ||
+                                                              null,
+                                                            checkout_by_uid:
+                                                              subphase.material_checkout_by_uid ||
+                                                              null,
+                                                          },
+                                                        ];
+                                                      }
+
+                                                      console.log(
+                                                        `🔍 Materials for ${subphase.name}:`,
+                                                        materialsArray.length
+                                                      ); // Debug log
+
+                                                      if (
+                                                        materialsArray.length >
+                                                        0
+                                                      ) {
+                                                        return (
+                                                          <div className="space-y-2 mb-2">
+                                                            <div className="flex items-center justify-between">
+                                                              <div className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                                                                Required
+                                                                Materials (
+                                                                {
+                                                                  materialsArray.length
+                                                                }
+                                                                ):
+                                                              </div>
+                                                              {/* Checkout button */}
+                                                              {materialsArray.some(
+                                                                (m) =>
+                                                                  !m.is_checked_out &&
+                                                                  !m.checked_out
+                                                              ) && (
+                                                                <button
+                                                                  onClick={() =>
+                                                                    handleCheckoutSubphaseMaterials(
+                                                                      item,
+                                                                      phase,
+                                                                      subphase
+                                                                    )
+                                                                  }
+                                                                  className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded"
+                                                                >
+                                                                  <Package
+                                                                    size={12}
+                                                                  />
+                                                                  Checkout All
+                                                                </button>
+                                                              )}
+                                                            </div>
+
+                                                            {materialsArray.map(
+                                                              (
+                                                                material,
+                                                                idx
+                                                              ) => (
+                                                                <div
+                                                                  key={
+                                                                    material.id ||
+                                                                    idx
+                                                                  }
+                                                                  className="space-y-2"
+                                                                >
+                                                                  {/* Material Header */}
+                                                                  <div
+                                                                    className={`flex items-center justify-between p-2 rounded ${
+                                                                      isDarkMode
+                                                                        ? "bg-blue-500/10 border border-blue-500/30"
+                                                                        : "bg-blue-500/10 border border-blue-500/30"
+                                                                    }`}
+                                                                  >
+                                                                    <div className="flex items-center gap-2">
+                                                                      <Package
+                                                                        size={
+                                                                          12
+                                                                        }
+                                                                        className="text-blue-500"
+                                                                      />
+                                                                      <div>
+                                                                        <div className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                                                          {
+                                                                            material.material_name
+                                                                          }
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                                                                          {
+                                                                            material.material_quantity
+                                                                          }{" "}
+                                                                          {material.unit_of_measure ||
+                                                                            "pcs"}
+                                                                        </div>
+                                                                      </div>
+                                                                    </div>
+
+                                                                    {/* Checkout Status Badge */}
+                                                                    {material.is_checked_out ? (
+                                                                      <div
+                                                                        className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
+                                                                          isDarkMode
+                                                                            ? "bg-green-500/20 text-green-300 border border-green-500/30"
+                                                                            : "bg-green-500/20 text-green-700 border border-green-500/30"
+                                                                        }`}
+                                                                      >
+                                                                        <CheckCircle
+                                                                          size={
+                                                                            12
+                                                                          }
+                                                                        />
+                                                                        Checked
+                                                                        Out
+                                                                      </div>
+                                                                    ) : (
+                                                                      <div
+                                                                        className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
+                                                                          isDarkMode
+                                                                            ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
+                                                                            : "bg-yellow-500/20 text-yellow-700 border border-yellow-500/30"
+                                                                        }`}
+                                                                      >
+                                                                        <Clock
+                                                                          size={
+                                                                            12
+                                                                          }
+                                                                        />
+                                                                        Pending
+                                                                      </div>
+                                                                    )}
+                                                                  </div>
+
+                                                                  {/* Checkout Details */}
+                                                                  {material.is_checked_out &&
+                                                                    material.checked_out_by_name && (
+                                                                      <div
+                                                                        className={`ml-4 p-2 rounded text-xs ${
+                                                                          isDarkMode
+                                                                            ? "bg-gray-700/50 border border-gray-600/30"
+                                                                            : "bg-gray-100/80 border border-gray-300/30"
+                                                                        }`}
+                                                                      >
+                                                                        <div className="flex items-center gap-1 mb-1">
+                                                                          <User
+                                                                            size={
+                                                                              10
+                                                                            }
+                                                                          />
+                                                                          <strong>
+                                                                            Checked
+                                                                            out
+                                                                            by:
+                                                                          </strong>
+                                                                        </div>
+                                                                        <div className="pl-3">
+                                                                          <div className="text-gray-700 dark:text-gray-300">
+                                                                            {
+                                                                              material.checked_out_by_name
+                                                                            }
+                                                                          </div>
+                                                                          {material.checked_out_by && (
+                                                                            <div className="text-gray-600 dark:text-gray-400">
+                                                                              ID:{" "}
+                                                                              {
+                                                                                material.checked_out_by
+                                                                              }
+                                                                            </div>
+                                                                          )}
+                                                                          {material.checkout_date && (
+                                                                            <div className="text-gray-600 dark:text-gray-400">
+                                                                              {new Date(
+                                                                                material.checkout_date
+                                                                              ).toLocaleString()}
+                                                                            </div>
+                                                                          )}
+                                                                        </div>
+                                                                      </div>
+                                                                    )}
+                                                                </div>
+                                                              )
+                                                            )}
+                                                          </div>
+                                                        );
+                                                      }
+
+                                                      return null;
+                                                    })()}
+
+                                                    {/* Quantity Update Modal - Mobile Optimized */}
+                                                    {quantityModalOpen &&
+                                                      quantityModalData && (
+                                                        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+                                                          <div
+                                                            className={`rounded-t-2xl sm:rounded-lg w-full sm:max-w-md sm:w-full p-4 sm:p-6 ${
+                                                              isDarkMode
+                                                                ? "bg-gray-800"
+                                                                : "bg-white"
+                                                            }`}
+                                                          >
+                                                            <h3
+                                                              className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${
+                                                                isDarkMode
+                                                                  ? "text-gray-200"
+                                                                  : "text-gray-800"
+                                                              }`}
+                                                            >
+                                                              <Package
+                                                                size={20}
+                                                              />
+                                                              Update Quantity
+                                                            </h3>
+
+                                                            <div
+                                                              className={`mb-4 p-3 rounded-lg space-y-2 ${
+                                                                isDarkMode
+                                                                  ? "bg-gray-700"
+                                                                  : "bg-gray-100"
+                                                              }`}
+                                                            >
+                                                              <div>
+                                                                <p
+                                                                  className={`text-sm ${
+                                                                    isDarkMode
+                                                                      ? "text-gray-400"
+                                                                      : "text-gray-600"
+                                                                  }`}
+                                                                >
+                                                                  Item:
+                                                                </p>
+                                                                <p
+                                                                  className={`font-semibold ${
+                                                                    isDarkMode
+                                                                      ? "text-gray-200"
+                                                                      : "text-gray-800"
+                                                                  }`}
+                                                                >
+                                                                  {
+                                                                    quantityModalData
+                                                                      .item.name
+                                                                  }
+                                                                </p>
+                                                              </div>
+                                                              <div>
+                                                                <p
+                                                                  className={`text-sm ${
+                                                                    isDarkMode
+                                                                      ? "text-gray-400"
+                                                                      : "text-gray-600"
+                                                                  }`}
+                                                                >
+                                                                  Phase /
+                                                                  Subphase:
+                                                                </p>
+                                                                <p
+                                                                  className={`font-medium ${
+                                                                    isDarkMode
+                                                                      ? "text-gray-200"
+                                                                      : "text-gray-800"
+                                                                  }`}
+                                                                >
+                                                                  {
+                                                                    quantityModalData
+                                                                      .phase
+                                                                      .name
+                                                                  }{" "}
+                                                                  →{" "}
+                                                                  {
+                                                                    quantityModalData
+                                                                      .subphase
+                                                                      .name
+                                                                  }
+                                                                </p>
+                                                              </div>
+                                                              <div>
+                                                                <p
+                                                                  className={`text-sm ${
+                                                                    isDarkMode
+                                                                      ? "text-gray-400"
+                                                                      : "text-gray-600"
+                                                                  }`}
+                                                                >
+                                                                  Expected:
+                                                                </p>
+                                                                <p
+                                                                  className={`font-bold ${
+                                                                    isDarkMode
+                                                                      ? "text-blue-400"
+                                                                      : "text-blue-600"
+                                                                  }`}
+                                                                >
+                                                                  {
+                                                                    quantityModalData
+                                                                      .subphase
+                                                                      .expected_quantity
+                                                                  }
+                                                                </p>
+                                                              </div>
+                                                            </div>
+
+                                                            <div className="mb-4">
+                                                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                                Completed
+                                                                Quantity
+                                                              </label>
+                                                              <input
+                                                                type="number"
+                                                                min="0"
+                                                                max={
+                                                                  quantityModalData
+                                                                    .subphase
+                                                                    .expected_quantity
+                                                                }
+                                                                value={
+                                                                  tempQuantity
+                                                                }
+                                                                onChange={(e) =>
+                                                                  setTempQuantity(
+                                                                    e.target
+                                                                      .value
+                                                                  )
+                                                                }
+                                                                onKeyPress={(
+                                                                  e
+                                                                ) =>
+                                                                  e.key ===
+                                                                    "Enter" &&
+                                                                  handleUpdateCompletedQuantity()
+                                                                }
+                                                                autoFocus
+                                                                className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
+                                                                  isDarkMode
+                                                                    ? "bg-gray-700 border-gray-600 text-gray-200"
+                                                                    : "bg-gray-100 border-gray-300 text-gray-800"
+                                                                }`}
+                                                              />
+                                                            </div>
+
+                                                            <div className="flex flex-col sm:flex-row gap-3">
+                                                              <button
+                                                                onClick={
+                                                                  handleUpdateCompletedQuantity
+                                                                }
+                                                                className="flex-1 bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
+                                                              >
+                                                                Update
+                                                              </button>
+                                                              <button
+                                                                onClick={() => {
+                                                                  setQuantityModalOpen(
+                                                                    false
+                                                                  );
+                                                                  setQuantityModalData(
+                                                                    null
+                                                                  );
+                                                                  setTempQuantity(
+                                                                    ""
+                                                                  );
+                                                                }}
+                                                                className="flex-1 bg-gray-500 hover:bg-gray-600 active:bg-gray-700 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
+                                                              >
+                                                                Cancel
+                                                              </button>
+                                                            </div>
+                                                          </div>
+                                                        </div>
+                                                      )}
+
+                                                    {/* Employee Badge */}
+                                                    {subphase.employee_barcode && (
+                                                      <div
+                                                        className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 mb-2 ${
+                                                          isDarkMode
+                                                            ? "bg-slate-500/20 text-slate-300"
+                                                            : "bg-slate-500/20 text-slate-700"
+                                                        }`}
+                                                      >
+                                                        <User size={12} />
+                                                        {subphase.employee_name ||
+                                                          "Unknown"}{" "}
+                                                        (
+                                                        {
+                                                          subphase.employee_barcode
+                                                        }
+                                                        )
+                                                      </div>
+                                                    )}
+
+                                                    {/* Assign Employee Button - Full Width on Mobile */}
+                                                    <button
+                                                      onClick={() =>
+                                                        handleBarcodeScan(
+                                                          item.part_number,
+                                                          phase.id,
+                                                          subphase.id
+                                                        )
+                                                      }
+                                                      className="w-full px-3 py-2.5 text-sm bg-slate-600 hover:bg-slate-700 active:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded transition-colors flex items-center justify-center gap-2 mt-2"
+                                                    >
+                                                      <User size={14} />
+                                                      Assign Employee
+                                                    </button>
+
+                                                    {/* Completion Time */}
+                                                    {subphase.completed_at && (
+                                                      <div
+                                                        className={`text-xs mt-2 ${
+                                                          isDarkMode
+                                                            ? "text-gray-400"
+                                                            : "text-gray-600"
+                                                        }`}
+                                                      >
+                                                        <p className="flex items-center gap-1">
+                                                          <CheckCircle
+                                                            size={12}
+                                                          />
+                                                          {new Date(
+                                                            subphase.completed_at
+                                                          ).toLocaleString()}
+                                                        </p>
+                                                      </div>
+                                                    )}
+                                                  </div>
                                                 </div>
                                               </div>
-                                            </div>
-                                          )
-                                        })
+                                            );
+                                          }
+                                        )
                                       ) : (
-                                        <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"} py-2`}>
+                                        <p
+                                          className={`text-sm ${
+                                            isDarkMode
+                                              ? "text-gray-400"
+                                              : "text-gray-600"
+                                          } py-2`}
+                                        >
                                           No sub-phases yet.
                                         </p>
                                       )}
                                     </div>
                                   )}
                                 </div>
-                              )
+                              );
                             })
                           ) : (
-                            <p className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""} py-4`}>
+                            <p
+                              className={`text-gray-600 ${
+                                isDarkMode ? "dark:text-gray-400" : ""
+                              } py-4`}
+                            >
                               No phases added yet.
                             </p>
                           )}
                         </div>
                       )}
                     </div>
-                  )
+                  );
                 })}
               </div>
             </div>
@@ -2698,44 +3593,59 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
           {completedItems.length > 0 && (
             <div>
               <h3
-                className={`text-xl sm:text-2xl font-bold mb-3 sm:mb-4 flex items-center gap-2 ${isDarkMode ? "text-green-300" : "text-green-700"
-                  }`}
+                className={`text-xl sm:text-2xl font-bold mb-3 sm:mb-4 flex items-center gap-2 ${
+                  isDarkMode ? "text-green-300" : "text-green-700"
+                }`}
               >
                 <CheckCircle size={20} />
                 Completed ({completedItems.length})
               </h3>
               <div className="space-y-3 sm:space-y-4 opacity-75">
                 {completedItems.map((item) => {
-                  const itemKey = item.part_number || item.id
-                  const elapsedSeconds = getItemElapsedTime(item)
+                  const itemKey = item.part_number || item.id;
+                  const elapsedSeconds = getItemElapsedTime(item);
 
                   return (
                     <div
                       key={itemKey}
-                      className={`backdrop-blur-md rounded-lg border overflow-hidden transition-all shadow-sm ${isDarkMode
-                        ? "bg-green-500/10 border-green-500/30"
-                        : "bg-gradient-to-r from-green-500/10 to-green-400/10 border-green-500/30"
-                        }`}
+                      className={`backdrop-blur-md rounded-lg border overflow-hidden transition-all shadow-sm ${
+                        isDarkMode
+                          ? "bg-green-500/10 border-green-500/30"
+                          : "bg-gradient-to-r from-green-500/10 to-green-400/10 border-green-500/30"
+                      }`}
                     >
                       <div className="p-3 sm:p-4">
                         <div className="flex items-start gap-3 mb-3">
                           <button
-                            onClick={() => toggleItemExpansion(item.part_number)}
+                            onClick={() =>
+                              toggleItemExpansion(item.part_number)
+                            }
                             className="shrink-0 p-1 hover:bg-gray-200/20 active:bg-gray-200/30 rounded transition-colors"
                           >
-                            <span className="text-xl">{expandedItems[item.part_number] ? "▼" : "▶"}</span>
+                            <span className="text-xl">
+                              {expandedItems[item.part_number] ? "▼" : "▶"}
+                            </span>
                           </button>
 
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <h3 className={`font-semibold text-base sm:text-lg lg:text-xl ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                              <h3
+                                className={`font-semibold text-base sm:text-lg lg:text-xl ${
+                                  isDarkMode ? "text-gray-200" : "text-gray-800"
+                                }`}
+                              >
                                 {item.name}
                               </h3>
-                              <CheckCircle size={16} className="text-green-500" />
+                              <CheckCircle
+                                size={16}
+                                className="text-green-500"
+                              />
                               {item.client_name && (
                                 <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500">
                                   <User size={12} />
-                                  <span className="max-w-[150px] sm:max-w-none truncate">{item.client_name}</span>
+                                  <span className="max-w-[150px] sm:max-w-none truncate">
+                                    {item.client_name}
+                                  </span>
                                 </div>
                               )}
                               {item.quantity && item.quantity > 1 && (
@@ -2745,13 +3655,27 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                                 </div>
                               )}
                             </div>
-                            <p className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                              Part #: {item.part_number} • {item.phases?.length || 0} phases
+                            <p
+                              className={`text-xs sm:text-sm ${
+                                isDarkMode ? "text-gray-400" : "text-gray-600"
+                              }`}
+                            >
+                              Part #: {item.part_number} •{" "}
+                              {item.phases?.length || 0} phases
                             </p>
                             {item.remarks && (
-                              <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"} mt-1 italic flex items-start gap-1`}>
-                                <FileText size={12} className="mt-0.5 shrink-0" />
-                                <span className="line-clamp-2">{item.remarks}</span>
+                              <p
+                                className={`text-xs ${
+                                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                                } mt-1 italic flex items-start gap-1`}
+                              >
+                                <FileText
+                                  size={12}
+                                  className="mt-0.5 shrink-0"
+                                />
+                                <span className="line-clamp-2">
+                                  {item.remarks}
+                                </span>
                               </p>
                             )}
                           </div>
@@ -2759,36 +3683,58 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                           <div className="flex items-center gap-2 shrink-0">
                             <button
                               onClick={(e) => {
-                                e.stopPropagation()
+                                e.stopPropagation();
                                 if (!expandedItems[item.part_number]) {
-                                  toggleItemExpansion(item.part_number)
+                                  toggleItemExpansion(item.part_number);
                                 }
-                                alert("Please expand phases below and select a specific subphase to transfer from")
+                                alert(
+                                  "Please expand phases below and select a specific subphase to transfer from"
+                                );
                               }}
                               className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 active:bg-blue-500/20 rounded transition-colors"
                               title="Transfer"
                             >
                               <ArrowRightLeft size={16} />
                             </button>
-                            <span className={`text-lg font-bold ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
+                            <span
+                              className={`text-lg font-bold ${
+                                isDarkMode ? "text-green-400" : "text-green-600"
+                              }`}
+                            >
                               100%
                             </span>
                           </div>
                         </div>
 
                         {item.start_time && (
-                          <div className={`rounded-lg p-3 ${isDarkMode ? "bg-green-500/20" : "bg-green-500/10"}`}>
+                          <div
+                            className={`rounded-lg p-3 ${
+                              isDarkMode ? "bg-green-500/20" : "bg-green-500/10"
+                            }`}
+                          >
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
                               <span
-                                className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? "text-green-300" : "text-green-700"
-                                  }`}
+                                className={`text-sm font-semibold flex items-center gap-2 ${
+                                  isDarkMode
+                                    ? "text-green-300"
+                                    : "text-green-700"
+                                }`}
                               >
                                 <CheckCircle size={16} />
                                 Completed
                               </span>
                               <div className="flex items-center gap-2">
-                                <Clock size={16} className="text-green-600 dark:text-green-400" />
-                                <span className={`text-lg font-mono font-bold ${isDarkMode ? "text-green-400" : "text-green-700"}`}>
+                                <Clock
+                                  size={16}
+                                  className="text-green-600 dark:text-green-400"
+                                />
+                                <span
+                                  className={`text-lg font-mono font-bold ${
+                                    isDarkMode
+                                      ? "text-green-400"
+                                      : "text-green-700"
+                                  }`}
+                                >
                                   {formatTime(elapsedSeconds)}
                                 </span>
                               </div>
@@ -2796,14 +3742,42 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
 
                             <div className="space-y-1 text-xs">
                               <div className="flex justify-between">
-                                <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Started:</span>
-                                <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                <span
+                                  className={
+                                    isDarkMode
+                                      ? "text-gray-400"
+                                      : "text-gray-600"
+                                  }
+                                >
+                                  Started:
+                                </span>
+                                <span
+                                  className={`font-medium ${
+                                    isDarkMode
+                                      ? "text-gray-200"
+                                      : "text-gray-800"
+                                  }`}
+                                >
                                   {formatDateTime(item.start_time)}
                                 </span>
                               </div>
                               <div className="flex justify-between">
-                                <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Completed:</span>
-                                <span className={`font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                <span
+                                  className={
+                                    isDarkMode
+                                      ? "text-gray-400"
+                                      : "text-gray-600"
+                                  }
+                                >
+                                  Completed:
+                                </span>
+                                <span
+                                  className={`font-medium ${
+                                    isDarkMode
+                                      ? "text-gray-200"
+                                      : "text-gray-800"
+                                  }`}
+                                >
                                   {formatDateTime(item.end_time)}
                                 </span>
                               </div>
@@ -2817,174 +3791,323 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                         <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-3">
                           {item.phases && item.phases.length > 0 ? (
                             item.phases.map((phase) => {
-                              const phaseKey = phase.id
+                              const phaseKey = phase.id;
 
                               return (
                                 <div
                                   key={phaseKey}
-                                  className={`rounded-lg border ${isDarkMode ? "border-gray-700/10" : "border-gray-300/10"}`}
+                                  className={`rounded-lg border ${
+                                    isDarkMode
+                                      ? "border-gray-700/10"
+                                      : "border-gray-300/10"
+                                  }`}
                                 >
                                   <div className="p-3">
                                     <div className="flex items-start gap-2 mb-2">
                                       <button
-                                        onClick={() => togglePhaseExpansion(phase.id)}
+                                        onClick={() =>
+                                          togglePhaseExpansion(phase.id)
+                                        }
                                         className="shrink-0 p-1 hover:bg-gray-200/20 active:bg-gray-200/30 rounded transition-colors"
                                       >
-                                        <span className="text-base">{expandedPhases[phase.id] ? "▼" : "▶"}</span>
+                                        <span className="text-base">
+                                          {expandedPhases[phase.id] ? "▼" : "▶"}
+                                        </span>
                                       </button>
-                                      <span className={`font-medium text-base flex-1 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                                      <span
+                                        className={`font-medium text-base flex-1 ${
+                                          isDarkMode
+                                            ? "text-gray-200"
+                                            : "text-gray-800"
+                                        }`}
+                                      >
                                         {phase.name}
                                       </span>
-                                      <span className={`text-sm font-semibold ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
+                                      <span
+                                        className={`text-sm font-semibold ${
+                                          isDarkMode
+                                            ? "text-green-400"
+                                            : "text-green-600"
+                                        }`}
+                                      >
                                         100%
                                       </span>
                                     </div>
 
                                     {/* Completed Phase Subphases */}
-                                    {expandedPhases[phase.id] && phase.subphases && phase.subphases.length > 0 && (
-                                      <div className="mt-3 space-y-2 pl-4 border-l-2 dark:border-gray-700/20 border-gray-300/20">
-                                        {phase.subphases.map((subphase) => (
-                                          <div key={subphase.id} className={`p-3 rounded-lg ${isDarkMode ? "bg-black/10" : "bg-white/5"}`}>
-                                            <div className="flex items-start justify-between gap-2">
-                                              <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                  <CheckCircle size={14} className="text-green-500 shrink-0" />
-                                                  <span className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                                                    {subphase.name}
-                                                  </span>
-                                                </div>
-
-                                                {/* Quantity info */}
-                                                {subphase.expected_quantity > 0 && (
-                                                  <div className="flex flex-wrap gap-2 items-center mb-2">
+                                    {expandedPhases[phase.id] &&
+                                      phase.subphases &&
+                                      phase.subphases.length > 0 && (
+                                        <div className="mt-3 space-y-2 pl-4 border-l-2 dark:border-gray-700/20 border-gray-300/20">
+                                          {phase.subphases.map((subphase) => (
+                                            <div
+                                              key={subphase.id}
+                                              className={`p-3 rounded-lg ${
+                                                isDarkMode
+                                                  ? "bg-black/10"
+                                                  : "bg-white/5"
+                                              }`}
+                                            >
+                                              <div className="flex items-start justify-between gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                  <div className="flex items-center gap-2 mb-2">
+                                                    <CheckCircle
+                                                      size={14}
+                                                      className="text-green-500 shrink-0"
+                                                    />
                                                     <span
-                                                      className={`text-xs bg-purple-500/20 ${isDarkMode ? "text-purple-300" : "text-purple-800"
-                                                        } px-2 py-1 rounded flex items-center gap-1`}
+                                                      className={`text-sm font-medium ${
+                                                        isDarkMode
+                                                          ? "text-gray-200"
+                                                          : "text-gray-800"
+                                                      }`}
                                                     >
-                                                      <Package size={12} />
-                                                      {subphase.current_completed_quantity || 0} / {subphase.expected_quantity}
+                                                      {subphase.name}
                                                     </span>
                                                   </div>
-                                                )}
 
-                                                {/* Employee info */}
-                                                {subphase.employee_barcode && (
-                                                  <div
-                                                    className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 mb-2 ${isDarkMode ? "bg-slate-500/20 text-slate-300" : "bg-slate-500/20 text-slate-700"
+                                                  {/* Quantity info */}
+                                                  {subphase.expected_quantity >
+                                                    0 && (
+                                                    <div className="flex flex-wrap gap-2 items-center mb-2">
+                                                      <span
+                                                        className={`text-xs bg-purple-500/20 ${
+                                                          isDarkMode
+                                                            ? "text-purple-300"
+                                                            : "text-purple-800"
+                                                        } px-2 py-1 rounded flex items-center gap-1`}
+                                                      >
+                                                        <Package size={12} />
+                                                        {subphase.current_completed_quantity ||
+                                                          0}{" "}
+                                                        /{" "}
+                                                        {
+                                                          subphase.expected_quantity
+                                                        }
+                                                      </span>
+                                                    </div>
+                                                  )}
+
+                                                  {/* Employee info */}
+                                                  {subphase.employee_barcode && (
+                                                    <div
+                                                      className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 mb-2 ${
+                                                        isDarkMode
+                                                          ? "bg-slate-500/20 text-slate-300"
+                                                          : "bg-slate-500/20 text-slate-700"
                                                       }`}
-                                                  >
-                                                    <User size={12} />
-                                                    {subphase.employee_name || "Unknown"} ({subphase.employee_barcode})
-                                                  </div>
-                                                )}
+                                                    >
+                                                      <User size={12} />
+                                                      {subphase.employee_name ||
+                                                        "Unknown"}{" "}
+                                                      (
+                                                      {
+                                                        subphase.employee_barcode
+                                                      }
+                                                      )
+                                                    </div>
+                                                  )}
 
-                                                {/* Completion time */}
-                                                {subphase.completed_at && (
-                                                  <div className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                                                    <p className="flex items-center gap-1">
-                                                      <CheckCircle size={12} />
-                                                      {new Date(subphase.completed_at).toLocaleString()}
-                                                    </p>
-                                                  </div>
-                                                )}
+                                                  {/* Completion time */}
+                                                  {subphase.completed_at && (
+                                                    <div
+                                                      className={`text-xs ${
+                                                        isDarkMode
+                                                          ? "text-gray-400"
+                                                          : "text-gray-600"
+                                                      }`}
+                                                    >
+                                                      <p className="flex items-center gap-1">
+                                                        <CheckCircle
+                                                          size={12}
+                                                        />
+                                                        {new Date(
+                                                          subphase.completed_at
+                                                        ).toLocaleString()}
+                                                      </p>
+                                                    </div>
+                                                  )}
+                                                </div>
                                               </div>
                                             </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
+                                          ))}
+                                        </div>
+                                      )}
 
                                     {/* Duration Analysis */}
-                                    {item.expected_completion_hours && item.actual_completion_hours && (
-                                      <div
-                                        className={`mt-3 p-3 rounded-lg border ${isDarkMode ? "bg-purple-500/10 border-purple-500/30" : "bg-purple-500/10 border-purple-500/30"
+                                    {item.expected_completion_hours &&
+                                      item.actual_completion_hours && (
+                                        <div
+                                          className={`mt-3 p-3 rounded-lg border ${
+                                            isDarkMode
+                                              ? "bg-purple-500/10 border-purple-500/30"
+                                              : "bg-purple-500/10 border-purple-500/30"
                                           }`}
-                                      >
-                                        <div className="flex items-center justify-between mb-2">
-                                          <span
-                                            className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? "text-purple-300" : "text-purple-700"
+                                        >
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span
+                                              className={`text-sm font-semibold flex items-center gap-2 ${
+                                                isDarkMode
+                                                  ? "text-purple-300"
+                                                  : "text-purple-700"
                                               }`}
-                                          >
-                                            <Clock size={14} />
-                                            Analysis
-                                          </span>
-                                          <span
-                                            className={`text-xs px-2 py-1 rounded font-bold ${item.actual_completion_hours > item.expected_completion_hours
-                                              ? "bg-red-500/20 text-red-700 dark:text-red-300"
-                                              : "bg-green-500/20 text-green-700 dark:text-green-300"
+                                            >
+                                              <Clock size={14} />
+                                              Analysis
+                                            </span>
+                                            <span
+                                              className={`text-xs px-2 py-1 rounded font-bold ${
+                                                item.actual_completion_hours >
+                                                item.expected_completion_hours
+                                                  ? "bg-red-500/20 text-red-700 dark:text-red-300"
+                                                  : "bg-green-500/20 text-green-700 dark:text-green-300"
                                               }`}
-                                          >
-                                            {item.actual_completion_hours > item.expected_completion_hours ? "Over" : "Under"} by{" "}
-                                            {Math.abs(item.actual_completion_hours - item.expected_completion_hours).toFixed(1)}h
-                                          </span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 text-xs">
-                                          <div>
-                                            <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Expected: </span>
-                                            <span className={`font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
-                                              {Number.parseFloat(item.expected_completion_hours).toFixed(1)}h
+                                            >
+                                              {item.actual_completion_hours >
+                                              item.expected_completion_hours
+                                                ? "Over"
+                                                : "Under"}{" "}
+                                              by{" "}
+                                              {Math.abs(
+                                                item.actual_completion_hours -
+                                                  item.expected_completion_hours
+                                              ).toFixed(1)}
+                                              h
                                             </span>
                                           </div>
-                                          <div>
-                                            <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Actual: </span>
-                                            <span className={`font-bold ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
-                                              {Number.parseFloat(item.actual_completion_hours).toFixed(1)}h
-                                            </span>
+                                          <div className="grid grid-cols-2 gap-2 text-xs">
+                                            <div>
+                                              <span
+                                                className={
+                                                  isDarkMode
+                                                    ? "text-gray-400"
+                                                    : "text-gray-600"
+                                                }
+                                              >
+                                                Expected:{" "}
+                                              </span>
+                                              <span
+                                                className={`font-bold ${
+                                                  isDarkMode
+                                                    ? "text-purple-300"
+                                                    : "text-purple-700"
+                                                }`}
+                                              >
+                                                {Number.parseFloat(
+                                                  item.expected_completion_hours
+                                                ).toFixed(1)}
+                                                h
+                                              </span>
+                                            </div>
+                                            <div>
+                                              <span
+                                                className={
+                                                  isDarkMode
+                                                    ? "text-gray-400"
+                                                    : "text-gray-600"
+                                                }
+                                              >
+                                                Actual:{" "}
+                                              </span>
+                                              <span
+                                                className={`font-bold ${
+                                                  isDarkMode
+                                                    ? "text-blue-300"
+                                                    : "text-blue-700"
+                                                }`}
+                                              >
+                                                {Number.parseFloat(
+                                                  item.actual_completion_hours
+                                                ).toFixed(1)}
+                                                h
+                                              </span>
+                                            </div>
                                           </div>
-                                        </div>
-                                        <div className={`mt-2 w-full rounded-full h-2 ${isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
                                           <div
-                                            className={`h-2 rounded-full ${item.actual_completion_hours > item.expected_completion_hours
-                                              ? "bg-red-500"
-                                              : "bg-green-500"
+                                            className={`mt-2 w-full rounded-full h-2 ${
+                                              isDarkMode
+                                                ? "bg-gray-700"
+                                                : "bg-gray-300"
+                                            }`}
+                                          >
+                                            <div
+                                              className={`h-2 rounded-full ${
+                                                item.actual_completion_hours >
+                                                item.expected_completion_hours
+                                                  ? "bg-red-500"
+                                                  : "bg-green-500"
                                               }`}
-                                            style={{
-                                              width: `${Math.min(
-                                                100,
-                                                (item.actual_completion_hours / item.expected_completion_hours) * 100
-                                              )}%`,
-                                            }}
-                                          ></div>
+                                              style={{
+                                                width: `${Math.min(
+                                                  100,
+                                                  (item.actual_completion_hours /
+                                                    item.expected_completion_hours) *
+                                                    100
+                                                )}%`,
+                                              }}
+                                            ></div>
+                                          </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
                                   </div>
                                 </div>
-                              )
+                              );
                             })
                           ) : (
-                            <p className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""} py-4`}>No phases.</p>
+                            <p
+                              className={`text-gray-600 ${
+                                isDarkMode ? "dark:text-gray-400" : ""
+                              } py-4`}
+                            >
+                              No phases.
+                            </p>
                           )}
                         </div>
                       )}
                     </div>
-                  )
+                  );
                 })}
               </div>
             </div>
           )}
         </div>
       ) : (
-        <p className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-          {!isFiltering && items.length === 0 ? (
-            searchTerm || filterClient || filterPriority || filterStatus
+        <p
+          className={`text-center py-8 ${
+            isDarkMode ? "text-gray-400" : "text-gray-600"
+          }`}
+        >
+          {!isFiltering && items.length === 0
+            ? searchTerm || filterClient || filterPriority || filterStatus
               ? "No items match your search or filters."
               : 'No items yet. Go to "Add Items" to create your first item.'
-          ) : null}
+            : null}
         </p>
       )}
 
       {/* Pagination Controls - Mobile Optimized */}
       {!isFiltering && pagination.total_pages > 1 && (
         <div
-          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mt-6 border transition-all shadow-sm ${isDarkMode ? "bg-gray-800/60 border-gray-700/50" : "bg-white/30 border-white/40"
-            }`}
+          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mt-6 border transition-all shadow-sm ${
+            isDarkMode
+              ? "bg-gray-800/60 border-gray-700/50"
+              : "bg-white/30 border-white/40"
+          }`}
         >
           <div className="flex flex-col gap-4">
             {/* Page Info */}
-            <div className={`text-sm text-center sm:text-left ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-              Showing {(pagination.current_page - 1) * pagination.per_page + 1} -{" "}
-              {Math.min(pagination.current_page * pagination.per_page, pagination.total_items)} of {pagination.total_items}
+            <div
+              className={`text-sm text-center sm:text-left ${
+                isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
+              Showing {(pagination.current_page - 1) * pagination.per_page + 1}{" "}
+              -{" "}
+              {Math.min(
+                pagination.current_page * pagination.per_page,
+                pagination.total_items
+              )}{" "}
+              of {pagination.total_items}
             </div>
 
             {/* Pagination Buttons */}
@@ -2993,12 +4116,13 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
               <button
                 onClick={() => handlePageChange(1)}
                 disabled={!pagination.has_previous}
-                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${pagination.has_previous
-                  ? isDarkMode
-                    ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
-                    : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
-                  : "opacity-50 cursor-not-allowed"
-                  }`}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+                  pagination.has_previous
+                    ? isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
+                      : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
+                    : "opacity-50 cursor-not-allowed"
+                }`}
               >
                 ««
               </button>
@@ -3007,12 +4131,13 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
               <button
                 onClick={handlePreviousPage}
                 disabled={!pagination.has_previous}
-                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${pagination.has_previous
-                  ? isDarkMode
-                    ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
-                    : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
-                  : "opacity-50 cursor-not-allowed"
-                  }`}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+                  pagination.has_previous
+                    ? isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
+                      : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
+                    : "opacity-50 cursor-not-allowed"
+                }`}
               >
                 ‹
               </button>
@@ -3020,13 +4145,19 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
               {/* Page Numbers - Responsive */}
               <div className="flex gap-1">
                 {(() => {
-                  const pages = []
-                  const showPages = window.innerWidth < 640 ? 3 : 5
-                  let startPage = Math.max(1, pagination.current_page - Math.floor(showPages / 2))
-                  let endPage = Math.min(pagination.total_pages, startPage + showPages - 1)
+                  const pages = [];
+                  const showPages = window.innerWidth < 640 ? 3 : 5;
+                  let startPage = Math.max(
+                    1,
+                    pagination.current_page - Math.floor(showPages / 2)
+                  );
+                  let endPage = Math.min(
+                    pagination.total_pages,
+                    startPage + showPages - 1
+                  );
 
                   if (endPage - startPage < showPages - 1) {
-                    startPage = Math.max(1, endPage - showPages + 1)
+                    startPage = Math.max(1, endPage - showPages + 1);
                   }
 
                   for (let i = startPage; i <= endPage; i++) {
@@ -3034,20 +4165,21 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
                       <button
                         key={i}
                         onClick={() => handlePageChange(i)}
-                        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm min-w-[40px] ${pagination.current_page === i
-                          ? isDarkMode
-                            ? "bg-slate-600 text-white"
-                            : "bg-slate-600 text-white"
-                          : isDarkMode
+                        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm min-w-[40px] ${
+                          pagination.current_page === i
+                            ? isDarkMode
+                              ? "bg-slate-600 text-white"
+                              : "bg-slate-600 text-white"
+                            : isDarkMode
                             ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
                             : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
-                          }`}
+                        }`}
                       >
                         {i}
                       </button>
-                    )
+                    );
                   }
-                  return pages
+                  return pages;
                 })()}
               </div>
 
@@ -3055,12 +4187,13 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
               <button
                 onClick={handleNextPage}
                 disabled={!pagination.has_next}
-                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${pagination.has_next
-                  ? isDarkMode
-                    ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
-                    : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
-                  : "opacity-50 cursor-not-allowed"
-                  }`}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+                  pagination.has_next
+                    ? isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
+                      : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
+                    : "opacity-50 cursor-not-allowed"
+                }`}
               >
                 ›
               </button>
@@ -3069,26 +4202,31 @@ const handleCheckoutSingleMaterial = async (item, phase, subphase, materialIndex
               <button
                 onClick={() => handlePageChange(pagination.total_pages)}
                 disabled={!pagination.has_next}
-                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${pagination.has_next
-                  ? isDarkMode
-                    ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
-                    : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
-                  : "opacity-50 cursor-not-allowed"
-                  }`}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+                  pagination.has_next
+                    ? isDarkMode
+                      ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
+                      : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
+                    : "opacity-50 cursor-not-allowed"
+                }`}
               >
                 »»
               </button>
             </div>
 
             {/* Page indicator */}
-            <div className={`text-sm text-center ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+            <div
+              className={`text-sm text-center ${
+                isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
               Page {pagination.current_page} of {pagination.total_pages}
             </div>
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default Checklist
+export default Checklist;

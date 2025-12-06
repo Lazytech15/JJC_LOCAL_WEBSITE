@@ -6,6 +6,7 @@ import AddItems from "../op/AddItem.jsx";
 import Checklist from "../op/CheckList.jsx";
 import Reports from "../op/Report.jsx";
 import ItemComparison from "../op/ItemComparison.jsx";
+import StockMaterialsTab from "../op/StockMaterialsTab.jsx";
 import { pollingManager } from "../../utils/api/websocket/polling-manager.jsx";
 import {
   EditItemModal,
@@ -90,6 +91,9 @@ function OperationsDepartment() {
   const [selectedTargetItem, setSelectedTargetItem] = useState(null);
   const [selectedTargetPhase, setSelectedTargetPhase] = useState(null);
   const [selectedTargetSubphase, setSelectedTargetSubphase] = useState(null);
+
+  const [globalUnusedMaterials, setGlobalUnusedMaterials] = useState([]);
+  const [loadingGlobalUnused, setLoadingGlobalUnused] = useState(false);
 
   // Load items for selected client in transfer modal
   useEffect(() => {
@@ -336,6 +340,13 @@ function OperationsDepartment() {
   }, []);
 
   useEffect(() => {
+    // Only load global unused materials when needed (when modal might be opened)
+    if (activeTab === 'checklist' && !loadingGlobalUnused && globalUnusedMaterials.length === 0) {
+      loadGlobalUnusedMaterials();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
       // Request permission silently
       Notification.requestPermission().then((permission) => {
@@ -434,6 +445,65 @@ function OperationsDepartment() {
     }
   };
 
+  const loadGlobalUnusedMaterials = async () => {
+    try {
+      setLoadingGlobalUnused(true)
+      console.log('🌍 Loading global unused materials from database...')
+
+      // ✅ CRITICAL FIX: Fetch materials with status='scrap' (not 'returned')
+      const response = await apiService.operations.getMaterials({
+        status: 'scrap'  // ✅ Changed from 'returned' to 'scrap'
+      })
+
+      const materials = Array.isArray(response) ? response :
+        (response?.success && response?.data) ? response.data :
+          (response?.data) ? response.data : []
+
+      console.log(`✅ Found ${materials.length} scrap materials in database`)
+
+      const allUnusedMaterials = materials.map(mat => ({
+        id: mat.id,
+        name: mat.material_name,
+        quantity: parseFloat(mat.material_quantity) || 0,
+        unit: mat.unit_of_measure || 'pcs',
+        reason: mat.notes || 'Scrap/Leftover material',
+
+        // ✅ Assigned user info
+        assigned_user_uid: mat.checked_out_by_uid || null,
+        assigned_user_name: mat.original_assigned_user || mat.checked_out_by_name || 'Unknown',
+        assigned_user_barcode: mat.checked_out_by || null,
+
+        date_added: mat.created_at,
+
+        // Source context
+        source_item: mat.item_name || 'Unknown',
+        source_item_part_number: mat.item_part_number,
+        source_client: mat.client_name,
+        source_phase: mat.phase_name || 'Unknown',
+        source_subphase: mat.subphase_name || 'Unknown',
+        source_subphase_id: mat.subphase_id,
+        source_phase_id: mat.phase_id,
+
+        from_unused: mat.from_unused || false
+      }))
+
+      console.log(`✅ Total global scrap materials: ${allUnusedMaterials.length}`)
+      setGlobalUnusedMaterials(allUnusedMaterials)
+    } catch (error) {
+      console.error('❌ Failed to load global scrap materials:', error)
+    } finally {
+      setLoadingGlobalUnused(false)
+    }
+  }
+
+  // Call this function when needed:
+  useEffect(() => {
+    // Only load global unused materials when needed (when modal might be opened)
+    if (activeTab === 'checklist' && !loadingGlobalUnused && globalUnusedMaterials.length === 0) {
+      loadGlobalUnusedMaterials()
+    }
+  }, [activeTab])
+
   const refreshActiveData = async () => {
     try {
       console.log("Refreshing active data...");
@@ -514,6 +584,7 @@ function OperationsDepartment() {
       setPagination(paginationInfo);
       setCurrentPage(page);
       setStatistics(statsResponse);
+
     } catch (err) {
       console.error("❌ Failed to load operations data:", err);
       setError(`Failed to load data: ${err.message}`);
@@ -1044,6 +1115,7 @@ function OperationsDepartment() {
     { id: "dashboard", label: "Dashboard" },
     { id: "add-items", label: "Add Items" },
     { id: "checklist", label: "Checklist" },
+    { id: "stock-materials", label: "Stock Materials" }, // NEW
     { id: "comparison", label: "Comparison" },
     { id: "reports", label: "Reports" },
   ];
@@ -1134,9 +1206,9 @@ function OperationsDepartment() {
     }
   };
 
-  // Edit Subphase Handler
   const handleEditSubphase = async (subphaseData) => {
     try {
+      // Optimistic update
       setItems((prevItems) =>
         prevItems.map((item) => {
           if (item.phases) {
@@ -1160,18 +1232,29 @@ function OperationsDepartment() {
           return item;
         })
       );
+
       setShowEditSubphaseModal(false);
       setSelectedSubphaseForEdit(null);
+
+      // ✅ Save to backend
       await apiService.operations.updateSubphase(
         selectedSubphaseForEdit.id,
         subphaseData
       );
+
+      // ✅ CRITICAL: Reload the specific item to get fresh materials
+      if (selectedItemForEdit && selectedItemForEdit.part_number) {
+        console.log('🔄 Reloading item after subphase edit...')
+        await loadItemDetails(selectedItemForEdit.part_number)
+      }
+
     } catch (error) {
       console.error("Error updating subphase:", error);
       alert("Failed to update subphase: " + error.message);
-      await loadData();
+      await loadData(); // Full reload as fallback
     }
   };
+
 
   // Delete Subphase Handler
   const handleDeleteSubphase = async () => {
@@ -2062,6 +2145,13 @@ function OperationsDepartment() {
                   />
                 )}
 
+                {activeTab === "stock-materials" && (
+                  <StockMaterialsTab
+                    items={items} isDarkMode={isDarkMode}
+                    apiService={apiService}
+                  />
+                )}
+
                 {activeTab === "comparison" && (
                   <ItemComparison
                     items={items}
@@ -2219,6 +2309,13 @@ function OperationsDepartment() {
               batchQty={selectedItemForEdit.qty}
               isDarkMode={isDarkMode}
               apiService={apiService}
+              globalUnusedMaterials={globalUnusedMaterials}
+              loadingGlobalUnused={loadingGlobalUnused}
+              onRefreshGlobalUnused={loadGlobalUnusedMaterials}
+
+              selectedItemForEdit={selectedItemForEdit}
+              selectedPhaseForEdit={selectedPhaseForEdit}
+
               onClose={() => {
                 setShowEditSubphaseModal(false);
                 setSelectedSubphaseForEdit(null);
