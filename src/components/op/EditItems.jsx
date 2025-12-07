@@ -10,7 +10,12 @@ import {
   Package,
   Clock,
   AlertTriangle,
-  Archive
+  Archive,
+  PackageCheck,
+  Scissors,
+  RefreshCw,
+  PackagePlus,
+  CheckCircle
 } from "lucide-react"
 
 // ============================================================================
@@ -370,11 +375,13 @@ function EditPhaseModal({ phase, onClose, onSave, onDelete, isDarkMode }) {
   )
 }
 
+
 // ============================================================================
-// EDIT SUBPHASE MODAL
+// EDIT SUBPHASE MODAL - Updated with MaterialsService
 // ============================================================================
 function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, batchQty = 1, apiService, globalUnusedMaterials = [], loadingGlobalUnused = false, onRefreshGlobalUnused = null, selectedItemForEdit = null,
   selectedPhaseForEdit = null }) {
+
   // Parse existing materials
   const parseExistingMaterials = () => {
     if (subphase?.materials) {
@@ -425,6 +432,9 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
   const [loadingMaterials, setLoadingMaterials] = useState(false)
   const [activeTab, setActiveTab] = useState('required')
 
+  const [availableScrapMaterials, setAvailableScrapMaterials] = useState([])
+  const [loadingScrapMaterials, setLoadingScrapMaterials] = useState(false)
+
   const [formData, setFormData] = useState({
     name: subphase?.name || "",
     expected_duration: subphase?.expected_duration || 0,
@@ -440,77 +450,169 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
   }, [subphase?.id])
 
   const loadSubphaseMaterials = async () => {
-  if (!subphase?.id) {
-    console.log('⚠️ No subphase ID provided')
-    return
-  }
-
-  try {
-    console.log('📥 Loading materials for subphase:', subphase.id)
-    const response = await apiService.operations.getSubphaseMaterials(subphase.id)
-    
-    console.log('✅ Raw API response:', response)
-
-    // ✅ FIXED: Handle different response formats
-    let materialsData = []
-    
-    if (response?.success && Array.isArray(response.data)) {
-      materialsData = response.data
-    } else if (response?.data && Array.isArray(response.data)) {
-      materialsData = response.data
-    } else if (Array.isArray(response)) {
-      materialsData = response
+    if (!subphase?.id) {
+      console.log('⚠️ No subphase ID provided')
+      return
     }
 
-    console.log('✅ Extracted materials data:', materialsData)
-    console.log('✅ Materials statuses:', materialsData.map(m => ({ name: m.material_name, status: m.status })))
+    try {
+      console.log('📥 Loading materials for subphase:', subphase.id)
 
-    // ✅ CRITICAL: Filter out 'scrap' status materials
-    const activeMaterials = materialsData.filter(m => {
-      const isScrap = m.status === 'scrap'
-      console.log(`Material ${m.material_name}: status=${m.status}, isScrap=${isScrap}`)
-      return !isScrap
-    })
+      // ✅ Use MaterialsService
+      const response = await apiService.materials.getSubphaseMaterials(subphase.id)
 
-    console.log(`✅ Active materials (scrap filtered): ${activeMaterials.length}/${materialsData.length}`)
+      console.log('✅ Raw API response:', response)
 
-    if (activeMaterials.length > 0) {
-      const formattedMaterials = activeMaterials.map(m => ({
+      // ✅ Handle different response formats
+      let materialsData = []
+
+      if (response?.success && Array.isArray(response.data)) {
+        materialsData = response.data
+      } else if (response?.data && Array.isArray(response.data)) {
+        materialsData = response.data
+      } else if (Array.isArray(response)) {
+        materialsData = response
+      }
+
+      console.log('✅ Extracted materials data:', materialsData)
+      console.log('✅ Materials statuses:', materialsData.map(m => ({ name: m.material_name, status: m.status })))
+
+      // ✅ FIX: Filter for valid active statuses from database ENUM
+      const activeMaterials = materialsData.filter(m => {
+        // Include: checked_out, in_use (exclude: completed, cancelled)
+        return m.status === 'checked_out' || m.status === 'in_use'
+      })
+
+      console.log(`✅ Active materials: ${activeMaterials.length}/${materialsData.length}`)
+
+      if (activeMaterials.length > 0) {
+        const formattedMaterials = activeMaterials.map(m => ({
+          id: m.id,
+          name: m.material_name,
+          quantity: parseFloat(m.material_quantity) || 0,
+          unit: m.unit_of_measure || 'pcs',
+          checked_out: m.status === 'checked_out' || m.status === 'in_use', // ✅ Changed
+          checkout_date: m.checkout_date || null,
+          checkout_by: m.checked_out_by || null,
+          checkout_by_name: m.checked_out_by_name || null,
+          checkout_by_uid: m.checked_out_by_uid || null,
+          status: m.status || 'checked_out', // ✅ Use actual status
+          notes: m.notes || '',
+          quantity_used: m.quantity_used || 0
+        }))
+
+        console.log('✅ Formatted active materials:', formattedMaterials)
+        setMaterials(formattedMaterials)
+      } else {
+        console.log('ℹ️ No active materials')
+        setMaterials([])
+      }
+    } catch (error) {
+      console.error('❌ Failed to load materials:', error)
+      if (materials.length === 0) {
+        setMaterials([])
+      }
+    }
+  }
+
+  const loadUnusedMaterials = async () => {
+    if (!subphase?.id) return
+
+    try {
+      console.log('📦 Loading returned AND scrap materials for subphase:', subphase.id)
+
+      // ✅ Load BOTH returned and scrap materials
+      const [returnedResponse, scrapResponse] = await Promise.all([
+        apiService.materials.getReturnedMaterials({ subphase_id: subphase.id }),
+        apiService.materials.getScrapMaterials({ subphase_id: subphase.id })
+      ])
+
+      // Process returned materials
+      let returnedMaterials = []
+      if (returnedResponse?.success && Array.isArray(returnedResponse.data)) {
+        returnedMaterials = returnedResponse.data
+      } else if (Array.isArray(returnedResponse)) {
+        returnedMaterials = returnedResponse
+      } else if (returnedResponse?.data && Array.isArray(returnedResponse.data)) {
+        returnedMaterials = returnedResponse.data
+      }
+
+      // Process scrap materials
+      let scrapMaterials = []
+      if (scrapResponse?.success && Array.isArray(scrapResponse.data)) {
+        scrapMaterials = scrapResponse.data
+      } else if (Array.isArray(scrapResponse)) {
+        scrapMaterials = scrapResponse
+      } else if (scrapResponse?.data && Array.isArray(scrapResponse.data)) {
+        scrapMaterials = scrapResponse.data
+      }
+
+      console.log(`✅ Found ${returnedMaterials.length} returned + ${scrapMaterials.length} scrap materials`)
+
+      // Format returned materials
+      const formattedReturned = returnedMaterials.map(m => ({
         id: m.id,
         name: m.material_name,
-        quantity: parseFloat(m.material_quantity) || 0,
+        quantity: parseFloat(m.quantity_returned) || 0,
         unit: m.unit_of_measure || 'pcs',
-        checked_out: m.is_checked_out || false,
-        checkout_date: m.checkout_date || null,
-        checkout_by: m.checked_out_by || null,
-        checkout_by_name: m.checked_out_by_name || null,
-        checkout_by_uid: m.checked_out_by_uid || null,
-        status: m.status || 'pending',
-        notes: m.notes || '',
-        from_unused: m.from_unused || false,
-        original_assigned_user: m.original_assigned_user || null
+        reason: m.return_reason || '',
+        assigned_user_uid: m.returned_by_uid,
+        assigned_user_name: m.returned_by_name,
+        assigned_user_barcode: m.returned_by,
+        date_added: m.return_date || m.created_at,
+        condition_status: m.condition_status || 'good',
+        is_reusable: m.is_reusable !== false,
+        original_material_id: m.original_material_id,
+        source_type: 'returned', // ✅ Mark as returned
+        isNew: false
       }))
 
-      console.log('✅ Formatted active materials:', formattedMaterials)
-      setMaterials(formattedMaterials)
-    } else {
-      console.log('ℹ️ No active materials (all are scrap or none exist)')
-      setMaterials([])
-    }
-  } catch (error) {
-    console.error('❌ Failed to load materials:', error)
-    // Don't clear materials on error if we already have some
-    if (materials.length === 0) {
-      setMaterials([])
+      // Format scrap materials
+      const formattedScrap = scrapMaterials.map(m => ({
+        id: m.id,
+        name: m.material_name,
+        quantity: parseFloat(m.quantity_scrapped) || 0,
+        unit: m.unit_of_measure || 'pcs',
+        reason: m.scrap_reason || '',
+        assigned_user_uid: m.scrapped_by_uid,
+        assigned_user_name: m.scrapped_by_name,
+        assigned_user_barcode: m.scrapped_by,
+        date_added: m.scrap_date || m.created_at,
+        condition_status: m.scrap_type || 'waste',
+        is_reusable: m.is_recyclable || false,
+        original_material_id: m.original_material_id,
+        source_type: 'scrap', // ✅ Mark as scrap
+        scrap_type: m.scrap_type || 'waste',
+        isNew: false
+      }))
+
+      // ✅ Combine both lists
+      const allUnusedMaterials = [...formattedReturned, ...formattedScrap]
+      console.log(`✅ Total unused materials: ${allUnusedMaterials.length}`)
+
+      setUnusedMaterials(allUnusedMaterials)
+    } catch (error) {
+      console.error('❌ Failed to load unused materials:', error)
+      if (unusedMaterials.length === 0) {
+        setUnusedMaterials([])
+      }
     }
   }
-}
+
+  useEffect(() => {
+    if (subphase?.id) {
+      loadSubphaseMaterials()
+      loadUnusedMaterials()
+    }
+  }, [subphase?.id])
 
   const handleReturnMaterial = async (material, materialIndex) => {
     const quantityToReturn = parseFloat(prompt(
-      `How much of "${material.name}" is unused/scrap?\n\n` +
+      `How much of "${material.name}" do you want to RETURN to warehouse?\n\n` +
       `Available: ${material.quantity} ${material.unit}\n\n` +
-      `Enter quantity to mark as scrap:`,
+      `⚠️ RETURN = Unused material going back to warehouse inventory\n` +
+      `   (Material is still in original form, not processed yet)\n\n` +
+      `Enter quantity to return to warehouse:`,
       material.quantity
     ))
 
@@ -525,13 +627,14 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
     }
 
     const reason = prompt(
-      `Why is "${material.name}" being marked as scrap?\n\n` +
+      `Why is "${material.name}" being RETURNED to warehouse?\n\n` +
       `Examples:\n` +
-      `• Excess material\n` +
-      `• Damaged\n` +
-      `• Wrong specification\n` +
-      `• Production overrun\n` +
-      `• Leftover from cutting\n\n` +
+      `• Excess material (not needed)\n` +
+      `• Project scope changed\n` +
+      `• Overestimated requirement\n` +
+      `• Design change - no longer needed\n` +
+      `• Wrong material ordered\n\n` +
+      `⚠️ Material will be returned to warehouse inventory\n\n` +
       `Enter reason:`
     )
 
@@ -541,7 +644,10 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
     }
 
     try {
-      // ✅ Find material in inventory to return stock
+      // ✅ Get employee data
+      const employeeData = await getEmployeeData(material.checkout_by_uid, apiService)
+
+      // ✅ Find material in inventory
       const materialsResponse = await apiService.items.getItems({
         item_type: "OPERATION PARTICULARS",
         search: material.name,
@@ -567,80 +673,100 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
         throw new Error(`Material "${material.name}" not found in inventory`)
       }
 
-      // ✅ Return stock to inventory using addStock
-      console.log(`📥 Returning ${quantityToReturn} ${material.unit} back to inventory as scrap`)
+      // ✅ Return stock to warehouse inventory
+      console.log(`📥 Returning ${quantityToReturn} ${material.unit} to warehouse inventory`)
 
       await apiService.items.addStock(
         inventoryItem.item_no,
         quantityToReturn,
-        `Scrap material returned from operations\n` +
+        `Material returned to warehouse (unused)\n` +
+        `Item: ${selectedItemForEdit?.name || 'Unknown'}\n` +
+        `Phase: ${selectedPhaseForEdit?.name || 'Unknown'}\n` +
         `Subphase: ${formData.name}\n` +
         `Reason: ${reason}\n` +
-        `Returned by: ${material.checkout_by_name || 'Unknown'}`
+        `Returned by: ${material.checkout_by_name || 'Unknown'}`,
+        material.checkout_by || 'SYSTEM'
       )
 
-      console.log(`✅ Stock returned to inventory`)
+      console.log(`✅ Stock returned to warehouse inventory`)
 
-      // ✅ Get context for saving
-      const itemPartNumber = subphase.item_part_number || selectedItemForEdit?.part_number
-      const phaseId = subphase.phase_id || selectedPhaseForEdit?.id
+      // ✅ Create employee log for material return
+      try {
+        const materialsArray = [{
+          item_no: inventoryItem.item_no,
+          item_name: inventoryItem.item_name,
+          quantity: quantityToReturn,
+          unit: material.unit || 'pcs'
+        }]
 
-      if (!itemPartNumber || !phaseId) {
-        throw new Error('Missing item_part_number or phase_id context')
+        const operationContext = {
+          item_name: selectedItemForEdit?.name || 'Unknown',
+          part_number: selectedItemForEdit?.part_number || 'Unknown',
+          phase_name: selectedPhaseForEdit?.name || 'Unknown',
+          subphase_name: formData.name
+        }
+
+        const logResult = await createMaterialReturnLog(
+          materialsArray,
+          employeeData,
+          operationContext,
+          reason,
+          apiService
+        )
+
+        if (logResult.success) {
+          console.log("✅ Employee return log created:", logResult.logId)
+        }
+      } catch (logError) {
+        console.warn("⚠️ Failed to create employee log (non-critical):", logError)
       }
 
-      // ✅ Save to operations_subphase_materials with status='scrap'
-      await apiService.operations.createMaterial({
+      // ✅ Use MaterialsService to create returned material record
+      await apiService.materials.createReturnedMaterial({
+        original_material_id: material.id,
         subphase_id: subphase.id,
-        item_part_number: itemPartNumber,
-        phase_id: phaseId,
         material_name: material.name,
-        material_quantity: quantityToReturn,
+        quantity_returned: quantityToReturn,
         unit_of_measure: material.unit || 'pcs',
-        is_checked_out: false,
-        checkout_date: null,
-        checked_out_by: material.checkout_by,
-        checked_out_by_name: material.checkout_by_name,
-        checked_out_by_uid: material.checkout_by_uid,
-        status: 'scrap', // ✅ Changed from 'returned' to 'scrap'
-        notes: `Scrap/Leftover - ${reason}\nOriginally assigned to: ${material.checkout_by_name || 'Unknown'}`,
-        from_unused: true,
-        original_assigned_user: material.checkout_by_name
+        returned_by: material.checkout_by,
+        returned_by_name: material.checkout_by_name,
+        returned_by_uid: material.checkout_by_uid,
+        condition_status: 'good',
+        return_reason: reason,
+        is_reusable: true,
+        notes: `Unused material returned to warehouse - Originally assigned to: ${material.checkout_by_name || 'Unknown'}`
       })
 
       // ✅ Calculate remaining quantity
-const remainingQty = parseFloat(material.quantity) - quantityToReturn
+      const remainingQty = parseFloat(material.quantity) - quantityToReturn
 
-if (remainingQty > 0) {
-  // ✅ Update existing material with reduced quantity
-  console.log(`🔄 Updating material ${material.id} with remaining quantity: ${remainingQty}`)
-  await apiService.operations.updateMaterial(material.id, {
-    material_quantity: remainingQty
-  })
-  console.log(`✅ Material ${material.id} updated with remaining qty: ${remainingQty}`)
-} else {
-  // ✅ Delete material record when quantity reaches 0
-  console.log(`🗑️ Deleting material ${material.id} - quantity fully returned as scrap`)
-  await apiService.operations.deleteMaterial(material.id)
-  console.log(`✅ Material ${material.id} deleted successfully`)
-}
+      if (remainingQty > 0) {
+        console.log(`🔄 Updating material ${material.id} with remaining quantity: ${remainingQty}`)
+        await apiService.materials.updateMaterial(material.id, {
+          material_quantity: remainingQty
+        })
+        console.log(`✅ Material ${material.id} updated with remaining qty: ${remainingQty}`)
+      } else {
+        console.log(`🗑️ Deleting material ${material.id} - quantity fully returned`)
+        await apiService.materials.deleteMaterial(material.id)
+        console.log(`✅ Material ${material.id} deleted successfully`)
+      }
 
       // ✅ Reload both lists
       await loadSubphaseMaterials()
       await loadUnusedMaterials()
 
-      // ✅ Refresh global unused list
       if (onRefreshGlobalUnused) {
         onRefreshGlobalUnused()
       }
 
       alert(
-        `✅ Material marked as scrap and returned to inventory!\n\n` +
-        `Scrap quantity: ${quantityToReturn} ${material.unit}\n` +
+        `✅ Material returned to warehouse!\n\n` +
+        `Returned quantity: ${quantityToReturn} ${material.unit}\n` +
         `Remaining checked out: ${remainingQty} ${material.unit}\n\n` +
         `${remainingQty === 0
-          ? '✅ Original checkout record removed.\n📦 Material now available as scrap for other items.'
-          : '📦 Material returned to inventory as scrap.'}`
+          ? '✅ Original checkout record removed.\n📦 Material now back in warehouse inventory.'
+          : '📦 Material returned to warehouse inventory.'}`
       )
 
     } catch (error) {
@@ -649,6 +775,285 @@ if (remainingQty > 0) {
     }
   }
 
+  // ✅ FIX 2: NEW - Mark Material as Scrap (processed waste)
+  const handleMarkAsScrap = async (material, materialIndex) => {
+    const quantityToScrap = parseFloat(prompt(
+      `How much of "${material.name}" is SCRAP/WASTE?\n\n` +
+      `Available: ${material.quantity} ${material.unit}\n\n` +
+      `⚠️ SCRAP = Processed material waste (cannot be returned as-is)\n` +
+      `   Examples: cut pieces, leftovers, damaged during work\n\n` +
+      `Enter quantity to mark as scrap:`,
+      material.quantity
+    ))
+
+    if (!quantityToScrap || quantityToScrap <= 0) {
+      alert("Invalid quantity")
+      return
+    }
+
+    if (quantityToScrap > parseFloat(material.quantity)) {
+      alert(`Cannot scrap more than checked out quantity (${material.quantity})`)
+      return
+    }
+
+    const reason = prompt(
+      `Why is "${material.name}" being marked as SCRAP?\n\n` +
+      `Examples:\n` +
+      `• Leftover pieces after cutting\n` +
+      `• Damaged during processing\n` +
+      `• Production waste\n` +
+      `• Defective after use\n` +
+      `• Cut-offs and scraps\n\n` +
+      `⚠️ This material CANNOT be returned to warehouse\n` +
+      `   (But can be reused by other operations if suitable)\n\n` +
+      `Enter reason:`
+    )
+
+    if (!reason || !reason.trim()) {
+      alert("Reason is required")
+      return
+    }
+
+    try {
+      // ✅ Get employee data
+      const employeeData = await getEmployeeData(material.checkout_by_uid, apiService)
+
+      // ✅ Create employee log for scrap
+      try {
+        const materialsArray = [{
+          item_no: 'SCRAP',
+          item_name: material.name,
+          quantity: quantityToScrap,
+          unit: material.unit || 'pcs'
+        }]
+
+        const operationContext = {
+          item_name: selectedItemForEdit?.name || 'Unknown',
+          part_number: selectedItemForEdit?.part_number || 'Unknown',
+          phase_name: selectedPhaseForEdit?.name || 'Unknown',
+          subphase_name: formData.name
+        }
+
+        const logResult = await createMaterialScrapLog(
+          materialsArray,
+          employeeData,
+          operationContext,
+          reason,
+          apiService
+        )
+
+        if (logResult.success) {
+          console.log("✅ Employee scrap log created:", logResult.logId)
+        }
+      } catch (logError) {
+        console.warn("⚠️ Failed to create employee log (non-critical):", logError)
+      }
+
+      // ✅ Save to operations_scrap_materials table
+      await apiService.materials.createScrapMaterial({
+        original_material_id: material.id,
+        subphase_id: subphase.id,
+        material_name: material.name,
+        quantity_scrapped: quantityToScrap,
+        unit_of_measure: material.unit || 'pcs',
+        scrapped_by: material.checkout_by || 'SYSTEM',
+        scrapped_by_name: material.checkout_by_name || 'Unknown',
+        scrapped_by_uid: material.checkout_by_uid || 'SYSTEM',
+        scrap_type: 'waste',
+        scrap_reason: reason,
+        is_recyclable: true, // ✅ Can be reused by others
+        notes: `Processed material waste - Originally assigned to: ${material.checkout_by_name || 'Unknown'}`
+      })
+
+      // ✅ Calculate remaining quantity
+      const remainingQty = parseFloat(material.quantity) - quantityToScrap
+
+      if (remainingQty > 0) {
+        console.log(`🔄 Updating material ${material.id} with remaining quantity: ${remainingQty}`)
+        await apiService.materials.updateMaterial(material.id, {
+          material_quantity: remainingQty
+        })
+        console.log(`✅ Material ${material.id} updated with remaining qty: ${remainingQty}`)
+      } else {
+        console.log(`🗑️ Deleting material ${material.id} - quantity fully scrapped`)
+        await apiService.materials.deleteMaterial(material.id)
+        console.log(`✅ Material ${material.id} deleted successfully`)
+      }
+
+      // ✅ Reload both lists
+      await loadSubphaseMaterials()
+      await loadUnusedMaterials()
+
+      if (onRefreshGlobalUnused) {
+        onRefreshGlobalUnused()
+      }
+
+      alert(
+        `✅ Material marked as scrap!\n\n` +
+        `Scrap quantity: ${quantityToScrap} ${material.unit}\n` +
+        `Remaining checked out: ${remainingQty} ${material.unit}\n\n` +
+        `${remainingQty === 0
+          ? '✅ Original checkout record removed.\n📦 Scrap available for reuse by other operations.'
+          : '📦 Scrap recorded and available for reuse.'}`
+      )
+
+    } catch (error) {
+      console.error("❌ Error marking as scrap:", error)
+      alert("Failed to mark as scrap: " + error.message)
+    }
+  }
+
+  /**
+   * Create employee log for material returns
+   */
+  const createMaterialReturnLog = async (materials, employeeData, operationContext, reason, apiService) => {
+    try {
+      const itemCount = materials.length
+      const itemsList = materials
+        .map((m) => `${m.item_name} x${m.quantity} (${m.unit || "pcs"})`)
+        .join(", ")
+
+      const detailsText = `Material Return: ${itemCount} item${itemCount > 1 ? "s" : ""} - ${itemsList}`
+
+      const purpose = operationContext.subphase_name
+        ? `Material Return for ${operationContext.item_name} - ${operationContext.phase_name} - ${operationContext.subphase_name}\nReason: ${reason}`
+        : operationContext.phase_name
+          ? `Material Return for ${operationContext.item_name} - ${operationContext.phase_name}\nReason: ${reason}`
+          : `Material Return for ${operationContext.item_name}\nReason: ${reason}`
+
+      const itemsJson = materials.map((m) => ({
+        item_no: m.item_no,
+        item_name: m.item_name,
+        quantity: m.quantity,
+        unit: m.unit || "pcs",
+        operation_item: operationContext.part_number,
+        operation_phase: operationContext.phase_name,
+        operation_subphase: operationContext.subphase_name,
+        return_reason: reason
+      }))
+
+      const logData = {
+        username: employeeData.username,
+        id_number: employeeData.id_number,
+        id_barcode: employeeData.id_barcode,
+        details: detailsText,
+        purpose: purpose,
+        item_no: materials[0]?.item_no,
+        items_json: JSON.stringify(itemsJson)
+      }
+
+      console.log("📝 Creating employee return log:", logData)
+
+      const result = await apiService.employeeLogs.createEmployeeLog(logData)
+      console.log("✅ Employee return log created:", result)
+
+      return {
+        success: true,
+        logId: result.id,
+        data: result
+      }
+    } catch (error) {
+      console.error("❌ Failed to create employee return log:", error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  }
+
+  /**
+   * Create employee log for material scrap
+   */
+  const createMaterialScrapLog = async (materials, employeeData, operationContext, scrapReason, apiService) => {
+    try {
+      const itemCount = materials.length
+      const itemsList = materials
+        .map((m) => `${m.item_name} x${m.quantity} (${m.unit || "pcs"})`)
+        .join(", ")
+
+      const detailsText = `Material Scrap: ${itemCount} item${itemCount > 1 ? "s" : ""} - ${itemsList}`
+
+      const purpose = operationContext.subphase_name
+        ? `Material Scrap for ${operationContext.item_name} - ${operationContext.phase_name} - ${operationContext.subphase_name}\nReason: ${scrapReason}`
+        : operationContext.phase_name
+          ? `Material Scrap for ${operationContext.item_name} - ${operationContext.phase_name}\nReason: ${scrapReason}`
+          : `Material Scrap for ${operationContext.item_name}\nReason: ${scrapReason}`
+
+      const itemsJson = materials.map((m) => ({
+        item_no: m.item_no,
+        item_name: m.item_name,
+        quantity: m.quantity,
+        unit: m.unit || "pcs",
+        operation_item: operationContext.part_number,
+        operation_phase: operationContext.phase_name,
+        operation_subphase: operationContext.subphase_name,
+        scrap_reason: scrapReason
+      }))
+
+      const logData = {
+        username: employeeData.username,
+        id_number: employeeData.id_number,
+        id_barcode: employeeData.id_barcode,
+        details: detailsText,
+        purpose: purpose,
+        item_no: materials[0]?.item_no,
+        items_json: JSON.stringify(itemsJson)
+      }
+
+      console.log("📝 Creating employee scrap log:", logData)
+
+      const result = await apiService.employeeLogs.createEmployeeLog(logData)
+      console.log("✅ Employee scrap log created:", result)
+
+      return {
+        success: true,
+        logId: result.id,
+        data: result
+      }
+    } catch (error) {
+      console.error("❌ Failed to create employee scrap log:", error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  }
+
+  /**
+   * Get employee data helper (add if not exists)
+   */
+  const getEmployeeData = async (employeeUid, apiService) => {
+    try {
+      console.log("🔍 Fetching employee data for UID:", employeeUid)
+      const response = await apiService.employees.getEmployee(employeeUid)
+      console.log("📦 Employee API response:", response)
+
+      if (response.success) {
+        return {
+          username: response.username || "unknown",
+          id_number: response.idNumber || "UNKNOWN",
+          id_barcode: response.idBarcode || "UNKNOWN",
+          fullName: response.fullName || "Unknown",
+          department: response.department,
+          position: response.position,
+          uid: String(employeeUid)
+        }
+      }
+
+      throw new Error("Invalid employee response")
+    } catch (error) {
+      console.error("❌ Failed to fetch employee data:", error)
+      return {
+        username: "unknown",
+        id_number: "UNKNOWN",
+        id_barcode: "UNKNOWN",
+        fullName: "Unknown Employee",
+        department: null,
+        position: null,
+        uid: String(employeeUid)
+      }
+    }
+  }
 
   useEffect(() => {
     loadMaterialsRaw()
@@ -685,130 +1090,140 @@ if (remainingQty > 0) {
     }
   }
 
-  const loadUnusedMaterials = async () => {
-  if (!subphase?.id) return
 
-  try {
-    console.log('📦 Loading unused materials for subphase:', subphase.id)
-    
-    // ✅ FIXED: Use getSubphaseMaterials to get ALL materials, then filter
-    const response = await apiService.operations.getSubphaseMaterials(subphase.id)
 
-    // ✅ Handle different response formats
-    let allMaterials = []
-    if (response?.success && Array.isArray(response.data)) {
-      allMaterials = response.data
-    } else if (Array.isArray(response)) {
-      allMaterials = response
-    } else if (response?.data && Array.isArray(response.data)) {
-      allMaterials = response.data
-    }
+  /**
+ * Load all available scrap materials from database
+ */
+  const loadAvailableScrapMaterials = async () => {
+    try {
+      setLoadingScrapMaterials(true)
+      console.log('🗑️ Loading all available scrap materials...')
 
-    console.log(`📊 Total materials from API: ${allMaterials.length}`)
+      const response = await apiService.materials.getScrapMaterials({})
 
-    // ✅ CRITICAL: Filter to ONLY status='scrap'
-    const scrapMaterials = allMaterials.filter(m => m.status === 'scrap')
-    
-    console.log(`✅ Found ${scrapMaterials.length} scrap materials for subphase ${subphase.id}`)
-    console.log('📋 Scrap materials:', scrapMaterials)
+      console.log('📦 Raw scrap response:', response) // ✅ NEW: Log raw response
 
-    const formattedUnused = scrapMaterials.map(m => ({
-      id: m.id,
-      name: m.material_name,
-      quantity: parseFloat(m.material_quantity) || 0,
-      unit: m.unit_of_measure || 'pcs',
-      reason: m.notes || '',
-      assigned_user_uid: m.checked_out_by_uid,
-      assigned_user_name: m.original_assigned_user || m.checked_out_by_name,
-      assigned_user_barcode: m.checked_out_by,
-      date_added: m.created_at,
-      isNew: false // Existing records
-    }))
+      let scrapMaterials = []
+      if (response?.success && Array.isArray(response.data)) {
+        scrapMaterials = response.data
+      } else if (Array.isArray(response)) {
+        scrapMaterials = response
+      } else if (response?.data && Array.isArray(response.data)) {
+        scrapMaterials = response.data
+      }
 
-    console.log(`✅ Formatted ${formattedUnused.length} unused materials`)
-    setUnusedMaterials(formattedUnused)
-  } catch (error) {
-    console.error('❌ Failed to load unused materials:', error)
-    // Don't clear on error if we already have some
-    if (unusedMaterials.length === 0) {
-      setUnusedMaterials([])
+      console.log(`✅ Found ${scrapMaterials.length} total scrap materials:`, scrapMaterials) // ✅ NEW: Log all scraps
+
+      // Filter out scraps from current subphase
+      const availableScraps = scrapMaterials.filter(s => {
+        const isDifferentSubphase = s.subphase_id !== subphase?.id
+        console.log(`  - ${s.material_name}: subphase_id=${s.subphase_id}, current=${subphase?.id}, show=${isDifferentSubphase}`) // ✅ NEW: Log each filter decision
+        return isDifferentSubphase
+      })
+
+      console.log(`✅ ${availableScraps.length} available for use (excluding current subphase):`, availableScraps) // ✅ NEW: Log filtered result
+      setAvailableScrapMaterials(availableScraps)
+
+    } catch (error) {
+      console.error('❌ Failed to load scrap materials:', error)
+      setAvailableScrapMaterials([])
+    } finally {
+      setLoadingScrapMaterials(false)
     }
   }
-}
 
-
-  useEffect(() => {
-    if (subphase?.id) {
-      loadSubphaseMaterials()
-      loadUnusedMaterials() // Load unused materials
+  const handleUseScrapMaterial = async (scrap) => {
+    // ✅ Check if employee is assigned to subphase
+    if (!subphase.employee_uid || !subphase.employee_barcode || !subphase.employee_name) {
+      alert(
+        `⚠️ Please assign an employee to this subphase first!\n\n` +
+        `Scrap materials need to be assigned to someone for tracking purposes.\n\n` +
+        `Steps:\n` +
+        `1. Close this modal\n` +
+        `2. Assign an employee to "${subphase.name}"\n` +
+        `3. Re-open and try again`
+      )
+      return
     }
-  }, [subphase?.id])
 
-  const handleTransferFromOtherItem = async (material, globalIndex) => {
     if (!window.confirm(
-      `Transfer "${material.name}" (${material.quantity} ${material.unit}) from:\n\n` +
-      `${material.source_item}\n` +
-      `${material.source_phase} → ${material.source_subphase}\n\n` +
-      `To current subphase?\n\n` +
+      `Use scrap material "${scrap.material_name}"?\n\n` +
+      `Available: ${scrap.quantity_scrapped} ${scrap.unit_of_measure}\n` +
+      `From: ${scrap.item_name || 'Unknown'}\n` +
+      `Type: ${scrap.scrap_type || 'waste'}\n\n` +
       `This will:\n` +
-      `• Make this material available in your Required Materials\n` +
-      `• Mark as pending checkout for you\n` +
-      `• Remove from source location\n` +
-      `• Originally assigned to: ${material.assigned_user_name || 'Unknown'}`
+      `• Add to your Required Materials\n` +
+      `• NOT deduct from warehouse inventory (it's scrap)\n` +
+      `• Assign to: ${subphase.employee_name}\n` +
+      `• Mark with SCRAP-REUSE identifier\n\n` +
+      `Originally scrapped by: ${scrap.scrapped_by_name || 'Unknown'}\n` +
+      `Reason: ${scrap.scrap_reason || 'N/A'}`
     )) {
       return
     }
 
     try {
-      // ✅ Delete from source (operations_subphase_materials)
-      if (material.id) {
-        await apiService.operations.deleteMaterial(material.id)
-        console.log(`✅ Deleted material ${material.id} from source`)
-      }
+      console.log('♻️ Using scrap material:', scrap.material_name)
 
-      // ✅ Create new material in current subphase
-      const itemPartNumber = selectedItemForEdit?.part_number
-      const phaseId = selectedPhaseForEdit?.id
-
-      if (!itemPartNumber || !phaseId) {
-        throw new Error('Missing item context for transfer')
-      }
-
-      const created = await apiService.operations.createMaterial({
+      // ✅ Create material with assigned employee info
+      await apiService.materials.createMaterial({
         subphase_id: subphase.id,
-        item_part_number: itemPartNumber,
-        phase_id: phaseId,
-        material_name: material.name,
-        material_quantity: parseFloat(material.quantity),
-        unit_of_measure: material.unit || 'pcs',
-        is_checked_out: false, // ✅ Needs to be checked out again
-        status: 'pending',
-        from_unused: true,
-        original_assigned_user: material.assigned_user_name,
-        notes: `Transferred from ${material.source_item} (${material.source_subphase})\nOriginally assigned to: ${material.assigned_user_name}`
+        material_name: scrap.material_name,
+        material_quantity: parseFloat(scrap.quantity_scrapped),
+        unit_of_measure: scrap.unit_of_measure || 'pcs',
+
+        // ✅ Use assigned employee from subphase
+        checked_out_by: subphase.employee_barcode,
+        checked_out_by_name: subphase.employee_name,
+        checked_out_by_uid: subphase.employee_uid,
+
+        checkout_date: new Date().toISOString(),
+        status: 'in_use',
+
+        // ✅ Add clear SCRAP-REUSE identifier in notes
+        notes: `🔄 SCRAP-REUSE (NO WAREHOUSE DEDUCTION)\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `This material is reused scrap - NOT from warehouse inventory.\n\n` +
+          `📦 Source Details:\n` +
+          `   • Item: ${scrap.item_name}\n` +
+          `   • Phase/Subphase: ${scrap.phase_name} → ${scrap.subphase_name}\n` +
+          `   • Scrap Type: ${scrap.scrap_type}\n` +
+          `   • Originally Scrapped By: ${scrap.scrapped_by_name}\n` +
+          `   • Scrap Reason: ${scrap.scrap_reason}\n\n` +
+          `👤 Now Assigned To:\n` +
+          `   • ${subphase.employee_name} (${subphase.employee_barcode})\n` +
+          `   • Reuse Date: ${new Date().toLocaleString()}`
       })
 
-      console.log(`✅ Material transferred to current subphase`)
+      console.log('✅ Added to required materials with employee assignment')
 
-      // ✅ Refresh global unused list
+      // ✅ Delete the scrap record
+      await apiService.materials.deleteScrapMaterial(scrap.id)
+      console.log('✅ Removed from scrap list')
+
+      // ✅ Reload lists
+      await loadSubphaseMaterials()
+      await loadAvailableScrapMaterials()
+
       if (onRefreshGlobalUnused) {
         onRefreshGlobalUnused()
       }
 
-      // ✅ Reload current subphase materials
-      await loadSubphaseMaterials()
-
       alert(
-        `✅ Transferred "${material.name}" successfully!\n\n` +
-        `• Added to your Required Materials (${material.quantity} ${material.unit})\n` +
-        `• Status: Pending checkout\n` +
-        `• Originally from: ${material.source_item}\n` +
-        `• Originally assigned to: ${material.assigned_user_name}\n\n` +
-        `You can now checkout this material for use.`
+        `✅ Scrap material assigned successfully!\n\n` +
+        `Material: ${scrap.material_name}\n` +
+        `Quantity: ${scrap.quantity_scrapped} ${scrap.unit_of_measure}\n` +
+        `Source: ${scrap.item_name}\n\n` +
+        `✓ Assigned to: ${subphase.employee_name}\n` +
+        `✓ Marked as SCRAP-REUSE\n` +
+        `✓ NO warehouse deduction\n` +
+        `✓ Ready to use immediately`
       )
+
     } catch (error) {
-      console.error("❌ Error transferring material:", error)
-      alert("Failed to transfer material: " + error.message)
+      console.error('❌ Error using scrap material:', error)
+      alert('Failed to use scrap material: ' + error.message)
     }
   }
 
@@ -838,22 +1253,22 @@ if (remainingQty > 0) {
       }
     }
 
-    // Validate NEW scrap materials only
-    const newScrapMaterials = unusedMaterials.filter(m => m.isNew)
+    // Validate NEW returned materials only
+    const newReturnedMaterials = unusedMaterials.filter(m => m.isNew)
 
-    for (let i = 0; i < newScrapMaterials.length; i++) {
-      const mat = newScrapMaterials[i]
+    for (let i = 0; i < newReturnedMaterials.length; i++) {
+      const mat = newReturnedMaterials[i]
 
       if (!mat.name || !mat.name.trim()) {
-        alert(`Scrap Material: Material name is required`)
+        alert(`Returned Material: Material name is required`)
         return
       }
       if (!mat.quantity || mat.quantity <= 0) {
-        alert(`Scrap Material "${mat.name}": Quantity must be greater than 0`)
+        alert(`Returned Material "${mat.name}": Quantity must be greater than 0`)
         return
       }
       if (!mat.reason || !mat.reason.trim()) {
-        alert(`Scrap Material "${mat.name}": Reason is required`)
+        alert(`Returned Material "${mat.name}": Reason is required`)
         return
       }
 
@@ -861,33 +1276,25 @@ if (remainingQty > 0) {
 
       if (sourceMat && parseFloat(mat.quantity) > parseFloat(sourceMat.quantity)) {
         alert(
-          `Scrap Material "${mat.name}":\n\n` +
-          `Scrap quantity (${mat.quantity}) cannot exceed checked-out quantity (${sourceMat.quantity})`
+          `Returned Material "${mat.name}":\n\n` +
+          `Return quantity (${mat.quantity}) cannot exceed checked-out quantity (${sourceMat.quantity})`
         )
         return
       }
     }
 
     try {
-      // Get context
-      const itemPartNumber = subphase.item_part_number || selectedItemForEdit?.part_number
-      const phaseId = subphase.phase_id || selectedPhaseForEdit?.id
-
-      if (!itemPartNumber || !phaseId) {
-        throw new Error('Missing item_part_number or phase_id context')
-      }
-
       // ============================================================
-      // STEP 1: Save NEW SCRAP MATERIALS
+      // STEP 1: Save NEW RETURNED MATERIALS using MaterialsService
       // ============================================================
-      for (const scrapMat of newScrapMaterials) {
+      for (const returnedMat of newReturnedMaterials) {
         try {
-          console.log(`📦 Processing NEW scrap material: ${scrapMat.name}`)
+          console.log(`📦 Processing NEW returned material: ${returnedMat.name}`)
 
           // Find material in inventory
           const materialsResponse = await apiService.items.getItems({
             item_type: "OPERATION PARTICULARS",
-            search: scrapMat.name,
+            search: returnedMat.name,
             limit: 10
           })
 
@@ -903,50 +1310,44 @@ if (remainingQty > 0) {
           }
 
           const inventoryItem = inventoryItems.find(m =>
-            m.item_name?.toLowerCase() === scrapMat.name.toLowerCase()
+            m.item_name?.toLowerCase() === returnedMat.name.toLowerCase()
           )
 
           // ✅ Return stock to inventory
           if (inventoryItem) {
-            console.log(`📥 Returning ${scrapMat.quantity} ${scrapMat.unit} back to inventory as scrap`)
+            console.log(`📥 Returning ${returnedMat.quantity} ${returnedMat.unit} back to inventory`)
 
             await apiService.items.addStock(
               inventoryItem.item_no,
-              parseFloat(scrapMat.quantity),
-              `Scrap material returned from operations\n` +
+              parseFloat(returnedMat.quantity),
+              `Returned material from operations\n` +
               `Subphase: ${formData.name}\n` +
-              `Reason: ${scrapMat.reason}\n` +
-              `Returned by: ${scrapMat.assigned_user_name || 'Unknown'}`,
-              scrapMat.assigned_user_barcode || 'SYSTEM'
+              `Reason: ${returnedMat.reason}\n` +
+              `Returned by: ${returnedMat.assigned_user_name || 'Unknown'}`,
+              returnedMat.assigned_user_barcode || 'SYSTEM'
             )
 
-            console.log(`✅ Stock returned successfully for ${scrapMat.name}`)
+            console.log(`✅ Stock returned successfully for ${returnedMat.name}`)
           }
 
-          // ✅ Save scrap material to operations_subphase_materials table
-          await apiService.operations.createMaterial({
+          // ✅ Save returned material using MaterialsService
+          await apiService.materials.createMaterial({
             subphase_id: subphase.id,
-            item_part_number: itemPartNumber,
-            phase_id: phaseId,
-            material_name: scrapMat.name,
-            material_quantity: parseFloat(scrapMat.quantity),
-            unit_of_measure: scrapMat.unit || 'pcs',
-            is_checked_out: false,
-            checkout_date: null,
-            checked_out_by: null,
-            checked_out_by_name: null,
-            checked_out_by_uid: null,
-            status: 'scrap', // ✅ Changed from 'returned' to 'scrap'
-            notes: `Scrap/Leftover - ${scrapMat.reason}\nOriginally assigned to: ${scrapMat.assigned_user_name || 'Unknown'}`,
-            from_unused: true,
-            original_assigned_user: scrapMat.assigned_user_name || null
+            material_name: material.name,
+            material_quantity: parseFloat(material.quantity),
+            unit_of_measure: material.unit || 'pcs',
+            checked_out_by: material.checkout_by || 'SYSTEM',
+            checked_out_by_name: material.checkout_by_name || 'Pending',
+            checked_out_by_uid: material.checkout_by_uid || 'SYSTEM',
+            status: 'checked_out', // ✅ Changed - always use checked_out for new materials
+            notes: material.notes || null
           })
 
-          console.log(`✅ Scrap material saved to database: ${scrapMat.name}`)
+          console.log(`✅ Returned material saved to database: ${returnedMat.name}`)
 
-        } catch (scrapError) {
-          console.error(`❌ Failed to process scrap material ${scrapMat.name}:`, scrapError)
-          throw new Error(`Failed to save scrap material "${scrapMat.name}": ${scrapError.message}`)
+        } catch (returnError) {
+          console.error(`❌ Failed to process returned material ${returnedMat.name}:`, returnError)
+          throw new Error(`Failed to save returned material "${returnedMat.name}": ${returnError.message}`)
         }
       }
 
@@ -965,22 +1366,17 @@ if (remainingQty > 0) {
 
           console.log(`➕ Creating new material record: ${material.name}`)
 
-          await apiService.operations.createMaterial({
+          // ✅ Use MaterialsService
+          await apiService.materials.createMaterial({
             subphase_id: subphase.id,
-            item_part_number: itemPartNumber,
-            phase_id: phaseId,
             material_name: material.name,
             material_quantity: parseFloat(material.quantity),
             unit_of_measure: material.unit || 'pcs',
-            is_checked_out: material.checked_out || false,
-            checkout_date: material.checkout_date || null,
-            checked_out_by: material.checkout_by || null,
-            checked_out_by_name: material.checkout_by_name || null,
-            checked_out_by_uid: material.checkout_by_uid || null,
+            checked_out_by: material.checkout_by || 'SYSTEM',
+            checked_out_by_name: material.checkout_by_name || 'Pending',
+            checked_out_by_uid: material.checkout_by_uid || 'SYSTEM',
             status: material.checked_out ? 'checked_out' : 'pending',
-            notes: material.notes || null,
-            from_unused: material.from_unused || false,
-            original_assigned_user: material.original_assigned_user || null
+            notes: material.notes || null
           })
 
           console.log(`✅ Material saved: ${material.name}`)
@@ -1019,7 +1415,7 @@ if (remainingQty > 0) {
       // STEP 5: Success message
       // ============================================================
       const checkedOutCount = materials.filter(m => m.checked_out).length
-      const newScrapCount = newScrapMaterials.length
+      const newReturnCount = newReturnedMaterials.length
       const newMaterialsCount = materials.filter(m => !m.id).length
 
       let successMessage = '✅ Subphase saved successfully!'
@@ -1032,8 +1428,8 @@ if (remainingQty > 0) {
         successMessage += `\n• ${checkedOutCount} material(s) checked out`
       }
 
-      if (newScrapCount > 0) {
-        successMessage += `\n• ${newScrapCount} scrap material(s) returned to inventory`
+      if (newReturnCount > 0) {
+        successMessage += `\n• ${newReturnCount} returned material(s) saved to inventory`
       }
 
       alert(successMessage)
@@ -1048,138 +1444,169 @@ if (remainingQty > 0) {
     }
   }
 
-  // ✅ NEW: Handle saving ONLY scrap materials (no checkout triggered)
-const handleSaveScrapOnly = async () => {
-  try {
-    // Get context
-    const itemPartNumber = subphase.item_part_number || selectedItemForEdit?.part_number
-    const phaseId = subphase.phase_id || selectedPhaseForEdit?.id
+  // ✅ NEW: Handle saving ONLY returned materials
+  const handleSaveScrapOnly = async () => {
+    try {
+      // Get only NEW returned materials (these are being marked as scrap)
+      const newScrapMaterials = unusedMaterials.filter(m => m.isNew)
 
-    if (!itemPartNumber || !phaseId) {
-      throw new Error('Missing item context')
-    }
-
-    // Get only NEW scrap materials
-    const newScrapMaterials = unusedMaterials.filter(m => m.isNew)
-
-    if (newScrapMaterials.length === 0) {
-      alert('No new scrap materials to save')
-      return
-    }
-
-    // Validate scrap materials
-    for (const mat of newScrapMaterials) {
-      if (!mat.name || !mat.name.trim()) {
-        alert(`Scrap Material: Material name is required`)
-        return
-      }
-      if (!mat.quantity || mat.quantity <= 0) {
-        alert(`Scrap Material "${mat.name}": Quantity must be greater than 0`)
-        return
-      }
-      if (!mat.reason || !mat.reason.trim()) {
-        alert(`Scrap Material "${mat.name}": Reason is required`)
+      if (newScrapMaterials.length === 0) {
+        alert('No new scrap materials to save')
         return
       }
 
-      // Check against checked-out materials
-      const sourceMat = materials.find(m => m.name === mat.name && m.checked_out)
-      if (sourceMat && parseFloat(mat.quantity) > parseFloat(sourceMat.quantity)) {
-        alert(
-          `Scrap Material "${mat.name}":\n\n` +
-          `Scrap quantity (${mat.quantity}) cannot exceed checked-out quantity (${sourceMat.quantity})`
-        )
-        return
-      }
-    }
-
-    // Process each scrap material
-    for (const scrapMat of newScrapMaterials) {
-      try {
-        console.log(`📦 Processing scrap material: ${scrapMat.name}`)
-
-        // Find material in inventory
-        const materialsResponse = await apiService.items.getItems({
-          item_type: "OPERATION PARTICULARS",
-          search: scrapMat.name,
-          limit: 10
-        })
-
-        let inventoryItems = []
-        if (Array.isArray(materialsResponse)) {
-          inventoryItems = materialsResponse
-        } else if (materialsResponse?.data && Array.isArray(materialsResponse.data)) {
-          inventoryItems = materialsResponse.data
-        } else if (materialsResponse?.items && Array.isArray(materialsResponse.items)) {
-          inventoryItems = materialsResponse.items
+      // Validate scrap materials
+      for (const mat of newScrapMaterials) {
+        if (!mat.name || !mat.name.trim()) {
+          alert(`Scrap Material: Material name is required`)
+          return
+        }
+        if (!mat.quantity || mat.quantity <= 0) {
+          alert(`Scrap Material "${mat.name}": Quantity must be greater than 0`)
+          return
+        }
+        if (!mat.reason || !mat.reason.trim()) {
+          alert(`Scrap Material "${mat.name}": Reason is required`)
+          return
         }
 
-        const inventoryItem = inventoryItems.find(m =>
-          m.item_name?.toLowerCase() === scrapMat.name.toLowerCase()
-        )
+        const sourceMat = materials.find(m => m.name === mat.name && m.checked_out)
+        if (sourceMat && parseFloat(mat.quantity) > parseFloat(sourceMat.quantity)) {
+          alert(
+            `Scrap Material "${mat.name}":\n\n` +
+            `Scrap quantity (${mat.quantity}) cannot exceed checked-out quantity (${sourceMat.quantity})`
+          )
+          return
+        }
+      }
 
-        // ✅ Return stock to inventory as scrap
-        if (inventoryItem) {
-          console.log(`📥 Returning ${scrapMat.quantity} ${scrapMat.unit} to inventory as scrap`)
+      // Process each scrap material
+      for (const scrapMat of newScrapMaterials) {
+        try {
+          console.log(`📦 Processing scrap material: ${scrapMat.name}`)
 
-          await apiService.items.addStock(
-            inventoryItem.item_no,
-            parseFloat(scrapMat.quantity),
-            `Scrap material returned from operations\n` +
-            `Subphase: ${formData.name}\n` +
-            `Reason: ${scrapMat.reason}\n` +
-            `Returned by: ${scrapMat.assigned_user_name || 'Unknown'}`,
-            scrapMat.assigned_user_barcode || 'SYSTEM'
+          // ✅ Get employee data
+          const employeeData = await getEmployeeData(scrapMat.assigned_user_uid || 'SYSTEM', apiService)
+
+          // ✅ Find source material (the checked-out material)
+          const sourceMaterial = materials.find(m => m.name === scrapMat.name && m.checked_out)
+
+          if (!sourceMaterial) {
+            throw new Error(`Source material "${scrapMat.name}" not found in checked-out materials`)
+          }
+
+          // ✅ Find material in inventory
+          const materialsResponse = await apiService.items.getItems({
+            item_type: "OPERATION PARTICULARS",
+            search: scrapMat.name,
+            limit: 10
+          })
+
+          let inventoryItems = []
+          if (Array.isArray(materialsResponse)) {
+            inventoryItems = materialsResponse
+          } else if (materialsResponse?.data && Array.isArray(materialsResponse.data)) {
+            inventoryItems = materialsResponse.data
+          } else if (materialsResponse?.items && Array.isArray(materialsResponse.items)) {
+            inventoryItems = materialsResponse.items
+          }
+
+          const inventoryItem = inventoryItems.find(m =>
+            m.item_name?.toLowerCase() === scrapMat.name.toLowerCase()
           )
 
-          console.log(`✅ Stock returned successfully`)
+          if (!inventoryItem) {
+            throw new Error(`Material "${scrapMat.name}" not found in inventory`)
+          }
+
+          // ✅ Reduce quantity from checked-out material
+          const remainingQty = parseFloat(sourceMaterial.quantity) - parseFloat(scrapMat.quantity)
+
+          if (remainingQty > 0) {
+            console.log(`🔄 Updating material ${sourceMaterial.id} with remaining quantity: ${remainingQty}`)
+            await apiService.materials.updateMaterial(sourceMaterial.id, {
+              material_quantity: remainingQty
+            })
+            console.log(`✅ Material ${sourceMaterial.id} updated`)
+          } else {
+            console.log(`🗑️ Deleting material ${sourceMaterial.id} - quantity fully scrapped`)
+            await apiService.materials.deleteMaterial(sourceMaterial.id)
+            console.log(`✅ Material ${sourceMaterial.id} deleted`)
+          }
+
+          // ✅ Create employee log for scrap
+          try {
+            const materialsArray = [{
+              item_no: inventoryItem.item_no,
+              item_name: inventoryItem.item_name,
+              quantity: parseFloat(scrapMat.quantity),
+              unit: scrapMat.unit || 'pcs'
+            }]
+
+            const operationContext = {
+              item_name: selectedItemForEdit?.name || 'Unknown',
+              part_number: selectedItemForEdit?.part_number || 'Unknown',
+              phase_name: selectedPhaseForEdit?.name || 'Unknown',
+              subphase_name: formData.name
+            }
+
+            const logResult = await createMaterialScrapLog(
+              materialsArray,
+              employeeData,
+              operationContext,
+              scrapMat.reason,
+              apiService
+            )
+
+            if (logResult.success) {
+              console.log("✅ Employee scrap log created:", logResult.logId)
+            }
+          } catch (logError) {
+            console.warn("⚠️ Failed to create employee log (non-critical):", logError)
+          }
+
+          // ✅ Save to operations_scrap_materials table
+          await apiService.materials.createScrapMaterial({
+            original_material_id: sourceMaterial.id,
+            subphase_id: subphase.id,
+            material_name: scrapMat.name,
+            quantity_scrapped: parseFloat(scrapMat.quantity),
+            unit_of_measure: scrapMat.unit || 'pcs',
+            scrapped_by: scrapMat.assigned_user_barcode || 'SYSTEM',
+            scrapped_by_name: scrapMat.assigned_user_name || 'Unknown',
+            scrapped_by_uid: scrapMat.assigned_user_uid || 'SYSTEM',
+            scrap_type: 'waste',
+            scrap_reason: scrapMat.reason,
+            is_recyclable: false,
+            notes: `Scrap from operations - Originally assigned to: ${scrapMat.assigned_user_name || 'Unknown'}`
+          })
+
+          console.log(`✅ Scrap material saved to operations_scrap_materials: ${scrapMat.name}`)
+
+        } catch (scrapError) {
+          console.error(`❌ Failed to process scrap material ${scrapMat.name}:`, scrapError)
+          throw new Error(`Failed to save scrap material "${scrapMat.name}": ${scrapError.message}`)
         }
-
-        // ✅ Save scrap material to operations_subphase_materials with status='scrap'
-        await apiService.operations.createMaterial({
-          subphase_id: subphase.id,
-          item_part_number: itemPartNumber,
-          phase_id: phaseId,
-          material_name: scrapMat.name,
-          material_quantity: parseFloat(scrapMat.quantity),
-          unit_of_measure: scrapMat.unit || 'pcs',
-          is_checked_out: false,
-          checkout_date: null,
-          checked_out_by: scrapMat.assigned_user_barcode,
-          checked_out_by_name: scrapMat.assigned_user_name,
-          checked_out_by_uid: scrapMat.assigned_user_uid,
-          status: 'scrap', // ✅ Mark as scrap - will be filtered out
-          notes: `Scrap/Leftover - ${scrapMat.reason}\nOriginally assigned to: ${scrapMat.assigned_user_name || 'Unknown'}`,
-          from_unused: true,
-          original_assigned_user: scrapMat.assigned_user_name || null
-        })
-
-        console.log(`✅ Scrap material saved to database: ${scrapMat.name}`)
-
-      } catch (scrapError) {
-        console.error(`❌ Failed to process scrap material ${scrapMat.name}:`, scrapError)
-        throw new Error(`Failed to save scrap material "${scrapMat.name}": ${scrapError.message}`)
       }
+
+      // ✅ Reload lists
+      await loadSubphaseMaterials()
+      await loadUnusedMaterials()
+
+      if (onRefreshGlobalUnused) {
+        onRefreshGlobalUnused()
+      }
+
+      // Clear new scrap materials from form
+      setUnusedMaterials(prevUnused => prevUnused.filter(m => !m.isNew))
+
+      alert(`✅ Saved ${newScrapMaterials.length} scrap material(s) successfully!\n\nRecords saved to scrap materials table.`)
+
+    } catch (error) {
+      console.error("❌ Error saving scrap materials:", error)
+      alert("Failed to save scrap materials: " + error.message)
     }
-
-    // ✅ Reload lists
-    await loadSubphaseMaterials()
-    await loadUnusedMaterials()
-
-    if (onRefreshGlobalUnused) {
-      onRefreshGlobalUnused()
-    }
-
-    // Clear new scrap materials from form
-    setUnusedMaterials(prevUnused => prevUnused.filter(m => !m.isNew))
-
-    alert(`✅ Saved ${newScrapMaterials.length} scrap material(s) successfully!\n\nThey are now available for reuse.`)
-
-  } catch (error) {
-    console.error("❌ Error saving scrap materials:", error)
-    alert("Failed to save scrap materials: " + error.message)
   }
-}
 
   const handleDelete = () => {
     if (window.confirm(`Delete subphase "${subphase.name}"?`)) {
@@ -1189,36 +1616,78 @@ const handleSaveScrapOnly = async () => {
 
   const handleUseUnusedMaterial = async (unusedMaterialId) => {
     try {
-      // ✅ Get the unused material from database
-      const response = await apiService.operations.getMaterials({ id: unusedMaterialId })
-      const unusedMat = Array.isArray(response) ? response[0] : response?.data?.[0] || response
+      // ✅ Find the material in state to check source_type
+      const material = unusedMaterials.find(m => m.id === unusedMaterialId)
 
-      if (!unusedMat) {
+      if (!material) {
         alert("Material not found")
         return
       }
 
+      let materialData
+
+      if (material.source_type === 'returned') {
+        // Get from returned materials table
+        const response = await apiService.materials.getReturnedMaterial(unusedMaterialId)
+        materialData = Array.isArray(response) ? response[0] : response?.data?.[0] || response
+      } else if (material.source_type === 'scrap') {
+        // Get from scrap materials table
+        const response = await apiService.materials.getScrapMaterial(unusedMaterialId)
+        materialData = Array.isArray(response) ? response[0] : response?.data?.[0] || response
+      }
+
+      if (!materialData) {
+        alert("Material not found")
+        return
+      }
+
+      const quantity = material.source_type === 'returned'
+        ? materialData.quantity_returned
+        : materialData.quantity_scrapped
+
+      const sourceLabel = material.source_type === 'returned'
+        ? 'Returned Materials'
+        : 'Scrap Materials'
+
       if (!window.confirm(
-        `Use "${unusedMat.material_name}" (${unusedMat.material_quantity} ${unusedMat.unit_of_measure})?\n\n` +
+        `Use "${material.name}" (${quantity} ${material.unit}) from ${sourceLabel}?\n\n` +
         `This will:\n` +
         `• Add to your Required Materials\n` +
         `• Mark as pending checkout\n` +
-        `• Remove from unused/leftover list`
+        `• Remove from ${sourceLabel} list\n\n` +
+        `Source: ${material.source_type === 'scrap' ? 'Scrap/Waste' : 'Returned (Reusable)'}\n` +
+        `Originally handled by: ${material.assigned_user_name || 'Unknown'}`
       )) {
         return
       }
 
-      // ✅ Update material status from 'returned' to 'pending'
-      await apiService.operations.updateMaterial(unusedMaterialId, {
-        status: 'pending',
-        is_checked_out: false,
-        notes: `${unusedMat.notes}\nMoved back to required materials on ${new Date().toLocaleString()}`
+      // ✅ Create new material checkout in current subphase
+      await apiService.materials.createMaterial({
+        subphase_id: subphase.id,
+        material_name: material.name,
+        material_quantity: parseFloat(quantity),
+        unit_of_measure: material.unit || 'pcs',
+        checked_out_by: 'SYSTEM',
+        checked_out_by_name: 'Pending',
+        checked_out_by_uid: 'SYSTEM',
+        status: 'checked_out',
+        notes: `Reused from ${sourceLabel} (${material.source_type})\nOriginally handled by: ${material.assigned_user_name}\nReason: ${material.reason}`
       })
 
-      console.log(`✅ Material ${unusedMaterialId} moved to required materials`)
+      // ✅ Delete the source record (returned or scrap)
+      if (material.source_type === 'returned') {
+        await apiService.materials.deleteReturnedMaterial(unusedMaterialId)
+        console.log(`✅ Deleted from returned materials`)
+      } else if (material.source_type === 'scrap') {
+        await apiService.materials.deleteScrapMaterial(unusedMaterialId)
+        console.log(`✅ Deleted from scrap materials`)
+      }
+
+      console.log(`✅ Material transferred to current subphase`)
 
       // ✅ Reload materials
       await loadSubphaseMaterials()
+      await loadUnusedMaterials()
 
       // ✅ Refresh global unused list
       if (onRefreshGlobalUnused) {
@@ -1226,15 +1695,16 @@ const handleSaveScrapOnly = async () => {
       }
 
       alert(
-        `✅ Moved "${unusedMat.material_name}" to Required Materials\n\n` +
-        `Quantity: ${unusedMat.material_quantity} ${unusedMat.unit_of_measure}\n` +
+        `✅ Moved "${material.name}" to Required Materials\n\n` +
+        `Source: ${sourceLabel}\n` +
+        `Quantity: ${quantity} ${material.unit}\n` +
         `Status: Pending checkout\n\n` +
         `You can now checkout this material for use.`
       )
 
     } catch (error) {
-      console.error("❌ Error using unused material:", error)
-      alert("Failed to use unused material: " + error.message)
+      console.error("❌ Error using material:", error)
+      alert("Failed to use material: " + error.message)
     }
   }
 
@@ -1357,14 +1827,17 @@ const handleSaveScrapOnly = async () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('unused')}
-                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${activeTab === 'unused'
-                      ? isDarkMode ? "bg-orange-600 text-white" : "bg-orange-600 text-white"
-                      : isDarkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  onClick={() => {
+                    setActiveTab('scraps')
+                    loadAvailableScrapMaterials()
+                  }}
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${activeTab === 'scraps'
+                    ? isDarkMode ? "bg-orange-600 text-white" : "bg-orange-600 text-white"
+                    : isDarkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                     }`}
                 >
                   <Archive size={16} />
-                  Scraps ({unusedMaterials.length}) {/* ✅ Changed label */}
+                  Available Scraps ({availableScrapMaterials.length})
                 </button>
               </div>
 
@@ -1402,18 +1875,34 @@ const handleSaveScrapOnly = async () => {
                                 Material #{index + 1}
                               </span>
                               <div className="flex gap-1">
-                                {/* ✅ Add Return button for checked-out materials */}
+                                {/* ✅ TWO DIFFERENT BUTTONS when checked out */}
                                 {material.checked_out && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReturnMaterial(material, index)}
-                                    className="flex items-center gap-1 px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded transition-colors"
-                                    title="Return unused/leftover material"
-                                  >
-                                    <Archive size={12} />
-                                    Return
-                                  </button>
+                                  <>
+                                    {/* RETURN Button - Returns to warehouse */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleReturnMaterial(material, index)}
+                                      className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                                      title="Return unused material to warehouse"
+                                    >
+                                      <PackageCheck size={12} />
+                                      Return
+                                    </button>
+
+                                    {/* SCRAP Button - Marks as processed waste */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMarkAsScrap(material, index)}
+                                      className="flex items-center gap-1 px-2 py-1 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded transition-colors"
+                                      title="Mark as scrap/waste (processed material)"
+                                    >
+                                      <Scissors size={12} />
+                                      Scrap
+                                    </button>
+                                  </>
                                 )}
+
+                                {/* Remove button */}
                                 <button
                                   type="button"
                                   onClick={() => setMaterials(materials.filter((_, i) => i !== index))}
@@ -1526,489 +2015,219 @@ const handleSaveScrapOnly = async () => {
                 </div>
               )}
 
-              {/* Unused Materials Tab */}
-              {activeTab === 'unused' && (
-                <div className={`space-y-3 p-4 rounded-lg border ${isDarkMode ? "bg-gray-700/30 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
+              {activeTab === 'scraps' && (
+                <div className={`space-y-4 p-4 rounded-lg border ${isDarkMode ? "bg-gray-700/30 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
 
-                  {/* ============================================ */}
-                  {/* SECTION 1: ALL AVAILABLE UNUSED STOCK */}
-                  {/* ============================================ */}
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-3">
+                  {/* Header with info */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
                       <label className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? "text-orange-300" : "text-orange-700"}`}>
                         <Archive size={16} />
-                        📦 Available Unused/Leftover Stock
+                        🗑️ Available Scrap Materials
                       </label>
-                      <div className="flex items-center gap-2">
-                        {loadingGlobalUnused && (
-                          <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                            Loading...
-                          </span>
-                        )}
-                        <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                          {unusedMaterials.length} local + {globalUnusedMaterials.length} from other items
-                        </span>
-                      </div>
+                      <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                        Processed material waste from all operations that can be reused
+                      </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => loadAvailableScrapMaterials()}
+                      disabled={loadingScrapMaterials}
+                      className="flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
+                    >
+                      <RefreshCw size={12} className={loadingScrapMaterials ? 'animate-spin' : ''} />
+                      Refresh
+                    </button>
+                  </div>
 
-                    {/* LOCAL UNUSED MATERIALS (from this subphase) */}
-                    {unusedMaterials.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className={`text-xs font-semibold mb-2 flex items-center gap-1 ${isDarkMode ? "text-blue-300" : "text-blue-700"}`}>
-                          🏠 From This Subphase ({unusedMaterials.length})
-                        </h4>
-                        <div className="space-y-3">
-                          {unusedMaterials.map((material, index) => (
-                            <div key={`local-${index}`} className={`p-3 rounded-lg border ${isDarkMode ? "bg-gray-800 border-blue-600" : "bg-white border-blue-300"}`}>
-                              <div className="flex items-center justify-between mb-2">
+                  {/* Info box */}
+                  <div className={`p-3 rounded-lg border text-xs ${isDarkMode
+                    ? "bg-blue-500/10 border-blue-500/30 text-blue-300"
+                    : "bg-blue-500/10 border-blue-500/30 text-blue-700"
+                    }`}>
+                    <p className="font-medium mb-1">ℹ️ About Scrap Materials:</p>
+                    <ul className="list-disc list-inside space-y-1 pl-2">
+                      <li>These are processed materials (cut pieces, leftovers, etc.)</li>
+                      <li>Cannot be returned to warehouse as original stock</li>
+                      <li>Can be reused if suitable for your operation</li>
+                      <li>Click "Use" to add to your Required Materials (no warehouse deduction)</li>
+                    </ul>
+                  </div>
+
+                  {/* Loading state */}
+                  {loadingScrapMaterials && (
+                    <div className="flex items-center justify-center py-8">
+                      <RefreshCw size={24} className="animate-spin text-gray-400" />
+                      <span className={`ml-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                        Loading scrap materials...
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Scrap Materials List */}
+                  {!loadingScrapMaterials && availableScrapMaterials.length > 0 && (
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                      {availableScrapMaterials.map((scrap, index) => (
+                        <div key={scrap.id || index} className={`p-3 rounded-lg border ${isDarkMode
+                          ? "bg-gray-800 border-orange-600"
+                          : "bg-white border-orange-300"
+                          }`}>
+
+                          {/* Header */}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
                                 <span className={`text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-                                  {material.name}
+                                  {scrap.material_name}
                                 </span>
-                                <div className="flex gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUseUnusedMaterial(index)}
-                                    className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
-                                    title="Move to Required Materials"
-                                  >
-                                    <Package size={12} />
-                                    Use
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (window.confirm(`Remove "${material.name}" from unused materials?`)) {
-                                        setUnusedMaterials(unusedMaterials.filter((_, i) => i !== index))
-                                      }
-                                    }}
-                                    className="p-1 text-red-600 hover:bg-red-500/10 rounded transition-colors"
-                                    title="Remove from list"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </div>
+                                {/* Scrap type badge */}
+                                <span className={`text-xs px-2 py-0.5 rounded bg-orange-500/20 text-orange-300 border border-orange-500/30`}>
+                                  {scrap.scrap_type || 'waste'}
+                                </span>
                               </div>
-
-                              <div className="space-y-2 text-xs">
-                                <div className="flex items-center gap-2">
-                                  <Package size={12} className="text-orange-500" />
-                                  <span className={isDarkMode ? "text-gray-300" : "text-gray-700"}>
-                                    Available: <strong>{material.quantity} {material.unit}</strong>
-                                  </span>
-                                </div>
-
-                                {material.assigned_user_name && (
-                                  <div className={`p-2 rounded border ${isDarkMode ? "bg-blue-500/10 border-blue-500/30 text-blue-300" : "bg-blue-500/10 border-blue-500/30 text-blue-700"}`}>
-                                    <div className="flex items-center gap-1 mb-1">
-                                      <User size={12} />
-                                      <strong>Originally assigned to:</strong>
-                                    </div>
-                                    <div className="pl-4">
-                                      <div>{material.assigned_user_name}</div>
-                                      {material.assigned_user_barcode && (
-                                        <div className="text-xs opacity-80">ID: {material.assigned_user_barcode}</div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {material.date_added && (
-                                  <div className="flex items-center gap-1">
-                                    <Clock size={12} />
-                                    <span>Marked unused: {new Date(material.date_added).toLocaleDateString()}</span>
-                                  </div>
-                                )}
-
-                                {material.reason && (
-                                  <div className={`p-2 rounded text-xs ${isDarkMode ? "bg-yellow-500/10 text-yellow-300" : "bg-yellow-500/10 text-yellow-700"}`}>
-                                    <AlertTriangle size={12} className="inline mr-1" />
-                                    {material.reason}
-                                  </div>
-                                )}
+                              {/* Source location */}
+                              <div className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                                📍 From: {scrap.item_name || 'Unknown'} → {scrap.phase_name || 'Unknown'} → {scrap.subphase_name || 'Unknown'}
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
 
-                    {/* Available Unused Materials from Database */}
-                    {globalUnusedMaterials && globalUnusedMaterials.length > 0 && (
-                      <div className="mb-6">
-                        <div className="flex items-center justify-between mb-3">
-                          <label className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? "text-orange-300" : "text-orange-700"}`}>
-                            <Archive size={16} />
-                            📦 Available Scrap Materials {/* ✅ Changed label */}
-                          </label>
-                          {loadingGlobalUnused && (
-                            <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                              Loading...
-                            </span>
-                          )}
-                        </div>
+                            {/* Use button */}
+                            <button
+                              type="button"
+                              onClick={() => handleUseScrapMaterial(scrap)}
+                              className="flex items-center gap-1 px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
+                              title="Use this scrap material (no warehouse deduction)"
+                            >
+                              <PackagePlus size={12} />
+                              Use Scrap
+                            </button>
+                          </div>
 
-                        <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3">
-                          {globalUnusedMaterials
-                            .filter(material => material.source_subphase_id !== subphase?.id)
-                            .map((material, index) => (
-                              <div key={material.id || `global-${index}`} className={`p-3 rounded-lg border ${isDarkMode
-                                ? "bg-gray-800 border-purple-600"
-                                : "bg-white border-purple-300"
+                          {/* Details */}
+                          <div className="space-y-2 text-xs">
+                            {/* Quantity available */}
+                            <div className="flex items-center gap-2">
+                              <Package size={12} className="text-orange-500" />
+                              <span className={isDarkMode ? "text-gray-300" : "text-gray-700"}>
+                                Available: <strong>{scrap.quantity_scrapped} {scrap.unit_of_measure}</strong>
+                              </span>
+                            </div>
+
+                            {/* Originally scrapped by */}
+                            {scrap.scrapped_by_name && (
+                              <div className={`p-2 rounded border ${isDarkMode
+                                ? "bg-blue-500/10 border-blue-500/30 text-blue-300"
+                                : "bg-blue-500/10 border-blue-500/30 text-blue-700"
                                 }`}>
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex-1">
-                                    <span className={`text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-                                      {material.name}
-                                    </span>
-                                    <div className={`text-xs mt-1 ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
-                                      📍 {material.source_item} → {material.source_phase} → {material.source_subphase}
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleTransferFromOtherItem(material, index)}
-                                    className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
-                                    title="Transfer to this subphase"
-                                  >
-                                    <Package size={12} />
-                                    Transfer
-                                  </button>
+                                <div className="flex items-center gap-1 mb-1">
+                                  <User size={12} />
+                                  <strong>Originally scrapped by:</strong>
                                 </div>
-
-                                <div className="space-y-2 text-xs">
-                                  <div className="flex items-center gap-2">
-                                    <Package size={12} className="text-orange-500" />
-                                    <span className={isDarkMode ? "text-gray-300" : "text-gray-700"}>
-                                      Available: <strong>{material.quantity} {material.unit}</strong>
-                                    </span>
-                                  </div>
-
-                                  {material.assigned_user_name && (
-                                    <div className={`p-2 rounded border ${isDarkMode
-                                      ? "bg-blue-500/10 border-blue-500/30 text-blue-300"
-                                      : "bg-blue-500/10 border-blue-500/30 text-blue-700"
-                                      }`}>
-                                      <div className="flex items-center gap-1">
-                                        <User size={12} />
-                                        <strong>Originally assigned to:</strong>
-                                      </div>
-                                      <div className="pl-4 mt-1">
-                                        <div>{material.assigned_user_name}</div>
-                                        {material.assigned_user_barcode && (
-                                          <div className="opacity-80">
-                                            ID: {material.assigned_user_barcode}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
+                                <div className="pl-4">
+                                  <div>{scrap.scrapped_by_name}</div>
+                                  {scrap.scrapped_by && (
+                                    <div className="opacity-80">ID: {scrap.scrapped_by}</div>
                                   )}
-
-                                  {material.reason && (
-                                    <div className={`p-2 rounded text-xs ${isDarkMode
-                                      ? "bg-yellow-500/10 text-yellow-300"
-                                      : "bg-yellow-500/10 text-yellow-700"
-                                      }`}>
-                                      <AlertTriangle size={12} className="inline mr-1" />
-                                      {material.reason}
+                                  {scrap.scrap_date && (
+                                    <div className="opacity-80">
+                                      Date: {new Date(scrap.scrap_date).toLocaleDateString()}
                                     </div>
                                   )}
                                 </div>
                               </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
+                            )}
 
-                    {/* NO UNUSED MATERIALS AT ALL */}
-                    {unusedMaterials.length === 0 && globalUnusedMaterials.length === 0 && !loadingGlobalUnused && (
-                      <div className={`text-sm text-center py-8 rounded-lg border ${isDarkMode ? "bg-gray-800/50 border-gray-700 text-gray-400" : "bg-gray-100 border-gray-300 text-gray-600"}`}>
-                        <Package size={24} className="mx-auto mb-2 opacity-50" />
-                        <p>No unused materials available.</p>
-                        <p className="text-xs mt-1">Mark materials as unused to see them here.</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* DIVIDER */}
-                  <div className={`border-t pt-4 ${isDarkMode ? "border-gray-600" : "border-gray-300"}`}>
-
-                    {/* ============================================ */}
-                    {/* SECTION 2: MARK NEW MATERIALS AS UNUSED */}
-                    {/* ============================================ */}
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <label className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-                          <Plus size={16} />
-                          ➕ Mark Materials as Scrap {/* ✅ Changed label */}
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            // ✅ Get only materials from current item's required materials that are checked out
-                            const availableMaterials = materials.filter(m => m.checked_out)
-
-                            if (availableMaterials.length === 0) {
-                              alert("No checked-out materials available.\n\nPlease checkout materials from the 'Required Materials' tab first.")
-                              return
-                            }
-
-                            setUnusedMaterials([...unusedMaterials, {
-                              name: '',
-                              quantity: 0,
-                              unit: 'pcs',
-                              reason: '',
-                              assigned_user_uid: null,
-                              assigned_user_name: null,
-                              assigned_user_barcode: null,
-                              date_added: new Date().toISOString(),
-                              isNew: true
-                            }])
-                          }}
-                          className="flex items-center gap-1 text-xs bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded transition-colors"
-                        >
-                          <Plus size={14} />
-                          Mark as Scrap {/* ✅ Changed label */}
-                        </button>
-                      </div>
-
-                      {/* Info box */}
-                      <div className={`mb-3 p-3 rounded-lg border text-xs ${isDarkMode
-                        ? "bg-blue-500/10 border-blue-500/30 text-blue-300"
-                        : "bg-blue-500/10 border-blue-500/30 text-blue-700"
-                        }`}>
-                        <p className="font-medium mb-1">ℹ️ How to mark materials as scrap:</p>
-                        <ol className="list-decimal list-inside space-y-1 pl-2">
-                          <li>Select a checked-out material from the dropdown</li>
-                          <li>Enter the scrap/leftover quantity</li>
-                          <li>Provide a reason (e.g., "Excess material", "Damaged", "Wrong specification")</li>
-                          <li>Click "Save Changes" to return the material to inventory as scrap</li>
-                        </ol>
-                      </div>
-
-                      {/* Show form for NEW entries only */}
-                      {unusedMaterials.filter(m => m.isNew).length > 0 && (
-                        <div className="space-y-3">
-                          {unusedMaterials.map((material, index) => {
-                            // Only show forms for NEW materials being added
-                            if (!material.isNew) return null
-
-                            return (
-                              <div key={index} className={`p-3 rounded-lg border ${isDarkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"
+                            {/* Scrap reason */}
+                            {scrap.scrap_reason && (
+                              <div className={`p-2 rounded border ${isDarkMode
+                                ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-300"
+                                : "bg-yellow-500/10 border-yellow-500/30 text-yellow-700"
                                 }`}>
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className={`text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"
-                                    }`}>
-                                    New Unused Material
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setUnusedMaterials(unusedMaterials.filter((_, i) => i !== index))}
-                                    className="p-1 text-red-600 hover:bg-red-500/10 rounded transition-colors"
-                                    title="Cancel"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
+                                <div className="flex items-center gap-1 mb-1">
+                                  <AlertTriangle size={12} />
+                                  <strong>Scrap reason:</strong>
                                 </div>
-
-                                <div className="space-y-2">
-                                  {/* Material Selection - Only from CHECKED OUT materials */}
-                                  <div>
-                                    <label className={`block text-xs mb-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"
-                                      }`}>
-                                      Select Material (from checked-out items) *
-                                    </label>
-                                    <select
-                                      value={material.name || ""}
-                                      onChange={(e) => {
-                                        const selectedMat = materials.find(m => m.name === e.target.value)
-                                        const updated = [...unusedMaterials]
-                                        updated[index] = {
-                                          ...updated[index],
-                                          name: e.target.value,
-                                          unit: selectedMat?.unit || 'pcs',
-                                          // Auto-assign user from checkout info
-                                          assigned_user_uid: selectedMat?.checkout_by_uid || null,
-                                          assigned_user_name: selectedMat?.checkout_by_name || null,
-                                          assigned_user_barcode: selectedMat?.checkout_by || null
-                                        }
-                                        setUnusedMaterials(updated)
-                                      }}
-                                      className={`w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${isDarkMode
-                                        ? "bg-gray-700 border border-gray-600 text-gray-100"
-                                        : "bg-gray-100 border border-gray-300 text-gray-800"
-                                        }`}
-                                    >
-                                      <option value="">Select from your checked-out materials...</option>
-                                      {materials
-                                        .filter(m => m.checked_out)
-                                        .map((mat, idx) => (
-                                          <option key={idx} value={mat.name}>
-                                            {mat.name} (available: {mat.quantity} {mat.unit})
-                                          </option>
-                                        ))}
-                                    </select>
-                                  </div>
-
-                                  {/* Quantity & Unit */}
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                      <label className={`block text-xs mb-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"
-                                        }`}>
-                                        Unused Quantity *
-                                      </label>
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        max={materials.find(m => m.name === material.name)?.quantity || 0}
-                                        value={material.quantity || ""}
-                                        onChange={(e) => {
-                                          const updated = [...unusedMaterials]
-                                          updated[index].quantity = e.target.value
-                                          setUnusedMaterials(updated)
-                                        }}
-                                        placeholder="0.00"
-                                        className={`w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${isDarkMode
-                                          ? "bg-gray-700 border border-gray-600 text-gray-100"
-                                          : "bg-gray-100 border border-gray-300 text-gray-800"
-                                          }`}
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className={`block text-xs mb-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"
-                                        }`}>
-                                        Unit
-                                      </label>
-                                      <input
-                                        type="text"
-                                        value={material.unit}
-                                        disabled
-                                        className={`w-full px-3 py-2 rounded-lg text-sm bg-gray-600/50 cursor-not-allowed ${isDarkMode
-                                          ? "border border-gray-600 text-gray-300"
-                                          : "border border-gray-300 text-gray-600"
-                                          }`}
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* Show max available */}
-                                  {material.name && (
-                                    <div className={`text-xs p-2 rounded ${isDarkMode
-                                      ? "bg-purple-500/10 text-purple-300"
-                                      : "bg-purple-500/10 text-purple-700"
-                                      }`}>
-                                      ℹ️ Max available: {materials.find(m => m.name === material.name)?.quantity || 0} {material.unit}
-                                    </div>
-                                  )}
-
-                                  {/* Auto-assigned User Display */}
-                                  {material.assigned_user_name && (
-                                    <div className={`p-2 rounded border text-xs ${isDarkMode
-                                      ? "bg-blue-500/10 border-blue-500/30 text-blue-300"
-                                      : "bg-blue-500/10 border-blue-500/30 text-blue-700"
-                                      }`}>
-                                      <div className="flex items-center gap-1">
-                                        <User size={12} />
-                                        <strong>Will be assigned to:</strong>
-                                      </div>
-                                      <div className="pl-4 mt-1">
-                                        <div>{material.assigned_user_name}</div>
-                                        {material.assigned_user_barcode && (
-                                          <div className="opacity-80">
-                                            ID: {material.assigned_user_barcode}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Reason */}
-                                  <div>
-                                    <label className={`block text-xs mb-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"
-                                      }`}>
-                                      Reason/Notes *
-                                    </label>
-                                    <textarea
-                                      placeholder="Why is this unused? (e.g., Excess material, Damaged, Wrong specification, etc.)"
-                                      value={material.reason || ''}
-                                      onChange={(e) => {
-                                        const updated = [...unusedMaterials]
-                                        updated[index].reason = e.target.value
-                                        setUnusedMaterials(updated)
-                                      }}
-                                      rows={2}
-                                      className={`w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none ${isDarkMode
-                                        ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-500"
-                                        : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-400"
-                                        }`}
-                                    />
-                                  </div>
-                                </div>
+                                <div className="pl-4">{scrap.scrap_reason}</div>
                               </div>
-                            )
-                          })}
-                        </div>
-                      )}
+                            )}
 
-                      {/* General Notes */}
-                      <div className="mt-4">
-                        <label className={`block text-sm font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"
-                          }`}>
-                          General Notes About Unused Materials
-                        </label>
-                        <textarea
-                          value={formData.unused_notes}
-                          onChange={(e) => setFormData({ ...formData, unused_notes: e.target.value })}
-                          placeholder="Any additional notes about unused/leftover materials for this subphase..."
-                          rows={3}
-                          className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none ${isDarkMode
-                            ? "bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-500"
-                            : "bg-gray-100 border border-gray-300 text-gray-800 placeholder-gray-400"
-                            }`}
-                        />
-                      </div>
+                            {/* Additional notes */}
+                            {scrap.notes && (
+                              <div className={`p-2 rounded text-xs ${isDarkMode
+                                ? "bg-gray-700 text-gray-300"
+                                : "bg-gray-100 text-gray-700"
+                                }`}>
+                                <strong>Notes:</strong> {scrap.notes}
+                              </div>
+                            )}
+
+                            {/* Recyclable indicator */}
+                            {scrap.is_recyclable && (
+                              <div className="flex items-center gap-1 text-green-400">
+                                <CheckCircle size={12} />
+                                <span>Marked as recyclable/reusable</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  )}
+
+                  {/* Empty state */}
+                  {!loadingScrapMaterials && availableScrapMaterials.length === 0 && (
+                    <div className={`text-sm text-center py-8 rounded-lg border ${isDarkMode
+                      ? "bg-gray-800/50 border-gray-700 text-gray-400"
+                      : "bg-gray-100 border-gray-300 text-gray-600"
+                      }`}>
+                      <Archive size={32} className="mx-auto mb-2 opacity-50" />
+                      <p className="font-medium">No scrap materials available</p>
+                      <p className="text-xs mt-1">
+                        Scrap materials from operations will appear here for reuse
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
 
+
           {/* Action Buttons - Fixed at bottom */}
-<div className={`p-6 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
-  <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-    <button
-      type="submit"
-      className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-    >
-      <Save size={16} />
-      Save Changes
-    </button>
-    <button
-      type="button"
-      onClick={handleSaveScrapOnly}
-      className="flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-    >
-      <Archive size={16} />
-      Save Scrap
-    </button>
-    <button
-      type="button"
-      onClick={handleDelete}
-      className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-    >
-      <Trash2 size={16} />
-      Delete Subphase
-    </button>
-    <button
-      type="button"
-      onClick={onClose}
-      className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
-    >
-      Cancel
-    </button>
-  </div>
-</div>
+          <div className={`p-6 border-t ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+              <button
+                type="submit"
+                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+              >
+                <Save size={16} />
+                Save Changes
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveScrapOnly}
+                className="flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+              >
+                <Archive size={16} />
+                Save Scrap
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+              >
+                <Trash2 size={16} />
+                Delete Subphase
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </form>
       </div>
     </div>

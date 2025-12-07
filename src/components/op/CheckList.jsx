@@ -140,86 +140,80 @@ function Checklist({
     );
   };
 
- useEffect(() => {
-  // When items change, ensure materials are loaded for visible subphases
-  items.forEach((item) => {
-    if (expandedItems[item.part_number] && item.phases) {
-      item.phases.forEach((phase) => {
-        if (expandedPhases[phase.id] && phase.subphases) {
-          phase.subphases.forEach(async (subphase) => {
-            if (
-              !subphase._materialsLoaded ||
-              !subphase.materials ||
-              subphase.materials.length === 0
-            ) {
-              try {
-                console.log(
-                  `🔄 Loading materials for subphase ${subphase.id}`
-                );
-                const response =
-                  await apiService.operations.getSubphaseMaterials(
-                    subphase.id
+  useEffect(() => {
+    // When items change, ensure materials are loaded for visible subphases
+    items.forEach((item) => {
+      if (expandedItems[item.part_number] && item.phases) {
+        item.phases.forEach((phase) => {
+          if (expandedPhases[phase.id] && phase.subphases) {
+            phase.subphases.forEach(async (subphase) => {
+              if (
+                !subphase._materialsLoaded ||
+                !subphase.materials ||
+                subphase.materials.length === 0
+              ) {
+                try {
+                  console.log(`🔄 Loading materials for subphase ${subphase.id}`);
+
+                  // ✅ CHANGED: Use materials service
+                  const response = await apiService.materials.getSubphaseMaterials(subphase.id);
+
+                  // ✅ Handle response format
+                  let materials = [];
+                  if (response?.success && Array.isArray(response.data)) {
+                    materials = response.data;
+                  } else if (Array.isArray(response)) {
+                    materials = response;
+                  }
+
+                  // ✅ CHANGED: Filter for active materials only (checked_out, in_use)
+                  const activeMaterials = materials.filter(
+                    (m) => m.status === 'checked_out' || m.status === 'in_use'
                   );
 
-                // ✅ Handle response format
-                let materials = [];
-                if (response?.success && Array.isArray(response.data)) {
-                  materials = response.data;
-                } else if (Array.isArray(response)) {
-                  materials = response;
-                }
+                  console.log(
+                    `✅ Subphase ${subphase.id}: ${activeMaterials.length} active (${materials.length - activeMaterials.length
+                    } filtered)`
+                  );
 
-                // ✅ CRITICAL FIX: Filter out scrap materials for checklist display
-                const activeMaterials = materials.filter(
-                  (m) => m.status !== 'scrap' // ✅ Hide scrap materials in checklist
-                );
-
-                console.log(
-                  `✅ Subphase ${subphase.id}: ${
-                    activeMaterials.length
-                  } active (${
-                    materials.length - activeMaterials.length
-                  } scrap filtered)`
-                );
-
-                setItems((prevItems) =>
-                  prevItems.map((i) =>
-                    i.part_number === item.part_number && i.phases
-                      ? {
+                  setItems((prevItems) =>
+                    prevItems.map((i) =>
+                      i.part_number === item.part_number && i.phases
+                        ? {
                           ...i,
                           phases: i.phases.map((p) =>
                             p.id === phase.id && p.subphases
                               ? {
-                                  ...p,
-                                  subphases: p.subphases.map((s) =>
-                                    s.id === subphase.id
-                                      ? {
-                                          ...s,
-                                          materials: activeMaterials,
-                                          _materialsLoaded: true,
-                                        }
-                                      : s
-                                  ),
-                                }
+                                ...p,
+                                subphases: p.subphases.map((s) =>
+                                  s.id === subphase.id
+                                    ? {
+                                      ...s,
+                                      materials: activeMaterials,
+                                      _materialsLoaded: true,
+                                    }
+                                    : s
+                                ),
+                              }
                               : p
                           ),
                         }
-                      : i
-                  )
-                );
-              } catch (error) {
-                console.error(
-                  `❌ Failed to load materials for subphase ${subphase.id}:`,
-                  error
-                );
+                        : i
+                    )
+                  );
+                } catch (error) {
+                  console.error(
+                    `❌ Failed to load materials for subphase ${subphase.id}:`,
+                    error
+                  );
+                }
               }
-            }
-          });
-        }
-      });
-    }
-  });
-}, [expandedItems, expandedPhases, items.length]);
+            });
+          }
+        });
+      }
+    });
+  }, [expandedItems, expandedPhases, items.length]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -508,71 +502,71 @@ function Checklist({
   };
 
   const loadItemDetails = async (partNumber) => {
-  try {
-    console.log("🔄 Loading details for item:", partNumber);
-    const fullItem = await apiService.operations.getItem(partNumber);
+    try {
+      console.log("🔄 Loading details for item:", partNumber);
+      const fullItem = await apiService.operations.getItem(partNumber);
 
-    // ✅ Load materials for each subphase
-    if (fullItem.phases) {
-      for (const phase of fullItem.phases) {
-        if (phase.subphases) {
-          for (const subphase of phase.subphases) {
-            try {
-              console.log(`🔄 Loading materials for subphase ${subphase.id}`);
-              const materialsResponse =
-                await apiService.operations.getSubphaseMaterials(subphase.id);
+      // ✅ Load materials for each subphase
+      if (fullItem.phases) {
+        for (const phase of fullItem.phases) {
+          if (phase.subphases) {
+            for (const subphase of phase.subphases) {
+              try {
+                console.log(`🔄 Loading materials for subphase ${subphase.id}`);
 
-              // ✅ Handle response format
-              let materials = [];
-              if (materialsResponse?.success && Array.isArray(materialsResponse.data)) {
-                materials = materialsResponse.data;
-              } else if (Array.isArray(materialsResponse)) {
-                materials = materialsResponse;
+                // ✅ CHANGED: Use materials service
+                const materialsResponse = await apiService.materials.getSubphaseMaterials(subphase.id);
+
+                // ✅ Handle response format
+                let materials = [];
+                if (materialsResponse?.success && Array.isArray(materialsResponse.data)) {
+                  materials = materialsResponse.data;
+                } else if (Array.isArray(materialsResponse)) {
+                  materials = materialsResponse;
+                }
+
+                // ✅ CHANGED: Filter for active materials only (checked_out, in_use)
+                const activeMaterials = materials.filter(
+                  (m) => m.status === 'checked_out' || m.status === 'in_use'
+                );
+
+                // Attach active materials to subphase
+                subphase.materials = activeMaterials;
+
+                console.log(
+                  `✅ Loaded ${activeMaterials.length} active materials (${materials.length - activeMaterials.length
+                  } filtered) for subphase ${subphase.id}`
+                );
+              } catch (error) {
+                console.warn(
+                  `⚠️ Failed to load materials for subphase ${subphase.id}:`,
+                  error
+                );
+                subphase.materials = [];
               }
-
-              // ✅ CRITICAL: Filter out scrap materials for checklist
-              const activeMaterials = materials.filter(
-                (m) => m.status !== 'scrap' // ✅ Hide scrap in checklist
-              );
-
-              // Attach active materials to subphase
-              subphase.materials = activeMaterials;
-
-              console.log(
-                `✅ Loaded ${activeMaterials.length} active materials (${
-                  materials.length - activeMaterials.length
-                } scrap filtered) for subphase ${subphase.id}`
-              );
-            } catch (error) {
-              console.warn(
-                `⚠️ Failed to load materials for subphase ${subphase.id}:`,
-                error
-              );
-              subphase.materials = [];
             }
           }
         }
       }
+
+      console.log("✅ Full item loaded with materials:", fullItem);
+
+      if (isMountedRef.current) {
+        setItems((prevItems) => {
+          const newItems = prevItems.map((item) =>
+            item.part_number === partNumber ? fullItem : item
+          );
+          console.log("✅ Updated items state");
+          return newItems;
+        });
+      }
+
+      return fullItem;
+    } catch (err) {
+      console.error("❌ Failed to load item details:", err);
+      return null;
     }
-
-    console.log("✅ Full item loaded with materials:", fullItem);
-
-    if (isMountedRef.current) {
-      setItems((prevItems) => {
-        const newItems = prevItems.map((item) =>
-          item.part_number === partNumber ? fullItem : item
-        );
-        console.log("✅ Updated items state");
-        return newItems;
-      });
-    }
-
-    return fullItem;
-  } catch (err) {
-    console.error("❌ Failed to load item details:", err);
-    return null;
-  }
-};
+  };
 
   const showNotification = (message, type = "info") => {
     console.log("📢 Notification:", message);
@@ -767,6 +761,17 @@ function Checklist({
         await loadData();
       }
     }
+  };
+
+   const handleItemExpansion = (partNumber) => {
+    setExpandedItems((prev) => {
+      // If clicking the same item, just toggle it
+      if (prev[partNumber]) {
+        return { ...prev, [partNumber]: false };
+      }
+      // Otherwise, close all others and open this one
+      return { [partNumber]: true };
+    });
   };
 
   const handleAutoStartNextPhase = async (partNumber, currentPhaseId) => {
@@ -1196,9 +1201,8 @@ function Checklist({
       .map((m) => `${m.item_name} x${m.quantity} (${m.unit || "pcs"})`)
       .join(", ");
 
-    return `Checkout: ${itemCount} item${
-      itemCount > 1 ? "s" : ""
-    } - ${itemsList}`;
+    return `Checkout: ${itemCount} item${itemCount > 1 ? "s" : ""
+      } - ${itemsList}`;
   };
 
   const getEmployeeData = async (employeeUid, apiService) => {
@@ -1257,8 +1261,8 @@ function Checklist({
       const purpose = operationContext.subphase_name
         ? `Material Checkout for ${operationContext.item_name} - ${operationContext.phase_name} - ${operationContext.subphase_name}`
         : operationContext.phase_name
-        ? `Material Checkout for ${operationContext.item_name} - ${operationContext.phase_name}`
-        : `Material Checkout for ${operationContext.item_name}`;
+          ? `Material Checkout for ${operationContext.item_name} - ${operationContext.phase_name}`
+          : `Material Checkout for ${operationContext.item_name}`;
 
       // Prepare items_json with full context
       const itemsJson = materials.map((m) => ({
@@ -1320,66 +1324,33 @@ function Checklist({
     }
   };
 
-  // ============================================================================
-  // FIXED: handleCheckoutSubphaseMaterials in Checklist.jsx
-  // This fixes the "materialsResponse.filter is not a function" error
-  // ============================================================================
-
   const handleCheckoutSubphaseMaterials = async (item, phase, subphase) => {
     try {
       // ✅ Get assigned employee from subphase (REQUIRED)
-      if (
-        !subphase.employee_uid ||
-        !subphase.employee_barcode ||
-        !subphase.employee_name
-      ) {
-        throw new Error(
-          "No employee assigned to this subphase. Please assign an employee first."
-        );
+      if (!subphase.employee_uid || !subphase.employee_barcode || !subphase.employee_name) {
+        throw new Error("No employee assigned to this subphase. Please assign an employee first.");
       }
 
       const checkoutByUid = subphase.employee_uid;
       const checkoutBy = subphase.employee_barcode;
       const checkoutByName = subphase.employee_name;
 
-      console.log(
-        `✅ Using assigned employee: ${checkoutByName} (UID: ${checkoutByUid}, Barcode: ${checkoutBy})`
-      );
+      console.log(`✅ Using assigned employee: ${checkoutByName} (UID: ${checkoutByUid}, Barcode: ${checkoutBy})`);
 
-      // ✅ Load fresh materials from database
+      // ✅ CHANGED: Load fresh materials from database using materials service
       console.log("📥 Loading materials for subphase:", subphase.id);
-      const materialsResponse =
-        await apiService.operations.getSubphaseMaterials(subphase.id);
+      const materialsResponse = await apiService.materials.getSubphaseMaterials(subphase.id);
 
-      // ✅ FIXED: Robust response parsing to handle different formats
+      // ✅ Robust response parsing
       let materialsArray = [];
-
       if (Array.isArray(materialsResponse)) {
-        // Direct array response
         materialsArray = materialsResponse;
-      } else if (
-        materialsResponse?.success &&
-        Array.isArray(materialsResponse.data)
-      ) {
-        // Success wrapper with data array
+      } else if (materialsResponse?.success && Array.isArray(materialsResponse.data)) {
         materialsArray = materialsResponse.data;
-      } else if (
-        materialsResponse?.data &&
-        Array.isArray(materialsResponse.data)
-      ) {
-        // Data wrapper
+      } else if (materialsResponse?.data && Array.isArray(materialsResponse.data)) {
         materialsArray = materialsResponse.data;
-      } else if (
-        materialsResponse?.materials &&
-        Array.isArray(materialsResponse.materials)
-      ) {
-        // Materials wrapper
-        materialsArray = materialsResponse.materials;
       } else {
-        console.warn(
-          "⚠️ Unexpected materials response format:",
-          materialsResponse
-        );
+        console.warn("⚠️ Unexpected materials response format:", materialsResponse);
         materialsArray = [];
       }
 
@@ -1390,24 +1361,20 @@ function Checklist({
         return;
       }
 
-      // ✅ Filter unchecked materials
-      const uncheckedMaterials = materialsArray.filter(
-        (m) => !m.is_checked_out
+      // ✅ CHANGED: Filter unchecked materials (status = 'checked_out' but is_checked_out = false)
+      const uncheckedMaterials = materialsArray.filter((m) =>
+        m.status === 'checked_out' &&
+        (!m.checked_out_by_uid || m.checked_out_by_uid === 'SYSTEM')
       );
 
       if (uncheckedMaterials.length === 0) {
-        alert("All materials have already been checked out");
+        alert("All materials have already been checked out to employees");
         return;
       }
 
       // ✅ Confirm checkout
       const materialsList = uncheckedMaterials
-        .map(
-          (m) =>
-            `• ${m.material_name}: ${m.material_quantity} ${
-              m.unit_of_measure || "pcs"
-            }`
-        )
+        .map((m) => `• ${m.material_name}: ${m.material_quantity} ${m.unit_of_measure || "pcs"}`)
         .join("\n");
 
       const confirmMsg =
@@ -1434,47 +1401,26 @@ function Checklist({
             limit: 10,
           });
 
-          // ✅ FIXED: Robust inventory response parsing
+          // ✅ Robust inventory response parsing
           let inventoryItems = [];
           if (Array.isArray(inventoryResponse)) {
             inventoryItems = inventoryResponse;
-          } else if (
-            inventoryResponse?.items &&
-            Array.isArray(inventoryResponse.items)
-          ) {
+          } else if (inventoryResponse?.items && Array.isArray(inventoryResponse.items)) {
             inventoryItems = inventoryResponse.items;
-          } else if (
-            inventoryResponse?.data &&
-            Array.isArray(inventoryResponse.data)
-          ) {
+          } else if (inventoryResponse?.data && Array.isArray(inventoryResponse.data)) {
             inventoryItems = inventoryResponse.data;
-          } else if (
-            inventoryResponse?.success &&
-            Array.isArray(inventoryResponse.data)
-          ) {
+          } else if (inventoryResponse?.success && Array.isArray(inventoryResponse.data)) {
             inventoryItems = inventoryResponse.data;
-          } else {
-            console.warn(
-              "⚠️ Unexpected inventory response format:",
-              inventoryResponse
-            );
-            inventoryItems = [];
           }
 
-          console.log(
-            `📋 Found ${inventoryItems.length} inventory items for "${material.material_name}"`
-          );
+          console.log(`📋 Found ${inventoryItems.length} inventory items for "${material.material_name}"`);
 
           const inventoryItem = inventoryItems.find(
-            (m) =>
-              m.item_name?.toLowerCase() ===
-              material.material_name.toLowerCase()
+            (m) => m.item_name?.toLowerCase() === material.material_name.toLowerCase()
           );
 
           if (!inventoryItem) {
-            throw new Error(
-              `Material "${material.material_name}" not found in inventory`
-            );
+            throw new Error(`Material "${material.material_name}" not found in inventory`);
           }
 
           const requestedQty = parseFloat(material.material_quantity);
@@ -1486,43 +1432,37 @@ function Checklist({
             );
           }
 
-          // ✅ Deduct from inventory
-          console.log(
-            `📦 Deducting ${requestedQty} ${material.unit_of_measure} from inventory...`
-          );
+          // ✅ Deduct from inventory (KEEP THIS - DO NOT REPLACE)
+          console.log(`📦 Deducting ${requestedQty} ${material.unit_of_measure} from inventory...`);
 
           const deductResult = await apiService.items.removeStock(
             inventoryItem.item_no,
             requestedQty,
             `Material checkout for operations\n` +
-              `Item: ${item.name} (${item.part_number})\n` +
-              `Phase: ${phase.name}\n` +
-              `Subphase: ${subphase.name}\n` +
-              `Material: ${material.material_name}\n` +
-              `Checked out by: ${checkoutByName}`,
+            `Item: ${item.name} (${item.part_number})\n` +
+            `Phase: ${phase.name}\n` +
+            `Subphase: ${subphase.name}\n` +
+            `Material: ${material.material_name}\n` +
+            `Checked out by: ${checkoutByName}`,
             checkoutBy
           );
 
           console.log(`✅ Inventory deducted:`, deductResult);
 
-          // ✅ Update material record in operations_subphase_materials
-          await apiService.operations.updateMaterial(material.id, {
-            is_checked_out: true,
-            checkout_date: formatMySQLDateTime(new Date()),
+          // ✅ CHANGED: Update material record using materials service
+          await apiService.materials.updateMaterial(material.id, {
             checked_out_by: checkoutBy,
             checked_out_by_name: checkoutByName,
             checked_out_by_uid: checkoutByUid,
-            status: "checked_out",
+            checkout_date: formatMySQLDateTime(new Date()),
+            status: 'in_use'
           });
 
-          console.log(`✅ Material ${material.id} updated in database`);
+          console.log(`✅ Material ${material.id} updated with employee info`);
 
-          // ✅ Create employee log
+          // ✅ Create employee log (unchanged)
           try {
-            const fullEmployeeData = await getEmployeeData(
-              checkoutByUid,
-              apiService
-            );
+            const fullEmployeeData = await getEmployeeData(checkoutByUid, apiService);
 
             const materialsArray = [
               {
@@ -1551,18 +1491,12 @@ function Checklist({
               console.log("✅ Employee log created:", logResult.logId);
             }
           } catch (logError) {
-            console.warn(
-              "⚠️ Failed to create employee log (non-critical):",
-              logError
-            );
+            console.warn("⚠️ Failed to create employee log (non-critical):", logError);
           }
 
           successCount++;
         } catch (matError) {
-          console.error(
-            `❌ Failed to checkout ${material.material_name}:`,
-            matError
-          );
+          console.error(`❌ Failed to checkout ${material.material_name}:`, matError);
           failCount++;
           errors.push(`${material.material_name}: ${matError.message}`);
         }
@@ -1574,9 +1508,7 @@ function Checklist({
         resultMsg += `✅ Successfully checked out ${successCount} material(s)\n`;
       }
       if (failCount > 0) {
-        resultMsg += `\n❌ Failed to checkout ${failCount} material(s):\n${errors.join(
-          "\n"
-        )}`;
+        resultMsg += `\n❌ Failed to checkout ${failCount} material(s):\n${errors.join("\n")}`;
       }
 
       alert(resultMsg);
@@ -1593,253 +1525,199 @@ function Checklist({
   // ALSO FIX: handleCheckoutSingleMaterial
   // ============================================================================
 
-  const handleCheckoutSingleMaterial = async (
-    item,
-    phase,
-    subphase,
-    materialIndex
-  ) => {
-    // Parse materials array
-    let materials = [];
-    try {
-      materials =
-        typeof subphase.materials === "string"
-          ? JSON.parse(subphase.materials)
-          : subphase.materials || [];
-    } catch (error) {
-      console.error("Failed to parse materials:", error);
-      alert("Error reading materials data");
+  const handleCheckoutSingleMaterial = async (item, phase, subphase, material) => {
+
+    if (material.checked_out_by_uid && material.checked_out_by_uid !== 'SYSTEM') {
+      alert(`This material is already checked out to: ${material.checked_out_by_name || 'Unknown'}`);
       return;
     }
-
-    const material = materials[materialIndex];
-    if (!material || material.checked_out) {
-      alert("Material already checked out or not found");
-      return;
-    }
-
     try {
-      // STEP 1: Determine who is checking out
-      let checkoutByUid = null;
-      let checkoutBy = null;
-      let checkoutByName = null;
-
-      if (subphase.employee_uid && subphase.employee_name) {
-        checkoutByUid = subphase.employee_uid;
-        checkoutBy = subphase.employee_barcode;
-        checkoutByName = subphase.employee_name;
-      } else {
-        throw new Error(
-          "No employee assigned to this subphase. Please assign an employee first."
-        );
+      // ✅ Get assigned employee from subphase
+      if (!subphase.employee_uid || !subphase.employee_barcode || !subphase.employee_name) {
+        throw new Error("No employee assigned to this subphase. Please assign an employee first.");
       }
 
-      // STEP 2: Find material in inventory
-      const materialsResponse = await apiService.items.getItems({
+      const checkoutByUid = subphase.employee_uid;
+      const checkoutBy = subphase.employee_barcode;
+      const checkoutByName = subphase.employee_name;
+
+      // ✅ Find material in inventory
+      const inventoryResponse = await apiService.items.getItems({
         item_type: "OPERATION PARTICULARS",
-        search: material.name,
+        search: material.material_name,
         limit: 10,
       });
 
-      // ✅ FIXED: Robust response parsing
       let inventoryItems = [];
-      if (Array.isArray(materialsResponse)) {
-        inventoryItems = materialsResponse;
-      } else if (
-        materialsResponse?.items &&
-        Array.isArray(materialsResponse.items)
-      ) {
-        inventoryItems = materialsResponse.items;
-      } else if (
-        materialsResponse?.data &&
-        Array.isArray(materialsResponse.data)
-      ) {
-        inventoryItems = materialsResponse.data;
-      } else if (
-        materialsResponse?.success &&
-        Array.isArray(materialsResponse.data)
-      ) {
-        inventoryItems = materialsResponse.data;
-      } else {
-        console.warn("⚠️ Unexpected response format:", materialsResponse);
-        inventoryItems = [];
+      if (Array.isArray(inventoryResponse)) {
+        inventoryItems = inventoryResponse;
+      } else if (inventoryResponse?.items && Array.isArray(inventoryResponse.items)) {
+        inventoryItems = inventoryResponse.items;
+      } else if (inventoryResponse?.data && Array.isArray(inventoryResponse.data)) {
+        inventoryItems = inventoryResponse.data;
+      } else if (inventoryResponse?.success && Array.isArray(inventoryResponse.data)) {
+        inventoryItems = inventoryResponse.data;
       }
 
-      console.log(`📋 Found ${inventoryItems.length} inventory items`);
-
       const inventoryItem = inventoryItems.find(
-        (m) => m.item_name?.toLowerCase() === material.name.toLowerCase()
+        (m) => m.item_name?.toLowerCase() === material.material_name.toLowerCase()
       );
 
       if (!inventoryItem) {
-        throw new Error(`Material "${material.name}" not found in inventory`);
+        throw new Error(`Material "${material.material_name}" not found in inventory`);
       }
 
-      const requestedQty = parseFloat(material.quantity);
+      const requestedQty = parseFloat(material.material_quantity);
 
-      // STEP 3: Check stock availability
-      if (inventoryItem.balance < requestedQty) {
-        const proceed = window.confirm(
-          `⚠️ Insufficient stock for ${inventoryItem.item_name}\n\n` +
-            `Requested: ${requestedQty} ${material.unit || "units"}\n` +
-            `Available: ${inventoryItem.balance} ${
-              inventoryItem.unit_of_measure || "units"
-            }\n\n` +
-            `Proceed with checkout anyway?`
-        );
-        if (!proceed) return;
-      }
-
-      // STEP 4: Confirm checkout
+      // ✅ Confirm checkout
       const confirmMsg =
         `Checkout material:\n\n` +
         `Material: ${inventoryItem.item_name}\n` +
-        `Quantity: ${requestedQty} ${material.unit || "units"}\n` +
-        `Available: ${inventoryItem.balance} ${
-          inventoryItem.unit_of_measure || "units"
-        }\n\n` +
+        `Quantity: ${requestedQty} ${material.unit_of_measure || "units"}\n` +
+        `Available: ${inventoryItem.balance} ${inventoryItem.unit_of_measure || "units"}\n\n` +
         `For: ${item.name} → ${phase.name} → ${subphase.name}\n` +
         `✅ Checked out by: ${checkoutByName} (${checkoutBy})\n\n` +
         `Proceed?`;
 
       if (!window.confirm(confirmMsg)) return;
 
-      // STEP 5: Deduct from inventory
-      console.log(
-        `📦 Deducting ${requestedQty} ${material.unit} from inventory...`
-      );
+      // ✅ Deduct from inventory
+      console.log(`📦 Deducting ${requestedQty} ${material.unit_of_measure} from inventory...`);
 
-      const checkoutResult = await apiService.items.removeStock(
+      await apiService.items.removeStock(
         inventoryItem.item_no,
         requestedQty,
         `Material checkout for operations\n` +
-          `Item: ${item.name} (${item.part_number})\n` +
-          `Phase: ${phase.name}\n` +
-          `Subphase: ${subphase.name}\n` +
-          `Material: ${material.name}\n` +
-          `Checked out by: ${checkoutByName}`,
+        `Item: ${item.name} (${item.part_number})\n` +
+        `Phase: ${phase.name}\n` +
+        `Subphase: ${subphase.name}\n` +
+        `Material: ${material.material_name}\n` +
+        `Checked out by: ${checkoutByName}`,
         checkoutBy
       );
 
-      console.log(`✅ Inventory deducted successfully:`, checkoutResult);
+      console.log(`✅ Inventory deducted successfully`);
 
-      const isSuccess =
-        checkoutResult.success ||
-        (checkoutResult.successful && checkoutResult.successful > 0) ||
-        (checkoutResult.results &&
-          checkoutResult.results.some((r) => r.success));
+      // ✅ Update material checkout status in database
+      await apiService.materials.updateMaterial(material.id, {
+        checked_out_by: checkoutBy,
+        checked_out_by_name: checkoutByName,
+        checked_out_by_uid: checkoutByUid,
+        checkout_date: formatMySQLDateTime(new Date()),
+        status: 'in_use'
+      });
 
-      if (isSuccess) {
-        // STEP 6: Create material record in database
-        try {
-          const materialRecord = await apiService.operations.createMaterial({
-            subphase_id: subphase.id,
-            item_part_number: item.part_number,
-            phase_id: phase.id,
-            material_name: material.name,
-            material_quantity: requestedQty,
-            unit_of_measure: material.unit || "pcs",
-            is_checked_out: true,
-            checkout_date: new Date().toISOString(),
-            checked_out_by: checkoutBy,
-            checked_out_by_name: checkoutByName,
-            checked_out_by_uid: checkoutByUid,
-            status: "checked_out",
-            notes: `Checked out from inventory: ${inventoryItem.item_no}`,
-          });
+      console.log(`✅ Material ${material.id} updated with employee info`);
 
-          console.log(
-            `✅ Material record created in database:`,
-            materialRecord
-          );
+      // ✅ Create employee log
+      try {
+        const fullEmployeeData = await getEmployeeData(checkoutByUid, apiService);
 
-          // Also update local materials array
-          materials[materialIndex] = {
-            ...material,
-            id: materialRecord.id,
-            checked_out: true,
-            checkout_date: new Date().toISOString(),
-            checkout_by: checkoutBy,
-            checkout_by_name: checkoutByName,
-            checkout_by_uid: checkoutByUid,
-          };
+        const materialsArray = [
+          {
+            item_no: inventoryItem.item_no,
+            item_name: inventoryItem.item_name,
+            quantity: requestedQty,
+            unit: material.unit_of_measure || "pcs",
+          },
+        ];
 
-          // Save updated materials array
-          await apiService.operations.updateSubphase(subphase.id, {
-            materials: JSON.stringify(materials),
-          });
-        } catch (materialError) {
-          console.error("Failed to create material record:", materialError);
-          throw new Error(
-            "Material checked out but failed to create record: " +
-              materialError.message
-          );
-        }
+        const operationContext = {
+          item_name: item.name,
+          part_number: item.part_number,
+          phase_name: phase.name,
+          subphase_name: subphase.name,
+        };
 
-        // STEP 7: Create employee log
-        try {
-          console.log("📝 Creating employee log for material checkout...");
-
-          const fullEmployeeData = await getEmployeeData(
-            checkoutByUid,
-            apiService
-          );
-          console.log("👤 Full employee data:", fullEmployeeData);
-
-          const materialsArray = [
-            {
-              item_no: inventoryItem.item_no,
-              item_name: inventoryItem.item_name,
-              quantity: requestedQty,
-              unit: material.unit || "pcs",
-            },
-          ];
-
-          const operationContext = {
-            item_name: item.name,
-            part_number: item.part_number,
-            phase_name: phase.name,
-            subphase_name: subphase.name,
-          };
-
-          const logResult = await createMaterialCheckoutLog(
-            materialsArray,
-            fullEmployeeData,
-            operationContext,
-            apiService
-          );
-
-          if (logResult.success) {
-            console.log(
-              "✅ Employee log created successfully:",
-              logResult.logId
-            );
-          } else {
-            console.warn("⚠️ Employee log creation failed:", logResult.error);
-          }
-        } catch (logError) {
-          console.error(
-            "⚠️ Failed to create employee log (non-critical):",
-            logError
-          );
-        }
-
-        // Reload to show updates
-        await loadItemDetails(item.part_number);
-
-        alert(
-          `✅ Material checked out successfully!\n\n` +
-            `${material.name}: ${requestedQty} ${material.unit}\n` +
-            `Checked out by: ${checkoutByName}`
+        const logResult = await createMaterialCheckoutLog(
+          materialsArray,
+          fullEmployeeData,
+          operationContext,
+          apiService
         );
-      } else {
-        throw new Error(checkoutResult.error || "Checkout failed");
+
+        if (logResult.success) {
+          console.log("✅ Employee log created:", logResult.logId);
+        }
+      } catch (logError) {
+        console.warn("⚠️ Failed to create employee log (non-critical):", logError);
       }
+
+      // ✅ Reload item details
+      await loadItemDetails(item.part_number);
+
+      alert(
+        `✅ Material checked out successfully!\n\n` +
+        `${material.material_name}: ${requestedQty} ${material.unit_of_measure}\n` +
+        `Checked out by: ${checkoutByName}`
+      );
     } catch (error) {
       console.error("❌ Failed to checkout material:", error);
       alert(`Failed to checkout material:\n\n${error.message}`);
     }
   };
+
+  const handleUpdateScrapAssignment = async (item, phase, subphase, material) => {
+    try {
+      // ✅ Get current assigned employee from subphase
+      if (!subphase.employee_uid || !subphase.employee_barcode || !subphase.employee_name) {
+        alert(
+          `⚠️ No employee assigned to this subphase!\n\n` +
+          `Please assign an employee to "${subphase.name}" first.`
+        )
+        return
+      }
+
+      // ✅ Confirm update
+      const currentEmployee = material.checked_out_by_name || 'Unknown'
+      const newEmployee = subphase.employee_name
+
+      if (currentEmployee === newEmployee) {
+        alert(`This scrap material is already assigned to ${newEmployee}`)
+        return
+      }
+
+      if (!window.confirm(
+        `Update scrap material assignment?\n\n` +
+        `Material: ${material.material_name}\n` +
+        `Current: ${currentEmployee}\n` +
+        `New: ${newEmployee}\n\n` +
+        `This will update the tracking data for this reused scrap material.`
+      )) {
+        return
+      }
+
+      // ✅ Update the material assignment
+      await apiService.materials.updateMaterial(material.id, {
+        checked_out_by: subphase.employee_barcode,
+        checked_out_by_name: subphase.employee_name,
+        checked_out_by_uid: subphase.employee_uid,
+        checkout_date: new Date().toISOString(),
+
+        // ✅ Append update note to existing notes
+        notes: material.notes +
+          `\n\n📝 ASSIGNMENT UPDATED:\n` +
+          `   • From: ${currentEmployee}\n` +
+          `   • To: ${newEmployee}\n` +
+          `   • Updated: ${new Date().toLocaleString()}`
+      })
+
+      console.log('✅ Scrap material assignment updated')
+
+      // ✅ Reload item details
+      await loadItemDetails(item.part_number)
+
+      alert(
+        `✅ Assignment updated successfully!\n\n` +
+        `${material.material_name}\n` +
+        `Now assigned to: ${newEmployee}`
+      )
+
+    } catch (error) {
+      console.error('❌ Error updating scrap assignment:', error)
+      alert('Failed to update assignment: ' + error.message)
+    }
+  }
 
   // Helper function to check if previous phase is completed
   const isPreviousPhaseCompleted = (item, currentPhaseIndex) => {
@@ -1871,9 +1749,8 @@ function Checklist({
     <div className="pb-20 sm:pb-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
         <h2
-          className={`text-xl sm:text-2xl font-bold ${
-            isDarkMode ? "text-gray-200" : "text-gray-800"
-          }`}
+          className={`text-xl sm:text-2xl font-bold ${isDarkMode ? "text-gray-200" : "text-gray-800"
+            }`}
         >
           Progress Checklist
         </h2>
@@ -1881,11 +1758,10 @@ function Checklist({
 
       {/* Search and Filter Bar - Mobile Optimized */}
       <div
-        className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 border transition-all shadow-sm ${
-          isDarkMode
-            ? "bg-gray-800/60 border-gray-700/50"
-            : "bg-white/30 border-white/40"
-        }`}
+        className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 border transition-all shadow-sm ${isDarkMode
+          ? "bg-gray-800/60 border-gray-700/50"
+          : "bg-white/30 border-white/40"
+          }`}
       >
         <div className="flex flex-col gap-3">
           {/* Search - Full width on mobile */}
@@ -1902,11 +1778,10 @@ function Checklist({
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className={`w-full pl-10 pr-4 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
-                isDarkMode
-                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                  : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-              }`}
+              className={`w-full pl-10 pr-4 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${isDarkMode
+                ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
+                : "bg-white/50 border border-gray-300/30 text-gray-800 placeholder-gray-500"
+                }`}
             />
           </div>
 
@@ -1918,10 +1793,9 @@ function Checklist({
             <Filter size={18} />
             <span>Filters</span>
             {(filterClient || filterPriority || filterStatus || sortBy) &&
-              ` (${
-                [filterClient, filterPriority, filterStatus, sortBy].filter(
-                  Boolean
-                ).length
+              ` (${[filterClient, filterPriority, filterStatus, sortBy].filter(
+                Boolean
+              ).length
               })`}
           </button>
         </div>
@@ -1936,11 +1810,10 @@ function Checklist({
               <select
                 value={filterClient}
                 onChange={(e) => setFilterClient(e.target.value)}
-                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
-                  isDarkMode
-                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                    : "bg-white/50 border border-gray-300/30 text-gray-800"
-                }`}
+                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800"
+                  }`}
               >
                 <option value="">All Clients</option>
                 {uniqueClients.map((client) => (
@@ -1958,11 +1831,10 @@ function Checklist({
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value)}
-                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
-                  isDarkMode
-                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                    : "bg-white/50 border border-gray-300/30 text-gray-800"
-                }`}
+                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800"
+                  }`}
               >
                 <option value="">All Priorities</option>
                 <option value="High">High</option>
@@ -1978,11 +1850,10 @@ function Checklist({
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
-                  isDarkMode
-                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                    : "bg-white/50 border border-gray-300/30 text-gray-800"
-                }`}
+                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800"
+                  }`}
               >
                 <option value="">All Statuses</option>
                 <option value="not-started">Not Started</option>
@@ -1998,11 +1869,10 @@ function Checklist({
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${
-                  isDarkMode
-                    ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                    : "bg-white/50 border border-gray-300/30 text-gray-800"
-                }`}
+                className={`w-full px-3 py-3 sm:py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all text-base ${isDarkMode
+                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
+                  : "bg-white/50 border border-gray-300/30 text-gray-800"
+                  }`}
               >
                 <option value="">Default</option>
                 <option value="name-asc">Name (A-Z)</option>
@@ -2035,14 +1905,12 @@ function Checklist({
       {isFiltering && (
         <div className="text-center py-8">
           <div
-            className={`animate-spin rounded-full h-8 w-8 border-b-2 mx-auto ${
-              isDarkMode ? "border-slate-400" : "border-slate-600"
-            }`}
+            className={`animate-spin rounded-full h-8 w-8 border-b-2 mx-auto ${isDarkMode ? "border-slate-400" : "border-slate-600"
+              }`}
           ></div>
           <p
-            className={`mt-4 text-sm ${
-              isDarkMode ? "text-gray-400" : "text-gray-600"
-            }`}
+            className={`mt-4 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
           >
             Filtering items...
           </p>
@@ -2052,17 +1920,15 @@ function Checklist({
       {/* Bulk Edit Section - Mobile Optimized */}
       {getCheckedItemsCount() > 0 && (
         <div
-          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mb-4 border transition-all shadow-sm ${
-            isDarkMode
-              ? "bg-purple-500/10 border-purple-500/30"
-              : "bg-purple-500/10 border-purple-500/30"
-          }`}
+          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mb-4 border transition-all shadow-sm ${isDarkMode
+            ? "bg-purple-500/10 border-purple-500/30"
+            : "bg-purple-500/10 border-purple-500/30"
+            }`}
         >
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <span
-              className={`text-sm font-medium ${
-                isDarkMode ? "text-purple-300" : "text-purple-700"
-              }`}
+              className={`text-sm font-medium ${isDarkMode ? "text-purple-300" : "text-purple-700"
+                }`}
             >
               {getCheckedItemsCount()} item(s) selected
             </span>
@@ -2097,45 +1963,39 @@ function Checklist({
       {/* Summary Stats - Mobile Optimized */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div
-          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border transition-all shadow-sm ${
-            isDarkMode
-              ? "bg-blue-500/10 border-blue-500/30"
-              : "bg-gradient-to-r from-blue-500/10 to-blue-400/10 border-blue-500/30"
-          }`}
+          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border transition-all shadow-sm ${isDarkMode
+            ? "bg-blue-500/10 border-blue-500/30"
+            : "bg-gradient-to-r from-blue-500/10 to-blue-400/10 border-blue-500/30"
+            }`}
         >
           <h3
-            className={`text-sm sm:text-lg font-semibold ${
-              isDarkMode ? "text-blue-300" : "text-blue-700"
-            }`}
+            className={`text-sm sm:text-lg font-semibold ${isDarkMode ? "text-blue-300" : "text-blue-700"
+              }`}
           >
             In Progress
           </h3>
           <p
-            className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 ${
-              isDarkMode ? "text-blue-400" : "text-blue-600"
-            }`}
+            className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 ${isDarkMode ? "text-blue-400" : "text-blue-600"
+              }`}
           >
             {inProgressItems.length}
           </p>
         </div>
         <div
-          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border transition-all shadow-sm ${
-            isDarkMode
-              ? "bg-green-500/10 border-green-500/30"
-              : "bg-gradient-to-r from-green-500/10 to-green-400/10 border-green-500/30"
-          }`}
+          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 border transition-all shadow-sm ${isDarkMode
+            ? "bg-green-500/10 border-green-500/30"
+            : "bg-gradient-to-r from-green-500/10 to-green-400/10 border-green-500/30"
+            }`}
         >
           <h3
-            className={`text-sm sm:text-lg font-semibold ${
-              isDarkMode ? "text-green-300" : "text-green-700"
-            }`}
+            className={`text-sm sm:text-lg font-semibold ${isDarkMode ? "text-green-300" : "text-green-700"
+              }`}
           >
             Completed
           </h3>
           <p
-            className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 ${
-              isDarkMode ? "text-green-400" : "text-green-600"
-            }`}
+            className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 ${isDarkMode ? "text-green-400" : "text-green-600"
+              }`}
           >
             {completedItems.length}
           </p>
@@ -2148,9 +2008,8 @@ function Checklist({
           {inProgressItems.length > 0 && (
             <div>
               <h3
-                className={`text-xl sm:text-2xl font-bold mb-3 sm:mb-4 flex items-center gap-2 ${
-                  isDarkMode ? "text-gray-200" : "text-gray-800"
-                }`}
+                className={`text-xl sm:text-2xl font-bold mb-3 sm:mb-4 flex items-center gap-2 ${isDarkMode ? "text-gray-200" : "text-gray-800"
+                  }`}
               >
                 <Clock size={20} />
                 In Progress ({inProgressItems.length})
@@ -2165,11 +2024,10 @@ function Checklist({
                   return (
                     <div
                       key={itemKey}
-                      className={`backdrop-blur-md rounded-lg border overflow-hidden transition-all shadow-sm ${
-                        isDarkMode
-                          ? "bg-gray-800/60 border-gray-700/50"
-                          : "bg-white/30 border-white/40"
-                      }`}
+                      className={`backdrop-blur-md rounded-lg border overflow-hidden transition-all shadow-sm ${isDarkMode
+                        ? "bg-gray-800/60 border-gray-700/50"
+                        : "bg-white/30 border-white/40"
+                        }`}
                     >
                       {/* Item Header - Mobile Optimized */}
                       <div className="p-3 sm:p-4">
@@ -2189,25 +2047,22 @@ function Checklist({
 
                             <div className="flex-1 min-w-0">
                               <h3
-                                className={`font-semibold text-base sm:text-lg lg:text-xl ${
-                                  isDarkMode ? "text-gray-200" : "text-gray-800"
-                                } break-words`}
+                                className={`font-semibold text-base sm:text-lg lg:text-xl ${isDarkMode ? "text-gray-200" : "text-gray-800"
+                                  } break-words`}
                               >
                                 {item.name}
                               </h3>
                               <p
-                                className={`text-xs sm:text-sm ${
-                                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                                } mt-1`}
+                                className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"
+                                  } mt-1`}
                               >
                                 Part #: {item.part_number}
                               </p>
                             </div>
 
                             <span
-                              className={`text-lg sm:text-xl font-bold shrink-0 ${
-                                isDarkMode ? "text-gray-200" : "text-gray-800"
-                              }`}
+                              className={`text-lg sm:text-xl font-bold shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"
+                                }`}
                             >
                               {progress}%
                             </span>
@@ -2252,13 +2107,12 @@ function Checklist({
                                   onClick={() =>
                                     handleUpdatePriority(item.part_number, p)
                                   }
-                                  className={`p-2 text-xs rounded transition-colors active:scale-95 ${
-                                    priority === p
-                                      ? getPriorityColor(p)
-                                      : isDarkMode
+                                  className={`p-2 text-xs rounded transition-colors active:scale-95 ${priority === p
+                                    ? getPriorityColor(p)
+                                    : isDarkMode
                                       ? "text-gray-400 hover:text-gray-300 active:bg-gray-700"
                                       : "text-gray-400 hover:text-gray-600 active:bg-gray-200"
-                                  }`}
+                                    }`}
                                   title={`Set ${p} priority`}
                                 >
                                   <Flag size={16} />
@@ -2364,9 +2218,8 @@ function Checklist({
                           {item.remarks && (
                             <div className="pl-10">
                               <p
-                                className={`text-xs ${
-                                  isDarkMode ? "text-gray-400" : "text-gray-500"
-                                } italic flex items-start gap-1`}
+                                className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"
+                                  } italic flex items-start gap-1`}
                               >
                                 <FileText
                                   size={12}
@@ -2396,22 +2249,20 @@ function Checklist({
                               return (
                                 <div
                                   key={phaseKey}
-                                  className={`rounded-lg border ${
-                                    isPhaseDisabled
-                                      ? "border-yellow-500/30 opacity-60"
-                                      : isDarkMode
+                                  className={`rounded-lg border ${isPhaseDisabled
+                                    ? "border-yellow-500/30 opacity-60"
+                                    : isDarkMode
                                       ? "border-gray-700/10"
                                       : "border-gray-300/10"
-                                  }`}
+                                    }`}
                                 >
                                   {isPhaseDisabled && (
                                     <div className="px-3 pt-3">
                                       <div
-                                        className={`p-2 rounded text-xs ${
-                                          isDarkMode
-                                            ? "text-yellow-400 bg-yellow-500/10 border border-yellow-500/30"
-                                            : "text-yellow-700 bg-yellow-500/10 border border-yellow-500/30"
-                                        }`}
+                                        className={`p-2 rounded text-xs ${isDarkMode
+                                          ? "text-yellow-400 bg-yellow-500/10 border border-yellow-500/30"
+                                          : "text-yellow-700 bg-yellow-500/10 border border-yellow-500/30"
+                                          }`}
                                       >
                                         ⚠️ Complete previous phase first
                                       </div>
@@ -2439,11 +2290,10 @@ function Checklist({
                                         <div className="flex-1 min-w-0">
                                           <div className="flex flex-wrap items-center gap-2">
                                             <span
-                                              className={`font-medium text-base sm:text-lg ${
-                                                isDarkMode
-                                                  ? "text-gray-200"
-                                                  : "text-gray-800"
-                                              }`}
+                                              className={`font-medium text-base sm:text-lg ${isDarkMode
+                                                ? "text-gray-200"
+                                                : "text-gray-800"
+                                                }`}
                                             >
                                               {phase.name}
                                             </span>
@@ -2453,11 +2303,10 @@ function Checklist({
                                               </span>
                                             )}
                                             <span
-                                              className={`text-xs sm:text-sm ${
-                                                isDarkMode
-                                                  ? "text-gray-400"
-                                                  : "text-gray-600"
-                                              }`}
+                                              className={`text-xs sm:text-sm ${isDarkMode
+                                                ? "text-gray-400"
+                                                : "text-gray-600"
+                                                }`}
                                             >
                                               ({phase.subphases?.length || 0}{" "}
                                               sub)
@@ -2498,11 +2347,10 @@ function Checklist({
                                       {/* Progress Bar */}
                                       <div className="flex items-center gap-3">
                                         <div
-                                          className={`flex-1 rounded-full h-2 ${
-                                            isDarkMode
-                                              ? "bg-gray-700"
-                                              : "bg-gray-300"
-                                          }`}
+                                          className={`flex-1 rounded-full h-2 ${isDarkMode
+                                            ? "bg-gray-700"
+                                            : "bg-gray-300"
+                                            }`}
                                         >
                                           <div
                                             className="bg-slate-600 dark:bg-slate-400 h-2 rounded-full transition-all duration-300"
@@ -2514,11 +2362,10 @@ function Checklist({
                                           ></div>
                                         </div>
                                         <span
-                                          className={`text-sm font-semibold w-12 text-right ${
-                                            isDarkMode
-                                              ? "text-gray-200"
-                                              : "text-gray-800"
-                                          }`}
+                                          className={`text-sm font-semibold w-12 text-right ${isDarkMode
+                                            ? "text-gray-200"
+                                            : "text-gray-800"
+                                            }`}
                                         >
                                           {calculatePhaseProgress(phase)}%
                                         </span>
@@ -2527,31 +2374,28 @@ function Checklist({
 
                                     {/* Phase Duration Tracker - Mobile Optimized */}
                                     <div
-                                      className={`rounded-lg p-3 mt-3 ${
-                                        isDarkMode
-                                          ? "bg-slate-500/20"
-                                          : "bg-slate-500/10"
-                                      }`}
+                                      className={`rounded-lg p-3 mt-3 ${isDarkMode
+                                        ? "bg-slate-500/20"
+                                        : "bg-slate-500/10"
+                                        }`}
                                     >
                                       <div className="flex flex-col gap-2 mb-3">
                                         <div className="flex items-center justify-between">
                                           <span
-                                            className={`text-sm font-semibold flex items-center gap-2 ${
-                                              isDarkMode
-                                                ? "text-gray-300"
-                                                : "text-gray-700"
-                                            }`}
+                                            className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode
+                                              ? "text-gray-300"
+                                              : "text-gray-700"
+                                              }`}
                                           >
                                             <Calendar size={16} />
                                             Duration
                                           </span>
                                           {phase.expected_hours && (
                                             <span
-                                              className={`text-xs px-2 py-1 rounded ${
-                                                isDarkMode
-                                                  ? "bg-purple-500/20 text-purple-300"
-                                                  : "bg-purple-500/20 text-purple-700"
-                                              }`}
+                                              className={`text-xs px-2 py-1 rounded ${isDarkMode
+                                                ? "bg-purple-500/20 text-purple-300"
+                                                : "bg-purple-500/20 text-purple-700"
+                                                }`}
                                             >
                                               Expected:{" "}
                                               {Number.parseFloat(
@@ -2568,11 +2412,10 @@ function Checklist({
                                             className="text-slate-600 dark:text-slate-400"
                                           />
                                           <span
-                                            className={`text-lg sm:text-xl font-mono font-bold ${
-                                              isDarkMode
-                                                ? "text-gray-200"
-                                                : "text-gray-800"
-                                            }`}
+                                            className={`text-lg sm:text-xl font-mono font-bold ${isDarkMode
+                                              ? "text-gray-200"
+                                              : "text-gray-800"
+                                              }`}
                                           >
                                             {formatTime(
                                               getPhaseElapsedTime(phase)
@@ -2582,15 +2425,14 @@ function Checklist({
                                             phase.expected_hours &&
                                             phase.actual_hours && (
                                               <span
-                                                className={`text-xs px-2 py-1 rounded font-medium ${
-                                                  phase.actual_hours >
+                                                className={`text-xs px-2 py-1 rounded font-medium ${phase.actual_hours >
                                                   phase.expected_hours
-                                                    ? "bg-red-500/20 text-red-700 dark:text-red-300"
-                                                    : "bg-green-500/20 text-green-700 dark:text-green-300"
-                                                }`}
+                                                  ? "bg-red-500/20 text-red-700 dark:text-red-300"
+                                                  : "bg-green-500/20 text-green-700 dark:text-green-300"
+                                                  }`}
                                               >
                                                 {phase.actual_hours >
-                                                phase.expected_hours
+                                                  phase.expected_hours
                                                   ? "+"
                                                   : ""}
                                                 {(
@@ -2635,20 +2477,18 @@ function Checklist({
                                               </span>
                                             </div>
                                             <div
-                                              className={`w-full rounded-full h-2 ${
-                                                isDarkMode
-                                                  ? "bg-gray-700"
-                                                  : "bg-gray-300"
-                                              }`}
+                                              className={`w-full rounded-full h-2 ${isDarkMode
+                                                ? "bg-gray-700"
+                                                : "bg-gray-300"
+                                                }`}
                                             >
                                               <div
-                                                className={`h-2 rounded-full transition-all duration-300 ${
-                                                  getPhaseElapsedTime(phase) /
-                                                    3600 >
+                                                className={`h-2 rounded-full transition-all duration-300 ${getPhaseElapsedTime(phase) /
+                                                  3600 >
                                                   phase.expected_hours
-                                                    ? "bg-red-500"
-                                                    : "bg-purple-500"
-                                                }`}
+                                                  ? "bg-red-500"
+                                                  : "bg-purple-500"
+                                                  }`}
                                                 style={{
                                                   width: `${Math.min(
                                                     100,
@@ -2657,17 +2497,16 @@ function Checklist({
                                                     ) /
                                                       3600 /
                                                       phase.expected_hours) *
-                                                      100
+                                                    100
                                                   )}%`,
                                                 }}
                                               ></div>
                                             </div>
                                             <p
-                                              className={`text-xs mt-1 ${
-                                                isDarkMode
-                                                  ? "text-gray-400"
-                                                  : "text-gray-600"
-                                              }`}
+                                              className={`text-xs mt-1 ${isDarkMode
+                                                ? "text-gray-400"
+                                                : "text-gray-600"
+                                                }`}
                                             >
                                               {(
                                                 getPhaseElapsedTime(phase) /
@@ -2691,11 +2530,10 @@ function Checklist({
                                             Start:
                                           </span>
                                           <span
-                                            className={`font-medium ${
-                                              isDarkMode
-                                                ? "text-gray-200"
-                                                : "text-gray-800"
-                                            }`}
+                                            className={`font-medium ${isDarkMode
+                                              ? "text-gray-200"
+                                              : "text-gray-800"
+                                              }`}
                                           >
                                             {formatDateTime(phase.start_time)}
                                           </span>
@@ -2711,17 +2549,16 @@ function Checklist({
                                             End:
                                           </span>
                                           <span
-                                            className={`font-medium ${
-                                              isDarkMode
-                                                ? "text-gray-200"
-                                                : "text-gray-800"
-                                            }`}
+                                            className={`font-medium ${isDarkMode
+                                              ? "text-gray-200"
+                                              : "text-gray-800"
+                                              }`}
                                           >
                                             {phase.end_time
                                               ? formatDateTime(phase.end_time)
                                               : phase.pause_time
-                                              ? "Paused"
-                                              : "In progress"}
+                                                ? "Paused"
+                                                : "In progress"}
                                           </span>
                                         </div>
                                       </div>
@@ -2788,7 +2625,7 @@ function Checklist({
                                             >
                                               <StopCircle size={16} />
                                               {calculatePhaseProgress(phase) ===
-                                              100
+                                                100
                                                 ? "Stop"
                                                 : "Complete First"}
                                             </button>
@@ -2823,7 +2660,7 @@ function Checklist({
                                   {expandedPhases[phase.id] && (
                                     <div className="px-3 pb-3 space-y-2">
                                       {phase.subphases &&
-                                      phase.subphases.length > 0 ? (
+                                        phase.subphases.length > 0 ? (
                                         phase.subphases.map(
                                           (subphase, subphaseIndex) => {
                                             const subPhaseKey = subphase.id;
@@ -2841,11 +2678,10 @@ function Checklist({
                                             return (
                                               <div
                                                 key={subPhaseKey}
-                                                className={`p-3 rounded-lg border ${
-                                                  isDarkMode
-                                                    ? "bg-black/10 border-gray-700/10"
-                                                    : "bg-white/5 border-gray-300/10"
-                                                }`}
+                                                className={`p-3 rounded-lg border ${isDarkMode
+                                                  ? "bg-black/10 border-gray-700/10"
+                                                  : "bg-white/5 border-gray-300/10"
+                                                  }`}
                                               >
                                                 <div className="flex items-start gap-3">
                                                   {/* Checkbox - Larger touch target */}
@@ -2860,7 +2696,7 @@ function Checklist({
                                                         if (!isDisabled) {
                                                           const action =
                                                             subphase.completed !=
-                                                            1
+                                                              1
                                                               ? "complete"
                                                               : "incomplete";
                                                           if (
@@ -2873,31 +2709,30 @@ function Checklist({
                                                               phase.id,
                                                               subphase.id,
                                                               subphase.completed ==
-                                                                1
+                                                              1
                                                             );
                                                           }
                                                         }
                                                       }}
-                                                      className={`w-6 h-6 rounded border-gray-300 dark:border-gray-600 text-slate-600 focus:ring-slate-500 focus:ring-2 ${
-                                                        isDisabled
-                                                          ? "cursor-not-allowed opacity-50"
-                                                          : "cursor-pointer"
-                                                      }`}
+                                                      className={`w-6 h-6 rounded border-gray-300 dark:border-gray-600 text-slate-600 focus:ring-slate-500 focus:ring-2 ${isDisabled
+                                                        ? "cursor-not-allowed opacity-50"
+                                                        : "cursor-pointer"
+                                                        }`}
                                                       title={
                                                         isDisabled
                                                           ? !phase.start_time
                                                             ? "Phase not started"
                                                             : phase.pause_time
-                                                            ? "Phase paused"
-                                                            : phase.end_time
-                                                            ? "Phase completed"
-                                                            : !subphase.employee_barcode
-                                                            ? "Assign employee first"
-                                                            : "Conditions not met"
+                                                              ? "Phase paused"
+                                                              : phase.end_time
+                                                                ? "Phase completed"
+                                                                : !subphase.employee_barcode
+                                                                  ? "Assign employee first"
+                                                                  : "Conditions not met"
                                                           : subphase.completed ==
                                                             1
-                                                          ? "Mark incomplete"
-                                                          : "Mark complete"
+                                                            ? "Mark incomplete"
+                                                            : "Mark complete"
                                                       }
                                                     />
                                                     {isDisabled && (
@@ -2909,18 +2744,16 @@ function Checklist({
                                                     <div className="flex items-start justify-between gap-2 mb-2">
                                                       <div className="flex items-center gap-2 flex-1 min-w-0">
                                                         <p
-                                                          className={`font-medium text-sm sm:text-base break-words ${
-                                                            subphase.completed ==
+                                                          className={`font-medium text-sm sm:text-base break-words ${subphase.completed ==
                                                             1
-                                                              ? "line-through opacity-60"
-                                                              : isDisabled
+                                                            ? "line-through opacity-60"
+                                                            : isDisabled
                                                               ? "opacity-50"
                                                               : ""
-                                                          } ${
-                                                            isDarkMode
+                                                            } ${isDarkMode
                                                               ? "text-gray-200"
                                                               : "text-gray-800"
-                                                          }`}
+                                                            }`}
                                                         >
                                                           {subphase.name}
                                                         </p>
@@ -2947,21 +2780,20 @@ function Checklist({
                                                       </div>
                                                       {subphase.completed ==
                                                         1 && (
-                                                        <CheckCircle
-                                                          size={18}
-                                                          className="text-green-500 shrink-0"
-                                                        />
-                                                      )}
+                                                          <CheckCircle
+                                                            size={18}
+                                                            className="text-green-500 shrink-0"
+                                                          />
+                                                        )}
                                                     </div>
 
                                                     {/* Condition Warning */}
                                                     {isDisabled && (
                                                       <div
-                                                        className={`mb-2 p-2 rounded text-xs ${
-                                                          isDarkMode
-                                                            ? "text-yellow-400 bg-yellow-500/10 border border-yellow-500/30"
-                                                            : "text-yellow-700 bg-yellow-500/10 border border-yellow-500/30"
-                                                        }`}
+                                                        className={`mb-2 p-2 rounded text-xs ${isDarkMode
+                                                          ? "text-yellow-400 bg-yellow-500/10 border border-yellow-500/30"
+                                                          : "text-yellow-700 bg-yellow-500/10 border border-yellow-500/30"
+                                                          }`}
                                                       >
                                                         {!subphase.employee_barcode ? (
                                                           <>
@@ -2979,10 +2811,10 @@ function Checklist({
                                                             first
                                                           </>
                                                         ) : subphase.expected_quantity >
-                                                            0 &&
+                                                          0 &&
                                                           (subphase.current_completed_quantity ||
                                                             0) <
-                                                            subphase.expected_quantity ? (
+                                                          subphase.expected_quantity ? (
                                                           <>
                                                             ⚠️ Need{" "}
                                                             {
@@ -3015,21 +2847,20 @@ function Checklist({
                                                     {/* Time Duration */}
                                                     {subphase.time_duration >
                                                       0 && (
-                                                      <p
-                                                        className={`text-xs sm:text-sm ${
-                                                          isDarkMode
+                                                        <p
+                                                          className={`text-xs sm:text-sm ${isDarkMode
                                                             ? "text-gray-400"
                                                             : "text-gray-600"
-                                                        } italic flex items-center gap-1 mb-2`}
-                                                      >
-                                                        <Clock size={12} />
-                                                        {formatDuration(
-                                                          subphase.time_duration /
+                                                            } italic flex items-center gap-1 mb-2`}
+                                                        >
+                                                          <Clock size={12} />
+                                                          {formatDuration(
+                                                            subphase.time_duration /
                                                             60
-                                                        )}{" "}
-                                                        {/* Convert seconds to minutes */}
-                                                      </p>
-                                                    )}
+                                                          )}{" "}
+                                                          {/* Convert seconds to minutes */}
+                                                        </p>
+                                                      )}
 
                                                     {/* Expected Duration & Quantity */}
                                                     <div className="flex flex-wrap gap-2 items-center mb-2">
@@ -3045,9 +2876,9 @@ function Checklist({
                                                       {subphase.expected_quantity !==
                                                         undefined &&
                                                         subphase.expected_quantity !==
-                                                          null &&
+                                                        null &&
                                                         subphase.expected_quantity >
-                                                          0 && (
+                                                        0 && (
                                                           <>
                                                             <span className="text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300 px-2 py-1 rounded flex items-center gap-1">
                                                               <Package
@@ -3091,248 +2922,228 @@ function Checklist({
                                                         )}
                                                     </div>
 
-                                                    {/* ✅ Enhanced Materials Display - Check multiple sources */}
-                                                    {(() => {
-                                                      // ✅ Try to get materials from multiple sources
-                                                      let materialsArray = [];
+                                                    {/* ✅ Enhanced Materials Display - RESPONSIVE VERSION */}
+{(() => {
+  // ✅ Get materials from loaded data
+  let materialsArray = [];
 
-                                                      // Source 1: Loaded materials
-                                                      if (
-                                                        subphase.materials &&
-                                                        Array.isArray(
-                                                          subphase.materials
-                                                        )
-                                                      ) {
-                                                        materialsArray =
-                                                          subphase.materials;
-                                                      }
-                                                      // Source 2: Parsed from database (fallback)
-                                                      else if (
-                                                        subphase.material_raw &&
-                                                        subphase.material_quantity
-                                                      ) {
-                                                        materialsArray = [
-                                                          {
-                                                            name: subphase.material_raw,
-                                                            quantity:
-                                                              parseFloat(
-                                                                subphase.material_quantity
-                                                              ) || 0,
-                                                            unit: "pcs",
-                                                            checked_out:
-                                                              subphase.material_checked_out ||
-                                                              false,
-                                                            checkout_date:
-                                                              subphase.material_checkout_date ||
-                                                              null,
-                                                            checkout_by:
-                                                              subphase.material_checkout_by ||
-                                                              null,
-                                                            checkout_by_name:
-                                                              subphase.material_checkout_by_name ||
-                                                              null,
-                                                            checkout_by_uid:
-                                                              subphase.material_checkout_by_uid ||
-                                                              null,
-                                                          },
-                                                        ];
-                                                      }
+  if (subphase.materials && Array.isArray(subphase.materials)) {
+    materialsArray = subphase.materials;
+  }
 
-                                                      console.log(
-                                                        `🔍 Materials for ${subphase.name}:`,
-                                                        materialsArray.length
-                                                      ); // Debug log
+  console.log(`🔍 Materials for ${subphase.name}:`, materialsArray.length);
 
-                                                      if (
-                                                        materialsArray.length >
-                                                        0
-                                                      ) {
-                                                        return (
-                                                          <div className="space-y-2 mb-2">
-                                                            <div className="flex items-center justify-between">
-                                                              <div className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-                                                                Required
-                                                                Materials (
-                                                                {
-                                                                  materialsArray.length
-                                                                }
-                                                                ):
-                                                              </div>
-                                                              {/* Checkout button */}
-                                                              {materialsArray.some(
-                                                                (m) =>
-                                                                  !m.is_checked_out &&
-                                                                  !m.checked_out
-                                                              ) && (
-                                                                <button
-                                                                  onClick={() =>
-                                                                    handleCheckoutSubphaseMaterials(
-                                                                      item,
-                                                                      phase,
-                                                                      subphase
-                                                                    )
-                                                                  }
-                                                                  className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded"
-                                                                >
-                                                                  <Package
-                                                                    size={12}
-                                                                  />
-                                                                  Checkout All
-                                                                </button>
-                                                              )}
-                                                            </div>
+  if (materialsArray.length > 0) {
+    return (
+      <div className="space-y-2 mb-2">
+        {/* Header with Checkout Button - Mobile Optimized */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+            Required Materials ({materialsArray.length}):
+          </div>
+          {/* Checkout button - only show if there are unchecked materials */}
+          {materialsArray.some((m) => !m.checked_out_by_uid || m.checked_out_by_uid === 'SYSTEM') && (
+            <button
+              onClick={() => handleCheckoutSubphaseMaterials(item, phase, subphase)}
+              className="w-full sm:w-auto flex items-center justify-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-3 py-2 rounded transition-colors"
+            >
+              <Package size={12} />
+              Checkout All
+            </button>
+          )}
+        </div>
 
-                                                            {materialsArray.map(
-                                                              (
-                                                                material,
-                                                                idx
-                                                              ) => (
-                                                                <div
-                                                                  key={
-                                                                    material.id ||
-                                                                    idx
-                                                                  }
-                                                                  className="space-y-2"
-                                                                >
-                                                                  {/* Material Header */}
-                                                                  <div
-                                                                    className={`flex items-center justify-between p-2 rounded ${
-                                                                      isDarkMode
-                                                                        ? "bg-blue-500/10 border border-blue-500/30"
-                                                                        : "bg-blue-500/10 border border-blue-500/30"
-                                                                    }`}
-                                                                  >
-                                                                    <div className="flex items-center gap-2">
-                                                                      <Package
-                                                                        size={
-                                                                          12
-                                                                        }
-                                                                        className="text-blue-500"
-                                                                      />
-                                                                      <div>
-                                                                        <div className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                                                                          {
-                                                                            material.material_name
-                                                                          }
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-600 dark:text-gray-400">
-                                                                          {
-                                                                            material.material_quantity
-                                                                          }{" "}
-                                                                          {material.unit_of_measure ||
-                                                                            "pcs"}
-                                                                        </div>
-                                                                      </div>
-                                                                    </div>
+        {/* Materials List - Mobile Optimized */}
+        {materialsArray.map((material, idx) => (
+          <div key={material.id || idx} className="space-y-2">
+            {/* Material Card - Stacked Layout for Mobile */}
+            <div
+              className={`rounded-lg border overflow-hidden ${
+                isDarkMode
+                  ? "bg-blue-500/10 border-blue-500/30"
+                  : "bg-blue-500/10 border-blue-500/30"
+              }`}
+            >
+              {/* Material Info Section */}
+              <div className="p-2.5">
+                <div className="flex items-start gap-2 mb-2">
+                  <Package size={14} className="text-blue-500 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium text-gray-700 dark:text-gray-300 break-words">
+                      {material.material_name}
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                      {material.material_quantity} {material.unit_of_measure || "pcs"}
+                    </div>
+                  </div>
+                </div>
 
-                                                                    {/* Checkout Status Badge */}
-                                                                    {material.is_checked_out ? (
-                                                                      <div
-                                                                        className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
-                                                                          isDarkMode
-                                                                            ? "bg-green-500/20 text-green-300 border border-green-500/30"
-                                                                            : "bg-green-500/20 text-green-700 border border-green-500/30"
-                                                                        }`}
-                                                                      >
-                                                                        <CheckCircle
-                                                                          size={
-                                                                            12
-                                                                          }
-                                                                        />
-                                                                        Checked
-                                                                        Out
-                                                                      </div>
-                                                                    ) : (
-                                                                      <div
-                                                                        className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
-                                                                          isDarkMode
-                                                                            ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
-                                                                            : "bg-yellow-500/20 text-yellow-700 border border-yellow-500/30"
-                                                                        }`}
-                                                                      >
-                                                                        <Clock
-                                                                          size={
-                                                                            12
-                                                                          }
-                                                                        />
-                                                                        Pending
-                                                                      </div>
-                                                                    )}
-                                                                  </div>
+                {/* Status & Action Buttons - Mobile Optimized */}
+                <div className="flex flex-col gap-2 mt-2">
+                  {/* ✅ Check if it's a scrap-reuse material */}
+                  {material.notes && material.notes.includes('SCRAP-REUSE') ? (
+                    // ✅ For scrap-reuse materials
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <div className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs ${
+                        isDarkMode
+                          ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
+                          : "bg-orange-500/20 text-orange-700 border border-orange-500/30"
+                      }`}>
+                        <CheckCircle size={12} />
+                        <span className="font-medium">SCRAP-REUSE</span>
+                      </div>
+                      {/* ✅ Update Assignment Button */}
+                      <button
+                        onClick={() => handleUpdateScrapAssignment(item, phase, subphase, material)}
+                        className="flex items-center justify-center gap-1 text-xs bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white px-3 py-2 rounded transition-colors"
+                        title="Update employee assignment"
+                      >
+                        <User size={12} />
+                        <span>Update Assignment</span>
+                      </button>
+                    </div>
+                  ) : (
+                    // ✅ For regular warehouse materials
+                    material.checked_out_by_uid && material.checked_out_by_uid !== 'SYSTEM' ? (
+                      <div className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs ${
+                        isDarkMode
+                          ? "bg-green-500/20 text-green-300 border border-green-500/30"
+                          : "bg-green-500/20 text-green-700 border border-green-500/30"
+                      }`}>
+                        <CheckCircle size={12} />
+                        <span className="font-medium">Checked Out</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <div className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs ${
+                          isDarkMode
+                            ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
+                            : "bg-yellow-500/20 text-yellow-700 border border-yellow-500/30"
+                        }`}>
+                          <Clock size={12} />
+                          <span className="font-medium">Pending Checkout</span>
+                        </div>
+                        <button
+                          onClick={() => handleCheckoutSingleMaterial(item, phase, subphase, material)}
+                          className="flex items-center justify-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-3 py-2 rounded transition-colors"
+                        >
+                          <Package size={12} />
+                          <span>Checkout Now</span>
+                        </button>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
 
-                                                                  {/* Checkout Details */}
-                                                                  {material.is_checked_out &&
-                                                                    material.checked_out_by_name && (
-                                                                      <div
-                                                                        className={`ml-4 p-2 rounded text-xs ${
-                                                                          isDarkMode
-                                                                            ? "bg-gray-700/50 border border-gray-600/30"
-                                                                            : "bg-gray-100/80 border border-gray-300/30"
-                                                                        }`}
-                                                                      >
-                                                                        <div className="flex items-center gap-1 mb-1">
-                                                                          <User
-                                                                            size={
-                                                                              10
-                                                                            }
-                                                                          />
-                                                                          <strong>
-                                                                            Checked
-                                                                            out
-                                                                            by:
-                                                                          </strong>
-                                                                        </div>
-                                                                        <div className="pl-3">
-                                                                          <div className="text-gray-700 dark:text-gray-300">
-                                                                            {
-                                                                              material.checked_out_by_name
-                                                                            }
-                                                                          </div>
-                                                                          {material.checked_out_by && (
-                                                                            <div className="text-gray-600 dark:text-gray-400">
-                                                                              ID:{" "}
-                                                                              {
-                                                                                material.checked_out_by
-                                                                              }
-                                                                            </div>
-                                                                          )}
-                                                                          {material.checkout_date && (
-                                                                            <div className="text-gray-600 dark:text-gray-400">
-                                                                              {new Date(
-                                                                                material.checkout_date
-                                                                              ).toLocaleString()}
-                                                                            </div>
-                                                                          )}
-                                                                        </div>
-                                                                      </div>
-                                                                    )}
-                                                                </div>
-                                                              )
-                                                            )}
-                                                          </div>
-                                                        );
-                                                      }
+              {/* Checkout Details Section - Collapsible on Mobile */}
+              {(() => {
+                const isScrapReuse = material.notes && material.notes.includes('SCRAP-REUSE');
+                const hasCheckoutInfo = material.checked_out_by_name || material.checked_out_by;
+                
+                if (!hasCheckoutInfo) return null;
 
-                                                      return null;
-                                                    })()}
+                return (
+                  <div className={`border-t p-2.5 text-xs ${
+                    isScrapReuse
+                      ? isDarkMode
+                        ? "bg-orange-700/20 border-orange-600/30"
+                        : "bg-orange-100/80 border-orange-300/30"
+                      : isDarkMode
+                      ? "bg-gray-700/30 border-gray-600/30"
+                      : "bg-gray-100/80 border-gray-300/30"
+                  }`}>
+                    {isScrapReuse ? (
+                      // Scrap-reuse details
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1 font-semibold text-orange-700 dark:text-orange-300">
+                          <AlertTriangle size={12} />
+                          <span>REUSED SCRAP MATERIAL</span>
+                        </div>
+                        <div className="space-y-1 pl-3 text-gray-700 dark:text-gray-300">
+                          <div className="flex items-start gap-1">
+                            <span className="shrink-0">⚠️</span>
+                            <span>No warehouse deduction (reused from scrap)</span>
+                          </div>
+                          {material.checked_out_by_name && (
+                            <div className="flex items-start gap-1">
+                              <span className="shrink-0">👤</span>
+                              <span>Assigned to: <strong>{material.checked_out_by_name}</strong></span>
+                            </div>
+                          )}
+                          {material.checked_out_by && (
+                            <div className="flex items-start gap-1">
+                              <span className="shrink-0">🆔</span>
+                              <span className="break-all">{material.checked_out_by}</span>
+                            </div>
+                          )}
+                          {material.checkout_date && (
+                            <div className="flex items-start gap-1">
+                              <span className="shrink-0">📅</span>
+                              <span className="text-xs">{new Date(material.checkout_date).toLocaleString()}</span>
+                            </div>
+                          )}
+                          <button
+                            onClick={() => alert(material.notes)}
+                            className="text-blue-600 dark:text-blue-400 hover:underline text-xs mt-1 flex items-center gap-1"
+                          >
+                            <span>View Full Details</span>
+                            <span>→</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      // Regular checkout details
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1 font-semibold text-gray-700 dark:text-gray-300">
+                          <User size={12} />
+                          <span>Checked out by:</span>
+                        </div>
+                        <div className="pl-3 space-y-1">
+                          <div className="font-medium text-gray-800 dark:text-gray-200">
+                            {material.checked_out_by_name}
+                          </div>
+                          {material.checked_out_by && (
+                            <div className="text-gray-600 dark:text-gray-400 break-all">
+                              ID: {material.checked_out_by}
+                            </div>
+                          )}
+                          {material.checkout_date && (
+                            <div className="text-gray-600 dark:text-gray-400">
+                              {new Date(material.checkout_date).toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return null;
+})()}
 
                                                     {/* Quantity Update Modal - Mobile Optimized */}
                                                     {quantityModalOpen &&
                                                       quantityModalData && (
                                                         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
                                                           <div
-                                                            className={`rounded-t-2xl sm:rounded-lg w-full sm:max-w-md sm:w-full p-4 sm:p-6 ${
-                                                              isDarkMode
-                                                                ? "bg-gray-800"
-                                                                : "bg-white"
-                                                            }`}
+                                                            className={`rounded-t-2xl sm:rounded-lg w-full sm:max-w-md sm:w-full p-4 sm:p-6 ${isDarkMode
+                                                              ? "bg-gray-800"
+                                                              : "bg-white"
+                                                              }`}
                                                           >
                                                             <h3
-                                                              className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${
-                                                                isDarkMode
-                                                                  ? "text-gray-200"
-                                                                  : "text-gray-800"
-                                                              }`}
+                                                              className={`text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${isDarkMode
+                                                                ? "text-gray-200"
+                                                                : "text-gray-800"
+                                                                }`}
                                                             >
                                                               <Package
                                                                 size={20}
@@ -3341,28 +3152,25 @@ function Checklist({
                                                             </h3>
 
                                                             <div
-                                                              className={`mb-4 p-3 rounded-lg space-y-2 ${
-                                                                isDarkMode
-                                                                  ? "bg-gray-700"
-                                                                  : "bg-gray-100"
-                                                              }`}
+                                                              className={`mb-4 p-3 rounded-lg space-y-2 ${isDarkMode
+                                                                ? "bg-gray-700"
+                                                                : "bg-gray-100"
+                                                                }`}
                                                             >
                                                               <div>
                                                                 <p
-                                                                  className={`text-sm ${
-                                                                    isDarkMode
-                                                                      ? "text-gray-400"
-                                                                      : "text-gray-600"
-                                                                  }`}
+                                                                  className={`text-sm ${isDarkMode
+                                                                    ? "text-gray-400"
+                                                                    : "text-gray-600"
+                                                                    }`}
                                                                 >
                                                                   Item:
                                                                 </p>
                                                                 <p
-                                                                  className={`font-semibold ${
-                                                                    isDarkMode
-                                                                      ? "text-gray-200"
-                                                                      : "text-gray-800"
-                                                                  }`}
+                                                                  className={`font-semibold ${isDarkMode
+                                                                    ? "text-gray-200"
+                                                                    : "text-gray-800"
+                                                                    }`}
                                                                 >
                                                                   {
                                                                     quantityModalData
@@ -3372,21 +3180,19 @@ function Checklist({
                                                               </div>
                                                               <div>
                                                                 <p
-                                                                  className={`text-sm ${
-                                                                    isDarkMode
-                                                                      ? "text-gray-400"
-                                                                      : "text-gray-600"
-                                                                  }`}
+                                                                  className={`text-sm ${isDarkMode
+                                                                    ? "text-gray-400"
+                                                                    : "text-gray-600"
+                                                                    }`}
                                                                 >
                                                                   Phase /
                                                                   Subphase:
                                                                 </p>
                                                                 <p
-                                                                  className={`font-medium ${
-                                                                    isDarkMode
-                                                                      ? "text-gray-200"
-                                                                      : "text-gray-800"
-                                                                  }`}
+                                                                  className={`font-medium ${isDarkMode
+                                                                    ? "text-gray-200"
+                                                                    : "text-gray-800"
+                                                                    }`}
                                                                 >
                                                                   {
                                                                     quantityModalData
@@ -3403,20 +3209,18 @@ function Checklist({
                                                               </div>
                                                               <div>
                                                                 <p
-                                                                  className={`text-sm ${
-                                                                    isDarkMode
-                                                                      ? "text-gray-400"
-                                                                      : "text-gray-600"
-                                                                  }`}
+                                                                  className={`text-sm ${isDarkMode
+                                                                    ? "text-gray-400"
+                                                                    : "text-gray-600"
+                                                                    }`}
                                                                 >
                                                                   Expected:
                                                                 </p>
                                                                 <p
-                                                                  className={`font-bold ${
-                                                                    isDarkMode
-                                                                      ? "text-blue-400"
-                                                                      : "text-blue-600"
-                                                                  }`}
+                                                                  className={`font-bold ${isDarkMode
+                                                                    ? "text-blue-400"
+                                                                    : "text-blue-600"
+                                                                    }`}
                                                                 >
                                                                   {
                                                                     quantityModalData
@@ -3453,15 +3257,14 @@ function Checklist({
                                                                   e
                                                                 ) =>
                                                                   e.key ===
-                                                                    "Enter" &&
+                                                                  "Enter" &&
                                                                   handleUpdateCompletedQuantity()
                                                                 }
                                                                 autoFocus
-                                                                className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${
-                                                                  isDarkMode
-                                                                    ? "bg-gray-700 border-gray-600 text-gray-200"
-                                                                    : "bg-gray-100 border-gray-300 text-gray-800"
-                                                                }`}
+                                                                className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-slate-500 text-base ${isDarkMode
+                                                                  ? "bg-gray-700 border-gray-600 text-gray-200"
+                                                                  : "bg-gray-100 border-gray-300 text-gray-800"
+                                                                  }`}
                                                               />
                                                             </div>
 
@@ -3498,11 +3301,10 @@ function Checklist({
                                                     {/* Employee Badge */}
                                                     {subphase.employee_barcode && (
                                                       <div
-                                                        className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 mb-2 ${
-                                                          isDarkMode
-                                                            ? "bg-slate-500/20 text-slate-300"
-                                                            : "bg-slate-500/20 text-slate-700"
-                                                        }`}
+                                                        className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 mb-2 ${isDarkMode
+                                                          ? "bg-slate-500/20 text-slate-300"
+                                                          : "bg-slate-500/20 text-slate-700"
+                                                          }`}
                                                       >
                                                         <User size={12} />
                                                         {subphase.employee_name ||
@@ -3533,11 +3335,10 @@ function Checklist({
                                                     {/* Completion Time */}
                                                     {subphase.completed_at && (
                                                       <div
-                                                        className={`text-xs mt-2 ${
-                                                          isDarkMode
-                                                            ? "text-gray-400"
-                                                            : "text-gray-600"
-                                                        }`}
+                                                        className={`text-xs mt-2 ${isDarkMode
+                                                          ? "text-gray-400"
+                                                          : "text-gray-600"
+                                                          }`}
                                                       >
                                                         <p className="flex items-center gap-1">
                                                           <CheckCircle
@@ -3557,11 +3358,10 @@ function Checklist({
                                         )
                                       ) : (
                                         <p
-                                          className={`text-sm ${
-                                            isDarkMode
-                                              ? "text-gray-400"
-                                              : "text-gray-600"
-                                          } py-2`}
+                                          className={`text-sm ${isDarkMode
+                                            ? "text-gray-400"
+                                            : "text-gray-600"
+                                            } py-2`}
                                         >
                                           No sub-phases yet.
                                         </p>
@@ -3573,9 +3373,8 @@ function Checklist({
                             })
                           ) : (
                             <p
-                              className={`text-gray-600 ${
-                                isDarkMode ? "dark:text-gray-400" : ""
-                              } py-4`}
+                              className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""
+                                } py-4`}
                             >
                               No phases added yet.
                             </p>
@@ -3593,9 +3392,8 @@ function Checklist({
           {completedItems.length > 0 && (
             <div>
               <h3
-                className={`text-xl sm:text-2xl font-bold mb-3 sm:mb-4 flex items-center gap-2 ${
-                  isDarkMode ? "text-green-300" : "text-green-700"
-                }`}
+                className={`text-xl sm:text-2xl font-bold mb-3 sm:mb-4 flex items-center gap-2 ${isDarkMode ? "text-green-300" : "text-green-700"
+                  }`}
               >
                 <CheckCircle size={20} />
                 Completed ({completedItems.length})
@@ -3608,11 +3406,10 @@ function Checklist({
                   return (
                     <div
                       key={itemKey}
-                      className={`backdrop-blur-md rounded-lg border overflow-hidden transition-all shadow-sm ${
-                        isDarkMode
-                          ? "bg-green-500/10 border-green-500/30"
-                          : "bg-gradient-to-r from-green-500/10 to-green-400/10 border-green-500/30"
-                      }`}
+                      className={`backdrop-blur-md rounded-lg border overflow-hidden transition-all shadow-sm ${isDarkMode
+                        ? "bg-green-500/10 border-green-500/30"
+                        : "bg-gradient-to-r from-green-500/10 to-green-400/10 border-green-500/30"
+                        }`}
                     >
                       <div className="p-3 sm:p-4">
                         <div className="flex items-start gap-3 mb-3">
@@ -3630,9 +3427,8 @@ function Checklist({
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-2">
                               <h3
-                                className={`font-semibold text-base sm:text-lg lg:text-xl ${
-                                  isDarkMode ? "text-gray-200" : "text-gray-800"
-                                }`}
+                                className={`font-semibold text-base sm:text-lg lg:text-xl ${isDarkMode ? "text-gray-200" : "text-gray-800"
+                                  }`}
                               >
                                 {item.name}
                               </h3>
@@ -3656,18 +3452,16 @@ function Checklist({
                               )}
                             </div>
                             <p
-                              className={`text-xs sm:text-sm ${
-                                isDarkMode ? "text-gray-400" : "text-gray-600"
-                              }`}
+                              className={`text-xs sm:text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"
+                                }`}
                             >
                               Part #: {item.part_number} •{" "}
                               {item.phases?.length || 0} phases
                             </p>
                             {item.remarks && (
                               <p
-                                className={`text-xs ${
-                                  isDarkMode ? "text-gray-400" : "text-gray-500"
-                                } mt-1 italic flex items-start gap-1`}
+                                className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"
+                                  } mt-1 italic flex items-start gap-1`}
                               >
                                 <FileText
                                   size={12}
@@ -3697,9 +3491,8 @@ function Checklist({
                               <ArrowRightLeft size={16} />
                             </button>
                             <span
-                              className={`text-lg font-bold ${
-                                isDarkMode ? "text-green-400" : "text-green-600"
-                              }`}
+                              className={`text-lg font-bold ${isDarkMode ? "text-green-400" : "text-green-600"
+                                }`}
                             >
                               100%
                             </span>
@@ -3708,17 +3501,15 @@ function Checklist({
 
                         {item.start_time && (
                           <div
-                            className={`rounded-lg p-3 ${
-                              isDarkMode ? "bg-green-500/20" : "bg-green-500/10"
-                            }`}
+                            className={`rounded-lg p-3 ${isDarkMode ? "bg-green-500/20" : "bg-green-500/10"
+                              }`}
                           >
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
                               <span
-                                className={`text-sm font-semibold flex items-center gap-2 ${
-                                  isDarkMode
-                                    ? "text-green-300"
-                                    : "text-green-700"
-                                }`}
+                                className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode
+                                  ? "text-green-300"
+                                  : "text-green-700"
+                                  }`}
                               >
                                 <CheckCircle size={16} />
                                 Completed
@@ -3729,11 +3520,10 @@ function Checklist({
                                   className="text-green-600 dark:text-green-400"
                                 />
                                 <span
-                                  className={`text-lg font-mono font-bold ${
-                                    isDarkMode
-                                      ? "text-green-400"
-                                      : "text-green-700"
-                                  }`}
+                                  className={`text-lg font-mono font-bold ${isDarkMode
+                                    ? "text-green-400"
+                                    : "text-green-700"
+                                    }`}
                                 >
                                   {formatTime(elapsedSeconds)}
                                 </span>
@@ -3752,11 +3542,10 @@ function Checklist({
                                   Started:
                                 </span>
                                 <span
-                                  className={`font-medium ${
-                                    isDarkMode
-                                      ? "text-gray-200"
-                                      : "text-gray-800"
-                                  }`}
+                                  className={`font-medium ${isDarkMode
+                                    ? "text-gray-200"
+                                    : "text-gray-800"
+                                    }`}
                                 >
                                   {formatDateTime(item.start_time)}
                                 </span>
@@ -3772,11 +3561,10 @@ function Checklist({
                                   Completed:
                                 </span>
                                 <span
-                                  className={`font-medium ${
-                                    isDarkMode
-                                      ? "text-gray-200"
-                                      : "text-gray-800"
-                                  }`}
+                                  className={`font-medium ${isDarkMode
+                                    ? "text-gray-200"
+                                    : "text-gray-800"
+                                    }`}
                                 >
                                   {formatDateTime(item.end_time)}
                                 </span>
@@ -3796,11 +3584,10 @@ function Checklist({
                               return (
                                 <div
                                   key={phaseKey}
-                                  className={`rounded-lg border ${
-                                    isDarkMode
-                                      ? "border-gray-700/10"
-                                      : "border-gray-300/10"
-                                  }`}
+                                  className={`rounded-lg border ${isDarkMode
+                                    ? "border-gray-700/10"
+                                    : "border-gray-300/10"
+                                    }`}
                                 >
                                   <div className="p-3">
                                     <div className="flex items-start gap-2 mb-2">
@@ -3815,20 +3602,18 @@ function Checklist({
                                         </span>
                                       </button>
                                       <span
-                                        className={`font-medium text-base flex-1 ${
-                                          isDarkMode
-                                            ? "text-gray-200"
-                                            : "text-gray-800"
-                                        }`}
+                                        className={`font-medium text-base flex-1 ${isDarkMode
+                                          ? "text-gray-200"
+                                          : "text-gray-800"
+                                          }`}
                                       >
                                         {phase.name}
                                       </span>
                                       <span
-                                        className={`text-sm font-semibold ${
-                                          isDarkMode
-                                            ? "text-green-400"
-                                            : "text-green-600"
-                                        }`}
+                                        className={`text-sm font-semibold ${isDarkMode
+                                          ? "text-green-400"
+                                          : "text-green-600"
+                                          }`}
                                       >
                                         100%
                                       </span>
@@ -3842,11 +3627,10 @@ function Checklist({
                                           {phase.subphases.map((subphase) => (
                                             <div
                                               key={subphase.id}
-                                              className={`p-3 rounded-lg ${
-                                                isDarkMode
-                                                  ? "bg-black/10"
-                                                  : "bg-white/5"
-                                              }`}
+                                              className={`p-3 rounded-lg ${isDarkMode
+                                                ? "bg-black/10"
+                                                : "bg-white/5"
+                                                }`}
                                             >
                                               <div className="flex items-start justify-between gap-2">
                                                 <div className="flex-1 min-w-0">
@@ -3856,11 +3640,10 @@ function Checklist({
                                                       className="text-green-500 shrink-0"
                                                     />
                                                     <span
-                                                      className={`text-sm font-medium ${
-                                                        isDarkMode
-                                                          ? "text-gray-200"
-                                                          : "text-gray-800"
-                                                      }`}
+                                                      className={`text-sm font-medium ${isDarkMode
+                                                        ? "text-gray-200"
+                                                        : "text-gray-800"
+                                                        }`}
                                                     >
                                                       {subphase.name}
                                                     </span>
@@ -3869,33 +3652,31 @@ function Checklist({
                                                   {/* Quantity info */}
                                                   {subphase.expected_quantity >
                                                     0 && (
-                                                    <div className="flex flex-wrap gap-2 items-center mb-2">
-                                                      <span
-                                                        className={`text-xs bg-purple-500/20 ${
-                                                          isDarkMode
+                                                      <div className="flex flex-wrap gap-2 items-center mb-2">
+                                                        <span
+                                                          className={`text-xs bg-purple-500/20 ${isDarkMode
                                                             ? "text-purple-300"
                                                             : "text-purple-800"
-                                                        } px-2 py-1 rounded flex items-center gap-1`}
-                                                      >
-                                                        <Package size={12} />
-                                                        {subphase.current_completed_quantity ||
-                                                          0}{" "}
-                                                        /{" "}
-                                                        {
-                                                          subphase.expected_quantity
-                                                        }
-                                                      </span>
-                                                    </div>
-                                                  )}
+                                                            } px-2 py-1 rounded flex items-center gap-1`}
+                                                        >
+                                                          <Package size={12} />
+                                                          {subphase.current_completed_quantity ||
+                                                            0}{" "}
+                                                          /{" "}
+                                                          {
+                                                            subphase.expected_quantity
+                                                          }
+                                                        </span>
+                                                      </div>
+                                                    )}
 
                                                   {/* Employee info */}
                                                   {subphase.employee_barcode && (
                                                     <div
-                                                      className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 mb-2 ${
-                                                        isDarkMode
-                                                          ? "bg-slate-500/20 text-slate-300"
-                                                          : "bg-slate-500/20 text-slate-700"
-                                                      }`}
+                                                      className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 mb-2 ${isDarkMode
+                                                        ? "bg-slate-500/20 text-slate-300"
+                                                        : "bg-slate-500/20 text-slate-700"
+                                                        }`}
                                                     >
                                                       <User size={12} />
                                                       {subphase.employee_name ||
@@ -3911,11 +3692,10 @@ function Checklist({
                                                   {/* Completion time */}
                                                   {subphase.completed_at && (
                                                     <div
-                                                      className={`text-xs ${
-                                                        isDarkMode
-                                                          ? "text-gray-400"
-                                                          : "text-gray-600"
-                                                      }`}
+                                                      className={`text-xs ${isDarkMode
+                                                        ? "text-gray-400"
+                                                        : "text-gray-600"
+                                                        }`}
                                                     >
                                                       <p className="flex items-center gap-1">
                                                         <CheckCircle
@@ -3938,39 +3718,36 @@ function Checklist({
                                     {item.expected_completion_hours &&
                                       item.actual_completion_hours && (
                                         <div
-                                          className={`mt-3 p-3 rounded-lg border ${
-                                            isDarkMode
-                                              ? "bg-purple-500/10 border-purple-500/30"
-                                              : "bg-purple-500/10 border-purple-500/30"
-                                          }`}
+                                          className={`mt-3 p-3 rounded-lg border ${isDarkMode
+                                            ? "bg-purple-500/10 border-purple-500/30"
+                                            : "bg-purple-500/10 border-purple-500/30"
+                                            }`}
                                         >
                                           <div className="flex items-center justify-between mb-2">
                                             <span
-                                              className={`text-sm font-semibold flex items-center gap-2 ${
-                                                isDarkMode
-                                                  ? "text-purple-300"
-                                                  : "text-purple-700"
-                                              }`}
+                                              className={`text-sm font-semibold flex items-center gap-2 ${isDarkMode
+                                                ? "text-purple-300"
+                                                : "text-purple-700"
+                                                }`}
                                             >
                                               <Clock size={14} />
                                               Analysis
                                             </span>
                                             <span
-                                              className={`text-xs px-2 py-1 rounded font-bold ${
-                                                item.actual_completion_hours >
+                                              className={`text-xs px-2 py-1 rounded font-bold ${item.actual_completion_hours >
                                                 item.expected_completion_hours
-                                                  ? "bg-red-500/20 text-red-700 dark:text-red-300"
-                                                  : "bg-green-500/20 text-green-700 dark:text-green-300"
-                                              }`}
+                                                ? "bg-red-500/20 text-red-700 dark:text-red-300"
+                                                : "bg-green-500/20 text-green-700 dark:text-green-300"
+                                                }`}
                                             >
                                               {item.actual_completion_hours >
-                                              item.expected_completion_hours
+                                                item.expected_completion_hours
                                                 ? "Over"
                                                 : "Under"}{" "}
                                               by{" "}
                                               {Math.abs(
                                                 item.actual_completion_hours -
-                                                  item.expected_completion_hours
+                                                item.expected_completion_hours
                                               ).toFixed(1)}
                                               h
                                             </span>
@@ -3987,11 +3764,10 @@ function Checklist({
                                                 Expected:{" "}
                                               </span>
                                               <span
-                                                className={`font-bold ${
-                                                  isDarkMode
-                                                    ? "text-purple-300"
-                                                    : "text-purple-700"
-                                                }`}
+                                                className={`font-bold ${isDarkMode
+                                                  ? "text-purple-300"
+                                                  : "text-purple-700"
+                                                  }`}
                                               >
                                                 {Number.parseFloat(
                                                   item.expected_completion_hours
@@ -4010,11 +3786,10 @@ function Checklist({
                                                 Actual:{" "}
                                               </span>
                                               <span
-                                                className={`font-bold ${
-                                                  isDarkMode
-                                                    ? "text-blue-300"
-                                                    : "text-blue-700"
-                                                }`}
+                                                className={`font-bold ${isDarkMode
+                                                  ? "text-blue-300"
+                                                  : "text-blue-700"
+                                                  }`}
                                               >
                                                 {Number.parseFloat(
                                                   item.actual_completion_hours
@@ -4024,25 +3799,23 @@ function Checklist({
                                             </div>
                                           </div>
                                           <div
-                                            className={`mt-2 w-full rounded-full h-2 ${
-                                              isDarkMode
-                                                ? "bg-gray-700"
-                                                : "bg-gray-300"
-                                            }`}
+                                            className={`mt-2 w-full rounded-full h-2 ${isDarkMode
+                                              ? "bg-gray-700"
+                                              : "bg-gray-300"
+                                              }`}
                                           >
                                             <div
-                                              className={`h-2 rounded-full ${
-                                                item.actual_completion_hours >
+                                              className={`h-2 rounded-full ${item.actual_completion_hours >
                                                 item.expected_completion_hours
-                                                  ? "bg-red-500"
-                                                  : "bg-green-500"
-                                              }`}
+                                                ? "bg-red-500"
+                                                : "bg-green-500"
+                                                }`}
                                               style={{
                                                 width: `${Math.min(
                                                   100,
                                                   (item.actual_completion_hours /
                                                     item.expected_completion_hours) *
-                                                    100
+                                                  100
                                                 )}%`,
                                               }}
                                             ></div>
@@ -4055,9 +3828,8 @@ function Checklist({
                             })
                           ) : (
                             <p
-                              className={`text-gray-600 ${
-                                isDarkMode ? "dark:text-gray-400" : ""
-                              } py-4`}
+                              className={`text-gray-600 ${isDarkMode ? "dark:text-gray-400" : ""
+                                } py-4`}
                             >
                               No phases.
                             </p>
@@ -4073,9 +3845,8 @@ function Checklist({
         </div>
       ) : (
         <p
-          className={`text-center py-8 ${
-            isDarkMode ? "text-gray-400" : "text-gray-600"
-          }`}
+          className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-600"
+            }`}
         >
           {!isFiltering && items.length === 0
             ? searchTerm || filterClient || filterPriority || filterStatus
@@ -4088,18 +3859,16 @@ function Checklist({
       {/* Pagination Controls - Mobile Optimized */}
       {!isFiltering && pagination.total_pages > 1 && (
         <div
-          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mt-6 border transition-all shadow-sm ${
-            isDarkMode
-              ? "bg-gray-800/60 border-gray-700/50"
-              : "bg-white/30 border-white/40"
-          }`}
+          className={`backdrop-blur-md rounded-lg p-3 sm:p-4 mt-6 border transition-all shadow-sm ${isDarkMode
+            ? "bg-gray-800/60 border-gray-700/50"
+            : "bg-white/30 border-white/40"
+            }`}
         >
           <div className="flex flex-col gap-4">
             {/* Page Info */}
             <div
-              className={`text-sm text-center sm:text-left ${
-                isDarkMode ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`text-sm text-center sm:text-left ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               Showing {(pagination.current_page - 1) * pagination.per_page + 1}{" "}
               -{" "}
@@ -4116,13 +3885,12 @@ function Checklist({
               <button
                 onClick={() => handlePageChange(1)}
                 disabled={!pagination.has_previous}
-                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
-                  pagination.has_previous
-                    ? isDarkMode
-                      ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
-                      : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
-                    : "opacity-50 cursor-not-allowed"
-                }`}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${pagination.has_previous
+                  ? isDarkMode
+                    ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
+                    : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
+                  : "opacity-50 cursor-not-allowed"
+                  }`}
               >
                 ««
               </button>
@@ -4131,13 +3899,12 @@ function Checklist({
               <button
                 onClick={handlePreviousPage}
                 disabled={!pagination.has_previous}
-                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
-                  pagination.has_previous
-                    ? isDarkMode
-                      ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
-                      : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
-                    : "opacity-50 cursor-not-allowed"
-                }`}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${pagination.has_previous
+                  ? isDarkMode
+                    ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
+                    : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
+                  : "opacity-50 cursor-not-allowed"
+                  }`}
               >
                 ‹
               </button>
@@ -4165,15 +3932,14 @@ function Checklist({
                       <button
                         key={i}
                         onClick={() => handlePageChange(i)}
-                        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm min-w-[40px] ${
-                          pagination.current_page === i
-                            ? isDarkMode
-                              ? "bg-slate-600 text-white"
-                              : "bg-slate-600 text-white"
-                            : isDarkMode
+                        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm min-w-[40px] ${pagination.current_page === i
+                          ? isDarkMode
+                            ? "bg-slate-600 text-white"
+                            : "bg-slate-600 text-white"
+                          : isDarkMode
                             ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
                             : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
-                        }`}
+                          }`}
                       >
                         {i}
                       </button>
@@ -4187,13 +3953,12 @@ function Checklist({
               <button
                 onClick={handleNextPage}
                 disabled={!pagination.has_next}
-                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
-                  pagination.has_next
-                    ? isDarkMode
-                      ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
-                      : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
-                    : "opacity-50 cursor-not-allowed"
-                }`}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${pagination.has_next
+                  ? isDarkMode
+                    ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
+                    : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
+                  : "opacity-50 cursor-not-allowed"
+                  }`}
               >
                 ›
               </button>
@@ -4202,13 +3967,12 @@ function Checklist({
               <button
                 onClick={() => handlePageChange(pagination.total_pages)}
                 disabled={!pagination.has_next}
-                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
-                  pagination.has_next
-                    ? isDarkMode
-                      ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
-                      : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
-                    : "opacity-50 cursor-not-allowed"
-                }`}
+                className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm ${pagination.has_next
+                  ? isDarkMode
+                    ? "bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-200"
+                    : "bg-white/50 hover:bg-white/70 active:bg-white/90 text-gray-700"
+                  : "opacity-50 cursor-not-allowed"
+                  }`}
               >
                 »»
               </button>
@@ -4216,9 +3980,8 @@ function Checklist({
 
             {/* Page indicator */}
             <div
-              className={`text-sm text-center ${
-                isDarkMode ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`text-sm text-center ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               Page {pagination.current_page} of {pagination.total_pages}
             </div>

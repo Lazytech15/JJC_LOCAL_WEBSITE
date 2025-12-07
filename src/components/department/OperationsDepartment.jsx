@@ -448,49 +448,86 @@ function OperationsDepartment() {
   const loadGlobalUnusedMaterials = async () => {
     try {
       setLoadingGlobalUnused(true)
-      console.log('🌍 Loading global unused materials from database...')
+      console.log('🌍 Loading ALL unused materials (returned + scrap) from database...')
 
-      // ✅ CRITICAL FIX: Fetch materials with status='scrap' (not 'returned')
-      const response = await apiService.operations.getMaterials({
-        status: 'scrap'  // ✅ Changed from 'returned' to 'scrap'
-      })
+      // ✅ Load BOTH returned and scrap materials from ALL subphases
+      const [returnedResponse, scrapResponse] = await Promise.all([
+        apiService.materials.getReturnedMaterials({}), // All returned materials
+        apiService.materials.getScrapMaterials({})     // All scrap materials
+      ])
 
-      const materials = Array.isArray(response) ? response :
-        (response?.success && response?.data) ? response.data :
-          (response?.data) ? response.data : []
+      // Process returned materials
+      let returnedMaterials = []
+      if (returnedResponse?.success && Array.isArray(returnedResponse.data)) {
+        returnedMaterials = returnedResponse.data
+      } else if (Array.isArray(returnedResponse)) {
+        returnedMaterials = returnedResponse
+      } else if (returnedResponse?.data && Array.isArray(returnedResponse.data)) {
+        returnedMaterials = returnedResponse.data
+      }
 
-      console.log(`✅ Found ${materials.length} scrap materials in database`)
+      // Process scrap materials
+      let scrapMaterials = []
+      if (scrapResponse?.success && Array.isArray(scrapResponse.data)) {
+        scrapMaterials = scrapResponse.data
+      } else if (Array.isArray(scrapResponse)) {
+        scrapMaterials = scrapResponse
+      } else if (scrapResponse?.data && Array.isArray(scrapResponse.data)) {
+        scrapMaterials = scrapResponse.data
+      }
 
-      const allUnusedMaterials = materials.map(mat => ({
-        id: mat.id,
-        name: mat.material_name,
-        quantity: parseFloat(mat.material_quantity) || 0,
-        unit: mat.unit_of_measure || 'pcs',
-        reason: mat.notes || 'Scrap/Leftover material',
+      console.log(`📊 Found ${returnedMaterials.length} returned + ${scrapMaterials.length} scrap = ${returnedMaterials.length + scrapMaterials.length} total`)
 
-        // ✅ Assigned user info
-        assigned_user_uid: mat.checked_out_by_uid || null,
-        assigned_user_name: mat.original_assigned_user || mat.checked_out_by_name || 'Unknown',
-        assigned_user_barcode: mat.checked_out_by || null,
-
-        date_added: mat.created_at,
-
-        // Source context
-        source_item: mat.item_name || 'Unknown',
-        source_item_part_number: mat.item_part_number,
-        source_client: mat.client_name,
-        source_phase: mat.phase_name || 'Unknown',
-        source_subphase: mat.subphase_name || 'Unknown',
-        source_subphase_id: mat.subphase_id,
-        source_phase_id: mat.phase_id,
-
-        from_unused: mat.from_unused || false
+      // Format returned materials
+      const formattedReturned = returnedMaterials.map(m => ({
+        id: m.id,
+        name: m.material_name,
+        quantity: parseFloat(m.quantity_returned) || 0,
+        unit: m.unit_of_measure || 'pcs',
+        reason: m.return_reason || '',
+        source_subphase_id: m.subphase_id,
+        source_item: m.item_name || 'Unknown Item',
+        source_phase: m.phase_name || 'Unknown Phase',
+        source_subphase: m.subphase_name || 'Unknown Subphase',
+        assigned_user_uid: m.returned_by_uid,
+        assigned_user_name: m.returned_by_name,
+        assigned_user_barcode: m.returned_by,
+        condition_status: m.condition_status || 'good',
+        is_reusable: m.is_reusable !== false,
+        source_type: 'returned' // ✅ Mark source
       }))
 
-      console.log(`✅ Total global scrap materials: ${allUnusedMaterials.length}`)
-      setGlobalUnusedMaterials(allUnusedMaterials)
+      // Format scrap materials
+      const formattedScrap = scrapMaterials.map(m => ({
+        id: m.id,
+        name: m.material_name,
+        quantity: parseFloat(m.quantity_scrapped) || 0,
+        unit: m.unit_of_measure || 'pcs',
+        reason: m.scrap_reason || '',
+        source_subphase_id: m.subphase_id,
+        source_item: m.item_name || 'Unknown Item',
+        source_phase: m.phase_name || 'Unknown Phase',
+        source_subphase: m.subphase_name || 'Unknown Subphase',
+        assigned_user_uid: m.scrapped_by_uid,
+        assigned_user_name: m.scrapped_by_name,
+        assigned_user_barcode: m.scrapped_by,
+        condition_status: m.scrap_type || 'waste',
+        is_reusable: m.is_recyclable || false,
+        scrap_type: m.scrap_type || 'waste',
+        source_type: 'scrap' // ✅ Mark source
+      }))
+
+      // ✅ Combine both lists
+      const allGlobalUnused = [...formattedReturned, ...formattedScrap]
+
+      console.log(`✅ Total global unused: ${allGlobalUnused.length}`)
+      console.log(`   - Returned: ${formattedReturned.length}`)
+      console.log(`   - Scrap: ${formattedScrap.length}`)
+
+      setGlobalUnusedMaterials(allGlobalUnused)
     } catch (error) {
-      console.error('❌ Failed to load global scrap materials:', error)
+      console.error('❌ Failed to load global unused materials:', error)
+      setGlobalUnusedMaterials([])
     } finally {
       setLoadingGlobalUnused(false)
     }
