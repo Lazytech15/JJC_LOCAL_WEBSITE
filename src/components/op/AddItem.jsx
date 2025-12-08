@@ -44,60 +44,11 @@ function AddItems({ items, submitting, setSubmitting, apiService }) {
   const [expectedCompletionHours, setExpectedCompletionHours] = useState("")
   const [distributeDuration, setDistributeDuration] = useState(false)
 
-  const [materialsRawList, setMaterialsRawList] = useState([])
-  const [loadingMaterials, setLoadingMaterials] = useState(false)
-
 
   // Load existing clients on mount
   useEffect(() => {
     loadClients()
   }, [])
-
-  useEffect(() => {
-    loadMaterialsRaw()
-  }, [])
-
-  // 3. ADD function to fetch materials with OPERATION PARTICULARS filter
-  const loadMaterialsRaw = async () => {
-    try {
-      setLoadingMaterials(true)
-
-      // ✅ Fetch items with item_type = "OPERATION PARTICULARS" from inventory
-      const response = await apiService.items.getItems({
-        item_type: "OPERATION PARTICULARS",
-        limit: 500, // Get all materials
-        sort_by: "item_name",
-        sort_order: "ASC"
-      })
-
-      if (response && response.success && response.data) {
-        // Map inventory items to dropdown options
-        const materials = response.data.map(item => ({
-          value: item.item_name,           // Use item_name as value
-          label: item.item_name,           // Display name
-          item_no: item.item_no,           // For checkout reference
-          unit: item.unit_of_measure || 'pcs',
-          balance: parseFloat(item.balance) || 0,
-          supplier: item.supplier || '',
-          brand: item.brand || '',
-          location: item.location || ''
-        }))
-
-        setMaterialsRawList(materials)
-        console.log(`✅ Loaded ${materials.length} operation materials from inventory`)
-      } else {
-        console.warn("⚠️ No materials found or invalid response")
-        setMaterialsRawList([])
-      }
-    } catch (error) {
-      console.error("❌ Failed to load materials:", error)
-      alert("Failed to load materials list from inventory: " + error.message)
-      setMaterialsRawList([])
-    } finally {
-      setLoadingMaterials(false)
-    }
-  }
-
 
   const loadClients = async () => {
     try {
@@ -303,8 +254,6 @@ function AddItems({ items, submitting, setSubmitting, apiService }) {
               name: sub.name || "",
               expectedDuration: sub.expected_duration ? (sub.expected_duration / 60).toString() : "",
               expectedQuantity: sub.expected_quantity || "",
-              material_raw: sub.material_raw || "",           // ✅ NEW
-              material_quantity: sub.material_quantity || "", // ✅ NEW
             })) || [],
         }))
         setPhases(loadedPhases)
@@ -348,8 +297,6 @@ function AddItems({ items, submitting, setSubmitting, apiService }) {
                 name: "",
                 expectedDuration: "",
                 expectedQuantity: "",
-                material_raw: "",      // ✅ NEW: Material raw dropdown
-                material_quantity: "", // ✅ NEW: Material quantity input
               },
             ],
           }
@@ -444,107 +391,6 @@ function AddItems({ items, submitting, setSubmitting, apiService }) {
     )
   }
 
-  const checkoutMaterialsForItem = async (itemData) => {
-    try {
-      // Collect all materials needed from all subphases
-      const materialsToCheckout = []
-      const materialDetails = []
-
-      itemData.phases.forEach((phase) => {
-        phase.subphases.forEach((subphase) => {
-          if (subphase.material_raw && subphase.material_quantity > 0) {
-            // Find the material in our list by name
-            const material = materialsRawList.find(m => m.value === subphase.material_raw)
-
-            if (material && material.item_no) {
-              // Check if we have enough stock
-              if (material.balance < parseFloat(subphase.material_quantity)) {
-                console.warn(
-                  `⚠️ Insufficient stock for ${material.label}: ` +
-                  `Needed: ${subphase.material_quantity}, Available: ${material.balance}`
-                )
-              }
-
-              materialsToCheckout.push({
-                item_no: material.item_no,
-                quantity: parseFloat(subphase.material_quantity)
-              })
-
-              materialDetails.push({
-                name: material.label,
-                quantity: subphase.material_quantity,
-                unit: material.unit,
-                subphase: subphase.name,
-                phase: phase.name
-              })
-            } else {
-              console.warn(`⚠️ Material not found in inventory: ${subphase.material_raw}`)
-            }
-          }
-        })
-      })
-
-      if (materialsToCheckout.length === 0) {
-        console.log("ℹ️ No materials to checkout")
-        return null
-      }
-
-      // Show confirmation with material details
-      const confirmMessage = `The following materials will be checked out from inventory:\n\n` +
-        materialDetails.map(m =>
-          `• ${m.name}: ${m.quantity} ${m.unit} (${m.phase} > ${m.subphase})`
-        ).join('\n') +
-        `\n\nTotal items: ${materialsToCheckout.length}\n\nProceed with checkout?`
-
-      if (!confirm(confirmMessage)) {
-        console.log("❌ Material checkout cancelled by user")
-        return null
-      }
-
-      // Process checkout with inventory API
-      const checkoutData = {
-        items: materialsToCheckout,
-        checkout_by: user?.uid || user?.id_number || "Operations",
-        notes: `Materials for Operations Item: ${itemData.name} (${itemData.part_number})`
-      }
-
-      console.log("🔄 Checking out materials:", checkoutData)
-
-      const response = await apiService.items.recordItemOut(
-        checkoutData.items,
-        checkoutData.checkout_by,
-        checkoutData.notes
-      )
-
-      if (response && response.success) {
-        console.log("✅ Materials checked out successfully:", response.data)
-
-        // Show success message
-        alert(
-          `✅ Successfully checked out ${materialsToCheckout.length} material(s) from inventory!\n\n` +
-          materialDetails.map(m => `• ${m.name}: ${m.quantity} ${m.unit}`).join('\n')
-        )
-
-        // Reload materials list to update stock levels
-        await loadMaterialsRaw()
-
-        return response.data
-      }
-    } catch (error) {
-      console.error("❌ Failed to checkout materials:", error)
-
-      // Show detailed error
-      const errorMsg = error.message || error.toString()
-      alert(
-        `⚠️ Item created successfully, but material checkout failed:\n\n` +
-        `${errorMsg}\n\n` +
-        `Please manually check out the materials from inventory.`
-      )
-
-      throw error // Re-throw so caller knows checkout failed
-    }
-  }
-
   const handleSave = async () => {
     if (!partNumber.trim()) {
       alert("Part Number is required")
@@ -617,8 +463,6 @@ function AddItems({ items, submitting, setSubmitting, apiService }) {
             name: sub.name.trim(),
             expected_duration: (Number.parseFloat(sub.expectedDuration) || 0) * 60,
             expected_quantity: Number.parseInt(sub.expectedQuantity) || 0,
-            material_raw: sub.material_raw || null,           // ✅ Save material name
-            material_quantity: Number.parseFloat(sub.material_quantity) || null, // ✅ Save material quantity
           })),
       })),
     }
@@ -630,24 +474,6 @@ function AddItems({ items, submitting, setSubmitting, apiService }) {
       console.log("📝 Creating operations item...")
       await apiService.operations.createItemWithStructure(itemData)
       console.log("✅ Operations item created successfully")
-
-      // Step 2: Check if there are materials to checkout
-      const hasMaterials = validPhases.some(p =>
-        p.subphases.some(s => s.material_raw && s.material_quantity > 0)
-      )
-
-      if (hasMaterials) {
-        console.log("📦 Materials detected, processing checkout...")
-        try {
-          await checkoutMaterialsForItem(itemData)
-        } catch (checkoutError) {
-          // Material checkout failed, but item was created
-          console.error("⚠️ Material checkout failed:", checkoutError)
-          // User was already alerted in checkoutMaterialsForItem()
-        }
-      } else {
-        console.log("ℹ️ No materials to checkout")
-      }
 
       // Step 3: Clear form and show success
       setPartNumber("")
@@ -1541,7 +1367,7 @@ function AddItems({ items, submitting, setSubmitting, apiService }) {
                             </button>
                           </div>
 
-                          {/* ✅ NEW: 2x2 Grid for Duration, Quantity, Material, Material Qty */}
+                          {/* ✅ NEW: 2x2 Grid for Duration, Quantity */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {/* Duration Input */}
                             <div>
@@ -1597,96 +1423,7 @@ function AddItems({ items, submitting, setSubmitting, apiService }) {
                                 : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
                                 }`}
                             />
-
-                            <div className="relative">
-                              <select
-                                value={subphase.material_raw || ""}
-                                onChange={(e) => {
-                                  const selectedMaterial = materialsRawList.find(m => m.value === e.target.value)
-                                  updateSubphase(phase.id, subphase.id, "material_raw", e.target.value)
-
-                                  // Optional: Auto-fill unit based on selected material
-                                  if (selectedMaterial && selectedMaterial.unit) {
-                                    // You can store this for reference or display
-                                    console.log(`Selected: ${selectedMaterial.label} (${selectedMaterial.unit})`)
-                                  }
-                                }}
-                                disabled={submitting || loadingMaterials}
-                                className={`px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                                  ? "bg-gray-700/50 border border-gray-600/50 text-gray-100"
-                                  : "bg-white/60 border border-gray-300/30 text-gray-800"
-                                  }`}
-                              >
-                                <option value="">
-                                  {loadingMaterials ? "Loading materials..." : "Select material..."}
-                                </option>
-
-                                {materialsRawList.length > 0 ? (
-                                  materialsRawList.map((material) => (
-                                    <option key={material.value} value={material.value}>
-                                      {material.label} {material.unit ? `(${material.unit})` : ''}
-                                      {material.balance > 0 ? ` - Stock: ${material.balance}` : ''}
-                                    </option>
-                                  ))
-                                ) : !loadingMaterials && (
-                                  <>
-                                    <option value="Steel">Steel</option>
-                                    <option value="Aluminum">Aluminum</option>
-                                    <option value="Copper">Copper</option>
-                                    <option value="Plastic">Plastic</option>
-                                    <option value="Wood">Wood</option>
-                                    <option value="Brass">Brass</option>
-                                    <option value="Stainless Steel">Stainless Steel</option>
-                                    <option value="Carbon Fiber">Carbon Fiber</option>
-                                    <option value="Glass">Glass</option>
-                                    <option value="Rubber">Rubber</option>
-                                    <option value="Other">Other</option>
-                                  </>
-                                )}
-                              </select>
-
-                              {/* Optional: Show loading indicator */}
-                              {loadingMaterials && (
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                  <div className={`animate-spin rounded-full h-4 w-4 border-b-2 ${isDarkMode ? "border-blue-400" : "border-blue-600"
-                                    }`}></div>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* ✅ OPTIONAL: Show material info below dropdown */}
-                            {subphase.material_raw && (
-                              <div className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                                {(() => {
-                                  const material = materialsRawList.find(m => m.value === subphase.material_raw)
-                                  if (material) {
-                                    return (
-                                      <span>
-                                        Available: {material.balance} {material.unit}
-                                        {material.supplier && ` • Supplier: ${material.supplier}`}
-                                      </span>
-                                    )
-                                  }
-                                  return null
-                                })()}
-                              </div>
-                            )}
-
-
-                            {/* ✅ NEW: Material Quantity Input */}
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              placeholder="Material qty"
-                              value={subphase.material_quantity || ""}
-                              onChange={(e) => updateSubphase(phase.id, subphase.id, "material_quantity", e.target.value)}
-                              disabled={submitting}
-                              className={`px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all ${isDarkMode
-                                ? "bg-gray-700/50 border border-gray-600/50 text-gray-100 placeholder-gray-400"
-                                : "bg-white/60 border border-gray-300/30 text-gray-800 placeholder-gray-500"
-                                }`}
-                            />
+                           
                           </div>
                         </div>
                       )
