@@ -850,37 +850,37 @@ function EmployeeLogs() {
                 </svg>
               </div>
               <div>
-                <h1 className={`text-lg md:text-2xl font-bold ${t.header}`}>Logs</h1>
-                <p className={`text-xs md:text-sm ${t.muted} mt-0.5 hidden sm:block`}>Track and manage</p>
+                <h1 className={`text-lg md:text-2xl font-bold ${t.header}`}>
+                  Logs <span className={`text-xs md:text-sm font-normal ${t.muted} hidden sm:inline`}>• Track and manage</span>
+                </h1>
               </div>
             </div>
 
-            <div className="flex flex-col xs:flex-row flex-wrap gap-1.5 xs:gap-2 items-center w-full lg:w-auto justify-center xs:justify-start">
+            <div className="flex flex-row gap-2 items-center">
               <button 
                 onClick={fetchEmployeeLogs} 
                 disabled={loading}
-                className="flex-1 xs:flex-none px-2 xs:px-3 md:px-4 py-1.5 xs:py-2 md:py-2.5 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg md:rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 xs:gap-2 font-medium text-xs xs:text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 md:px-4 py-2 md:py-2.5 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg md:rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 font-medium text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <svg className={`w-3.5 h-3.5 xs:w-4 md:w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                <span className="hidden xs:inline">Refresh</span>
+                <span className="hidden sm:inline">Refresh</span>
               </button>
               <button 
                 onClick={() => exportLogs('csv')} 
-                className="flex-1 xs:flex-none px-2 xs:px-3 md:px-4 py-1.5 xs:py-2 md:py-2.5 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg md:rounded-xl transition-all shadow-md hover:shadow-lg font-medium text-xs xs:text-sm md:text-base"
+                className="px-3 md:px-4 py-2 md:py-2.5 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg md:rounded-xl transition-all shadow-md hover:shadow-lg font-medium text-sm md:text-base"
               >
-                <span className="hidden xs:inline">Export</span>
-                <span className="xs:hidden">CSV</span>
+                CSV
               </button>
               <button 
                 onClick={() => setState(prev => ({ ...prev, showReportBuilder: true }))}
-                className="flex-1 xs:flex-none px-2 xs:px-3 md:px-4 py-1.5 xs:py-2 md:py-2.5 bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-lg md:rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 xs:gap-2 font-medium text-xs xs:text-sm md:text-base"
+                className="px-3 md:px-4 py-2 md:py-2.5 bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-lg md:rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 font-medium text-sm md:text-base"
               >
-                <svg className="w-3.5 h-3.5 xs:w-4 md:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <span className="hidden xs:inline">Report</span>
+                <span className="hidden sm:inline">Report</span>
               </button>
               {/* Checkout quantity editing is available via "Edit Checkout Items" button in detailed view */}
             </div>

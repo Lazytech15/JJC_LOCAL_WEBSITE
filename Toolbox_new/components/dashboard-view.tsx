@@ -5,7 +5,7 @@ import {
   processBarcodeInput,
   type Product
 } from "../lib/barcode-scanner"
-import { Filter, Grid, List, Scan, ChevronDown, RefreshCw, Settings, Wifi, Download, FileText, FileSpreadsheet, Code, Plus, Package, Menu, X } from "lucide-react"
+import { Filter, Grid, List, ChevronDown, RefreshCw, Settings, Wifi, Download, FileText, FileSpreadsheet, Code, Package, Menu, X } from "lucide-react"
 import { useLoading } from "./loading-context"
 import { SearchLoader } from "./enhanced-loaders"
 import { OfflineStatusPanel } from "./offline-status"
@@ -1056,121 +1056,93 @@ export function DashboardView({
         <>
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300"
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
             onClick={() => setIsMobileSidebarOpen(false)}
-            aria-hidden="true"
           />
           {/* Mobile Drawer */}
-          <div className="fixed inset-y-0 left-0 w-72 bg-card border-r border-border z-50 lg:hidden overflow-y-auto transform transition-transform duration-300 ease-in-out">
-            {/* Mobile Sidebar Header with Close Button */}
-            <div className="p-6 border-b border-border">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
-                    <Filter className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="font-semibold text-foreground">Controls</h2>
-                    <p className="text-xs text-muted-foreground">Filter & manage items</p>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsMobileSidebarOpen(false)}
-                  className="w-8 h-8 p-0 hover:bg-muted rounded-lg transition-all duration-200"
-                  aria-label="Close sidebar"
-                >
-                  <X className="w-4 h-4 text-muted-foreground" />
-                </Button>
+          <div className="fixed inset-y-0 left-0 w-64 bg-card border-r z-50 lg:hidden overflow-y-auto">
+            {/* Mobile Sidebar Header */}
+            <div className="p-4 border-b flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <h2 className="font-medium">Filters</h2>
               </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setIsMobileSidebarOpen(false)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
             </div>
 
-            {/* Mobile Sidebar Content (same as desktop) */}
-            <div className="p-6 space-y-8">
-              {/* System Status Card */}
-              <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
-                <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <div className="w-5 h-5 bg-linear-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
-                      <Wifi className="w-3 h-3 text-white" />
-                    </div>
-                    System Status
-                  </h3>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-success' : 'bg-orange-500'}`}></div>
-                        <span className="text-xs text-muted-foreground">API</span>
-                      </div>
-                      <Badge 
-                        variant={isConnected ? "default" : "outline"} 
-                        className="text-xs px-2 py-0.5 rounded-full"
-                      >
-                        {isConnected ? "Connected" : "Disconnected"}
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-success' : 'bg-red-500'}`}></div>
-                        <span className="text-xs text-muted-foreground">Network</span>
-                      </div>
-                      <Badge 
-                        variant={isOnline ? "default" : "outline"} 
-                        className="text-xs px-2 py-0.5 rounded-full"
-                      >
-                        {isOnline ? "Online" : "Offline"}
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Source</span>
-                      <Badge 
-                        variant={dataSource === "api" ? "default" : "outline"} 
-                        className="text-xs px-2 py-0.5 rounded-full"
-                      >
-                        {dataSource === "api" ? "Live" : "Cache"}
-                      </Badge>
-                    </div>
-                    
-                    {lastFetchTime && (
-                      <div className="text-xs text-muted-foreground pt-1 border-t border-border">
-                        Updated {lastFetchTime.toLocaleTimeString()}
-                      </div>
-                    )}
-                  </div>
+            {/* Mobile Sidebar Content */}
+            <div className="p-4 space-y-6">
+              {/* View Mode */}
+              <div className="space-y-2">
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">View Mode</h3>
+                <div className="flex border rounded-lg w-full">
+                  <Button
+                    variant={viewMode === "grid" ? "default" : "ghost"}
+                    size="sm"
+                    className="flex-1 h-9 gap-2"
+                    onClick={() => setViewMode("grid")}
+                  >
+                    <Grid className="w-4 h-4" />
+                    <span className="text-xs">Grid</span>
+                  </Button>
+                  <Button
+                    variant={viewMode === "list" ? "default" : "ghost"}
+                    size="sm"
+                    className="flex-1 h-9 gap-2"
+                    onClick={() => setViewMode("list")}
+                  >
+                    <List className="w-4 h-4" />
+                    <span className="text-xs">List</span>
+                  </Button>
                 </div>
               </div>
 
-              {/* Categories Section */}
-              <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-3 shadow-sm">
+              {/* Sort By */}
+              <div className="space-y-2">
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sort By</h3>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name-asc">Name A-Z</SelectItem>
+                    <SelectItem value="name-desc">Name Z-A</SelectItem>
+                    <SelectItem value="stock-high">Stock High-Low</SelectItem>
+                    <SelectItem value="stock-low">Stock Low-High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Categories */}
+              <div className="space-y-2">
                 <button
                   onClick={() => setIsCategoriesCollapsed(!isCategoriesCollapsed)}
-                  className="w-full flex items-center justify-between mb-2 group"
+                  className="w-full flex items-center justify-between py-1"
                 >
-                  <h3 className="text-xs font-semibold text-foreground flex items-center gap-2">
-                    <div className="w-4 h-4 bg-linear-to-br from-purple-400 to-pink-500 rounded flex items-center justify-center">
-                      <Filter className="w-2.5 h-2.5 text-white" />
-                    </div>
+                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
                     Categories
                     {excludedCategories.size > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-red-500/20 text-red-500 rounded-full">
+                      <span className="text-[10px] px-1.5 py-0.5 bg-destructive/20 text-destructive rounded-full normal-case">
                         {excludedCategories.size} hidden
                       </span>
                     )}
                   </h3>
-                  <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${isCategoriesCollapsed ? "-rotate-90" : ""}`} />
+                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isCategoriesCollapsed ? "-rotate-90" : ""}`} />
                 </button>
                 
                 {!isCategoriesCollapsed && (
-                  <div className="space-y-0.5 max-h-64 overflow-y-auto custom-scrollbar">
-                    {/* Select All / Clear All buttons */}
-                    <div className="flex gap-1 mb-2">
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    <div className="flex gap-2 mb-2">
                       <button
                         onClick={() => setExcludedCategories(new Set())}
-                        className="flex-1 text-[10px] px-2 py-1 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30 transition-colors font-medium"
+                        className="flex-1 text-xs px-2 py-1 rounded bg-muted hover:bg-muted/80"
                       >
                         Show All
                       </button>
@@ -1179,7 +1151,7 @@ export function DashboardView({
                           const allCats = categories.filter(c => c !== "all")
                           setExcludedCategories(new Set(allCats))
                         }}
-                        className="flex-1 text-[10px] px-2 py-1 rounded bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/30 transition-colors font-medium"
+                        className="flex-1 text-xs px-2 py-1 rounded bg-muted hover:bg-muted/80"
                       >
                         Hide All
                       </button>
@@ -1193,39 +1165,26 @@ export function DashboardView({
                           onClick={() => {
                             setExcludedCategories(prev => {
                               const newSet = new Set(prev)
-                              if (newSet.has(cat)) {
-                                newSet.delete(cat)
-                              } else {
-                                newSet.add(cat)
-                              }
+                              if (newSet.has(cat)) newSet.delete(cat)
+                              else newSet.add(cat)
                               return newSet
                             })
                           }}
-                          className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-all duration-200 ${
-                            isExcluded
-                              ? "bg-red-500/10 text-muted-foreground line-through opacity-60 hover:opacity-80"
-                              : "bg-emerald-500/10 text-foreground hover:bg-emerald-500/20"
+                          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm ${
+                            isExcluded ? "text-muted-foreground line-through opacity-60" : "text-foreground hover:bg-muted"
                           }`}
                         >
-                          <div className={`w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                            isExcluded 
-                              ? "border-red-400 bg-red-500/20" 
-                              : "border-emerald-400 bg-emerald-500"
+                          <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${
+                            isExcluded ? "border-muted-foreground" : "border-primary bg-primary"
                           }`}>
                             {!isExcluded && (
-                              <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <svg className="w-2 h-2 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                               </svg>
                             )}
                           </div>
-                          <span className="text-xs truncate flex-1 text-left">{cat}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                            isExcluded 
-                              ? "bg-red-500/20 text-red-500" 
-                              : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                          }`}>
-                            {itemCount}
-                          </span>
+                          <span className="truncate flex-1 text-left">{cat}</span>
+                          <span className="text-xs text-muted-foreground">{itemCount}</span>
                         </button>
                       )
                     })}
@@ -1233,38 +1192,51 @@ export function DashboardView({
                 )}
               </div>
 
-              {/* Availability Filters */}
-              <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
-                <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-                  <div className="w-5 h-5 bg-linear-to-br from-blue-400 to-cyan-500 rounded-md flex items-center justify-center">
-                    <Package className="w-3 h-3 text-white" />
-                  </div>
-                  Availability
-                </h3>
-                <div className="space-y-3">
-                  <label className="flex items-center gap-3 cursor-pointer group">
+              {/* Availability */}
+              <div className="space-y-2">
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Availability</h3>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <Checkbox 
-                      id="mobile-available" 
                       checked={showAvailable} 
                       onCheckedChange={(checked) => setShowAvailable(checked === true)}
-                      className="border-border data-[state=checked]:bg-success data-[state=checked]:border-success"
                     />
-                    <span className="text-sm text-foreground group-hover:text-foreground transition-colors">
-                      In Stock
-                    </span>
+                    <span className="text-sm">In Stock</span>
                   </label>
                   
-                  <label className="flex items-center gap-3 cursor-pointer group">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <Checkbox 
-                      id="mobile-unavailable" 
                       checked={showUnavailable} 
                       onCheckedChange={(checked) => setShowUnavailable(checked === true)}
-                      className="border-border data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
                     />
-                    <span className="text-sm text-foreground group-hover:text-foreground transition-colors">
-                      Out of Stock
-                    </span>
+                    <span className="text-sm">Out of Stock</span>
                   </label>
+                </div>
+              </div>
+
+              {/* Status */}
+              <div className="space-y-2">
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-orange-500'}`}></div>
+                      <span className="text-muted-foreground">API</span>
+                    </div>
+                    <span className={isConnected ? "text-green-600" : "text-orange-600"}>
+                      {isConnected ? "Connected" : "Disconnected"}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                      <span className="text-muted-foreground">Network</span>
+                    </div>
+                    <span className={isOnline ? "text-green-600" : "text-red-600"}>
+                      {isOnline ? "Online" : "Offline"}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1273,35 +1245,30 @@ export function DashboardView({
       )}
 
       {/* Desktop Sidebar - Hidden on mobile, visible on lg+ */}
-      <div className="hidden lg:flex lg:flex-col w-72 bg-card border-r border-border sticky top-0 h-screen shrink-0">
+      <div className="hidden lg:flex lg:flex-col w-64 bg-card border-r sticky top-0 h-screen shrink-0">
         <div className="flex-1 overflow-y-auto">
           {/* Sidebar Header */}
-          <div className="p-6 border-b border-border sticky top-0 bg-card z-10">
+          <div className="p-4 border-b sticky top-0 bg-card z-10">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
-                <Filter className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <h2 className="font-semibold text-foreground">Controls</h2>
-                <p className="text-xs text-muted-foreground">Filter & manage items</p>
-              </div>
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <h2 className="font-medium text-foreground">Filters</h2>
             </div>
-            <div className="flex space-x-1">
+            <div className="flex gap-1">
               <Button 
                 variant="ghost" 
-                size="sm" 
+                size="icon"
+                className="h-8 w-8"
                 onClick={() => setIsSettingsOpen(true)} 
-                className="w-8 h-8 p-0 hover:bg-muted rounded-lg transition-all duration-200"
               >
                 <Settings className="w-4 h-4 text-muted-foreground" />
               </Button>
               <Button 
                 variant="ghost" 
-                size="sm" 
+                size="icon"
+                className="h-8 w-8"
                 onClick={handleRefreshData} 
                 disabled={isLoadingData} 
-                className="w-8 h-8 p-0 hover:bg-muted rounded-lg transition-all duration-200"
               >
                 <RefreshCw className={`w-4 h-4 text-muted-foreground ${isLoadingData ? "animate-spin" : ""}`} />
               </Button>
@@ -1310,62 +1277,47 @@ export function DashboardView({
         </div>
 
         {/* Sidebar Content */}
-        <div className="p-6 space-y-8">
+        <div className="p-4 space-y-6">
 
-          {/* System Status Card */}
-          <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                <div className="w-5 h-5 bg-linear-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
-                  <Wifi className="w-3 h-3 text-white" />
-                </div>
-                System Status
-              </h3>
-              
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-orange-500'}`}></div>
-                    <span className="text-xs text-muted-foreground">API</span>
-                  </div>
-                  <Badge 
-                    variant={isConnected ? "default" : "outline"} 
-                    className="text-xs px-2 py-0.5 rounded-full"
-                  >
-                    {isConnected ? "Connected" : "Disconnected"}
-                  </Badge>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
-                    <span className="text-xs text-muted-foreground">Network</span>
-                  </div>
-                  <Badge 
-                    variant={isOnline ? "default" : "outline"} 
-                    className="text-xs px-2 py-0.5 rounded-full"
-                  >
-                    {isOnline ? "Online" : "Offline"}
-                  </Badge>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Source</span>
-                  <Badge 
-                    variant={dataSource === "api" ? "default" : "outline"} 
-                    className="text-xs px-2 py-0.5 rounded-full"
-                  >
-                    {dataSource === "api" ? "Live" : "Cache"}
-                  </Badge>
-                </div>
-                
-                {lastFetchTime && (
-                  <div className="text-xs text-muted-foreground pt-1 border-t border-border">
-                    Updated {lastFetchTime.toLocaleTimeString()}
-                  </div>
-                )}
-              </div>
+          {/* View Mode */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">View Mode</h3>
+            <div className="flex border rounded-lg w-full">
+              <Button
+                variant={viewMode === "grid" ? "default" : "ghost"}
+                size="sm"
+                className="flex-1 h-9 gap-2"
+                onClick={() => setViewMode("grid")}
+              >
+                <Grid className="w-4 h-4" />
+                <span className="text-xs">Grid</span>
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "default" : "ghost"}
+                size="sm"
+                className="flex-1 h-9 gap-2"
+                onClick={() => setViewMode("list")}
+              >
+                <List className="w-4 h-4" />
+                <span className="text-xs">List</span>
+              </Button>
             </div>
+          </div>
+
+          {/* Sort By */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sort By</h3>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name-asc">Name A-Z</SelectItem>
+                <SelectItem value="name-desc">Name Z-A</SelectItem>
+                <SelectItem value="stock-high">Stock High-Low</SelectItem>
+                <SelectItem value="stock-low">Stock Low-High</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         
         {/* Settings Dialog with Tabs */}
@@ -1616,142 +1568,138 @@ export function DashboardView({
           )}
 
           {/* Categories Card - Collapsible */}
-          <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-3 shadow-sm">
-            <div className="space-y-2">
-              <button 
-                onClick={() => setIsCategoriesCollapsed(!isCategoriesCollapsed)}
-                className="w-full flex items-center justify-between group hover:bg-muted -mx-1 px-1 py-1 rounded-lg transition-all duration-200"
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-linear-to-br from-purple-400 to-pink-500 rounded flex items-center justify-center">
-                    <Package className="w-2.5 h-2.5 text-white" />
-                  </div>
-                  <h3 className="text-xs font-semibold text-foreground">
-                    Categories
-                  </h3>
-                  <div className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full font-medium">
-                    {categories.filter(c => c !== "all").length}
-                  </div>
-                  {excludedCategories.size > 0 && (
-                    <span className="text-[10px] px-1.5 py-0.5 bg-red-500/20 text-red-500 rounded-full">
-                      {excludedCategories.size} hidden
-                    </span>
-                  )}
-                </div>
-                <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${
-                  isCategoriesCollapsed ? 'rotate-180' : ''
-                }`} />
-              </button>
-              
-              <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                isCategoriesCollapsed ? 'max-h-0 opacity-0' : 'max-h-80 opacity-100 overflow-y-auto custom-scrollbar'
-              }`}>
-                {/* Select All / Clear All buttons */}
-                <div className="flex gap-1 mb-2 pt-1">
-                  <button
-                    onClick={() => setExcludedCategories(new Set())}
-                    className="flex-1 text-[10px] px-2 py-1.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30 transition-colors font-medium"
-                  >
-                    Show All
-                  </button>
-                  <button
-                    onClick={() => {
-                      const allCats = categories.filter(c => c !== "all")
-                      setExcludedCategories(new Set(allCats))
-                    }}
-                    className="flex-1 text-[10px] px-2 py-1.5 rounded bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/30 transition-colors font-medium"
-                  >
-                    Hide All
-                  </button>
-                </div>
-                <div className="space-y-0.5">
-                  {categories.filter(category => category !== "all").map((category) => {
-                    const isExcluded = excludedCategories.has(category)
-                    const itemCount = products.filter((p) => p.itemType === category).length
-                    return (
-                      <button
-                        key={category}
-                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs transition-all duration-200 ${
-                          isExcluded
-                            ? "bg-red-500/10 text-muted-foreground line-through opacity-60 hover:opacity-80"
-                            : "bg-emerald-500/10 text-foreground hover:bg-emerald-500/20 font-medium"
-                        }`}
-                        onClick={() => {
-                          setExcludedCategories(prev => {
-                            const newSet = new Set(prev)
-                            if (newSet.has(category)) {
-                              newSet.delete(category)
-                            } else {
-                              newSet.add(category)
-                            }
-                            return newSet
-                          })
-                        }}
-                      >
-                        <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                          isExcluded 
-                            ? "border-red-400 bg-red-500/20" 
-                            : "border-emerald-400 bg-emerald-500"
-                        }`}>
-                          {!isExcluded && (
-                            <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                        </div>
-                        <span className="truncate flex-1 text-left">
-                          {category}
-                        </span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${
-                          isExcluded 
-                            ? "bg-red-500/20 text-red-500" 
-                            : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                        }`}>
-                          {itemCount}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
+          <div className="space-y-2">
+            <button 
+              onClick={() => setIsCategoriesCollapsed(!isCategoriesCollapsed)}
+              className="w-full flex items-center justify-between py-1"
+            >
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                Categories
+                {excludedCategories.size > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 bg-destructive/20 text-destructive rounded-full normal-case">
+                    {excludedCategories.size} hidden
+                  </span>
+                )}
+              </h3>
+              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${
+                isCategoriesCollapsed ? 'rotate-180' : ''
+              }`} />
+            </button>
+            
+            <div className={`overflow-hidden transition-all ${
+              isCategoriesCollapsed ? 'max-h-0' : 'max-h-64 overflow-y-auto'
+            }`}>
+              {/* Quick actions */}
+              <div className="flex gap-2 mb-2">
+                <button
+                  onClick={() => setExcludedCategories(new Set())}
+                  className="flex-1 text-xs px-2 py-1 rounded bg-muted hover:bg-muted/80 transition-colors"
+                >
+                  Show All
+                </button>
+                <button
+                  onClick={() => {
+                    const allCats = categories.filter(c => c !== "all")
+                    setExcludedCategories(new Set(allCats))
+                  }}
+                  className="flex-1 text-xs px-2 py-1 rounded bg-muted hover:bg-muted/80 transition-colors"
+                >
+                  Hide All
+                </button>
+              </div>
+              <div className="space-y-1">
+                {categories.filter(category => category !== "all").map((category) => {
+                  const isExcluded = excludedCategories.has(category)
+                  const itemCount = products.filter((p) => p.itemType === category).length
+                  return (
+                    <button
+                      key={category}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors ${
+                        isExcluded
+                          ? "text-muted-foreground line-through opacity-60"
+                          : "text-foreground hover:bg-muted"
+                      }`}
+                      onClick={() => {
+                        setExcludedCategories(prev => {
+                          const newSet = new Set(prev)
+                          if (newSet.has(category)) {
+                            newSet.delete(category)
+                          } else {
+                            newSet.add(category)
+                          }
+                          return newSet
+                        })
+                      }}
+                    >
+                      <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${
+                        isExcluded ? "border-muted-foreground" : "border-primary bg-primary"
+                      }`}>
+                        {!isExcluded && (
+                          <svg className="w-2 h-2 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className="truncate flex-1 text-left">{category}</span>
+                      <span className="text-xs text-muted-foreground">{itemCount}</span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </div>
 
-          {/* Availability Filter Card */}
-          <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                <div className="w-5 h-5 bg-linear-to-br from-emerald-400 to-green-500 rounded-md flex items-center justify-center">
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                Availability
-              </h3>
+          {/* Availability Filter */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Availability</h3>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox 
+                  checked={showAvailable} 
+                  onCheckedChange={(checked) => setShowAvailable(checked === true)}
+                />
+                <span className="text-sm">In Stock</span>
+              </label>
               
-              <div className="space-y-3">
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <Checkbox 
-                    id="available" 
-                    checked={showAvailable} 
-                    onCheckedChange={(checked) => setShowAvailable(checked === true)}
-                    className="border-border data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
-                  />
-                  <span className="text-sm text-foreground group-hover:text-foreground transition-colors">
-                    Available Items
-                  </span>
-                </label>
-                
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <Checkbox 
-                    id="unavailable" 
-                    checked={showUnavailable} 
-                    onCheckedChange={(checked) => setShowUnavailable(checked === true)}
-                    className="border-border data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
-                  />
-                  <span className="text-sm text-foreground group-hover:text-foreground transition-colors">
-                    Out of Stock
-                  </span>
-                </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox 
+                  checked={showUnavailable} 
+                  onCheckedChange={(checked) => setShowUnavailable(checked === true)}
+                />
+                <span className="text-sm">Out of Stock</span>
+              </label>
+            </div>
+          </div>
+
+          {/* System Status */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-orange-500'}`}></div>
+                  <span className="text-muted-foreground">API</span>
+                </div>
+                <span className={isConnected ? "text-green-600" : "text-orange-600"}>
+                  {isConnected ? "Connected" : "Disconnected"}
+                </span>
               </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <span className="text-muted-foreground">Network</span>
+                </div>
+                <span className={isOnline ? "text-green-600" : "text-red-600"}>
+                  {isOnline ? "Online" : "Offline"}
+                </span>
+              </div>
+              
+              {lastFetchTime && (
+                <p className="text-xs text-muted-foreground pt-1">
+                  Updated {lastFetchTime.toLocaleTimeString()}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -1760,141 +1708,62 @@ export function DashboardView({
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6">
           {/* Top Controls */}
-          <div className="bg-background relative z-10 mb-6">
-            {/* Desktop Layout - Hidden on mobile */}
+          <div className="mb-6">
+            {/* Desktop Layout */}
             <div className="hidden lg:flex items-center justify-between">
-              <div className="flex items-center space-x-4 px-2 py-1 rounded">
-                <h1 className="text-2xl font-bold text-foreground">All Items</h1>
-                <Badge
-                  variant="secondary"
-                  className="bg-muted text-foreground"
-                >
-                  {paginatedProducts.length} of {totalFilteredCount} items
-                </Badge>
-                {(searchQuery || localSearchQuery) && (
-                  <Badge
-                    variant="outline"
-                    className="border-border text-muted-foreground"
-                  >
-                    Searching: "{searchQuery || localSearchQuery}"
-                  </Badge>
-                )}
-              </div>
-
-              <div className="flex items-center space-x-4 px-2 py-1 rounded">
-                <Input
-                  placeholder="Search items..."
-                  value={localSearchQuery}
-                  onChange={(e) => setLocalSearchQuery(e.target.value)}
-                  className="w-64 bg-card border-border"
-                />
-
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-40 text-foreground bg-card border-border">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    <SelectItem value="name-asc" className="text-foreground">
-                      Name A-Z
-                    </SelectItem>
-                    <SelectItem value="name-desc" className="text-foreground">
-                      Name Z-A
-                    </SelectItem>
-                    <SelectItem value="stock-high" className="text-foreground">
-                      Stock High-Low
-                    </SelectItem>
-                    <SelectItem value="stock-low" className="text-foreground">
-                      Stock Low-High
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <div className="flex border rounded-lg border-border bg-card">
-                  <Button
-                    variant={viewMode === "grid" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("grid")}
-                    className={`${
-                      viewMode === "grid"
-                        ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    }`}
-                  >
-                    <Grid className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === "list" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("list")}
-                    className={`${
-                      viewMode === "list"
-                        ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
-                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-200 dark:hover:text-slate-100 dark:hover:bg-slate-700"
-                    }`}
-                  >
-                    <List className="w-4 h-4" />
-                  </Button>
-                </div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl font-semibold">All Items</h1>
+                <span className="text-sm text-muted-foreground">
+                  {paginatedProducts.length} of {totalFilteredCount}
+                </span>
               </div>
             </div>
 
-            {/* Mobile Layout - Visible only on mobile */}
-            <div className="lg:hidden space-y-2">
-              {/* Single row: Hamburger + Title + View Mode + Sort */}
-              <div className="flex items-center gap-2 px-2">
+            {/* Mobile Layout */}
+            <div className="lg:hidden space-y-3">
+              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
                   onClick={() => setIsMobileSidebarOpen(true)}
-                  className="h-9 w-9 p-0 shrink-0 bg-slate-800/60 border-2 border-slate-600 hover:bg-slate-700/70"
-                  title="Open filters"
                 >
-                  <Menu className="w-5 h-5" />
+                  <Menu className="w-4 h-4" />
                 </Button>
                 
-                <div className="min-w-0 flex-shrink">
-                  <h1 className="text-base font-bold text-foreground truncate">All Items</h1>
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-base font-semibold truncate">All Items</h1>
+                  <span className="text-xs text-muted-foreground">
                     {paginatedProducts.length} of {totalFilteredCount}
                   </span>
                 </div>
 
-                {/* View Mode Toggle */}
-                <div className="flex border rounded-lg border-border bg-card shrink-0 ml-auto">
+                <div className="flex border rounded-lg shrink-0">
                   <Button
                     variant={viewMode === "grid" ? "default" : "ghost"}
-                    size="sm"
+                    size="icon"
+                    className="h-8 w-8"
                     onClick={() => setViewMode("grid")}
-                    className={`h-8 w-8 p-0 ${
-                      viewMode === "grid"
-                        ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    }`}
                   >
                     <Grid className="w-4 h-4" />
                   </Button>
                   <Button
                     variant={viewMode === "list" ? "default" : "ghost"}
-                    size="sm"
+                    size="icon"
+                    className="h-8 w-8"
                     onClick={() => setViewMode("list")}
-                    className={`h-8 w-8 p-0 ${
-                      viewMode === "list"
-                        ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    }`}
                   >
                     <List className="w-4 h-4" />
                   </Button>
                 </div>
 
-                {/* Sort Dropdown */}
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-28 h-8 text-xs bg-card border-border shrink-0">
+                  <SelectTrigger className="w-24 h-8 text-xs shrink-0">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
+                  <SelectContent>
                     <SelectItem value="name-asc" className="text-xs">A-Z</SelectItem>
                     <SelectItem value="name-desc" className="text-xs">Z-A</SelectItem>
                     <SelectItem value="stock-high" className="text-xs">High Stock</SelectItem>
@@ -1903,16 +1772,10 @@ export function DashboardView({
                 </Select>
               </div>
 
-              {/* Active Search Badge */}
-              {(searchQuery || localSearchQuery) && (
-                <div className="px-2">
-                  <Badge
-                    variant="outline"
-                    className="border-border text-muted-foreground text-xs"
-                  >
-                    Searching: "{searchQuery || localSearchQuery}"
-                  </Badge>
-                </div>
+              {searchQuery && (
+                <Badge variant="outline" className="text-xs">
+                  Searching: "{searchQuery}"
+                </Badge>
               )}
             </div>
           </div>

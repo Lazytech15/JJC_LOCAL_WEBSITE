@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Minus, Plus, Trash2, History, Package, Briefcase, Cog, Wrench } from "lucide-react"
+import { Minus, Plus, Trash2, History, Package, ShoppingCart } from "lucide-react"
 import { Button } from "../components/ui/button"
 import { Card, CardContent } from "../components/ui/card"
 import { Badge } from "../components/ui/badge"
@@ -15,13 +15,12 @@ import { useToast } from "../hooks/use-toast"
 import type { CartItem } from "../app/page"
 import type { Employee } from "../lib/Services/employees.service"
 
-// Image component with error handling - Industrial styled
+// Clean image component
 function CartItemImage({ itemId, itemName }: { itemId: string; itemName: string }) {
   const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   
-  // Fetch image URL from API - same approach as dashboard
   useEffect(() => {
     setImageError(false)
     setImageLoaded(false)
@@ -37,30 +36,23 @@ function CartItemImage({ itemId, itemName }: { itemId: string; itemName: string 
       return
     }
     
-    // Use latest image URL from apiService (same as dashboard/EnhancedItemCard)
     const url = apiService.getItemLatestImageUrl(numericItemId)
     setImageUrl(`${url}?t=${Date.now()}`)
   }, [itemId])
 
   return (
-    <div className="w-16 h-16 bg-slate-900/50 rounded-lg flex items-center justify-center overflow-hidden border-2 border-slate-700 relative">
-      {/* Corner bolts */}
-      <div className="absolute top-0.5 left-0.5 w-1 h-1 bg-slate-500 rounded-full"></div>
-      <div className="absolute top-0.5 right-0.5 w-1 h-1 bg-slate-500 rounded-full"></div>
-      <div className="absolute bottom-0.5 left-0.5 w-1 h-1 bg-slate-500 rounded-full"></div>
-      <div className="absolute bottom-0.5 right-0.5 w-1 h-1 bg-slate-500 rounded-full"></div>
-      
+    <div className="w-14 h-14 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
       {!imageError && imageUrl && (
         <img 
           src={imageUrl} 
           alt={itemName}
-          className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+          className={`w-full h-full object-cover transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
           onLoad={() => setImageLoaded(true)}
           onError={() => setImageError(true)}
         />
       )}
       {(!imageUrl || !imageLoaded || imageError) && (
-        <Package className="w-8 h-8 text-slate-400" />
+        <Package className="w-6 h-6 text-muted-foreground" />
       )}
     </div>
   )
@@ -363,52 +355,30 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 bg-background min-h-[calc(100dvh-4rem)]">
-      {/* Industrial Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-slate-700 relative">
-        {/* Decorative accent line */}
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-linear-to-r from-transparent via-blue-500/50 to-transparent"></div>
-        
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center gap-3">
-            {/* Industrial toolbox icon */}
-            <div className="relative">
-              <div className="absolute -inset-0.5 border border-slate-600 rounded"></div>
-              <div className="relative bg-slate-800 p-2 rounded border border-slate-600">
-                <Briefcase className="w-6 h-6 text-slate-300" />
-                {/* Corner bolts */}
-                <div className="absolute top-0 left-0 w-1 h-1 bg-slate-500 rounded-full"></div>
-                <div className="absolute top-0 right-0 w-1 h-1 bg-slate-500 rounded-full"></div>
-                <div className="absolute bottom-0 left-0 w-1 h-1 bg-slate-500 rounded-full"></div>
-                <div className="absolute bottom-0 right-0 w-1 h-1 bg-slate-500 rounded-full"></div>
-              </div>
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-2xl font-black text-transparent bg-clip-text bg-linear-to-r from-slate-200 via-slate-100 to-slate-300">
-                CART
-              </h1>
-              <div className="text-xs text-slate-500 font-mono hidden md:block">Work Order Items</div>
-            </div>
+      {/* Clean Header */}
+      <div className="flex items-center justify-between mb-6 pb-4 border-b">
+        <div className="flex items-center gap-3">
+          <ShoppingCart className="w-6 h-6 text-foreground" />
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">Cart</h1>
+            <p className="text-xs text-muted-foreground">{items.length} items</p>
           </div>
-          <Badge variant="secondary" className="bg-slate-800 text-slate-300 border border-slate-600">
-            <Cog className="w-3 h-3 mr-1" />
-            {items.length} items
-          </Badge>
           <CartStatusIndicator />
         </div>
 
-        {/* Desktop Controls */}
-        <div className="hidden md:flex items-center gap-2">
+        {/* Controls */}
+        <div className="flex items-center gap-2">
           <CartRecoveryPanel 
             trigger={
-              <Button variant="outline" size="sm" className="flex items-center gap-2 border-slate-600 hover:bg-slate-800">
+              <Button variant="ghost" size="sm" className="gap-2">
                 <History className="w-4 h-4" />
-                Memory
+                <span className="hidden sm:inline">History</span>
               </Button>
             }
           />
           
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-40 border-slate-600">
+            <SelectTrigger className="w-28 h-8 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -417,203 +387,121 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
             </SelectContent>
           </Select>
         </div>
-
-        {/* Mobile Controls */}
-        <div className="md:hidden flex items-center gap-2">
-          <CartRecoveryPanel 
-            trigger={
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0 border-slate-600">
-                <History className="w-4 h-4" />
-              </Button>
-            }
-          />
-          
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-24 h-8 text-xs border-slate-600">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name-asc" className="text-xs">A-Z</SelectItem>
-              <SelectItem value="name-desc" className="text-xs">Z-A</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
-      {/* Cart Items - Industrial Style */}
-      <div className="space-y-4 mb-6">
+      {/* Cart Items */}
+      <div className="space-y-3 mb-6">
         {sortedItems.length === 0 ? (
-          <Card className="border-2 border-slate-700 bg-slate-900/30">
-            <CardContent className="p-8 text-center">
-              <div className="flex flex-col items-center gap-4">
-                <div className="relative">
-                  <Wrench className="w-16 h-16 text-slate-600" />
-                  <div className="absolute -bottom-2 -right-2">
-                    <Cog className="w-8 h-8 text-slate-600 animate-spin-slow" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-slate-400 text-lg font-semibold">Your cart is empty</p>
-                  <p className="text-slate-500 text-sm mt-2">
-                    Add items from the dashboard to get started
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="py-16 text-center">
+            <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">Your cart is empty</p>
+            <p className="text-sm text-muted-foreground mt-1">Add items from the dashboard to get started</p>
+          </div>
         ) : (
           sortedItems.map((item) => (
-            <Card key={item.id} className="hover:shadow-lg transition-all duration-200 border-2 border-slate-700 bg-card/50 backdrop-blur-sm hover:border-slate-600">
-              <CardContent className="p-4 relative">
-                {/* Industrial corner accents */}
-                <div className="absolute top-2 left-2 w-3 h-3 border-l-2 border-t-2 border-slate-600"></div>
-                <div className="absolute top-2 right-2 w-3 h-3 border-r-2 border-t-2 border-slate-600"></div>
-                <div className="absolute bottom-2 left-2 w-3 h-3 border-l-2 border-b-2 border-slate-600"></div>
-                <div className="absolute bottom-2 right-2 w-3 h-3 border-r-2 border-b-2 border-slate-600"></div>
-                
+            <Card key={item.id} className="hover:shadow-sm transition-shadow">
+              <CardContent className="p-3">
                 {/* Desktop Layout */}
-                <div className="hidden md:flex items-center space-x-4">
-                  {/* Checkbox */}
+                <div className="hidden md:flex items-center gap-4">
                   <Checkbox
                     checked={selectedItems.has(item.id)}
                     onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
-                    className="border-slate-600"
                   />
 
-                  {/* Image */}
                   <CartItemImage itemId={item.id} itemName={item.name} />
 
-                  {/* Item Details */}
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-foreground mb-1">{item.name}</h3>
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <p>Brand: {item.brand}</p>
-                      <p>Item Type: {item.itemType}</p>
-                      <p>Location: {item.location}</p>
-                    </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-foreground truncate">{item.name}</h3>
+                    <p className="text-sm text-muted-foreground">{item.brand} • {item.itemType}</p>
+                    <p className="text-xs text-muted-foreground">{item.location}</p>
                   </div>
 
-                  {/* Balance Display */}
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-foreground mb-1">
-                      BAL: {item.balance.toString().padStart(2, "0")}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Available</p>
-                  </div>
+                  <Badge variant="outline" className="shrink-0">
+                    {item.balance} in stock
+                  </Badge>
 
-                  {/* Quantity Controls with direct numeric input */}
-                  <div className="flex items-center space-x-2">
+                  {/* Quantity Controls */}
+                  <div className="flex items-center gap-1">
                     <Button
                       variant="outline"
-                      size="sm"
+                      size="icon"
+                      className="h-8 w-8"
                       onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
                       disabled={item.quantity <= 1}
-                      className="w-8 h-8 p-0"
                     >
-                      <Minus className="w-4 h-4" />
+                      <Minus className="w-3 h-3" />
                     </Button>
 
-                    {/* Direct entry input */}
                     <input
                       aria-label={`Quantity for ${item.name}`}
                       type="number"
                       min={1}
-                      step={1}
                       value={item.quantity}
                       onChange={(e) => {
-                        const raw = e.target.value
-                        const numeric = raw === '' ? '' : raw.replace(/[^0-9]/g, '')
-                        if (numeric === '') {
-                          onUpdateQuantity(item.id, 1)
-                          return
-                        }
-                        const parsed = parseInt(numeric, 10)
-                        if (isNaN(parsed)) {
-                          onUpdateQuantity(item.id, 1)
-                          return
-                        }
-                        const clamped = Math.max(1, Math.min(parsed, item.balance))
-                        if (clamped !== item.quantity) {
-                          onUpdateQuantity(item.id, clamped)
-                        }
+                        const parsed = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10)
+                        const clamped = Math.max(1, Math.min(isNaN(parsed) ? 1 : parsed, item.balance))
+                        if (clamped !== item.quantity) onUpdateQuantity(item.id, clamped)
                       }}
-                      onBlur={(e) => {
-                        const raw = e.target.value
-                        const parsed = parseInt(String(raw).replace(/[^0-9]/g, ''), 10)
-                        const finalVal = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, item.balance)
-                        if (finalVal !== item.quantity) {
-                          onUpdateQuantity(item.id, finalVal)
-                        }
-                      }}
-                      className="w-16 text-center font-medium text-foreground bg-transparent border border-slate-700 rounded px-2 py-1"
+                      className="w-12 text-center text-sm font-medium bg-transparent border rounded h-8"
                     />
 
                     <Button
                       variant="outline"
-                      size="sm"
+                      size="icon"
+                      className="h-8 w-8"
                       onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
                       disabled={item.quantity >= item.balance}
-                      className="w-8 h-8 p-0"
                     >
-                      <Plus className="w-4 h-4" />
+                      <Plus className="w-3 h-3" />
                     </Button>
                   </div>
 
-                  {/* Remove Button */}
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => onRemoveItem(item.id)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
                   >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Remove
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
 
-                {/* Mobile Layout - Amazon/Shopee Style */}
+                {/* Mobile Layout */}
                 <div className="md:hidden space-y-3">
-                  {/* Row 1: Checkbox + Image + Basic Info + Remove */}
                   <div className="flex gap-3">
                     <Checkbox
                       checked={selectedItems.has(item.id)}
                       onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
-                      className="border-slate-600 mt-1"
+                      className="mt-1"
                     />
                     
                     <CartItemImage itemId={item.id} itemName={item.name} />
                     
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm text-foreground line-clamp-2 mb-1">{item.name}</h3>
-                      <div className="text-xs text-muted-foreground space-y-0.5">
-                        <p className="truncate">Brand: {item.brand}</p>
-                        <p className="truncate">Type: {item.itemType}</p>
-                      </div>
+                      <h3 className="font-medium text-sm truncate">{item.name}</h3>
+                      <p className="text-xs text-muted-foreground truncate">{item.brand} • {item.itemType}</p>
                     </div>
 
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
                       onClick={() => onRemoveItem(item.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 h-8 w-8 p-0 shrink-0"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
 
-                  {/* Row 2: Balance + Quantity Controls */}
-                  <div className="flex items-center justify-between pl-[72px]">
-                    <div className="text-xs text-muted-foreground">
-                      <span className="font-medium">Balance:</span> {item.balance}
-                    </div>
+                  <div className="flex items-center justify-between pl-[68px]">
+                    <span className="text-xs text-muted-foreground">{item.balance} in stock</span>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       <Button
                         variant="outline"
-                        size="sm"
+                        size="icon"
+                        className="h-7 w-7"
                         onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
                         disabled={item.quantity <= 1}
-                        className="w-7 h-7 p-0"
                       >
                         <Minus className="w-3 h-3" />
                       </Button>
@@ -622,42 +510,21 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
                         aria-label={`Quantity for ${item.name}`}
                         type="number"
                         min={1}
-                        step={1}
                         value={item.quantity}
                         onChange={(e) => {
-                          const raw = e.target.value
-                          const numeric = raw === '' ? '' : raw.replace(/[^0-9]/g, '')
-                          if (numeric === '') {
-                            onUpdateQuantity(item.id, 1)
-                            return
-                          }
-                          const parsed = parseInt(numeric, 10)
-                          if (isNaN(parsed)) {
-                            onUpdateQuantity(item.id, 1)
-                            return
-                          }
-                          const clamped = Math.max(1, Math.min(parsed, item.balance))
-                          if (clamped !== item.quantity) {
-                            onUpdateQuantity(item.id, clamped)
-                          }
+                          const parsed = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10)
+                          const clamped = Math.max(1, Math.min(isNaN(parsed) ? 1 : parsed, item.balance))
+                          if (clamped !== item.quantity) onUpdateQuantity(item.id, clamped)
                         }}
-                        onBlur={(e) => {
-                          const raw = e.target.value
-                          const parsed = parseInt(String(raw).replace(/[^0-9]/g, ''), 10)
-                          const finalVal = isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, item.balance)
-                          if (finalVal !== item.quantity) {
-                            onUpdateQuantity(item.id, finalVal)
-                          }
-                        }}
-                        className="w-12 text-center text-sm font-medium text-foreground bg-transparent border border-slate-700 rounded px-1 py-1"
+                        className="w-10 text-center text-sm font-medium bg-transparent border rounded h-7"
                       />
 
                       <Button
                         variant="outline"
-                        size="sm"
+                        size="icon"
+                        className="h-7 w-7"
                         onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
                         disabled={item.quantity >= item.balance}
-                        className="w-7 h-7 p-0"
                       >
                         <Plus className="w-3 h-3" />
                       </Button>
@@ -672,101 +539,47 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
 
       {/* Footer */}
       {items.length > 0 && (
-        <Card className="sticky bottom-0 z-10">
+        <Card className="sticky bottom-4 shadow-lg">
           <CardContent className="p-4">
-            {/* Desktop Footer */}
-            <div className="hidden md:flex items-center justify-between">
-              {/* Bulk Actions */}
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox checked={allSelected} onCheckedChange={handleSelectAll} />
-                  <span className="text-sm dark:text-slate-300">Select all ({selectedItems.size})</span>
-                </div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Checkbox checked={allSelected} onCheckedChange={handleSelectAll} />
+                <span className="text-sm text-muted-foreground">
+                  All ({selectedItems.size})
+                </span>
 
                 {selectedItems.size > 0 && (
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={handleBulkDelete}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 bg-transparent"
+                    className="text-destructive hover:text-destructive"
                   >
-                    <Trash2 className="w-4 h-4 mr-2" />
+                    <Trash2 className="w-4 h-4 mr-1" />
                     Delete
                   </Button>
                 )}
               </div>
 
-              {/* Summary and Checkout */}
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-sm text-slate-600 dark:text-slate-400">Total Items</p>
-                  <p className="text-lg font-bold dark:text-slate-100">({totalItems})</p>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="text-lg font-semibold">{totalItems} items</p>
                 </div>
 
                 <Button
                   size="lg"
-                  className="bg-teal-600 hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600"
+                  className="bg-primary hover:bg-primary/90"
                   onClick={handleCheckout}
                   disabled={isCommitting}
                 >
                   {isCommitting ? (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-2">
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       <span>Processing...</span>
                     </div>
                   ) : (
-                    "Proceed to checkout"
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Mobile Footer - Amazon/Shopee Style */}
-            <div className="md:hidden space-y-3">
-              {/* Row 1: Select All + Bulk Delete */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    checked={allSelected} 
-                    onCheckedChange={handleSelectAll}
-                    className="scale-90"
-                  />
-                  <span className="text-xs dark:text-slate-300">All ({selectedItems.size})</span>
-                </div>
-
-                {selectedItems.size > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleBulkDelete}
-                    className="text-red-600 hover:text-red-700 h-8 text-xs"
-                  >
-                    <Trash2 className="w-3 h-3 mr-1" />
-                    Delete
-                  </Button>
-                )}
-              </div>
-
-              {/* Row 2: Total + Checkout Button */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1">
-                  <p className="text-xs text-slate-600 dark:text-slate-400">Total</p>
-                  <p className="text-lg font-bold dark:text-slate-100">{totalItems} items</p>
-                </div>
-
-                <Button
-                  size="lg"
-                  className="bg-teal-600 hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600 flex-1"
-                  onClick={handleCheckout}
-                  disabled={isCommitting}
-                >
-                  {isCommitting ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span className="text-sm">Processing...</span>
-                    </div>
-                  ) : (
-                    <span className="text-sm">Checkout</span>
+                    "Checkout"
                   )}
                 </Button>
               </div>

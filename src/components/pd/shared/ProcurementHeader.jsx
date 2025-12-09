@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../contexts/AuthContext'
 import apiService from '../../../utils/api/api-service'
 
@@ -18,6 +19,7 @@ function ProcurementHeader({
   onMobileMenuToggle
 }) {
   const { user, isDarkMode, toggleDarkMode } = useAuth()
+  const navigate = useNavigate()
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [userProfile, setUserProfile] = useState(null)
@@ -77,14 +79,14 @@ function ProcurementHeader({
         <div className="max-w-screen-2xl mx-auto px-6 py-3">
           <div className="flex items-center justify-between gap-6">
             {/* Left: Department Info */}
-            <div className="min-w-0 shrink-0">
+            <div className="min-w-0 shrink-0 flex-1">
               <h1 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                 Procurement
               </h1>
             </div>
 
             {/* Center: Navigation Tabs */}
-            <nav className="flex items-center gap-2 flex-1">
+            <nav className="flex items-center justify-center gap-2">
               {tabs.map((tab) => (
                 <button
                   key={tab.key}
@@ -104,7 +106,7 @@ function ProcurementHeader({
             </nav>
 
             {/* Right: Actions */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center justify-end gap-2 shrink-0 flex-1">
               {/* Notifications */}
               <div className="relative">
                 <button
@@ -337,6 +339,19 @@ function ProcurementHeader({
                         }`}
                       >
                         ⚙️ Settings
+                      </button>
+                      <button
+                        onClick={() => {
+                          navigate('/jjctoolbox')
+                          setShowProfileMenu(false)
+                        }}
+                        className={`w-full text-left px-2 py-2 rounded transition-colors ${
+                          isDarkMode
+                            ? 'hover:bg-slate-700 text-slate-300'
+                            : 'hover:bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        🧰 Toolbox
                       </button>
                       <button
                         onClick={() => {
@@ -575,6 +590,19 @@ function ProcurementHeader({
                       }`}
                     >
                       ⚙️ Settings
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigate('/jjctoolbox')
+                        setShowProfileMenu(false)
+                      }}
+                      className={`w-full text-left px-2 py-1 rounded transition-colors ${
+                        isDarkMode
+                          ? 'hover:bg-slate-700 text-slate-300'
+                          : 'hover:bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      🧰 Toolbox
                     </button>
                     <button
                       onClick={() => {

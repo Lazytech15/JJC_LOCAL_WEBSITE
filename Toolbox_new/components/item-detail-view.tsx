@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { ArrowLeft, Plus, Minus, Package, Briefcase, Cog, Wrench } from "lucide-react"
+import { ArrowLeft, Plus, Minus, Package, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "./ui/button"
 import { Card, CardContent } from "./ui/card"
 import { Badge } from "./ui/badge"
@@ -158,196 +158,158 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
   }, [images])
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 relative">
-      {/* Industrial background pattern */}
-      <div className="absolute inset-0 opacity-5 pointer-events-none">
-        <div className="absolute top-10 right-10">
-          <Cog className="w-32 h-32 text-slate-400 animate-spin-slow" />
-        </div>
-        <div className="absolute bottom-10 left-10">
-          <Wrench className="w-24 h-24 text-slate-400 rotate-45" />
-        </div>
-      </div>
-
-      {/* Back Button - Industrial Style */}
+    <div className="max-w-4xl mx-auto p-4 sm:p-6">
+      {/* Back Button */}
       <Button 
         variant="ghost" 
         onClick={onBack} 
-        className="mb-6 border-2 border-slate-700 hover:bg-slate-800 hover:border-slate-600 transition-all"
+        className="mb-6 gap-2"
       >
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        Back to Dashboard
+        <ArrowLeft className="w-4 h-4" />
+        Back
       </Button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative">
-        {/* Image Section - Industrial Frame */}
-        <Card className="border-2 border-slate-700 bg-card/50 backdrop-blur-sm relative overflow-hidden">
-          {/* Corner bolts */}
-          <div className="absolute top-3 left-3 w-2 h-2 bg-slate-500 rounded-full z-10"></div>
-          <div className="absolute top-3 right-3 w-2 h-2 bg-slate-500 rounded-full z-10"></div>
-          <div className="absolute bottom-3 left-3 w-2 h-2 bg-slate-500 rounded-full z-10"></div>
-          <div className="absolute bottom-3 right-3 w-2 h-2 bg-slate-500 rounded-full z-10"></div>
-          
-          <CardContent className="p-8">
-            <div className="aspect-square bg-slate-900/50 rounded-lg flex items-center justify-center overflow-hidden border-2 border-slate-700 relative">
-              {/* Industrial frame corners */}
-              <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-slate-500"></div>
-              <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-slate-500"></div>
-              <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-slate-500"></div>
-              <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-slate-500"></div>
-              
-              {!imageError && (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Image Section */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="aspect-square bg-muted rounded-lg flex items-center justify-center overflow-hidden relative">
+              {!imageError && imageUrl && (
                 <img 
-                  src={imageUrl || undefined} 
+                  src={imageUrl} 
                   alt={product.name}
-                  className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  className={`w-full h-full object-cover transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                   onLoad={() => setImageLoaded(true)}
                   onError={() => setImageError(true)}
                 />
               )}
               {(!imageUrl || !imageLoaded || imageError) && (
-                <Package className="w-24 h-24 text-slate-400" />
+                <Package className="w-20 h-20 text-muted-foreground" />
               )}
               
-              {/* Image Counter */}
+              {/* Image Navigation */}
               {images.length > 1 && (
-                <div className="absolute bottom-4 right-4 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-medium">
-                  {currentIndex + 1} / {images.length}
-                </div>
+                <>
+                  <button
+                    onClick={() => {
+                      const prev = (currentIndex - 1 + images.length) % images.length
+                      setCurrentIndex(prev)
+                      setImageUrl(images[prev].url)
+                    }}
+                    className="absolute left-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      const next = (currentIndex + 1) % images.length
+                      setCurrentIndex(next)
+                      setImageUrl(images[next].url)
+                    }}
+                    className="absolute right-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                    {images.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setCurrentIndex(idx)
+                          setImageUrl(images[idx].url)
+                        }}
+                        className={`w-2 h-2 rounded-full transition-colors ${idx === currentIndex ? 'bg-white' : 'bg-white/50'}`}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Product Information - Industrial Style */}
+        {/* Product Information */}
         <div className="space-y-6">
           <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="relative">
-                <div className="absolute -inset-0.5 border border-slate-600 rounded"></div>
-                <div className="relative bg-slate-800 p-2 rounded border border-slate-600">
-                  <Briefcase className="w-5 h-5 text-slate-300" />
-                  <div className="absolute top-0 left-0 w-1 h-1 bg-slate-500 rounded-full"></div>
-                  <div className="absolute top-0 right-0 w-1 h-1 bg-slate-500 rounded-full"></div>
-                  <div className="absolute bottom-0 left-0 w-1 h-1 bg-slate-500 rounded-full"></div>
-                  <div className="absolute bottom-0 right-0 w-1 h-1 bg-slate-500 rounded-full"></div>
-                </div>
-              </div>
-              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-200 via-slate-100 to-slate-300">
-                {product.name}
-              </h1>
-            </div>
-
-            <div className="space-y-3 text-muted-foreground">
-              <div className="flex justify-between">
-                <span className="font-medium">Item Number:</span>
-                <span>{product.id}</span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="font-medium">Brand:</span>
-                <span>{product.brand}</span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="font-medium">Item Type:</span>
-                <span>{product.itemType}</span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="font-medium">Location:</span>
-                <span>{product.location}</span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="font-medium">Current Balance:</span>
-                <span className="font-bold text-foreground">{product.balance}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Status Badge */}
-          <div>
-            <Badge className={`${getStatusColor(product.status)} text-white text-sm px-4 py-2`}>
+            <h1 className="text-2xl font-semibold text-foreground mb-2">{product.name}</h1>
+            <Badge className={`${getStatusColor(product.status)} text-white`}>
               {getStatusText(product.status)}
             </Badge>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Item #</span>
+              <span className="font-medium">{product.id}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Brand</span>
+              <span className="font-medium">{product.brand}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Type</span>
+              <span className="font-medium">{product.itemType}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Location</span>
+              <span className="font-medium">{product.location}</span>
+            </div>
+            <div className="flex justify-between py-2">
+              <span className="text-muted-foreground">In Stock</span>
+              <span className="font-semibold text-lg">{product.balance}</span>
+            </div>
           </div>
 
           {/* Quantity Selection */}
           {product.status !== "out-of-stock" && (
             <Card>
               <CardContent className="p-4">
-                <div className="space-y-4">
-                  <h3 className="font-medium text-foreground">Select Quantity</h3>
-
-                  <div className="flex items-center space-x-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Quantity</span>
+                  <div className="flex items-center gap-3">
                     <Button
                       variant="outline"
-                      size="sm"
+                      size="icon"
+                      className="h-9 w-9"
                       onClick={decrementQuantity}
                       disabled={quantity <= 1}
-                      className="w-10 h-10 p-0 bg-transparent"
                     >
                       <Minus className="w-4 h-4" />
                     </Button>
 
-                    <div className="text-2xl font-bold w-16 text-center text-foreground">{quantity}</div>
+                    <span className="text-xl font-semibold w-12 text-center">{quantity}</span>
 
                     <Button
                       variant="outline"
-                      size="sm"
+                      size="icon"
+                      className="h-9 w-9"
                       onClick={incrementQuantity}
                       disabled={quantity >= product.balance}
-                      className="w-10 h-10 p-0"
                     >
                       <Plus className="w-4 h-4" />
                     </Button>
                   </div>
-
-                  <p className="text-sm text-muted-foreground">Maximum available: {product.balance}</p>
                 </div>
+                <p className="text-xs text-muted-foreground mt-2">Max: {product.balance}</p>
               </CardContent>
             </Card>
           )}
 
           {/* Add to Cart Button */}
-          <div className="space-y-3">
-            <Button
-              size="lg"
-              onClick={handleAddToCart}
-              disabled={product.status === "out-of-stock"}
-              className="w-full bg-teal-600 hover:bg-teal-700"
-            >
-              {product.status === "out-of-stock" ? "Out of Stock" : `Add ${quantity} to Toolbox`}
-            </Button>
+          <Button
+            size="lg"
+            onClick={handleAddToCart}
+            disabled={product.status === "out-of-stock"}
+            className="w-full"
+          >
+            {product.status === "out-of-stock" ? "Out of Stock" : `Add ${quantity} to Cart`}
+          </Button>
 
-            {product.status === "out-of-stock" && (
-              <p className="text-sm text-red-500 text-center">This item is currently out of stock</p>
-            )}
-          </div>
+          {product.status === "out-of-stock" && (
+            <p className="text-sm text-destructive text-center">This item is currently unavailable</p>
+          )}
         </div>
       </div>
-
-      {/* Additional Information */}
-      <Card className="mt-8">
-        <CardContent className="p-6">
-          <h3 className="font-medium text-foreground mb-4">Item Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-            <div>
-              <p className="font-medium text-foreground mb-1">Status</p>
-              <p className="text-muted-foreground">{getStatusText(product.status)}</p>
-            </div>
-            <div>
-              <p className="font-medium text-foreground mb-1">Available Stock</p>
-              <p className="text-muted-foreground">{product.balance} units</p>
-            </div>
-            <div>
-              <p className="font-medium text-foreground mb-1">Category</p>
-              <p className="text-muted-foreground">{product.itemType}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
