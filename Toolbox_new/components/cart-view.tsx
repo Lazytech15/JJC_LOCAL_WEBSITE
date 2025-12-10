@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Minus, Plus, Trash2, History, Package, ShoppingCart } from "lucide-react"
+import { useState, useEffect, useMemo } from "react"
+import { Minus, Plus, Trash2, History, Package, ShoppingCart, ChevronDown, ChevronRight } from "lucide-react"
 import { Button } from "../components/ui/button"
 import { Card, CardContent } from "../components/ui/card"
 import { Badge } from "../components/ui/badge"
@@ -14,6 +14,11 @@ import { apiService } from "../lib/api_service"
 import { useToast } from "../hooks/use-toast"
 import type { CartItem } from "../app/page"
 import type { Employee } from "../lib/Services/employees.service"
+
+// Extended CartItem type with addedAt timestamp
+interface CartItemWithTimestamp extends CartItem {
+  addedAt?: number
+}
 
 // Clean image component
 function CartItemImage({ itemId, itemName }: { itemId: string; itemName: string }) {
@@ -41,7 +46,7 @@ function CartItemImage({ itemId, itemName }: { itemId: string; itemName: string 
   }, [itemId])
 
   return (
-    <div className="w-14 h-14 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
+    <div className="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center overflow-hidden border border-slate-700">
       {!imageError && imageUrl && (
         <img 
           src={imageUrl} 
@@ -52,14 +57,14 @@ function CartItemImage({ itemId, itemName }: { itemId: string; itemName: string 
         />
       )}
       {(!imageUrl || !imageLoaded || imageError) && (
-        <Package className="w-6 h-6 text-muted-foreground" />
+        <Package className="w-5 h-5 text-slate-500" />
       )}
     </div>
   )
 }
 
 interface CartViewProps {
-  items: CartItem[]
+  items: CartItemWithTimestamp[]
   onUpdateQuantity: (id: string, quantity: number) => void
   onRemoveItem: (id: string) => void
   onReturnToBrowsing?: () => void
@@ -68,23 +73,55 @@ interface CartViewProps {
 
 export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrowsing, onRefreshData }: CartViewProps) {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
-  const [sortBy, setSortBy] = useState("name-asc")
+  const [sortBy, setSortBy] = useState("recent") // Default to recently added
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
   const [isCommitting, setIsCommitting] = useState(false)
-  const [showSuccessCountdown, setShowSuccessCountdown] = useState(false) // Added success countdown state
-  const [checkoutData, setCheckoutData] = useState<{ userId: string; totalItems: number } | null>(null) // Store checkout data for countdown
+  const [showSuccessCountdown, setShowSuccessCountdown] = useState(false)
+  const [checkoutData, setCheckoutData] = useState<{ userId: string; totalItems: number } | null>(null)
+  const [collapsedBrands, setCollapsedBrands] = useState<Set<string>>(new Set())
   const { toast } = useToast()
 
-  const sortedItems = [...items].sort((a, b) => {
+  // Sort items based on selection
+  const sortedItems = useMemo(() => {
+    const itemsCopy = [...items]
     switch (sortBy) {
+      case "recent":
+        // Sort by addedAt timestamp (most recent first), fallback to original order
+        return itemsCopy.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
       case "name-asc":
-        return a.name.localeCompare(b.name)
+        return itemsCopy.sort((a, b) => a.name.localeCompare(b.name))
       case "name-desc":
-        return b.name.localeCompare(a.name)
+        return itemsCopy.sort((a, b) => b.name.localeCompare(a.name))
+      case "qty-high":
+        return itemsCopy.sort((a, b) => b.quantity - a.quantity)
+      case "qty-low":
+        return itemsCopy.sort((a, b) => a.quantity - b.quantity)
       default:
-        return 0
+        return itemsCopy
     }
-  })
+  }, [items, sortBy])
+
+  // Group items by brand
+  const groupedByBrand = useMemo(() => {
+    const groups: Record<string, CartItemWithTimestamp[]> = {}
+    sortedItems.forEach(item => {
+      const brand = item.brand || 'Unknown Brand'
+      if (!groups[brand]) groups[brand] = []
+      groups[brand].push(item)
+    })
+    // Sort brand names alphabetically
+    const sortedBrands = Object.keys(groups).sort((a, b) => a.localeCompare(b))
+    return sortedBrands.map(brand => ({ brand, items: groups[brand] }))
+  }, [sortedItems])
+
+  const toggleBrandCollapse = (brand: string) => {
+    setCollapsedBrands(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(brand)) newSet.delete(brand)
+      else newSet.add(brand)
+      return newSet
+    })
+  }
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -354,238 +391,345 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 bg-background min-h-[calc(100dvh-4rem)]">
-      {/* Clean Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b">
-        <div className="flex items-center gap-3">
-          <ShoppingCart className="w-6 h-6 text-foreground" />
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Cart</h1>
-            <p className="text-xs text-muted-foreground">{items.length} items</p>
-          </div>
-          <CartStatusIndicator />
-        </div>
+    <div className="h-full flex flex-col bg-background">
+      {/* Header - Consistent with Dashboard */}
+      <div className="shrink-0 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+        <div className="p-4 lg:p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <ShoppingCart className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold text-foreground">Cart</h1>
+                <p className="text-xs text-muted-foreground">{items.length} unique items • {totalItems} total</p>
+              </div>
+              <CartStatusIndicator />
+            </div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-2">
-          <CartRecoveryPanel 
-            trigger={
-              <Button variant="ghost" size="sm" className="gap-2">
-                <History className="w-4 h-4" />
-                <span className="hidden sm:inline">History</span>
-              </Button>
-            }
-          />
-          
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-28 h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name-asc">Name A-Z</SelectItem>
-              <SelectItem value="name-desc">Name Z-A</SelectItem>
-            </SelectContent>
-          </Select>
+            {/* Controls */}
+            <div className="flex items-center gap-2">
+              <CartRecoveryPanel 
+                trigger={
+                  <Button variant="outline" size="sm" className="gap-2 h-9">
+                    <History className="w-4 h-4" />
+                    <span className="hidden sm:inline">History</span>
+                  </Button>
+                }
+              />
+              
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-32 h-9 text-xs">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recent">Recently Added</SelectItem>
+                  <SelectItem value="name-asc">Name A-Z</SelectItem>
+                  <SelectItem value="name-desc">Name Z-A</SelectItem>
+                  <SelectItem value="qty-high">Qty High-Low</SelectItem>
+                  <SelectItem value="qty-low">Qty Low-High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Cart Items */}
-      <div className="space-y-3 mb-6">
-        {sortedItems.length === 0 ? (
-          <div className="py-16 text-center">
-            <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Your cart is empty</p>
-            <p className="text-sm text-muted-foreground mt-1">Add items from the dashboard to get started</p>
+      {/* Cart Items - Grouped by Brand */}
+      <div className="flex-1 overflow-y-auto p-4 lg:p-6 pb-32">
+        {items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <ShoppingCart className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <p className="text-lg font-medium text-foreground mb-1">Your cart is empty</p>
+            <p className="text-sm text-muted-foreground">Add items from the dashboard to get started</p>
           </div>
         ) : (
-          sortedItems.map((item) => (
-            <Card key={item.id} className="hover:shadow-sm transition-shadow">
-              <CardContent className="p-3">
-                {/* Desktop Layout */}
-                <div className="hidden md:flex items-center gap-4">
-                  <Checkbox
-                    checked={selectedItems.has(item.id)}
-                    onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
-                  />
-
-                  <CartItemImage itemId={item.id} itemName={item.name} />
-
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-foreground truncate">{item.name}</h3>
-                    <p className="text-sm text-muted-foreground">{item.brand} • {item.itemType}</p>
-                    <p className="text-xs text-muted-foreground">{item.location}</p>
-                  </div>
-
-                  <Badge variant="outline" className="shrink-0">
-                    {item.balance} in stock
-                  </Badge>
-
-                  {/* Quantity Controls */}
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-                      disabled={item.quantity <= 1}
-                    >
-                      <Minus className="w-3 h-3" />
-                    </Button>
-
-                    <input
-                      aria-label={`Quantity for ${item.name}`}
-                      type="number"
-                      min={1}
-                      value={item.quantity}
-                      onChange={(e) => {
-                        const parsed = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10)
-                        const clamped = Math.max(1, Math.min(isNaN(parsed) ? 1 : parsed, item.balance))
-                        if (clamped !== item.quantity) onUpdateQuantity(item.id, clamped)
-                      }}
-                      className="w-12 text-center text-sm font-medium bg-transparent border rounded h-8"
-                    />
-
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                      disabled={item.quantity >= item.balance}
-                    >
-                      <Plus className="w-3 h-3" />
-                    </Button>
-                  </div>
-
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onRemoveItem(item.id)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+          <div className="space-y-4">
+            {groupedByBrand.map(({ brand, items: brandItems }) => {
+              const isCollapsed = collapsedBrands.has(brand)
+              const brandItemCount = brandItems.reduce((sum, item) => sum + item.quantity, 0)
+              const allBrandItemsSelected = brandItems.every(item => selectedItems.has(item.id))
+              const someBrandItemsSelected = brandItems.some(item => selectedItems.has(item.id))
+              
+              return (
+                <div key={brand} className="rounded-xl border border-border bg-card overflow-hidden">
+                  {/* Brand Header */}
+                  <button
+                    onClick={() => toggleBrandCollapse(brand)}
+                    className="w-full flex items-center justify-between p-3 bg-muted/30 hover:bg-muted/50 transition-colors"
                   >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                {/* Mobile Layout */}
-                <div className="md:hidden space-y-3">
-                  <div className="flex gap-3">
-                    <Checkbox
-                      checked={selectedItems.has(item.id)}
-                      onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
-                      className="mt-1"
-                    />
-                    
-                    <CartItemImage itemId={item.id} itemName={item.name} />
-                    
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-sm truncate">{item.name}</h3>
-                      <p className="text-xs text-muted-foreground truncate">{item.brand} • {item.itemType}</p>
-                    </div>
-
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => onRemoveItem(item.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between pl-[68px]">
-                    <span className="text-xs text-muted-foreground">{item.balance} in stock</span>
-
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-                        disabled={item.quantity <= 1}
-                      >
-                        <Minus className="w-3 h-3" />
-                      </Button>
-
-                      <input
-                        aria-label={`Quantity for ${item.name}`}
-                        type="number"
-                        min={1}
-                        value={item.quantity}
-                        onChange={(e) => {
-                          const parsed = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10)
-                          const clamped = Math.max(1, Math.min(isNaN(parsed) ? 1 : parsed, item.balance))
-                          if (clamped !== item.quantity) onUpdateQuantity(item.id, clamped)
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="relative"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // Toggle all items in this brand
+                          const allSelected = brandItems.every(item => selectedItems.has(item.id))
+                          if (allSelected) {
+                            setSelectedItems(prev => {
+                              const newSet = new Set(prev)
+                              brandItems.forEach(item => newSet.delete(item.id))
+                              return newSet
+                            })
+                          } else {
+                            setSelectedItems(prev => {
+                              const newSet = new Set(prev)
+                              brandItems.forEach(item => newSet.add(item.id))
+                              return newSet
+                            })
+                          }
                         }}
-                        className="w-10 text-center text-sm font-medium bg-transparent border rounded h-7"
-                      />
-
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                        disabled={item.quantity >= item.balance}
                       >
-                        <Plus className="w-3 h-3" />
-                      </Button>
+                        <Checkbox
+                          checked={allBrandItemsSelected}
+                          className={`h-5 w-5 border-2 ${
+                            allBrandItemsSelected 
+                              ? 'border-primary bg-primary data-[state=checked]:bg-primary' 
+                              : someBrandItemsSelected 
+                                ? 'border-primary/50 bg-primary/20' 
+                                : 'border-slate-600 bg-slate-800'
+                          }`}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isCollapsed ? (
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        )}
+                        <span className="font-medium text-foreground">{brand}</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {brandItems.length} item{brandItems.length > 1 ? 's' : ''} • {brandItemCount} qty
+                        </Badge>
+                      </div>
                     </div>
-                  </div>
+                  </button>
+
+                  {/* Brand Items */}
+                  {!isCollapsed && (
+                    <div className="divide-y divide-border">
+                      {brandItems.map((item) => (
+                        <div key={item.id} className="p-3 hover:bg-muted/20 transition-colors">
+                          {/* Desktop Layout */}
+                          <div className="hidden md:flex items-center gap-4">
+                            <div 
+                              className="relative cursor-pointer"
+                              onClick={() => handleSelectItem(item.id, !selectedItems.has(item.id))}
+                            >
+                              <Checkbox
+                                checked={selectedItems.has(item.id)}
+                                className={`h-5 w-5 border-2 ${
+                                  selectedItems.has(item.id) 
+                                    ? 'border-primary bg-primary data-[state=checked]:bg-primary' 
+                                    : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+                                }`}
+                              />
+                            </div>
+
+                            <CartItemImage itemId={item.id} itemName={item.name} />
+
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-medium text-foreground truncate">{item.name}</h3>
+                              <p className="text-sm text-muted-foreground">{item.itemType} • {item.location}</p>
+                            </div>
+
+                            <Badge variant="outline" className="shrink-0 text-xs">
+                              {item.balance} in stock
+                            </Badge>
+
+                            {/* Quantity Controls */}
+                            <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 hover:bg-background"
+                                onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
+                                disabled={item.quantity <= 1}
+                              >
+                                <Minus className="w-3 h-3" />
+                              </Button>
+
+                              <input
+                                aria-label={`Quantity for ${item.name}`}
+                                type="number"
+                                min={1}
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const parsed = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10)
+                                  const clamped = Math.max(1, Math.min(isNaN(parsed) ? 1 : parsed, item.balance))
+                                  if (clamped !== item.quantity) onUpdateQuantity(item.id, clamped)
+                                }}
+                                className="w-12 text-center text-sm font-medium bg-background border-0 rounded h-8 focus:ring-2 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 hover:bg-background"
+                                onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+                                disabled={item.quantity >= item.balance}
+                              >
+                                <Plus className="w-3 h-3" />
+                              </Button>
+                            </div>
+
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => onRemoveItem(item.id)}
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+
+                          {/* Mobile Layout */}
+                          <div className="md:hidden space-y-3">
+                            <div className="flex gap-3">
+                              <div 
+                                className="relative cursor-pointer mt-1"
+                                onClick={() => handleSelectItem(item.id, !selectedItems.has(item.id))}
+                              >
+                                <Checkbox
+                                  checked={selectedItems.has(item.id)}
+                                  className={`h-5 w-5 border-2 ${
+                                    selectedItems.has(item.id) 
+                                      ? 'border-primary bg-primary data-[state=checked]:bg-primary' 
+                                      : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+                                  }`}
+                                />
+                              </div>
+                              
+                              <CartItemImage itemId={item.id} itemName={item.name} />
+                              
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-medium text-sm truncate">{item.name}</h3>
+                                <p className="text-xs text-muted-foreground truncate">{item.itemType}</p>
+                              </div>
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive"
+                                onClick={() => onRemoveItem(item.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+
+                            <div className="flex items-center justify-between pl-10">
+                              <span className="text-xs text-muted-foreground">{item.balance} in stock</span>
+
+                              <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-0.5">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
+                                  disabled={item.quantity <= 1}
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </Button>
+
+                                <input
+                                  aria-label={`Quantity for ${item.name}`}
+                                  type="number"
+                                  min={1}
+                                  value={item.quantity}
+                                  onChange={(e) => {
+                                    const parsed = parseInt(e.target.value.replace(/[^0-9]/g, ''), 10)
+                                    const clamped = Math.max(1, Math.min(isNaN(parsed) ? 1 : parsed, item.balance))
+                                    if (clamped !== item.quantity) onUpdateQuantity(item.id, clamped)
+                                  }}
+                                  className="w-10 text-center text-sm font-medium bg-background border-0 rounded h-7 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+                                  disabled={item.quantity >= item.balance}
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          ))
+              )
+            })}
+          </div>
         )}
       </div>
 
-      {/* Footer */}
+      {/* Footer - Sticky */}
       {items.length > 0 && (
-        <Card className="sticky bottom-4 shadow-lg">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <Checkbox checked={allSelected} onCheckedChange={handleSelectAll} />
-                <span className="text-sm text-muted-foreground">
-                  All ({selectedItems.size})
-                </span>
-
-                {selectedItems.size > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleBulkDelete}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="w-4 h-4 mr-1" />
-                    Delete
-                  </Button>
-                )}
+        <div className="shrink-0 border-t border-border bg-card/95 backdrop-blur-sm p-4 sticky bottom-0">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div 
+                className="relative cursor-pointer"
+                onClick={() => handleSelectAll(!allSelected)}
+              >
+                <Checkbox 
+                  checked={allSelected} 
+                  className={`h-5 w-5 border-2 ${
+                    allSelected 
+                      ? 'border-primary bg-primary data-[state=checked]:bg-primary' 
+                      : selectedItems.size > 0 
+                        ? 'border-primary/50 bg-primary/20' 
+                        : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+                  }`}
+                />
               </div>
+              <span className="text-sm text-muted-foreground">
+                All ({selectedItems.size})
+              </span>
 
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Total</p>
-                  <p className="text-lg font-semibold">{totalItems} items</p>
-                </div>
-
+              {selectedItems.size > 0 && (
                 <Button
-                  size="lg"
-                  className="bg-primary hover:bg-primary/90"
-                  onClick={handleCheckout}
-                  disabled={isCommitting}
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
                 >
-                  {isCommitting ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Processing...</span>
-                    </div>
-                  ) : (
-                    "Checkout"
-                  )}
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Delete
                 </Button>
-              </div>
+              )}
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Total</p>
+                <p className="text-lg font-semibold">{totalItems} items</p>
+              </div>
+
+              <Button
+                size="lg"
+                className="bg-primary hover:bg-primary/90 px-6"
+                onClick={handleCheckout}
+                disabled={isCommitting}
+              >
+                {isCommitting ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Processing...</span>
+                  </div>
+                ) : (
+                  "Checkout"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Checkout Modal */}

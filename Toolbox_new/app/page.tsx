@@ -27,6 +27,8 @@ export interface CartItem {
   quantity: number
   // Status is automatically calculated by the database trigger based on balance vs min_stock
   status: "in-stock" | "low-stock" | "out-of-stock"
+  // Timestamp for sorting by recently added
+  addedAt?: number
 }
 
 
@@ -105,10 +107,11 @@ export default function HomePage() {
   // Sync persistent cart state with local cart state
   useEffect(() => {
     if (cartState) {
-      // Convert persistent cart items to local cart format
+      // Convert persistent cart items to local cart format, including addedAt for sorting
       const localCartItems: CartItem[] = cartState.items.map(item => ({
         ...item.product,
-        quantity: item.quantity
+        quantity: item.quantity,
+        addedAt: item.addedAt ? new Date(item.addedAt).getTime() : Date.now()
       }))
       setCartItems(localCartItems)
     } else {

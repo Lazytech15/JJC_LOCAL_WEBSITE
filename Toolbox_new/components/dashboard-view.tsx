@@ -902,6 +902,30 @@ export function DashboardView({
     }
   }, [products, excludedCategories, showAvailable, showUnavailable, searchQuery, localSearchQuery, sortBy, currentPage])
 
+  // Dynamic title based on category filter state
+  const itemsTitle = useMemo(() => {
+    const allCats = categories.filter(c => c !== "all")
+    const includedCategories = allCats.filter(cat => !excludedCategories.has(cat))
+    
+    // All categories hidden
+    if (includedCategories.length === 0) {
+      return "No Items to Show"
+    }
+    
+    // All categories shown
+    if (excludedCategories.size === 0) {
+      return "All Items"
+    }
+    
+    // Exactly one category shown
+    if (includedCategories.length === 1) {
+      return includedCategories[0]
+    }
+    
+    // Multiple but some filtered out
+    return "Filtered Items"
+  }, [categories, excludedCategories])
+
   const handleLoadMore = () => {
     setIsLoadingMore(true)
     // Simulate loading delay
@@ -1714,7 +1738,7 @@ export function DashboardView({
             {/* Desktop Layout */}
             <div className="hidden lg:flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <h1 className="text-xl font-semibold">All Items</h1>
+                <h1 className="text-xl font-semibold">{itemsTitle}</h1>
                 <span className="text-sm text-muted-foreground">
                   {paginatedProducts.length} of {totalFilteredCount}
                 </span>
@@ -1734,7 +1758,7 @@ export function DashboardView({
                 </Button>
                 
                 <div className="flex-1 min-w-0">
-                  <h1 className="text-base font-semibold truncate">All Items</h1>
+                  <h1 className="text-base font-semibold truncate">{itemsTitle}</h1>
                   <span className="text-xs text-muted-foreground">
                     {paginatedProducts.length} of {totalFilteredCount}
                   </span>
