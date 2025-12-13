@@ -1,17 +1,14 @@
 import { useAuth } from "../../contexts/AuthContext"
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
 import EmployeeRecords from "../hr/EmployeeRecords"
 import Recruitment from "../hr/Recruitment"
 import Attendance from "../hr/Attendance"
 import Announcement from "../hr/Announcement"
 import GearLoadingSpinner from "../../../public/LoadingGear"
 import apiService from "../../utils/api/api-service"
-import { ProfileMenu } from "../shared"
 
 function HRDepartment() {
   const { user, logout, isDarkMode, toggleDarkMode } = useAuth()
-  const navigate = useNavigate()
   const [employees, setEmployees] = useState([])
   const [stats, setStats] = useState({ total: 0, newHires: 0, openPositions: 0 })
   const [loading, setLoading] = useState(true)
@@ -243,13 +240,16 @@ function HRDepartment() {
           >
             {isDarkMode ? "☀️" : "🌙"}
           </button>
-          <ProfileMenu
-            onLogout={logout}
-            onViewProfile={() => navigate('/employee/dashboard?tab=profile')}
-            showSettings={false}
-            showToolbox={true}
-            size="md"
-          />
+          <button
+            onClick={logout}
+            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-sm sm:text-base transition-colors duration-200 ${
+              isDarkMode
+                ? "bg-slate-700 hover:bg-slate-600 text-white"
+                : "bg-slate-600 hover:bg-slate-700 text-white"
+            }`}
+          >
+            Logout
+          </button>
         </div>
       </div>
 

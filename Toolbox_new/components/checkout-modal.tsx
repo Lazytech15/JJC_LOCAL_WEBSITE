@@ -1,16 +1,14 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { 
-  X, Wifi, WifiOff, Scan, CreditCard, UserCheck, 
-  ShoppingCart, FileText, CheckCircle2, ChevronRight, ChevronLeft,
-  Package, ArrowRight, AlertCircle, Check
-} from "lucide-react"
+import { useState, useEffect } from "react"
+import { X, User, Wifi, WifiOff, Scan, CreditCard, UserCheck } from "lucide-react"
 import { Button } from "../components/ui/button"
-import { Card, CardContent } from "../components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Input } from "../components/ui/input"
+import { Label } from "../components/ui/label"
+import { Separator } from "../components/ui/separator"
 import { Badge } from "../components/ui/badge"
-import { Textarea } from "../components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select"
 import { apiService } from "../lib/api_service"
 import type { CartItem } from "../app/page"
 import type { Employee } from "../lib/Services/employees.service"
@@ -23,16 +21,7 @@ interface CheckoutModalProps {
   isCommitting?: boolean
 }
 
-type WizardStep = 1 | 2 | 3
-
-const WIZARD_STEPS = [
-  { step: 1, title: "Review Order", icon: ShoppingCart, description: "Verify your items" },
-  { step: 2, title: "Purpose", icon: FileText, description: "Add checkout reason" },
-  { step: 3, title: "Confirm", icon: CheckCircle2, description: "Employee verification" },
-] as const
-
 export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCommitting = false }: CheckoutModalProps) {
-  const [currentStep, setCurrentStep] = useState<WizardStep>(1)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
   const [inputMethod, setInputMethod] = useState<'barcode' | 'manual'>('barcode')
@@ -51,14 +40,15 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
 
   // Notify GlobalBarcodeListener about checkout modal state
   useEffect(() => {
+    // Dispatch event to disable global barcode scanner when checkout modal is open
     window.dispatchEvent(new CustomEvent('checkout-modal-state', { 
       detail: { isOpen } 
     }))
   }, [isOpen])
 
-  // Listen for barcode scanner input (only on step 3)
+  // Listen for barcode scanner input
   useEffect(() => {
-    if (!isOpen || inputMethod !== 'barcode' || currentStep !== 3) return
+    if (!isOpen || inputMethod !== 'barcode') return
 
     let barcodeBuffer = ""
     let lastKeyTime = Date.now()
@@ -66,23 +56,28 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
     const handleKeyDown = (event: KeyboardEvent) => {
       const currentTime = Date.now()
 
+      // If more than 100ms has passed, reset buffer (indicates manual typing vs scanner)
       if (currentTime - lastKeyTime > 100) {
         barcodeBuffer = ""
       }
       lastKeyTime = currentTime
 
+      // Handle Enter key (scanner typically sends this at the end)
       if (event.key === 'Enter') {
         event.preventDefault()
-        if (barcodeBuffer.length > 3) {
+        if (barcodeBuffer.length > 3) { // Minimum barcode length
           handleBarcodeScanned(barcodeBuffer)
           barcodeBuffer = ""
         }
         return
       }
 
+      // Add character to buffer if it's alphanumeric
       if (/^[a-zA-Z0-9]$/.test(event.key)) {
         barcodeBuffer += event.key
-        if (document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+
+        // Prevent the input from appearing in any focused input field
+        if (document.activeElement?.tagName !== 'INPUT') {
           event.preventDefault()
         }
       }
@@ -90,12 +85,11 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, inputMethod, employees, currentStep])
+  }, [isOpen, inputMethod, employees])
 
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
-      setCurrentStep(1)
       setSelectedEmployee(null)
       setUserInput("")
       setError(null)
@@ -109,7 +103,10 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
     setError(null)
     try {
       const employeeData = await apiService.fetchEmployees()
+      // Store ALL employees (including disabled) so we can show proper error messages
       setEmployees(employeeData)
+      console.log("[CheckoutModal] Loaded", employeeData.length, "employees")
+      console.log(employeeData)
     } catch (error) {
       console.error("[CheckoutModal] Failed to load employees:", error)
       setError("Failed to load employee data. Please check API connection.")
@@ -119,14 +116,19 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
   }
 
   const handleBarcodeScanned = (barcode: string) => {
+    console.log("[CheckoutModal] Barcode scanned:", barcode)
     setIsScanning(true)
+
+    // Find employee by idBarcode
     const employee = employees.find(emp => emp.idBarcode === barcode)
 
     if (employee) {
+      // Check if employee is disabled/inactive
       if (employee.status !== 'Active') {
-        setError(`⚠️ Employee ID is DISABLED: ${employee.firstName} ${employee.lastName}'s ID has been deactivated. Please report to HR Department.`)
+        setError(`⚠️ Employee ID is DISABLED: ${employee.firstName} ${employee.lastName}'s ID has been deactivated. Please report to HR Department to resolve this issue.`)
         setUserInput(barcode)
         setSelectedEmployee(null)
+        console.warn("[CheckoutModal] Employee found but DISABLED:", employee.firstName, employee.lastName, "Status:", employee.status)
         setIsScanning(false)
         return
       }
@@ -134,10 +136,12 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
       setSelectedEmployee(employee)
       setUserInput(barcode)
       setError(null)
+      console.log("[CheckoutModal] Employee found:", employee.firstName, employee.lastName)
     } else {
       setError(`No employee found with barcode: ${barcode}`)
       setUserInput(barcode)
       setSelectedEmployee(null)
+      console.warn("[CheckoutModal] No employee found for barcode:", barcode)
     }
 
     setIsScanning(false)
@@ -152,36 +156,50 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
       return
     }
 
+    // Only search when we have enough characters (at least 3)
     if (value.trim().length < 3) {
       setSelectedEmployee(null)
       return
     }
 
+    // Debug: Log what we're searching for and available employees
+    console.log("[CheckoutModal] Searching for ID:", value.trim())
+    console.log("[CheckoutModal] Available employee IDs:", employees.map(e => ({ id: e.idNumber, barcode: e.idBarcode, name: e.fullName, status: e.status })).slice(0, 10))
+
+    // Find employee by idNumber (try exact match first, then partial match)
     let employee = employees.find(emp => emp.idNumber === value.trim())
     
+    // If no exact match, try case-insensitive match
     if (!employee) {
       employee = employees.find(emp => 
         emp.idNumber?.toLowerCase() === value.trim().toLowerCase()
       )
     }
     
+    // Also try matching by idBarcode in case user entered barcode in manual mode
     if (!employee) {
       employee = employees.find(emp => emp.idBarcode === value.trim())
     }
 
     if (employee) {
+      console.log("[CheckoutModal] Found employee:", employee.fullName, "Status:", employee.status)
+      // Check if employee is disabled/inactive
       if (employee.status !== 'Active') {
-        setError(`⚠️ Employee ID is DISABLED: ${employee.firstName} ${employee.lastName}'s ID has been deactivated. Please report to HR Department.`)
+        setError(`⚠️ Employee ID is DISABLED: ${employee.firstName} ${employee.lastName}'s ID has been deactivated. Please report to HR Department to resolve this issue.`)
         setSelectedEmployee(null)
+        console.warn("[CheckoutModal] Employee found but DISABLED:", employee.firstName, employee.lastName, "Status:", employee.status)
         return
       }
       
       setSelectedEmployee(employee)
       setError(null)
+      console.log("[CheckoutModal] Employee found by ID:", employee.firstName, employee.lastName)
     } else {
       setSelectedEmployee(null)
+      // Show error when ID is long enough but not found
       if (value.trim().length >= 5) {
-        setError(`No employee found with ID number: ${value.trim()}`)
+        setError(`No employee found with ID number: ${value.trim()}. Please check the ID and try again.`)
+        console.warn("[CheckoutModal] No employee found for ID:", value.trim())
       }
     }
   }
@@ -193,6 +211,9 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
     }
 
     try {
+      console.log("[CheckoutModal] Processing checkout for employee:", selectedEmployee.fullName)
+      
+      // Pass the employee object and purpose directly
       onConfirmCheckout(selectedEmployee, purpose.trim() || undefined)
     } catch (error) {
       console.error("[CheckoutModal] Failed to log transaction:", error)
@@ -200,527 +221,277 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
     }
   }
 
-  const goToNextStep = useCallback(() => {
-    if (currentStep < 3) {
-      setCurrentStep((prev) => (prev + 1) as WizardStep)
-    }
-  }, [currentStep])
-
-  const goToPrevStep = useCallback(() => {
-    if (currentStep > 1) {
-      setCurrentStep((prev) => (prev - 1) as WizardStep)
-      setError(null)
-    }
-  }, [currentStep])
-
-  const goToStep = useCallback((step: WizardStep) => {
-    // Can only go to completed steps or current step
-    if (step <= currentStep) {
-      setCurrentStep(step)
-      setError(null)
-    }
-  }, [currentStep])
-
-  const canProceedToNext = useCallback(() => {
-    switch (currentStep) {
-      case 1:
-        return items.length > 0
-      case 2:
-        return true // Purpose is optional
-      case 3:
-        return !!selectedEmployee
-      default:
-        return false
-    }
-  }, [currentStep, items.length, selectedEmployee])
-
   if (!isOpen) return null
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
-  const totalValue = items.reduce((sum, item) => sum + item.quantity * 10, 0)
+  const totalValue = items.reduce((sum, item) => sum + item.quantity * 10, 0) // Assuming $10 per item
   const apiConfig = apiService.getConfig()
 
-  // Step Indicator Component - Clickable steps
-  const StepIndicator = () => (
-    <div className="px-6 py-4 border-b border-border">
-      <div className="flex items-center justify-between">
-        {WIZARD_STEPS.map((step, index) => {
-          const Icon = step.icon
-          const isActive = currentStep === step.step
-          const isCompleted = currentStep > step.step
-          const isClickable = step.step <= currentStep
-          
-          return (
-            <div key={step.step} className="flex items-center flex-1">
-              {/* Step Circle & Content */}
-              <button
-                type="button"
-                onClick={() => isClickable && goToStep(step.step as WizardStep)}
-                disabled={!isClickable || isCommitting}
-                className={`
-                  flex items-center gap-3 transition-all duration-200
-                  ${isClickable && !isCommitting ? 'cursor-pointer' : 'cursor-default'}
-                  ${isClickable && !isActive ? 'hover:opacity-80' : ''}
-                `}
-              >
-                {/* Circle */}
-                <div className={`
-                  relative flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200
-                  ${isActive 
-                    ? 'border-secondary bg-secondary text-secondary-foreground' 
-                    : isCompleted 
-                      ? 'border-success bg-success text-success-foreground' 
-                      : 'border-border bg-muted text-muted-foreground'
-                  }
-                `}>
-                  {isCompleted ? (
-                    <Check className="w-5 h-5" />
-                  ) : (
-                    <Icon className="w-5 h-5" />
-                  )}
-                </div>
-                
-                {/* Text */}
-                <div className="hidden md:block text-left">
-                  <p className={`text-sm font-medium leading-tight ${
-                    isActive ? 'text-foreground' : isCompleted ? 'text-success' : 'text-muted-foreground'
-                  }`}>
-                    {step.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground leading-tight">
-                    {step.description}
-                  </p>
-                </div>
-              </button>
-              
-              {/* Connector Line */}
-              {index < WIZARD_STEPS.length - 1 && (
-                <div className="flex-1 mx-4 hidden sm:block">
-                  <div className={`h-0.5 rounded-full transition-colors duration-200 ${
-                    currentStep > step.step ? 'bg-success' : 'bg-border'
-                  }`} />
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-3xl bg-card border-border/50 shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30">
-          <div>
-            <h2 className="text-xl font-bold text-card-foreground">Checkout</h2>
-            <p className="text-sm text-muted-foreground">Step {currentStep} of 3 — {WIZARD_STEPS[currentStep - 1].title}</p>
-          </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={onClose} 
-            disabled={isCommitting}
-            className="h-9 w-9 p-0 rounded-lg hover:bg-muted"
-          >
-            <X className="w-5 h-5" />
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-800">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardTitle className="text-xl font-bold dark:text-slate-100">Checkout Summary</CardTitle>
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={isCommitting}>
+            <X className="w-4 h-4" />
           </Button>
-        </div>
+        </CardHeader>
 
-        {/* Step Indicator */}
-        <StepIndicator />
-
-        {/* Content */}
-        <CardContent className="p-6 max-h-[60vh] overflow-y-auto">
-          {/* Step 1: Review Order */}
-          {currentStep === 1 && (
-            <div className="space-y-5">
-              {/* API Status Banner */}
-              <div className={`flex items-center justify-between p-3 rounded-lg border ${
-                apiConfig.isConnected 
-                  ? 'bg-success/10 border-success/30' 
-                  : 'bg-amber-500/10 border-amber-500/30'
-              }`}>
-                <div className="flex items-center gap-2">
-                  {apiConfig.isConnected ? (
-                    <Wifi className="w-4 h-4 text-success" />
-                  ) : (
-                    <WifiOff className="w-4 h-4 text-amber-500" />
-                  )}
-                  <span className={`text-sm font-medium ${
-                    apiConfig.isConnected ? 'text-success' : 'text-amber-600 dark:text-amber-400'
-                  }`}>
-                    {apiConfig.isConnected ? 'Connected to Server' : 'Offline Mode'}
-                  </span>
-                </div>
-                <Badge variant="outline" className={`text-xs ${
-                  apiConfig.isConnected 
-                    ? 'border-success/50 text-success' 
-                    : 'border-amber-500/50 text-amber-600 dark:text-amber-400'
-                }`}>
-                  {apiConfig.isConnected ? 'Synced' : 'Local Only'}
-                </Badge>
-              </div>
-
-              {/* Items List */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-foreground flex items-center gap-2 text-sm">
-                    <Package className="w-4 h-4 text-secondary" />
-                    Items in Cart
-                  </h3>
-                  <Badge variant="secondary" className="text-xs">
-                    {items.length} {items.length === 1 ? 'item' : 'items'}
-                  </Badge>
-                </div>
-                
-                <div className="rounded-lg border border-border/50 divide-y divide-border/50 max-h-[35vh] overflow-y-auto">
-                  {items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-3 px-3 py-2 hover:bg-muted/30 transition-colors"
-                    >
-                      <div className="flex items-center justify-center w-7 h-7 rounded-md bg-secondary/10 text-secondary font-semibold text-xs flex-shrink-0">
-                        {item.quantity}×
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-card-foreground text-sm truncate leading-tight">
-                          {item.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate leading-tight">
-                          {item.brand} • {item.itemType}
-                          <span className="ml-2 text-[10px] opacity-70">
-                            ({item.balance} → {Math.max(0, item.balance - item.quantity)})
-                          </span>
-                        </p>
-                      </div>
-                      <p className="text-sm font-medium text-foreground flex-shrink-0">
-                        ₱{(item.quantity * 10).toFixed(2)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Summary */}
-              <Card className="border-secondary/30 bg-secondary/5">
-                <CardContent className="p-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Total Quantity</span>
-                      <span className="font-medium text-foreground">{totalItems} pcs</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Unique Products</span>
-                      <span className="font-medium text-foreground">{items.length}</span>
-                    </div>
-                    <div className="h-px bg-border my-2" />
-                    <div className="flex justify-between items-center">
-                      <span className="text-base font-semibold text-foreground">Total Value</span>
-                      <span className="text-xl font-bold text-secondary">₱{totalValue.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Step 2: Purpose */}
-          {currentStep === 2 && (
-            <div className="space-y-6">
-              <div className="text-center py-2">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-secondary/10 mb-4">
-                  <FileText className="w-7 h-7 text-secondary" />
-                </div>
-                <h3 className="text-lg font-semibold text-foreground">
-                  What's this checkout for?
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Help us understand why these items are needed (optional)
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <Textarea
-                  placeholder="e.g., Equipment maintenance, Project materials, Emergency repair..."
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  className="min-h-[100px] resize-none bg-input border-border focus:border-secondary focus:ring-secondary/20"
-                  maxLength={255}
-                  disabled={isCommitting}
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>This helps with inventory tracking and reporting</span>
-                  <span>{purpose.length}/255</span>
-                </div>
-              </div>
-
-              {/* Quick Suggestions */}
-              <div className="space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Quick Select
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    "Maintenance Work",
-                    "Project Requirement",
-                    "Equipment Repair",
-                    "Stock Replenishment",
-                    "Emergency Use",
-                    "Customer Request"
-                  ].map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onClick={() => setPurpose(suggestion)}
-                      className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${
-                        purpose === suggestion
-                          ? 'bg-secondary text-secondary-foreground border-secondary'
-                          : 'bg-card border-border text-muted-foreground hover:border-secondary hover:text-secondary'
-                      }`}
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Confirmation & Employee ID */}
-          {currentStep === 3 && (
-            <div className="space-y-5">
-              {/* Employee Identification */}
-              <div className="space-y-4">
-                <div className="text-center">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-secondary/10 mb-3">
-                    <UserCheck className="w-6 h-6 text-secondary" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-foreground">
-                    Employee Verification
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Scan your ID badge or enter ID number
-                  </p>
-                </div>
-
-                {/* Input Method Toggle */}
-                <div className="flex justify-center">
-                  <div className="inline-flex p-1 rounded-lg bg-muted">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInputMethod('barcode')
-                        setUserInput("")
-                        setSelectedEmployee(null)
-                        setError(null)
-                      }}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                        inputMethod === 'barcode'
-                          ? 'bg-card text-secondary shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <Scan className="w-4 h-4" />
-                      Scan Barcode
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInputMethod('manual')
-                        setUserInput("")
-                        setSelectedEmployee(null)
-                        setError(null)
-                      }}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                        inputMethod === 'manual'
-                          ? 'bg-card text-secondary shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <CreditCard className="w-4 h-4" />
-                      Enter ID
-                    </button>
-                  </div>
-                </div>
-
-                {/* Input Field */}
-                <div className="space-y-2">
-                  <div className="relative">
-                    <Input
-                      placeholder={inputMethod === 'barcode' ? "Scan or type barcode..." : "Enter employee ID number..."}
-                      value={userInput}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        setUserInput(value)
-                        if (inputMethod === 'barcode') {
-                          if (value.trim().length > 3) {
-                            handleBarcodeScanned(value.trim())
-                          } else {
-                            setSelectedEmployee(null)
-                          }
-                        } else {
-                          handleManualInput(value)
-                        }
-                      }}
-                      className="h-12 text-center text-lg font-mono bg-input border-border focus:border-secondary"
-                      disabled={isCommitting}
-                      autoComplete="off"
-                    />
-                    {isScanning && (
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                        <div className="w-5 h-5 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
-                      </div>
-                    )}
-                  </div>
-                  
-                  {inputMethod === 'barcode' && !selectedEmployee && !error && (
-                    <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                      <div className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
-                      Ready to scan...
-                    </div>
-                  )}
-                </div>
-
-                {/* Loading State */}
-                {loadingEmployees && (
-                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <div className="w-4 h-4 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
-                    Loading employees...
-                  </div>
-                )}
-
-                {/* Error Display */}
-                {error && (
-                  <Card className={`border ${
-                    error.includes('DISABLED')
-                      ? 'bg-amber-500/10 border-amber-500/30'
-                      : 'bg-destructive/10 border-destructive/30'
-                  }`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        <AlertCircle className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
-                          error.includes('DISABLED') ? 'text-amber-500' : 'text-destructive'
-                        }`} />
-                        <div>
-                          <p className={`text-sm font-medium ${
-                            error.includes('DISABLED') ? 'text-amber-600 dark:text-amber-400' : 'text-destructive'
-                          }`}>
-                            {error.includes('DISABLED') ? 'ID Deactivated' : 'Verification Failed'}
-                          </p>
-                          <p className={`text-xs mt-1 ${
-                            error.includes('DISABLED') ? 'text-amber-600/80 dark:text-amber-400/80' : 'text-destructive/80'
-                          }`}>
-                            {error.replace('⚠️ Employee ID is DISABLED: ', '')}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Selected Employee */}
-                {selectedEmployee && (
-                  <Card className="bg-success/10 border-success/30">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-success text-success-foreground font-bold text-lg">
-                          {selectedEmployee.firstName[0]}{selectedEmployee.lastName[0]}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-success truncate">
-                            {selectedEmployee.firstName} {selectedEmployee.middleName && selectedEmployee.middleName + ' '}{selectedEmployee.lastName}
-                          </p>
-                          <p className="text-sm text-success/80 truncate">
-                            {selectedEmployee.position} • {selectedEmployee.department}
-                          </p>
-                          <p className="text-xs text-success/70 mt-1">
-                            ID: {selectedEmployee.idNumber}
-                          </p>
-                        </div>
-                        <CheckCircle2 className="w-6 h-6 text-success flex-shrink-0" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-
-              {/* Order Summary Mini */}
-              <Card className="border-border/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between text-sm mb-3">
-                    <span className="font-medium text-foreground">Order Summary</span>
-                    <Badge variant="outline" className="text-xs">{items.length} items</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Total Value</span>
-                    <span className="text-lg font-bold text-secondary">₱{totalValue.toFixed(2)}</span>
-                  </div>
-                  {purpose && (
-                    <div className="mt-3 pt-3 border-t border-border">
-                      <p className="text-xs text-muted-foreground">Purpose:</p>
-                      <p className="text-sm text-foreground mt-0.5">{purpose}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </CardContent>
-
-        {/* Footer Navigation */}
-        <div className="flex items-center justify-between gap-4 px-6 py-4 border-t border-border bg-muted/30">
-          <Button
-            variant="outline"
-            onClick={currentStep === 1 ? onClose : goToPrevStep}
-            disabled={isCommitting}
-            className="min-w-[120px] h-11"
-          >
-            <ChevronLeft className="w-4 h-4 mr-2" />
-            {currentStep === 1 ? 'Cancel' : 'Back'}
-          </Button>
-          
-          <div className="flex items-center gap-1">
-            {[1, 2, 3].map((step) => (
-              <div
-                key={step}
-                className={`w-2 h-2 rounded-full transition-colors ${
-                  step === currentStep ? 'bg-secondary' : step < currentStep ? 'bg-success' : 'bg-muted-foreground/30'
-                }`}
-              />
-            ))}
-          </div>
-          
-          {currentStep < 3 ? (
-            <Button
-              onClick={goToNextStep}
-              disabled={!canProceedToNext()}
-              className="min-w-[120px] h-11 bg-secondary hover:bg-secondary/90 text-secondary-foreground"
-            >
-              Continue
-              <ChevronRight className="w-4 h-4 ml-2" />
-            </Button>
-          ) : (
-            <Button
-              onClick={handleConfirm}
-              disabled={!selectedEmployee || isCommitting || loadingEmployees}
-              className="min-w-[160px] h-11 bg-success hover:bg-success/90 text-success-foreground"
-            >
-              {isCommitting ? (
+        <CardContent className="space-y-6">
+          {/* API Status */}
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div className="flex items-center space-x-2">
+              {apiConfig.isConnected ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                  Processing...
+                  <Wifi className="w-4 h-4 text-green-500" />
+                  <span className="text-sm text-green-600 dark:text-green-400">API Connected</span>
                 </>
               ) : (
                 <>
-                  Confirm Checkout
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                  <WifiOff className="w-4 h-4 text-red-500" />
+                  <span className="text-sm text-red-600 dark:text-red-400">API Disconnected</span>
                 </>
               )}
+            </div>
+            <Badge variant={apiConfig.isConnected ? "default" : "secondary"} className="text-xs">
+              {apiConfig.isConnected ? "Changes will be committed to API" : "Local checkout only"}
+            </Badge>
+          </div>
+
+          {/* Order Summary */}
+          <div>
+            <h3 className="font-semibold mb-3 dark:text-slate-100">Order Summary</h3>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between py-2 border-b border-slate-200 dark:border-slate-600"
+                >
+                  <div className="flex-1">
+                    <p className="font-medium dark:text-slate-100">{item.name}</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      {item.brand} • {item.itemType}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-500">
+                      Balance: {item.balance} → {Math.max(0, item.balance - item.quantity)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium dark:text-slate-100">Qty: {item.quantity}</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">₱{(item.quantity * 10).toFixed(2)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Totals */}
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="dark:text-slate-300">Total Items:</span>
+              <span className="font-medium dark:text-slate-100">{totalItems}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="dark:text-slate-300">Unique Products:</span>
+              <span className="font-medium dark:text-slate-100">{items.length}</span>
+            </div>
+            <div className="flex justify-between text-lg font-bold">
+              <span className="dark:text-slate-100">Total Amount:</span>
+              <span className="dark:text-slate-100">₱{totalValue.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Employee Identification */}
+          <div className="space-y-4">
+            <Label className="text-base font-semibold dark:text-slate-100">
+              Employee Identification <span className="text-red-500">*</span>
+            </Label>
+
+            {/* Input Method Selection */}
+            <div className="flex space-x-2">
+              <Select value={inputMethod} onValueChange={(value: 'barcode' | 'manual') => {
+                setInputMethod(value)
+                setUserInput("")
+                setSelectedEmployee(null)
+                setError(null)
+              }}>
+                <SelectTrigger className="w-48 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="barcode">
+                    <div className="flex items-center space-x-2">
+                      <Scan className="w-4 h-4" />
+                      <span>Scan Barcode</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="manual">
+                    <div className="flex items-center space-x-2">
+                      <CreditCard className="w-4 h-4" />
+                      <span>Enter ID Number</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Input Field */}
+            <div className="space-y-2">
+              {inputMethod === 'barcode' ? (
+                <div className="relative">
+                  <Input
+                    placeholder="Scan employee barcode or type barcode manually"
+                    value={userInput}
+                    onChange={(e) => {
+                      setUserInput(e.target.value)
+                      if (e.target.value.trim().length > 3) {
+                        handleBarcodeScanned(e.target.value.trim())
+                      } else {
+                        setSelectedEmployee(null)
+                      }
+                    }}
+                    className="pr-10 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600"
+                    disabled={isCommitting}
+                  />
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    {isScanning ? (
+                      <div className="w-4 h-4 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Scan className="w-4 h-4 text-slate-400" />
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <Input
+                  placeholder="Enter employee ID number"
+                  value={userInput}
+                  onChange={(e) => handleManualInput(e.target.value)}
+                  className="dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600"
+                  disabled={isCommitting}
+                />
+              )}
+
+              <div className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400">
+                <User className="w-4 h-4" />
+                <span>
+                  {inputMethod === 'barcode'
+                    ? "Position scanner to read employee barcode or type it manually"
+                    : "Enter the employee's ID number from their badge"
+                  }
+                </span>
+              </div>
+            </div>
+
+            {/* Loading State */}
+            {loadingEmployees && (
+              <div className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400">
+                <div className="w-4 h-4 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+                <span>Loading employee data...</span>
+              </div>
+            )}
+
+            {/* Error Display */}
+            {error && (
+              <div className={`p-3 rounded-lg text-sm ${
+                error.includes('DISABLED') 
+                  ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-2 border-orange-400 dark:border-orange-600' 
+                  : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
+              }`}>
+                {error.includes('DISABLED') ? (
+                  <div className="space-y-2">
+                    <div className="font-semibold text-orange-800 dark:text-orange-200 flex items-center gap-2">
+                      <span className="text-xl">⚠️</span>
+                      <span>Employee ID Disabled</span>
+                    </div>
+                    <p>{error.replace('⚠️ Employee ID is DISABLED: ', '')}</p>
+                    <p className="text-xs mt-2 font-medium">
+                      The employee must visit HR to have their ID reactivated before they can checkout items.
+                    </p>
+                  </div>
+                ) : (
+                  error
+                )}
+              </div>
+            )}
+
+            {/* Selected Employee Display */}
+            {selectedEmployee && (
+              <div className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700">
+                <div className="flex items-center space-x-3">
+                  <UserCheck className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-green-800 dark:text-green-300">
+                      {selectedEmployee.firstName} {selectedEmployee.middleName && selectedEmployee.middleName + ' '}{selectedEmployee.lastName}
+                    </p>
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      {selectedEmployee.position} • {selectedEmployee.department}
+                    </p>
+                    <p className="text-xs text-green-600 dark:text-green-500">
+                      ID: {selectedEmployee.idNumber} • Barcode: {selectedEmployee.idBarcode}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Purpose/Reason Field */}
+          <div className="space-y-4">
+            <Label className="text-base font-semibold dark:text-slate-100">
+              Purpose/Reason <span className="text-sm font-normal text-slate-500 dark:text-slate-400">(Optional)</span>
+            </Label>
+
+            <div className="space-y-2">
+              <Label htmlFor="purpose" className="text-sm text-slate-600 dark:text-slate-400">
+                Please provide a reason or purpose for this checkout
+              </Label>
+              <Input
+                id="purpose"
+                placeholder="e.g., Maintenance work, Project requirement, Replacement needed..."
+                value={purpose}
+                onChange={(e) => setPurpose(e.target.value)}
+                className="dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600"
+                disabled={isCommitting}
+                maxLength={255}
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-500">
+                This helps track why items are being checked out. Maximum 255 characters.
+              </p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex space-x-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={isCommitting}
+              className="flex-1 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-700 bg-transparent"
+            >
+              Cancel
             </Button>
-          )}
-        </div>
+            <Button
+              onClick={handleConfirm}
+              disabled={!selectedEmployee || isCommitting || loadingEmployees}
+              className="flex-1 bg-teal-600 hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600"
+            >
+              {isCommitting ? (
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Processing...</span>
+                </div>
+              ) : (
+                "Confirm Checkout"
+              )}
+            </Button>
+          </div>
+        </CardContent>
       </Card>
     </div>
   )

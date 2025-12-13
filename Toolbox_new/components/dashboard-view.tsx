@@ -5,19 +5,23 @@ import {
   processBarcodeInput,
   type Product
 } from "../lib/barcode-scanner"
-import { Filter, Grid, List, ChevronDown, RefreshCw, Settings, Download, FileText, FileSpreadsheet, Code, Package, Menu, X } from "lucide-react"
+import { Filter, Grid, List, Scan, ChevronDown, RefreshCw, Settings, Wifi, Download, FileText, FileSpreadsheet, Code, Plus, Package, Menu, X } from "lucide-react"
 import { useLoading } from "./loading-context"
 import { SearchLoader } from "./enhanced-loaders"
+import { OfflineStatusPanel } from "./offline-status"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Checkbox } from "./ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 import { Card, CardContent } from "./ui/card"
 import { Badge } from "./ui/badge"
+import { Progress } from "./ui/progress"
 import { useToast } from "../hooks/use-toast"
 import { apiService } from "../lib/api_service"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog"
-import { exportToCSV, exportToXLSX, exportToJSON, prepareExportData } from "../lib/export-utils"
+import { Label } from "./ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
+import { exportToCSV, exportToXLSX, exportToJSON, prepareExportData, exportLogsToXLSX } from "../lib/export-utils"
 import { EnhancedItemCard } from "./enhanced-item-card"
 import { BulkOperationsBar, useBulkSelection } from "./bulk-operations"
 import useGlobalBarcodeScanner from "../hooks/use-global-barcode-scanner"
@@ -118,6 +122,10 @@ export function DashboardView({
   })
   // Note: Global barcode scanning is handled by GlobalBarcodeListener component
   // The dashboard listens to 'scanned-barcode' events dispatched by that component
+  const [logs, setLogs] = useState<any[]>([])
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false)
+  const [logsError, setLogsError] = useState<string | null>(null)
+  const [hasLoadedLogs, setHasLoadedLogs] = useState(false)
   const [useEnhancedCards] = useState(true)
 
   // Bulk selection state
@@ -126,9 +134,11 @@ export function DashboardView({
     selectAll,
     clearSelection
   } = useBulkSelection()
+  const [activeTab, setActiveTab] = useState("api")
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? navigator.onLine : true)
   const [isCategoriesCollapsed, setIsCategoriesCollapsed] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+  const [isMobileSearchExpanded, setIsMobileSearchExpanded] = useState(false)
   const { toast } = useToast()
   const { setSearchLoading } = useLoading()
 
@@ -202,6 +212,69 @@ export function DashboardView({
     }
     return true
   }
+
+  // ================= Employee Logs (Transactions) =================
+  const fetchLogsFromAPI = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setIsLoadingLogs(true)
+      setLogsError(null)
+      // Fetch latest 100 logs
+      const data = await apiService.fetchTransactions({ limit: 100, offset: 0 })
+      if (data && Array.isArray(data.data)) {
+        setLogs(data.data)
+        setHasLoadedLogs(true)
+      }
+    } catch (err: any) {
+      console.error('[Dashboard] Failed to fetch employee logs', err)
+      setLogsError(err?.message || 'Failed to load logs')
+    } finally {
+      setIsLoadingLogs(false)
+    }
+  }, [])
+
+  // Initial load when opening the Logs tab first time
+  useEffect(() => {
+    if (activeTab === 'logs' && !hasLoadedLogs && !isLoadingLogs) {
+      fetchLogsFromAPI()
+    }
+  }, [activeTab, hasLoadedLogs, isLoadingLogs, fetchLogsFromAPI])
+
+  // Real-time subscription for new logs (append or refetch)
+  useEffect(() => {
+    // Ensure polling manager is initialized (handled in useInventorySync) but guard anyway
+    pollingManager.initialize()
+
+    // When a log is created, optimistically insert at top; if structure differs, fallback to refetch
+    const unsub1 = pollingManager.subscribeToUpdates(SOCKET_EVENTS.INVENTORY.LOG_CREATED, (data: any) => {
+      setLogs(prev => {
+        // Avoid duplicates
+        if (prev.some(l => String(l.id) === String(data.id))) return prev
+        const newEntry = {
+          id: data.id,
+          username: data.username || data.user || 'unknown',
+            // details may already be present else build a simple one
+          details: data.details || data.purpose || 'New transaction',
+          log_date: data.log_date || new Date().toISOString().slice(0,10),
+          log_time: data.log_time || new Date().toLocaleTimeString('en-PH', { hour12:false }),
+          purpose: data.purpose || ''
+        }
+        const updated = [newEntry, ...prev]
+        // Keep only last 100
+        return updated.slice(0,100)
+      })
+    })
+
+    // Generic refresh trigger (inventory:logs:refresh)
+    const unsub2 = pollingManager.subscribeToUpdates('inventory:logs:refresh', () => {
+      // Refetch in background (silent)
+      fetchLogsFromAPI(true)
+    })
+
+    return () => {
+      unsub1 && unsub1()
+      unsub2 && unsub2()
+    }
+  }, [fetchLogsFromAPI])
 
   // Online/Offline status tracking
   useEffect(() => {
@@ -517,6 +590,53 @@ export function DashboardView({
     }
   }
 
+  // (Legacy duplicate fetchLogsFromAPI removed; unified implementation above with useCallback(silent))
+
+  // Auto-load logs when Logs tab is opened
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    if (value === 'logs' && !hasLoadedLogs && !isLoadingLogs) {
+      fetchLogsFromAPI()
+    }
+  }
+
+  const handleExportLogsXLSX = async () => {
+    try {
+      if (!logs || logs.length === 0) {
+        toast({ 
+          title: 'No Logs', 
+          description: 'No logs available to export', 
+          variant: 'destructive',
+          toastType: 'warning',
+          duration: 4000
+        } as any)
+        return
+      }
+
+      setIsExporting(true)
+      const filename = `toolbox-logs-${new Date().toISOString().split('T')[0]}`
+      exportLogsToXLSX(logs, { filename })
+
+      toast({ 
+        title: 'Export Successful', 
+        description: `Logs exported to ${filename}.xlsx`,
+        toastType: 'success',
+        duration: 4000
+      } as any)
+    } catch (error) {
+      console.error('Export logs failed:', error)
+      toast({ 
+        title: 'Export Failed', 
+        description: 'Failed to export logs to Excel', 
+        variant: 'destructive',
+        toastType: 'error',
+        duration: 5000
+      } as any)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   useEffect(() => {
     // Skip initial data loading if parent is providing products state
     if (parentProducts !== undefined) {
@@ -782,30 +902,6 @@ export function DashboardView({
     }
   }, [products, excludedCategories, showAvailable, showUnavailable, searchQuery, localSearchQuery, sortBy, currentPage])
 
-  // Dynamic title based on category filter state
-  const itemsTitle = useMemo(() => {
-    const allCats = categories.filter(c => c !== "all")
-    const includedCategories = allCats.filter(cat => !excludedCategories.has(cat))
-    
-    // All categories hidden
-    if (includedCategories.length === 0) {
-      return "No Items to Show"
-    }
-    
-    // All categories shown
-    if (excludedCategories.size === 0) {
-      return "All Items"
-    }
-    
-    // Exactly one category shown
-    if (includedCategories.length === 1) {
-      return includedCategories[0]
-    }
-    
-    // Multiple but some filtered out
-    return "Filtered Items"
-  }, [categories, excludedCategories])
-
   const handleLoadMore = () => {
     setIsLoadingMore(true)
     // Simulate loading delay
@@ -866,8 +962,8 @@ export function DashboardView({
   // Show empty state if no products are available
   if (!isLoadingData && (!products || products.length === 0)) {
     return (
-      <div className="flex min-h-[400px] bg-card rounded-lg shadow-sm border items-center justify-center">
-        <div className="text-center space-y-4 max-w-md p-6">
+      <div className="flex h-screen bg-slate-50 dark:bg-slate-900 items-center justify-center">
+        <div className="text-center space-y-4 max-w-md p-6 bg-white dark:bg-slate-800 rounded-lg shadow-lg">
           <div className="w-16 h-16 mx-auto text-slate-400 dark:text-slate-500">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 12H4M8 16l-4-4 4-4M16 16l4-4-4-4" />
@@ -890,7 +986,7 @@ export function DashboardView({
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-5rem)] bg-card rounded-lg shadow-sm border">
+    <div className="flex h-full bg-background">
       {/* Global Barcode Modal (primary scanner UI) */}
       <BarcodeModal
         open={isBarcodeModalOpen}
@@ -960,93 +1056,121 @@ export function DashboardView({
         <>
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300"
             onClick={() => setIsMobileSidebarOpen(false)}
+            aria-hidden="true"
           />
           {/* Mobile Drawer */}
-          <div className="fixed inset-y-0 left-0 w-64 bg-card border-r z-50 lg:hidden overflow-y-auto">
-            {/* Mobile Sidebar Header */}
-            <div className="p-4 border-b flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-muted-foreground" />
-                <h2 className="font-medium">Filters</h2>
+          <div className="fixed inset-y-0 left-0 w-72 bg-card border-r border-border z-50 lg:hidden overflow-y-auto transform transition-transform duration-300 ease-in-out">
+            {/* Mobile Sidebar Header with Close Button */}
+            <div className="p-6 border-b border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
+                    <Filter className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-foreground">Controls</h2>
+                    <p className="text-xs text-muted-foreground">Filter & manage items</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsMobileSidebarOpen(false)}
+                  className="w-8 h-8 p-0 hover:bg-muted rounded-lg transition-all duration-200"
+                  aria-label="Close sidebar"
+                >
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setIsMobileSidebarOpen(false)}
-              >
-                <X className="w-4 h-4" />
-              </Button>
             </div>
 
-            {/* Mobile Sidebar Content */}
-            <div className="p-4 space-y-6">
-              {/* View Mode */}
-              <div className="space-y-2">
-                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">View Mode</h3>
-                <div className="flex border rounded-lg w-full">
-                  <Button
-                    variant={viewMode === "grid" ? "default" : "ghost"}
-                    size="sm"
-                    className="flex-1 h-9 gap-2"
-                    onClick={() => setViewMode("grid")}
-                  >
-                    <Grid className="w-4 h-4" />
-                    <span className="text-xs">Grid</span>
-                  </Button>
-                  <Button
-                    variant={viewMode === "list" ? "default" : "ghost"}
-                    size="sm"
-                    className="flex-1 h-9 gap-2"
-                    onClick={() => setViewMode("list")}
-                  >
-                    <List className="w-4 h-4" />
-                    <span className="text-xs">List</span>
-                  </Button>
+            {/* Mobile Sidebar Content (same as desktop) */}
+            <div className="p-6 space-y-8">
+              {/* System Status Card */}
+              <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <div className="w-5 h-5 bg-linear-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
+                      <Wifi className="w-3 h-3 text-white" />
+                    </div>
+                    System Status
+                  </h3>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-success' : 'bg-orange-500'}`}></div>
+                        <span className="text-xs text-muted-foreground">API</span>
+                      </div>
+                      <Badge 
+                        variant={isConnected ? "default" : "outline"} 
+                        className="text-xs px-2 py-0.5 rounded-full"
+                      >
+                        {isConnected ? "Connected" : "Disconnected"}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-success' : 'bg-red-500'}`}></div>
+                        <span className="text-xs text-muted-foreground">Network</span>
+                      </div>
+                      <Badge 
+                        variant={isOnline ? "default" : "outline"} 
+                        className="text-xs px-2 py-0.5 rounded-full"
+                      >
+                        {isOnline ? "Online" : "Offline"}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Source</span>
+                      <Badge 
+                        variant={dataSource === "api" ? "default" : "outline"} 
+                        className="text-xs px-2 py-0.5 rounded-full"
+                      >
+                        {dataSource === "api" ? "Live" : "Cache"}
+                      </Badge>
+                    </div>
+                    
+                    {lastFetchTime && (
+                      <div className="text-xs text-muted-foreground pt-1 border-t border-border">
+                        Updated {lastFetchTime.toLocaleTimeString()}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Sort By */}
-              <div className="space-y-2">
-                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sort By</h3>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="name-asc">Name A-Z</SelectItem>
-                    <SelectItem value="name-desc">Name Z-A</SelectItem>
-                    <SelectItem value="stock-high">Stock High-Low</SelectItem>
-                    <SelectItem value="stock-low">Stock Low-High</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Categories */}
-              <div className="space-y-2">
+              {/* Categories Section */}
+              <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-3 shadow-sm">
                 <button
                   onClick={() => setIsCategoriesCollapsed(!isCategoriesCollapsed)}
-                  className="w-full flex items-center justify-between py-1"
+                  className="w-full flex items-center justify-between mb-2 group"
                 >
-                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                  <h3 className="text-xs font-semibold text-foreground flex items-center gap-2">
+                    <div className="w-4 h-4 bg-linear-to-br from-purple-400 to-pink-500 rounded flex items-center justify-center">
+                      <Filter className="w-2.5 h-2.5 text-white" />
+                    </div>
                     Categories
                     {excludedCategories.size > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-destructive/20 text-destructive rounded-full normal-case">
+                      <span className="text-[10px] px-1.5 py-0.5 bg-red-500/20 text-red-500 rounded-full">
                         {excludedCategories.size} hidden
                       </span>
                     )}
                   </h3>
-                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isCategoriesCollapsed ? "-rotate-90" : ""}`} />
+                  <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${isCategoriesCollapsed ? "-rotate-90" : ""}`} />
                 </button>
                 
                 {!isCategoriesCollapsed && (
-                  <div className="space-y-1 max-h-48 overflow-y-auto">
-                    <div className="flex gap-2 mb-2">
+                  <div className="space-y-0.5 max-h-64 overflow-y-auto custom-scrollbar">
+                    {/* Select All / Clear All buttons */}
+                    <div className="flex gap-1 mb-2">
                       <button
                         onClick={() => setExcludedCategories(new Set())}
-                        className="flex-1 text-xs px-2 py-1 rounded bg-muted hover:bg-muted/80"
+                        className="flex-1 text-[10px] px-2 py-1 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30 transition-colors font-medium"
                       >
                         Show All
                       </button>
@@ -1055,7 +1179,7 @@ export function DashboardView({
                           const allCats = categories.filter(c => c !== "all")
                           setExcludedCategories(new Set(allCats))
                         }}
-                        className="flex-1 text-xs px-2 py-1 rounded bg-muted hover:bg-muted/80"
+                        className="flex-1 text-[10px] px-2 py-1 rounded bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/30 transition-colors font-medium"
                       >
                         Hide All
                       </button>
@@ -1069,26 +1193,39 @@ export function DashboardView({
                           onClick={() => {
                             setExcludedCategories(prev => {
                               const newSet = new Set(prev)
-                              if (newSet.has(cat)) newSet.delete(cat)
-                              else newSet.add(cat)
+                              if (newSet.has(cat)) {
+                                newSet.delete(cat)
+                              } else {
+                                newSet.add(cat)
+                              }
                               return newSet
                             })
                           }}
-                          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm ${
-                            isExcluded ? "text-muted-foreground line-through opacity-60" : "text-foreground hover:bg-muted"
+                          className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-all duration-200 ${
+                            isExcluded
+                              ? "bg-red-500/10 text-muted-foreground line-through opacity-60 hover:opacity-80"
+                              : "bg-emerald-500/10 text-foreground hover:bg-emerald-500/20"
                           }`}
                         >
-                          <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${
-                            isExcluded ? "border-muted-foreground" : "border-primary bg-primary"
+                          <div className={`w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                            isExcluded 
+                              ? "border-red-400 bg-red-500/20" 
+                              : "border-emerald-400 bg-emerald-500"
                           }`}>
                             {!isExcluded && (
-                              <svg className="w-2 h-2 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
+                              <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                               </svg>
                             )}
                           </div>
-                          <span className="truncate flex-1 text-left">{cat}</span>
-                          <span className="text-xs text-muted-foreground">{itemCount}</span>
+                          <span className="text-xs truncate flex-1 text-left">{cat}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                            isExcluded 
+                              ? "bg-red-500/20 text-red-500" 
+                              : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                          }`}>
+                            {itemCount}
+                          </span>
                         </button>
                       )
                     })}
@@ -1096,51 +1233,38 @@ export function DashboardView({
                 )}
               </div>
 
-              {/* Availability */}
-              <div className="space-y-2">
-                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Availability</h3>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
+              {/* Availability Filters */}
+              <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
+                <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                  <div className="w-5 h-5 bg-linear-to-br from-blue-400 to-cyan-500 rounded-md flex items-center justify-center">
+                    <Package className="w-3 h-3 text-white" />
+                  </div>
+                  Availability
+                </h3>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer group">
                     <Checkbox 
+                      id="mobile-available" 
                       checked={showAvailable} 
                       onCheckedChange={(checked) => setShowAvailable(checked === true)}
+                      className="border-border data-[state=checked]:bg-success data-[state=checked]:border-success"
                     />
-                    <span className="text-sm">In Stock</span>
+                    <span className="text-sm text-foreground group-hover:text-foreground transition-colors">
+                      In Stock
+                    </span>
                   </label>
                   
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className="flex items-center gap-3 cursor-pointer group">
                     <Checkbox 
+                      id="mobile-unavailable" 
                       checked={showUnavailable} 
                       onCheckedChange={(checked) => setShowUnavailable(checked === true)}
+                      className="border-border data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
                     />
-                    <span className="text-sm">Out of Stock</span>
+                    <span className="text-sm text-foreground group-hover:text-foreground transition-colors">
+                      Out of Stock
+                    </span>
                   </label>
-                </div>
-              </div>
-
-              {/* Status */}
-              <div className="space-y-2">
-                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-orange-500'}`}></div>
-                      <span className="text-muted-foreground">API</span>
-                    </div>
-                    <span className={isConnected ? "text-green-600" : "text-orange-600"}>
-                      {isConnected ? "Connected" : "Disconnected"}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                      <span className="text-muted-foreground">Network</span>
-                    </div>
-                    <span className={isOnline ? "text-green-600" : "text-red-600"}>
-                      {isOnline ? "Online" : "Offline"}
-                    </span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1148,31 +1272,36 @@ export function DashboardView({
         </>
       )}
 
-      {/* Desktop Sidebar - Sticky position to follow scroll */}
-      <div className="hidden lg:flex lg:flex-col w-64 bg-card border-r shrink-0">
-        <div className="sticky top-0 h-[calc(100vh-5rem)] overflow-y-auto">
+      {/* Desktop Sidebar - Hidden on mobile, visible on lg+ */}
+      <div className="hidden lg:flex lg:flex-col w-72 bg-card border-r border-border sticky top-0 h-screen shrink-0">
+        <div className="flex-1 overflow-y-auto">
           {/* Sidebar Header */}
-          <div className="p-4 border-b sticky top-0 bg-card z-10">
+          <div className="p-6 border-b border-border sticky top-0 bg-card z-10">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-muted-foreground" />
-              <h2 className="font-medium text-foreground">Filters</h2>
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-linear-to-br from-blue-500 to-teal-500 rounded-lg flex items-center justify-center shadow-lg">
+                <Filter className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-foreground">Controls</h2>
+                <p className="text-xs text-muted-foreground">Filter & manage items</p>
+              </div>
             </div>
-            <div className="flex gap-1">
+            <div className="flex space-x-1">
               <Button 
                 variant="ghost" 
-                size="icon"
-                className="h-8 w-8"
+                size="sm" 
                 onClick={() => setIsSettingsOpen(true)} 
+                className="w-8 h-8 p-0 hover:bg-muted rounded-lg transition-all duration-200"
               >
                 <Settings className="w-4 h-4 text-muted-foreground" />
               </Button>
               <Button 
                 variant="ghost" 
-                size="icon"
-                className="h-8 w-8"
+                size="sm" 
                 onClick={handleRefreshData} 
                 disabled={isLoadingData} 
+                className="w-8 h-8 p-0 hover:bg-muted rounded-lg transition-all duration-200"
               >
                 <RefreshCw className={`w-4 h-4 text-muted-foreground ${isLoadingData ? "animate-spin" : ""}`} />
               </Button>
@@ -1181,135 +1310,286 @@ export function DashboardView({
         </div>
 
         {/* Sidebar Content */}
-        <div className="p-4 space-y-6">
+        <div className="p-6 space-y-8">
 
-          {/* View Mode */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">View Mode</h3>
-            <div className="flex border rounded-lg w-full">
-              <Button
-                variant={viewMode === "grid" ? "default" : "ghost"}
-                size="sm"
-                className="flex-1 h-9 gap-2"
-                onClick={() => setViewMode("grid")}
-              >
-                <Grid className="w-4 h-4" />
-                <span className="text-xs">Grid</span>
-              </Button>
-              <Button
-                variant={viewMode === "list" ? "default" : "ghost"}
-                size="sm"
-                className="flex-1 h-9 gap-2"
-                onClick={() => setViewMode("list")}
-              >
-                <List className="w-4 h-4" />
-                <span className="text-xs">List</span>
-              </Button>
-            </div>
-          </div>
-
-          {/* Sort By */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sort By</h3>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name-asc">Name A-Z</SelectItem>
-                <SelectItem value="name-desc">Name Z-A</SelectItem>
-                <SelectItem value="stock-high">Stock High-Low</SelectItem>
-                <SelectItem value="stock-low">Stock Low-High</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        
-        {/* Settings Dialog - Clean & Minimal */}
-        <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                <span>Settings</span>
-              </DialogTitle>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-              {/* Status Section */}
-              <div className="rounded-lg border p-3 space-y-2">
-                <h4 className="text-sm font-medium">System Status</h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-orange-500'}`} />
-                    <span className="text-muted-foreground">API:</span>
-                    <span className={isConnected ? 'text-green-600' : 'text-orange-600'}>
-                      {isConnected ? 'Connected' : 'Offline'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`} />
-                    <span className="text-muted-foreground">Network:</span>
-                    <span className={isOnline ? 'text-green-600' : 'text-red-600'}>
-                      {isOnline ? 'Online' : 'Offline'}
-                    </span>
-                  </div>
+          {/* System Status Card */}
+          <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                <div className="w-5 h-5 bg-linear-to-br from-emerald-400 to-teal-500 rounded-md flex items-center justify-center">
+                  <Wifi className="w-3 h-3 text-white" />
                 </div>
+                System Status
+              </h3>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-orange-500'}`}></div>
+                    <span className="text-xs text-muted-foreground">API</span>
+                  </div>
+                  <Badge 
+                    variant={isConnected ? "default" : "outline"} 
+                    className="text-xs px-2 py-0.5 rounded-full"
+                  >
+                    {isConnected ? "Connected" : "Disconnected"}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                    <span className="text-xs text-muted-foreground">Network</span>
+                  </div>
+                  <Badge 
+                    variant={isOnline ? "default" : "outline"} 
+                    className="text-xs px-2 py-0.5 rounded-full"
+                  >
+                    {isOnline ? "Online" : "Offline"}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Source</span>
+                  <Badge 
+                    variant={dataSource === "api" ? "default" : "outline"} 
+                    className="text-xs px-2 py-0.5 rounded-full"
+                  >
+                    {dataSource === "api" ? "Live" : "Cache"}
+                  </Badge>
+                </div>
+                
                 {lastFetchTime && (
-                  <p className="text-xs text-muted-foreground pt-1 border-t">
-                    Last sync: {lastFetchTime.toLocaleString()}
-                  </p>
+                  <div className="text-xs text-muted-foreground pt-1 border-t border-border">
+                    Updated {lastFetchTime.toLocaleTimeString()}
+                  </div>
                 )}
               </div>
-              
-              {/* Export Section */}
-              <div className="rounded-lg border p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium">Export Inventory</h4>
-                  <span className="text-xs text-muted-foreground">{products.length} items</span>
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={handleExportCSV} 
-                    disabled={isExporting || products.length === 0}
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <FileText className="w-4 h-4 mr-1" />
-                    CSV
-                  </Button>
-                  <Button 
-                    onClick={handleExportXLSX} 
-                    disabled={isExporting || products.length === 0}
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <FileSpreadsheet className="w-4 h-4 mr-1" />
-                    Excel
-                  </Button>
-                  <Button 
-                    onClick={handleExportJSON} 
-                    disabled={isExporting || products.length === 0}
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <Code className="w-4 h-4 mr-1" />
-                    JSON
-                  </Button>
-                </div>
-              </div>
+            </div>
+          </div>
+        
+        {/* Settings Dialog with Tabs */}
+        <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+          <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <Settings className="w-5 h-5" />
+                <span>Dashboard Settings</span>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <Tabs defaultValue="api" className="w-full" value={activeTab} onValueChange={handleTabChange}>
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="api">API Configuration</TabsTrigger>
+                  <TabsTrigger value="offline">Offline & PWA</TabsTrigger>
+                  <TabsTrigger value="export">Export Data</TabsTrigger>
+                  <TabsTrigger value="logs">Logs</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="api" className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="dashboard-api-url">API Base URL</Label>
+                    <Input
+                      id="dashboard-api-url"
+                      placeholder="http://192.168.68.106:3001"
+                      value={tempApiUrl}
+                      onChange={(e) => setTempApiUrl(e.target.value)}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the base URL for your API server. Changes will take effect after saving.
+                    </p>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button onClick={handleSaveSettings} className="flex-1">
+                      Save Settings
+                    </Button>
+                    <Button variant="outline" onClick={() => setIsSettingsOpen(false)} className="flex-1">
+                      Cancel
+                    </Button>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="offline" className="space-y-4 mt-4">
+                  <OfflineStatusPanel className="w-full" />
+                </TabsContent>
+                
+                <TabsContent value="export" className="space-y-4 mt-4">
+                  <div className="space-y-4">
+                    <div className="text-sm text-muted-foreground">
+                      Export your inventory data in different formats. All exports include {products.length} items.
+                      <br />
+                      <span className="text-xs">
+                        Data source: {dataSource === 'api' ? 'Live API' : 'Cached'} 
+                        {lastFetchTime && ` (last updated: ${lastFetchTime.toLocaleString()})`}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 gap-3">
+                      <Card className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <FileText className="w-8 h-8 text-green-600" />
+                            <div>
+                              <h4 className="font-medium">CSV Format</h4>
+                              <p className="text-sm text-muted-foreground">
+                                Comma-separated values, ideal for spreadsheets
+                              </p>
+                            </div>
+                          </div>
+                          <Button 
+                            onClick={handleExportCSV} 
+                            disabled={isExporting || products.length === 0}
+                            size="sm"
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Export CSV
+                          </Button>
+                        </div>
+                      </Card>
+                      
+                      <Card className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <FileSpreadsheet className="w-8 h-8 text-blue-600" />
+                            <div>
+                              <h4 className="font-medium">Excel Format</h4>
+                              <p className="text-sm text-muted-foreground">
+                                Excel workbook with multiple sheets and summaries
+                              </p>
+                            </div>
+                          </div>
+                          <Button 
+                            onClick={handleExportXLSX} 
+                            disabled={isExporting || products.length === 0}
+                            size="sm"
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Export XLSX
+                          </Button>
+                        </div>
+                      </Card>
+                      
+                      <Card className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <Code className="w-8 h-8 text-orange-600" />
+                            <div>
+                              <h4 className="font-medium">JSON Format</h4>
+                              <p className="text-sm text-muted-foreground">
+                                Structured data format for developers and APIs
+                              </p>
+                            </div>
+                          </div>
+                          <Button 
+                            onClick={handleExportJSON} 
+                            disabled={isExporting || products.length === 0}
+                            size="sm"
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Export JSON
+                          </Button>
+                        </div>
+                      </Card>
+                    </div>
+                    
+                    {products.length === 0 && (
+                      <div className="text-center p-4 text-muted-foreground">
+                        <p>No data available to export. Please load inventory data first.</p>
+                      </div>
+                    )}
+                    
+                    {isExporting && (
+                      <div className="text-center p-4">
+                        <Progress value={undefined} className="w-full h-2" />
+                        <p className="text-sm text-muted-foreground mt-2">Preparing export...</p>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="logs" className="space-y-4 mt-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium">Employee Logs</h4>
+                        <p className="text-sm text-muted-foreground">Recent employee activity logs loaded automatically from the API.</p>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button onClick={() => fetchLogsFromAPI(false)} size="sm" disabled={isLoadingLogs} variant="outline">
+                          <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingLogs ? 'animate-spin' : ''}`} />
+                          Refresh
+                        </Button>
+                        <Button onClick={handleExportLogsXLSX} size="sm" disabled={isExporting || logs.length === 0}>
+                          <Download className="w-4 h-4 mr-2" />
+                          Export XLSX
+                        </Button>
+                      </div>
+                    </div>
 
-              {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <Button onClick={handleRefreshData} disabled={isLoadingData} className="flex-1">
-                  <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingData ? 'animate-spin' : ''}`} />
-                  Refresh Data
-                </Button>
-                <Button variant="outline" onClick={() => setIsSettingsOpen(false)}>
-                  Close
-                </Button>
-              </div>
+                    {isLoadingLogs && (
+                      <div className="flex items-center justify-center p-8 bg-slate-800/30 rounded-md border border-slate-700">
+                        <div className="text-center">
+                          <div className="w-8 h-8 border-2 border-slate-400 border-t-slate-200 rounded-full animate-spin mx-auto mb-3"></div>
+                          <p className="text-sm text-slate-400">Loading employee logs...</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {logsError && (
+                      <div className="p-4 text-sm text-destructive">Error loading logs: {logsError}</div>
+                    )}
+
+                    {!isLoadingLogs && logs.length > 0 && (
+                      <div className="overflow-hidden bg-slate-900 rounded-md border border-slate-600">
+                        <div className="overflow-auto max-h-96">
+                          <table className="w-full text-sm table-fixed">
+                            <thead>
+                              <tr>
+                                <th className="p-2 text-left bg-slate-800 text-slate-100 sticky top-0 z-10 border-b border-slate-600 font-medium w-24">Username</th>
+                                <th className="p-2 text-left bg-slate-800 text-slate-100 sticky top-0 z-10 border-b border-slate-600 font-medium">Details</th>
+                                <th className="p-2 text-left bg-slate-800 text-slate-100 sticky top-0 z-10 border-b border-slate-600 font-medium w-24">Log Date</th>
+                                <th className="p-2 text-left bg-slate-800 text-slate-100 sticky top-0 z-10 border-b border-slate-600 font-medium w-20">Log Time</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {logs.map((l, idx) => (
+                                <tr key={idx} className={`${idx % 2 === 0 ? 'bg-slate-800/50' : 'bg-slate-700/50'} text-slate-100 hover:bg-slate-600/30 transition-colors`}>
+                                  <td className="p-2 align-top border-b border-slate-700/50 w-24">
+                                    <div className="wrap-break-words font-medium text-slate-200 text-xs">
+                                      {l.username}
+                                    </div>
+                                  </td>
+                                  <td className="p-2 align-top border-b border-slate-700/50">
+                                    <div className="wrap-break-words text-slate-300 text-xs leading-relaxed">
+                                      {l.details}
+                                    </div>
+                                  </td>
+                                  <td className="p-2 align-top border-b border-slate-700/50 w-24">
+                                    <div className="text-slate-200 text-xs whitespace-nowrap">
+                                      {l.log_date}
+                                    </div>
+                                  </td>
+                                  <td className="p-2 align-top border-b border-slate-700/50 w-20">
+                                    <div className="text-slate-200 text-xs whitespace-nowrap">
+                                      {l.log_time}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {!isLoadingLogs && logs.length === 0 && !logsError && (
+                      <div className="p-4 text-sm text-muted-foreground">No logs loaded. Click Fetch Logs to retrieve entries from the API.</div>
+                    )}
+
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
           </DialogContent>
         </Dialog>
@@ -1336,138 +1616,142 @@ export function DashboardView({
           )}
 
           {/* Categories Card - Collapsible */}
-          <div className="space-y-2">
-            <button 
-              onClick={() => setIsCategoriesCollapsed(!isCategoriesCollapsed)}
-              className="w-full flex items-center justify-between py-1"
-            >
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-                Categories
-                {excludedCategories.size > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.5 bg-destructive/20 text-destructive rounded-full normal-case">
-                    {excludedCategories.size} hidden
-                  </span>
-                )}
-              </h3>
-              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${
-                isCategoriesCollapsed ? 'rotate-180' : ''
-              }`} />
-            </button>
-            
-            <div className={`overflow-hidden transition-all ${
-              isCategoriesCollapsed ? 'max-h-0' : 'max-h-64 overflow-y-auto'
-            }`}>
-              {/* Quick actions */}
-              <div className="flex gap-2 mb-2">
-                <button
-                  onClick={() => setExcludedCategories(new Set())}
-                  className="flex-1 text-xs px-2 py-1 rounded bg-muted hover:bg-muted/80 transition-colors"
-                >
-                  Show All
-                </button>
-                <button
-                  onClick={() => {
-                    const allCats = categories.filter(c => c !== "all")
-                    setExcludedCategories(new Set(allCats))
-                  }}
-                  className="flex-1 text-xs px-2 py-1 rounded bg-muted hover:bg-muted/80 transition-colors"
-                >
-                  Hide All
-                </button>
-              </div>
-              <div className="space-y-1">
-                {categories.filter(category => category !== "all").map((category) => {
-                  const isExcluded = excludedCategories.has(category)
-                  const itemCount = products.filter((p) => p.itemType === category).length
-                  return (
-                    <button
-                      key={category}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors ${
-                        isExcluded
-                          ? "text-muted-foreground line-through opacity-60"
-                          : "text-foreground hover:bg-muted"
-                      }`}
-                      onClick={() => {
-                        setExcludedCategories(prev => {
-                          const newSet = new Set(prev)
-                          if (newSet.has(category)) {
-                            newSet.delete(category)
-                          } else {
-                            newSet.add(category)
-                          }
-                          return newSet
-                        })
-                      }}
-                    >
-                      <div className={`w-3 h-3 rounded border flex items-center justify-center shrink-0 ${
-                        isExcluded ? "border-muted-foreground" : "border-primary bg-primary"
-                      }`}>
-                        {!isExcluded && (
-                          <svg className="w-2 h-2 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                      </div>
-                      <span className="truncate flex-1 text-left">{category}</span>
-                      <span className="text-xs text-muted-foreground">{itemCount}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Availability Filter */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Availability</h3>
+          <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-3 shadow-sm">
             <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox 
-                  checked={showAvailable} 
-                  onCheckedChange={(checked) => setShowAvailable(checked === true)}
-                />
-                <span className="text-sm">In Stock</span>
-              </label>
+              <button 
+                onClick={() => setIsCategoriesCollapsed(!isCategoriesCollapsed)}
+                className="w-full flex items-center justify-between group hover:bg-muted -mx-1 px-1 py-1 rounded-lg transition-all duration-200"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-linear-to-br from-purple-400 to-pink-500 rounded flex items-center justify-center">
+                    <Package className="w-2.5 h-2.5 text-white" />
+                  </div>
+                  <h3 className="text-xs font-semibold text-foreground">
+                    Categories
+                  </h3>
+                  <div className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full font-medium">
+                    {categories.filter(c => c !== "all").length}
+                  </div>
+                  {excludedCategories.size > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 bg-red-500/20 text-red-500 rounded-full">
+                      {excludedCategories.size} hidden
+                    </span>
+                  )}
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${
+                  isCategoriesCollapsed ? 'rotate-180' : ''
+                }`} />
+              </button>
               
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox 
-                  checked={showUnavailable} 
-                  onCheckedChange={(checked) => setShowUnavailable(checked === true)}
-                />
-                <span className="text-sm">Out of Stock</span>
-              </label>
+              <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                isCategoriesCollapsed ? 'max-h-0 opacity-0' : 'max-h-80 opacity-100 overflow-y-auto custom-scrollbar'
+              }`}>
+                {/* Select All / Clear All buttons */}
+                <div className="flex gap-1 mb-2 pt-1">
+                  <button
+                    onClick={() => setExcludedCategories(new Set())}
+                    className="flex-1 text-[10px] px-2 py-1.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30 transition-colors font-medium"
+                  >
+                    Show All
+                  </button>
+                  <button
+                    onClick={() => {
+                      const allCats = categories.filter(c => c !== "all")
+                      setExcludedCategories(new Set(allCats))
+                    }}
+                    className="flex-1 text-[10px] px-2 py-1.5 rounded bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/30 transition-colors font-medium"
+                  >
+                    Hide All
+                  </button>
+                </div>
+                <div className="space-y-0.5">
+                  {categories.filter(category => category !== "all").map((category) => {
+                    const isExcluded = excludedCategories.has(category)
+                    const itemCount = products.filter((p) => p.itemType === category).length
+                    return (
+                      <button
+                        key={category}
+                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs transition-all duration-200 ${
+                          isExcluded
+                            ? "bg-red-500/10 text-muted-foreground line-through opacity-60 hover:opacity-80"
+                            : "bg-emerald-500/10 text-foreground hover:bg-emerald-500/20 font-medium"
+                        }`}
+                        onClick={() => {
+                          setExcludedCategories(prev => {
+                            const newSet = new Set(prev)
+                            if (newSet.has(category)) {
+                              newSet.delete(category)
+                            } else {
+                              newSet.add(category)
+                            }
+                            return newSet
+                          })
+                        }}
+                      >
+                        <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                          isExcluded 
+                            ? "border-red-400 bg-red-500/20" 
+                            : "border-emerald-400 bg-emerald-500"
+                        }`}>
+                          {!isExcluded && (
+                            <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="truncate flex-1 text-left">
+                          {category}
+                        </span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${
+                          isExcluded 
+                            ? "bg-red-500/20 text-red-500" 
+                            : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                        }`}>
+                          {itemCount}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* System Status */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-orange-500'}`}></div>
-                  <span className="text-muted-foreground">API</span>
+          {/* Availability Filter Card */}
+          <div className="bg-card backdrop-blur-sm border border-border rounded-xl p-4 shadow-sm">
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                <div className="w-5 h-5 bg-linear-to-br from-emerald-400 to-green-500 rounded-md flex items-center justify-center">
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
-                <span className={isConnected ? "text-green-600" : "text-orange-600"}>
-                  {isConnected ? "Connected" : "Disconnected"}
-                </span>
-              </div>
+                Availability
+              </h3>
               
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                  <span className="text-muted-foreground">Network</span>
-                </div>
-                <span className={isOnline ? "text-green-600" : "text-red-600"}>
-                  {isOnline ? "Online" : "Offline"}
-                </span>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <Checkbox 
+                    id="available" 
+                    checked={showAvailable} 
+                    onCheckedChange={(checked) => setShowAvailable(checked === true)}
+                    className="border-border data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                  />
+                  <span className="text-sm text-foreground group-hover:text-foreground transition-colors">
+                    Available Items
+                  </span>
+                </label>
+                
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <Checkbox 
+                    id="unavailable" 
+                    checked={showUnavailable} 
+                    onCheckedChange={(checked) => setShowUnavailable(checked === true)}
+                    className="border-border data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                  />
+                  <span className="text-sm text-foreground group-hover:text-foreground transition-colors">
+                    Out of Stock
+                  </span>
+                </label>
               </div>
-              
-              {lastFetchTime && (
-                <p className="text-xs text-muted-foreground pt-1">
-                  Updated {lastFetchTime.toLocaleTimeString()}
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -1476,62 +1760,141 @@ export function DashboardView({
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+        <div className="flex-1 overflow-y-auto p-6">
           {/* Top Controls */}
-          <div className="mb-6">
-            {/* Desktop Layout */}
+          <div className="bg-background relative z-10 mb-6">
+            {/* Desktop Layout - Hidden on mobile */}
             <div className="hidden lg:flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl font-semibold">{itemsTitle}</h1>
-                <span className="text-sm text-muted-foreground">
-                  {paginatedProducts.length} of {totalFilteredCount}
-                </span>
-              </div>
-            </div>
-
-            {/* Mobile Layout */}
-            <div className="lg:hidden space-y-3">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 shrink-0"
-                  onClick={() => setIsMobileSidebarOpen(true)}
+              <div className="flex items-center space-x-4 px-2 py-1 rounded">
+                <h1 className="text-2xl font-bold text-foreground">All Items</h1>
+                <Badge
+                  variant="secondary"
+                  className="bg-muted text-foreground"
                 >
-                  <Menu className="w-4 h-4" />
-                </Button>
-                
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-base font-semibold truncate">{itemsTitle}</h1>
-                  <span className="text-xs text-muted-foreground">
-                    {paginatedProducts.length} of {totalFilteredCount}
-                  </span>
-                </div>
+                  {paginatedProducts.length} of {totalFilteredCount} items
+                </Badge>
+                {(searchQuery || localSearchQuery) && (
+                  <Badge
+                    variant="outline"
+                    className="border-border text-muted-foreground"
+                  >
+                    Searching: "{searchQuery || localSearchQuery}"
+                  </Badge>
+                )}
+              </div>
 
-                <div className="flex border rounded-lg shrink-0">
+              <div className="flex items-center space-x-4 px-2 py-1 rounded">
+                <Input
+                  placeholder="Search items..."
+                  value={localSearchQuery}
+                  onChange={(e) => setLocalSearchQuery(e.target.value)}
+                  className="w-64 bg-card border-border"
+                />
+
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-40 text-foreground bg-card border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border">
+                    <SelectItem value="name-asc" className="text-foreground">
+                      Name A-Z
+                    </SelectItem>
+                    <SelectItem value="name-desc" className="text-foreground">
+                      Name Z-A
+                    </SelectItem>
+                    <SelectItem value="stock-high" className="text-foreground">
+                      Stock High-Low
+                    </SelectItem>
+                    <SelectItem value="stock-low" className="text-foreground">
+                      Stock Low-High
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <div className="flex border rounded-lg border-border bg-card">
                   <Button
                     variant={viewMode === "grid" ? "default" : "ghost"}
-                    size="icon"
-                    className="h-8 w-8"
+                    size="sm"
                     onClick={() => setViewMode("grid")}
+                    className={`${
+                      viewMode === "grid"
+                        ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }`}
                   >
                     <Grid className="w-4 h-4" />
                   </Button>
                   <Button
                     variant={viewMode === "list" ? "default" : "ghost"}
-                    size="icon"
-                    className="h-8 w-8"
+                    size="sm"
                     onClick={() => setViewMode("list")}
+                    className={`${
+                      viewMode === "list"
+                        ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-200 dark:hover:text-slate-100 dark:hover:bg-slate-700"
+                    }`}
+                  >
+                    <List className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile Layout - Visible only on mobile */}
+            <div className="lg:hidden space-y-2">
+              {/* Single row: Hamburger + Title + View Mode + Sort */}
+              <div className="flex items-center gap-2 px-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsMobileSidebarOpen(true)}
+                  className="h-9 w-9 p-0 shrink-0 bg-slate-800/60 border-2 border-slate-600 hover:bg-slate-700/70"
+                  title="Open filters"
+                >
+                  <Menu className="w-5 h-5" />
+                </Button>
+                
+                <div className="min-w-0 flex-shrink">
+                  <h1 className="text-base font-bold text-foreground truncate">All Items</h1>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                    {paginatedProducts.length} of {totalFilteredCount}
+                  </span>
+                </div>
+
+                {/* View Mode Toggle */}
+                <div className="flex border rounded-lg border-border bg-card shrink-0 ml-auto">
+                  <Button
+                    variant={viewMode === "grid" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("grid")}
+                    className={`h-8 w-8 p-0 ${
+                      viewMode === "grid"
+                        ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <Grid className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === "list" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("list")}
+                    className={`h-8 w-8 p-0 ${
+                      viewMode === "list"
+                        ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }`}
                   >
                     <List className="w-4 h-4" />
                   </Button>
                 </div>
 
+                {/* Sort Dropdown */}
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-24 h-8 text-xs shrink-0">
+                  <SelectTrigger className="w-28 h-8 text-xs bg-card border-border shrink-0">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-card border-border">
                     <SelectItem value="name-asc" className="text-xs">A-Z</SelectItem>
                     <SelectItem value="name-desc" className="text-xs">Z-A</SelectItem>
                     <SelectItem value="stock-high" className="text-xs">High Stock</SelectItem>
@@ -1540,10 +1903,16 @@ export function DashboardView({
                 </Select>
               </div>
 
-              {searchQuery && (
-                <Badge variant="outline" className="text-xs">
-                  Searching: "{searchQuery}"
-                </Badge>
+              {/* Active Search Badge */}
+              {(searchQuery || localSearchQuery) && (
+                <div className="px-2">
+                  <Badge
+                    variant="outline"
+                    className="border-border text-muted-foreground text-xs"
+                  >
+                    Searching: "{searchQuery || localSearchQuery}"
+                  </Badge>
+                </div>
               )}
             </div>
           </div>

@@ -121,13 +121,13 @@ export default function EmployeeDashboard() {
             }
           }
           
+          // Set the active tab if provided
+          if (tabParam) {
+            setActiveTab(tabParam)
+          }
+          
           // Clean up URL
           window.history.replaceState({}, document.title, window.location.pathname)
-        }
-        
-        // Set the active tab if provided (works for both autoLogin and direct navigation)
-        if (tabParam) {
-          setActiveTab(tabParam)
         }
         
         // Fall back to stored token if no nav auth
