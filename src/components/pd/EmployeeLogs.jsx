@@ -841,46 +841,45 @@ function EmployeeLogs() {
       <div className="max-w-7xl mx-auto space-y-4">
         
         {/* Header Section */}
-        <div className={`${t.cardBg} ${t.cardBorder} rounded-2xl shadow-lg border p-4 md:p-6`}>
+        <div className={`${t.cardBg} ${t.cardBorder} rounded-2xl shadow-lg border p-6`}>
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <div className="flex items-center gap-2 md:gap-4">
-              <div className="w-10 h-10 md:w-14 md:h-14 bg-linear-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0">
-                <svg className="w-5 h-5 md:w-8 md:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-linear-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
               <div>
-                <h1 className={`text-lg md:text-2xl font-bold ${t.header}`}>
-                  Logs <span className={`text-xs md:text-sm font-normal ${t.muted} hidden sm:inline`}>• Track and manage</span>
-                </h1>
+                <h1 className={`text-2xl font-bold ${t.header}`}>Employee Activity Logs</h1>
+                <p className={`text-sm ${t.muted} mt-0.5`}>Track and manage employee activities</p>
               </div>
             </div>
 
-            <div className="flex flex-row gap-2 items-center">
+            <div className="flex flex-wrap gap-2 items-center">
               <button 
                 onClick={fetchEmployeeLogs} 
                 disabled={loading}
-                className="px-3 md:px-4 py-2 md:py-2.5 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg md:rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 font-medium text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                <span className="hidden sm:inline">Refresh</span>
+                <span>Refresh</span>
               </button>
               <button 
                 onClick={() => exportLogs('csv')} 
-                className="px-3 md:px-4 py-2 md:py-2.5 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg md:rounded-xl transition-all shadow-md hover:shadow-lg font-medium text-sm md:text-base"
+                className="px-4 py-2.5 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg font-medium"
               >
-                CSV
+                Export CSV
               </button>
               <button 
                 onClick={() => setState(prev => ({ ...prev, showReportBuilder: true }))}
-                className="px-3 md:px-4 py-2 md:py-2.5 bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-lg md:rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 font-medium text-sm md:text-base"
+                className="px-4 py-2.5 bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-medium"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <span className="hidden sm:inline">Report</span>
+                <span>Generate Report</span>
               </button>
               {/* Checkout quantity editing is available via "Edit Checkout Items" button in detailed view */}
             </div>
@@ -888,27 +887,26 @@ function EmployeeLogs() {
         </div>
 
         {/* Search and Filter Section */}
-        <div className={`${t.cardBg} ${t.cardBorder} rounded-xl md:rounded-2xl shadow-lg border p-2 md:p-4`}>
-          <div className="flex flex-col gap-2 md:gap-3">
-            <div className="w-full">
+        <div className={`${t.cardBg} ${t.cardBorder} rounded-2xl shadow-lg border p-4`}>
+          <div className="flex flex-col lg:flex-row gap-3">
+            <div className="flex-1">
               <div className="relative">
-                <svg className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={handleSearch}
-                  placeholder="Search by name, ID..."
-                  className={`w-full pl-9 md:pl-12 pr-3 md:pr-4 py-2 md:py-3 border ${t.inputBorder} rounded-lg md:rounded-xl ${t.inputBg} ${t.title} text-xs md:text-base`}
+                  placeholder="Search by name, ID number, or barcode..."
+                  className={`w-full pl-12 pr-4 py-3 border ${t.inputBorder} rounded-xl ${t.inputBg} ${t.title}`}
                 />
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
             <button
               onClick={toggleFilters}
-              className={`px-4 md:px-5 py-2.5 md:py-3 rounded-lg md:rounded-xl transition-all font-semibold flex items-center justify-center gap-2 text-sm md:text-base ${
+              className={`px-5 py-3 rounded-xl transition-all font-semibold flex items-center gap-2 ${
                 showFilters 
                   ? 'bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-lg' 
                   : `bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600`
@@ -928,49 +926,46 @@ function EmployeeLogs() {
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className={`px-4 md:px-5 py-2.5 md:py-3 bg-linear-to-r from-red-100 to-rose-100 dark:from-red-900/30 dark:to-rose-900/30 ${t.accent.red} rounded-lg md:rounded-xl hover:from-red-200 hover:to-rose-200 dark:hover:from-red-900/50 dark:hover:to-rose-900/50 transition-all font-semibold flex items-center justify-center gap-2 text-sm md:text-base`}
+                className={`px-5 py-3 bg-linear-to-r from-red-100 to-rose-100 dark:from-red-900/30 dark:to-rose-900/30 ${t.accent.red} rounded-xl hover:from-red-200 hover:to-rose-200 dark:hover:from-red-900/50 dark:hover:to-rose-900/50 transition-all font-semibold flex items-center gap-2`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-                <span>Clear</span>
+                <span>Clear All</span>
               </button>
             )}
-            </div>
           </div>
 
           {showFilters && (
-            <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-200 dark:border-slate-700 space-y-3 md:space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={`block text-sm font-semibold ${t.label} mb-2`}>From</label>
+                  <label className={`block text-sm font-semibold ${t.label} mb-2`}>Date From</label>
                   <input
                     type="date"
                     value={dateFilter.dateFrom}
                     onChange={(e) => handleDateFilterChange("dateFrom", e.target.value)}
-                    className={`w-full px-3 md:px-4 py-2 md:py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg md:rounded-xl bg-white dark:bg-slate-900/50 ${t.title} focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm md:text-base`}
+                    className={`w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 ${t.title} focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
                   />
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-semibold ${t.label} mb-2`}>To</label>
+                  <label className={`block text-sm font-semibold ${t.label} mb-2`}>Date To</label>
                   <input
                     type="date"
                     value={dateFilter.dateTo}
                     onChange={(e) => handleDateFilterChange("dateTo", e.target.value)}
-                    className={`w-full px-3 md:px-4 py-2 md:py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg md:rounded-xl bg-white dark:bg-slate-900/50 ${t.title} focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm md:text-base`}
+                    className={`w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900/50 ${t.title} focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
                   />
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2 sm:gap-3">
-                <span className={`text-sm font-semibold ${t.label}`}>Quick:</span>
-                <div className="flex flex-wrap gap-2 flex-1">
-                  <button onClick={() => setTimeRange('today')} className="flex-1 sm:flex-none px-3 md:px-4 py-2 bg-slate-600 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-all font-medium text-sm md:text-base">Today</button>
-                  <button onClick={() => setTimeRange('week')} className="flex-1 sm:flex-none px-3 md:px-4 py-2 bg-slate-600 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-all font-medium text-sm md:text-base">7 Days</button>
-                  <button onClick={() => setTimeRange('month')} className="flex-1 sm:flex-none px-3 md:px-4 py-2 bg-slate-600 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-all font-medium text-sm md:text-base">30 Days</button>
-                </div>                
-                <div className="w-full sm:w-auto">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className={`text-sm font-semibold ${t.label}`}>Quick Select:</span>
+                <button onClick={() => setTimeRange('today')} className="px-4 py-2 bg-slate-600 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-all font-medium">Today</button>
+                <button onClick={() => setTimeRange('week')} className="px-4 py-2 bg-slate-600 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-all font-medium">Last 7 Days</button>
+                <button onClick={() => setTimeRange('month')} className="px-4 py-2 bg-slate-600 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-all font-medium">Last 30 Days</button>                
+                <div className="ml-auto">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -978,7 +973,7 @@ function EmployeeLogs() {
                       onChange={(e) => handleFilterChange("hasDetails", e.target.checked)}
                       className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
                     />
-                    <span className={`text-xs sm:text-sm font-semibold ${t.smallMuted}`}>Only with details</span>
+                    <span className={`text-sm font-semibold ${t.smallMuted}`}>Show logs with details only</span>
                   </label>
                 </div>
               </div>
@@ -987,18 +982,17 @@ function EmployeeLogs() {
         </div>
 
         {/* Results Summary */}
-        <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-1.5 xs:gap-2 px-2">
-          <div className="flex items-center gap-2 flex-wrap">
-        <span className={`text-xs font-semibold ${t.label}`}>
-      <span className="hidden xs:inline">Showing </span><span className={`${t.accent.blue} font-bold`}>{logs.length}</span><span className="hidden xs:inline"> of </span>/{totalLogs}
-              {totalPages > 1 && <span className="text-slate-500 ml-1 hidden sm:inline">• Pg {currentPage}/{totalPages}</span>}
-              {totalPages > 1 && <span className="text-slate-500 text-xs sm:hidden">P{currentPage}/{totalPages}</span>}
+        <div className="flex items-center justify-between px-2">
+          <div className="flex items-center gap-2">
+        <span className={`text-sm font-semibold ${t.label}`}>
+      Showing <span className={`${t.accent.blue} font-bold`}>{logs.length}</span> of <span className="font-bold">{totalLogs}</span> logs
+              {totalPages > 1 && <span className="text-slate-500 ml-1">• Page {currentPage} of {totalPages}</span>}
             </span>
           </div>
           {loading && (
-            <div className={`flex items-center gap-1.5 xs:gap-2 ${t.accent.blue}`}>
-              <div className={`animate-spin w-3 h-3 xs:w-4 xs:h-4 border-2 ${t.accent.blue} dark:border-blue-400 border-t-transparent rounded-full`}></div>
-              <span className="text-xs xs:text-sm font-medium">Loading</span>
+            <div className={`flex items-center gap-2 ${t.accent.blue}`}>
+              <div className={`animate-spin w-4 h-4 border-2 ${t.accent.blue} dark:border-blue-400 border-t-transparent rounded-full`}></div>
+              <span className="text-sm font-medium">Loading...</span>
             </div>
           )}
         </div>
@@ -1044,12 +1038,12 @@ function EmployeeLogs() {
         )}
 
         {/* Logs Grid */}
-        <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-xl md:rounded-2xl shadow-lg border overflow-hidden" : "bg-white border-slate-200 rounded-xl md:rounded-2xl shadow-lg border overflow-hidden"}>
-          <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-400 scrollbar-track-transparent">
-            <table className="w-full min-w-max md:min-w-full">
-              <thead className={`${isDarkMode ? t.tableHeaderBg : 'bg-slate-100'} ${t.header} sticky top-0`}>
+        <div className={isDarkMode ? "bg-slate-800 border-slate-700 rounded-2xl shadow-lg border overflow-hidden" : "bg-white border-slate-200 rounded-2xl shadow-lg border overflow-hidden"}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className={`${isDarkMode ? t.tableHeaderBg : 'bg-slate-100'} ${t.header}`}>
                 <tr>
-                  <th className="px-3 md:px-4 py-3 md:py-4 text-left w-10 md:w-12">
+                  <th className="px-4 py-4 text-left w-12">
                     <input
                       type="checkbox"
                       checked={selectedLogs.length === logs.slice(0, visibleCount).length && logs.slice(0, visibleCount).length > 0}
@@ -1057,10 +1051,10 @@ function EmployeeLogs() {
                       className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
                     />
                   </th>
-                  <th className={`px-3 md:px-6 py-3 md:py-4 text-left font-bold uppercase text-xs tracking-wider ${t.label}`}>Activity</th>
-                  <th className={`px-3 md:px-6 py-3 md:py-4 text-left font-bold uppercase text-xs tracking-wider ${t.label}`}>Employee</th>
-                  <th className={`px-3 md:px-6 py-3 md:py-4 text-left font-bold uppercase text-xs tracking-wider ${t.label}`}>Date & Time</th>
-                  <th className={`px-3 md:px-6 py-3 md:py-4 text-left font-bold uppercase text-xs tracking-wider ${t.label}`}>Details</th>
+                  <th className={`px-6 py-4 text-left font-bold uppercase text-xs tracking-wider ${t.label}`}>Activity</th>
+                  <th className={`px-6 py-4 text-left font-bold uppercase text-xs tracking-wider ${t.label}`}>Employee</th>
+                  <th className={`px-6 py-4 text-left font-bold uppercase text-xs tracking-wider ${t.label}`}>Date & Time</th>
+                  <th className={`px-6 py-4 text-left font-bold uppercase text-xs tracking-wider ${t.label}`}>Details</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -1086,9 +1080,9 @@ function EmployeeLogs() {
                       key={log.id}
                       tabIndex={0}
                       onClick={() => openDetailedView(log)}
-                      className={`${idx % 2 === 0 ? t.rowEven : t.rowOdd} ${t.rowHover} hover:shadow-md transition-all`}
+                      className={`${idx % 2 === 0 ? t.rowEven : t.rowOdd} ${t.rowHover}`}
                     >
-                      <td className="px-3 md:px-4 py-3 md:py-4" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                         <input 
                           type="checkbox" 
                           checked={selectedLogs.includes(log.id)} 
@@ -1096,40 +1090,43 @@ function EmployeeLogs() {
                           className={`w-4 h-4 rounded border-slate-300 dark:border-slate-600 ${t.accent.blue} focus:ring-blue-500`}
                         />
                       </td>
-                      <td className="px-3 md:px-6 py-3 md:py-4">
-                        <div className={`inline-flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 rounded-full ${getActivityColor(log.details)} font-semibold text-xs md:text-sm`}>
-                          <span className="text-base md:text-lg">{getActivityIcon(log.details)}</span>
-                          <span className="hidden md:inline font-mono opacity-75">#{log.id}</span>
+                      <td className="px-6 py-4">
+                        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${getActivityColor(log.details)} font-semibold text-sm`}>
+                          <span className="text-lg">{getActivityIcon(log.details)}</span>
+                          <span className="font-mono text-xs opacity-75">#{log.id}</span>
                         </div>
                       </td>
-                      <td className="px-3 md:px-6 py-3 md:py-4">
-                        <div className="flex items-center gap-2 md:gap-3">
-                          <div className="w-8 md:w-10 h-8 md:h-10 rounded-full overflow-hidden flex items-center justify-center text-white font-bold shadow-md bg-linear-to-br from-blue-500 to-indigo-500 shrink-0">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center text-white font-bold shadow-md bg-linear-to-br from-blue-500 to-indigo-500">
                             {state.logProfileMap && state.logProfileMap[log.id] ? (
                               <img src={state.logProfileMap[log.id]} alt={log.username || 'profile'} className="w-full h-full object-cover" />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center text-white text-xs md:text-base">{(log.username || 'N')[0].toUpperCase()}</div>
+                              <div className="w-full h-full flex items-center justify-center text-white text-base">{(log.username || 'N')[0].toUpperCase()}</div>
                             )}
                           </div>
-                          <div className="min-w-0">
-                            <div className={`font-semibold ${t.title} text-xs md:text-sm truncate`}>{log.username || 'N/A'}</div>
-                            <div className="flex items-center gap-1 text-xs mt-0.5 flex-wrap">
+                          <div>
+                            <div className={`font-semibold ${t.title}`}>{log.username || 'N/A'}</div>
+                            <div className="flex items-center gap-2 text-xs mt-0.5">
                               {log.id_number && (
-                                <span className={`px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 ${t.smallMuted} rounded font-mono text-xs`}>ID: {log.id_number}</span>
+                                <span className={`px-2 py-0.5 bg-slate-100 ${t.smallMuted} rounded font-mono`}>ID: {log.id_number}</span>
+                              )}
+                              {log.id_barcode && (
+                                <span className={`px-2 py-0.5 bg-slate-100 ${t.smallMuted} rounded font-mono`}>BC: {log.id_barcode}</span>
                               )}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 md:px-6 py-3 md:py-4">
-                        <div className="text-xs md:text-sm">
-                          <div className={`font-semibold ${t.title} whitespace-nowrap`}>{formatDateTime(log.log_date, log.log_time)}</div>
-                          <div className={`text-xs mt-0.5 ${t.smallMuted} text-slate-900 dark:text-slate-300 hidden md:block`}>Created: {new Date(log.created_at).toLocaleString()}</div>
+                      <td className="px-6 py-4">
+                        <div className="text-sm">
+                          <div className={`font-semibold ${t.title}`}>{formatDateTime(log.log_date, log.log_time)}</div>
+                          <div className={`text-xs mt-0.5 ${t.smallMuted} text-slate-900 dark:text-slate-300`}>Created: {new Date(log.created_at).toLocaleString()}</div>
                         </div>
                       </td>
-                      <td className="px-3 md:px-6 py-3 md:py-4 max-w-xs md:max-w-md">
-                        <div className={`text-xs md:text-sm ${t.muted} truncate`}>
-                          {log.details || <span className={`italic ${t.smallMuted}`}>—</span>}
+                      <td className="px-6 py-4 max-w-md">
+                        <div className={`text-sm ${t.muted} truncate group-hover:text-clip`}>
+                          {log.details || <span className={`italic ${t.smallMuted}`}>No details</span>}
                         </div>
                       </td>
                     </tr>
@@ -1141,13 +1138,12 @@ function EmployeeLogs() {
 
           {/* Load More Button */}
           {logs.length > visibleCount && (
-            <div className="p-2 md:p-4 text-center border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+            <div className="p-4 text-center border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
               <button
                 onClick={() => setState(prev => ({ ...prev, visibleCount: Math.min(prev.visibleCount + 20, logs.length) }))}
-                className="px-4 md:px-6 py-2 md:py-3 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg md:rounded-xl transition-all shadow-md hover:shadow-lg font-semibold text-sm md:text-base"
+                className="px-6 py-3 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all shadow-md hover:shadow-lg font-semibold"
               >
-                <span className="hidden sm:inline">Load More ({Math.min(20, logs.length - visibleCount)} more)</span>
-                <span className="sm:hidden">Load More</span>
+                Load More ({Math.min(20, logs.length - visibleCount)} more)
               </button>
             </div>
           )}
@@ -1155,17 +1151,16 @@ function EmployeeLogs() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-1 md:gap-3 flex-wrap px-2">
+          <div className="flex justify-center items-center gap-3">
             <button
               onClick={() => setState(prev => ({ ...prev, currentPage: Math.max(prev.currentPage - 1, 1) }))}
               disabled={currentPage === 1 || loading}
-              className={`px-2 md:px-5 py-1.5 md:py-3 bg-slate-200 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-lg md:rounded-xl text-xs md:text-base text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-md hover:shadow-lg whitespace-nowrap`}
+              className={`px-5 py-3 bg-slate-200 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-md hover:shadow-lg`}
             >
-              <span className="hidden sm:inline">← Previous</span>
-              <span className="sm:hidden">←</span>
+              ← Previous
             </button>
             
-            <div className="flex gap-1 md:gap-2 flex-wrap justify-center">
+            <div className="flex gap-2">
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 let pageNum = totalPages <= 5 ? i + 1 : currentPage <= 3 ? i + 1 : currentPage >= totalPages - 2 ? totalPages - 4 + i : currentPage - 2 + i
                 return (
@@ -1173,9 +1168,9 @@ function EmployeeLogs() {
                     key={pageNum}
                     onClick={() => setState(prev => ({ ...prev, currentPage: pageNum }))}
                     disabled={loading}
-                    className={`w-8 h-8 md:w-12 md:h-12 rounded-lg md:rounded-xl transition-all font-bold shadow-md text-xs md:text-sm ${
+                    className={`w-12 h-12 rounded-xl transition-all font-bold shadow-md text-sm ${
                       currentPage === pageNum
-              ? "bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-lg md:scale-110"
+              ? "bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-110"
                 : `bg-slate-100 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700`
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
@@ -1188,10 +1183,9 @@ function EmployeeLogs() {
             <button
               onClick={() => setState(prev => ({ ...prev, currentPage: Math.min(prev.currentPage + 1, totalPages) }))}
               disabled={currentPage === totalPages || loading}
-              className={`px-2 md:px-5 py-1.5 md:py-3 bg-slate-200 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-lg md:rounded-xl text-xs md:text-base text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-md hover:shadow-lg whitespace-nowrap`}
+              className={`px-5 py-3 bg-slate-200 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-md hover:shadow-lg`}
             >
-              <span className="hidden sm:inline">Next →</span>
-              <span className="sm:hidden">→</span>
+              Next →
             </button>
           </div>
         )}
