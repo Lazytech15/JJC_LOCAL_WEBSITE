@@ -314,12 +314,22 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
   const isProcessing = isCommitting || savingToInventory
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-800">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle className="text-xl font-bold dark:text-slate-100">Checkout Summary</CardTitle>
-          <Button variant="ghost" size="sm" onClick={onClose} disabled={isProcessing}>
-            <X className="w-4 h-4" />
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-3xl bg-card border-border/50 shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30">
+          <div>
+            <h2 className="text-xl font-bold text-card-foreground">Checkout</h2>
+            <p className="text-sm text-muted-foreground">Step {currentStep} of 3 — {WIZARD_STEPS[currentStep - 1]?.title ?? ''}</p>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onClose} 
+            disabled={isCommitting}
+            className="h-9 w-9 p-0 rounded-lg hover:bg-muted"
+          >
+            <X className="w-5 h-5" />
           </Button>
         </CardHeader>
 
@@ -473,14 +483,67 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
                 />
               )}
 
-              <div className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400">
-                <User className="w-4 h-4" />
-                <span>
-                  {inputMethod === 'barcode'
-                    ? "Position scanner to read employee barcode or type it manually"
-                    : "Enter the employee's ID number from their badge"
-                  }
-                </span>
+                {/* Loading State */}
+                {loadingEmployees && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <div className="w-4 h-4 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+                    Loading employees...
+                  </div>
+                )}
+
+                {/* Error Display */}
+                {error && (
+                  <Card className={`border ${
+                    error.includes('DISABLED')
+                      ? 'bg-amber-500/10 border-amber-500/30'
+                      : 'bg-destructive/10 border-destructive/30'
+                  }`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+                          error.includes('DISABLED') ? 'text-amber-500' : 'text-destructive'
+                        }`} />
+                        <div>
+                          <p className={`text-sm font-medium ${
+                            error.includes('DISABLED') ? 'text-amber-600 dark:text-amber-400' : 'text-destructive'
+                          }`}>
+                            {error.includes('DISABLED') ? 'ID Deactivated' : 'Verification Failed'}
+                          </p>
+                          <p className={`text-xs mt-1 ${
+                            error.includes('DISABLED') ? 'text-amber-600/80 dark:text-amber-400/80' : 'text-destructive/80'
+                          }`}>
+                            {error.replace('⚠️ Employee ID is DISABLED: ', '')}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Selected Employee */}
+                {selectedEmployee && (
+                  <Card className="bg-success/10 border-success/30">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-success text-success-foreground font-bold text-lg">
+                          {selectedEmployee?.firstName?.[0] ?? ''}{selectedEmployee?.lastName?.[0] ?? ''}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-success truncate">
+                            {selectedEmployee?.firstName ?? ''} {selectedEmployee?.middleName ? selectedEmployee.middleName + ' ' : ''}{selectedEmployee?.lastName ?? ''}
+                          </p>
+                          <p className="text-sm text-success/80 truncate">
+                            {selectedEmployee?.position ?? ''} • {selectedEmployee?.department ?? ''}
+                          </p>
+                          <p className="text-xs text-success/70 mt-1">
+                            ID: {selectedEmployee?.idNumber ?? ''}
+                          </p>
+                        </div>
+                        <CheckCircle2 className="w-6 h-6 text-success flex-shrink-0" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </div>
 
