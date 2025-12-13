@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { Search, Package, ShoppingCart, X } from "lucide-react"
+import { Search, Package, ShoppingCart, X, FileText } from "lucide-react"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Badge } from "./ui/badge"
@@ -95,7 +95,7 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-slate-700/50 shadow-lg">
-      <div className="flex items-center justify-between px-4 py-2.5 max-w-7xl mx-auto gap-4">
+      <div className="flex items-center justify-between px-2 lg:px-3 py-2.5 max-w-[1600px] mx-auto gap-4">
         {/* Logo */}
         <div 
           className="flex items-center gap-3 cursor-pointer shrink-0 group" 
@@ -181,6 +181,20 @@ export function Header({ cartItemCount, currentView, onViewChange, onSearch }: H
             >
               <Package className="w-4 h-4 sm:mr-1.5" />
               <span className="hidden sm:inline">Items</span>
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onViewChange("logs")}
+              className={`rounded-full px-3 sm:px-4 h-8 text-sm font-medium transition-all ${
+                currentView === "logs" 
+                  ? "bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-md" 
+                  : "text-slate-400 hover:text-white hover:bg-slate-700/50"
+              }`}
+            >
+              <FileText className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Logs</span>
             </Button>
 
             <Button

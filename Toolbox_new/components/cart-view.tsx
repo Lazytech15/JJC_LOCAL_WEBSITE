@@ -391,9 +391,9 @@ export function CartView({ items, onUpdateQuantity, onRemoveItem, onReturnToBrow
   }
 
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div className="min-h-[calc(100vh-5rem)] flex flex-col bg-card rounded-lg shadow-sm border">
       {/* Header - Consistent with Dashboard */}
-      <div className="shrink-0 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+      <div className="shrink-0 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10 rounded-t-lg">
         <div className="p-4 lg:p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

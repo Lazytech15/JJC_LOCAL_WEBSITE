@@ -158,7 +158,7 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
   }, [images])
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6">
+    <div className="min-h-[calc(100vh-5rem)] bg-card rounded-lg shadow-sm border p-4 sm:p-6">
       {/* Back Button */}
       <Button 
         variant="ghost" 
@@ -169,7 +169,7 @@ export function ItemDetailView({ product, onAddToCart, onBack }: ItemDetailViewP
         Back
       </Button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
         {/* Image Section */}
         <Card>
           <CardContent className="p-4">

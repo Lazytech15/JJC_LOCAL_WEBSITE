@@ -5,6 +5,7 @@ import { Header } from "../components/header"
 import { DashboardView } from "../components/dashboard-view"
 import { CartView } from "../components/cart-view"
 import { ItemDetailView } from "../components/item-detail-view"
+import { EmployeeLogsView } from "../components/employee-logs-view"
 import { StartPage } from "../components/start-page"
 import { EnhancedToaster } from "../components/enhanced-toaster"
 import { useCartPersistence } from "../hooks/use-cart-persistence"
@@ -14,7 +15,7 @@ import { apiService } from "../lib/api_service"
 import { DEFAULT_API_CONFIG } from "../lib/api-config"
 import type { Product } from "../lib/barcode-scanner"
 
-export type ViewType = "dashboard" | "cart" | "item-detail"
+export type ViewType = "dashboard" | "cart" | "item-detail" | "logs"
 
 export interface CartItem {
   id: string
@@ -234,7 +235,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
+    <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-950">
       <Header
         cartItemCount={totalCartItems}
         currentView={currentView}
@@ -242,46 +243,52 @@ export default function HomePage() {
         onSearch={setHeaderSearchQuery}
       />
 
-      <main className="flex-1 overflow-y-auto pt-20 sm:pt-16">
-        {/* Keep DashboardView mounted but conditionally visible */}
-        <div className={currentView === "dashboard" ? "block" : "hidden"}>
-          <DashboardView 
-            onAddToCart={addToCart} 
-            onViewItem={viewItemDetail} 
-            searchQuery={headerSearchQuery}
-            onRefreshData={setDashboardRefresh}
-            apiUrl={apiUrl}
-            onApiUrlChange={handleApiUrlChange}
-            isConnected={isApiConnected}
-            // Pass products state from parent
-            products={products}
-            setProducts={setProducts}
-            isLoadingProducts={isLoadingProducts}
-            setIsLoadingProducts={setIsLoadingProducts}
-            dataSource={productsDataSource}
-            setDataSource={setProductsDataSource}
-            lastFetchTime={productsLastFetchTime}
-            setLastFetchTime={setProductsLastFetchTime}
-          />
+      <main className="flex-1 pt-20 sm:pt-16">
+        <div className="max-w-[1600px] mx-auto px-2 lg:px-3">
+          {/* Keep DashboardView mounted but conditionally visible */}
+          <div className={currentView === "dashboard" ? "block" : "hidden"}>
+            <DashboardView 
+              onAddToCart={addToCart} 
+              onViewItem={viewItemDetail} 
+              searchQuery={headerSearchQuery}
+              onRefreshData={setDashboardRefresh}
+              apiUrl={apiUrl}
+              onApiUrlChange={handleApiUrlChange}
+              isConnected={isApiConnected}
+              // Pass products state from parent
+              products={products}
+              setProducts={setProducts}
+              isLoadingProducts={isLoadingProducts}
+              setIsLoadingProducts={setIsLoadingProducts}
+              dataSource={productsDataSource}
+              setDataSource={setProductsDataSource}
+              lastFetchTime={productsLastFetchTime}
+              setLastFetchTime={setProductsLastFetchTime}
+            />
+          </div>
+
+          {currentView === "cart" && (
+            <CartView
+              items={cartItems}
+              onUpdateQuantity={updateCartItemQuantity}
+              onRemoveItem={removeFromCart}
+              onReturnToBrowsing={() => setCurrentView("dashboard")}
+              onRefreshData={dashboardRefresh ?? undefined}
+            />
+          )}
+
+          {currentView === "item-detail" && selectedProduct && (
+            <ItemDetailView
+              product={selectedProduct}
+              onAddToCart={addToCart}
+              onBack={() => setCurrentView("dashboard")}
+            />
+          )}
+
+          {currentView === "logs" && (
+            <EmployeeLogsView className="h-full" />
+          )}
         </div>
-
-        {currentView === "cart" && (
-          <CartView
-            items={cartItems}
-            onUpdateQuantity={updateCartItemQuantity}
-            onRemoveItem={removeFromCart}
-            onReturnToBrowsing={() => setCurrentView("dashboard")}
-            onRefreshData={dashboardRefresh ?? undefined}
-          />
-        )}
-
-        {currentView === "item-detail" && selectedProduct && (
-          <ItemDetailView
-            product={selectedProduct}
-            onAddToCart={addToCart}
-            onBack={() => setCurrentView("dashboard")}
-          />
-        )}
       </main>
 
       <EnhancedToaster />

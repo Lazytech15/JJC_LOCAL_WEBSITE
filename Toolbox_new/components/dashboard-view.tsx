@@ -5,23 +5,19 @@ import {
   processBarcodeInput,
   type Product
 } from "../lib/barcode-scanner"
-import { Filter, Grid, List, ChevronDown, RefreshCw, Settings, Wifi, Download, FileText, FileSpreadsheet, Code, Package, Menu, X } from "lucide-react"
+import { Filter, Grid, List, ChevronDown, RefreshCw, Settings, Download, FileText, FileSpreadsheet, Code, Package, Menu, X } from "lucide-react"
 import { useLoading } from "./loading-context"
 import { SearchLoader } from "./enhanced-loaders"
-import { OfflineStatusPanel } from "./offline-status"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Checkbox } from "./ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 import { Card, CardContent } from "./ui/card"
 import { Badge } from "./ui/badge"
-import { Progress } from "./ui/progress"
 import { useToast } from "../hooks/use-toast"
 import { apiService } from "../lib/api_service"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog"
-import { Label } from "./ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
-import { exportToCSV, exportToXLSX, exportToJSON, prepareExportData, exportLogsToXLSX } from "../lib/export-utils"
+import { exportToCSV, exportToXLSX, exportToJSON, prepareExportData } from "../lib/export-utils"
 import { EnhancedItemCard } from "./enhanced-item-card"
 import { BulkOperationsBar, useBulkSelection } from "./bulk-operations"
 import useGlobalBarcodeScanner from "../hooks/use-global-barcode-scanner"
@@ -122,10 +118,6 @@ export function DashboardView({
   })
   // Note: Global barcode scanning is handled by GlobalBarcodeListener component
   // The dashboard listens to 'scanned-barcode' events dispatched by that component
-  const [logs, setLogs] = useState<any[]>([])
-  const [isLoadingLogs, setIsLoadingLogs] = useState(false)
-  const [logsError, setLogsError] = useState<string | null>(null)
-  const [hasLoadedLogs, setHasLoadedLogs] = useState(false)
   const [useEnhancedCards] = useState(true)
 
   // Bulk selection state
@@ -134,11 +126,9 @@ export function DashboardView({
     selectAll,
     clearSelection
   } = useBulkSelection()
-  const [activeTab, setActiveTab] = useState("api")
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? navigator.onLine : true)
   const [isCategoriesCollapsed, setIsCategoriesCollapsed] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
-  const [isMobileSearchExpanded, setIsMobileSearchExpanded] = useState(false)
   const { toast } = useToast()
   const { setSearchLoading } = useLoading()
 
@@ -212,69 +202,6 @@ export function DashboardView({
     }
     return true
   }
-
-  // ================= Employee Logs (Transactions) =================
-  const fetchLogsFromAPI = useCallback(async (silent = false) => {
-    try {
-      if (!silent) setIsLoadingLogs(true)
-      setLogsError(null)
-      // Fetch latest 100 logs
-      const data = await apiService.fetchTransactions({ limit: 100, offset: 0 })
-      if (data && Array.isArray(data.data)) {
-        setLogs(data.data)
-        setHasLoadedLogs(true)
-      }
-    } catch (err: any) {
-      console.error('[Dashboard] Failed to fetch employee logs', err)
-      setLogsError(err?.message || 'Failed to load logs')
-    } finally {
-      setIsLoadingLogs(false)
-    }
-  }, [])
-
-  // Initial load when opening the Logs tab first time
-  useEffect(() => {
-    if (activeTab === 'logs' && !hasLoadedLogs && !isLoadingLogs) {
-      fetchLogsFromAPI()
-    }
-  }, [activeTab, hasLoadedLogs, isLoadingLogs, fetchLogsFromAPI])
-
-  // Real-time subscription for new logs (append or refetch)
-  useEffect(() => {
-    // Ensure polling manager is initialized (handled in useInventorySync) but guard anyway
-    pollingManager.initialize()
-
-    // When a log is created, optimistically insert at top; if structure differs, fallback to refetch
-    const unsub1 = pollingManager.subscribeToUpdates(SOCKET_EVENTS.INVENTORY.LOG_CREATED, (data: any) => {
-      setLogs(prev => {
-        // Avoid duplicates
-        if (prev.some(l => String(l.id) === String(data.id))) return prev
-        const newEntry = {
-          id: data.id,
-          username: data.username || data.user || 'unknown',
-            // details may already be present else build a simple one
-          details: data.details || data.purpose || 'New transaction',
-          log_date: data.log_date || new Date().toISOString().slice(0,10),
-          log_time: data.log_time || new Date().toLocaleTimeString('en-PH', { hour12:false }),
-          purpose: data.purpose || ''
-        }
-        const updated = [newEntry, ...prev]
-        // Keep only last 100
-        return updated.slice(0,100)
-      })
-    })
-
-    // Generic refresh trigger (inventory:logs:refresh)
-    const unsub2 = pollingManager.subscribeToUpdates('inventory:logs:refresh', () => {
-      // Refetch in background (silent)
-      fetchLogsFromAPI(true)
-    })
-
-    return () => {
-      unsub1 && unsub1()
-      unsub2 && unsub2()
-    }
-  }, [fetchLogsFromAPI])
 
   // Online/Offline status tracking
   useEffect(() => {
@@ -582,53 +509,6 @@ export function DashboardView({
         title: "Export Failed",
         description: "Failed to export data to JSON. Please try again.",
         variant: "destructive",
-        toastType: 'error',
-        duration: 5000
-      } as any)
-    } finally {
-      setIsExporting(false)
-    }
-  }
-
-  // (Legacy duplicate fetchLogsFromAPI removed; unified implementation above with useCallback(silent))
-
-  // Auto-load logs when Logs tab is opened
-  const handleTabChange = (value: string) => {
-    setActiveTab(value)
-    if (value === 'logs' && !hasLoadedLogs && !isLoadingLogs) {
-      fetchLogsFromAPI()
-    }
-  }
-
-  const handleExportLogsXLSX = async () => {
-    try {
-      if (!logs || logs.length === 0) {
-        toast({ 
-          title: 'No Logs', 
-          description: 'No logs available to export', 
-          variant: 'destructive',
-          toastType: 'warning',
-          duration: 4000
-        } as any)
-        return
-      }
-
-      setIsExporting(true)
-      const filename = `toolbox-logs-${new Date().toISOString().split('T')[0]}`
-      exportLogsToXLSX(logs, { filename })
-
-      toast({ 
-        title: 'Export Successful', 
-        description: `Logs exported to ${filename}.xlsx`,
-        toastType: 'success',
-        duration: 4000
-      } as any)
-    } catch (error) {
-      console.error('Export logs failed:', error)
-      toast({ 
-        title: 'Export Failed', 
-        description: 'Failed to export logs to Excel', 
-        variant: 'destructive',
         toastType: 'error',
         duration: 5000
       } as any)
@@ -986,8 +866,8 @@ export function DashboardView({
   // Show empty state if no products are available
   if (!isLoadingData && (!products || products.length === 0)) {
     return (
-      <div className="flex h-screen bg-slate-50 dark:bg-slate-900 items-center justify-center">
-        <div className="text-center space-y-4 max-w-md p-6 bg-white dark:bg-slate-800 rounded-lg shadow-lg">
+      <div className="flex min-h-[400px] bg-card rounded-lg shadow-sm border items-center justify-center">
+        <div className="text-center space-y-4 max-w-md p-6">
           <div className="w-16 h-16 mx-auto text-slate-400 dark:text-slate-500">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 12H4M8 16l-4-4 4-4M16 16l4-4-4-4" />
@@ -1010,7 +890,7 @@ export function DashboardView({
   }
 
   return (
-    <div className="flex h-full bg-background">
+    <div className="flex min-h-[calc(100vh-5rem)] bg-card rounded-lg shadow-sm border">
       {/* Global Barcode Modal (primary scanner UI) */}
       <BarcodeModal
         open={isBarcodeModalOpen}
@@ -1268,9 +1148,9 @@ export function DashboardView({
         </>
       )}
 
-      {/* Desktop Sidebar - Hidden on mobile, visible on lg+ */}
-      <div className="hidden lg:flex lg:flex-col w-64 bg-card border-r sticky top-0 h-screen shrink-0">
-        <div className="flex-1 overflow-y-auto">
+      {/* Desktop Sidebar - Sticky position to follow scroll */}
+      <div className="hidden lg:flex lg:flex-col w-64 bg-card border-r shrink-0">
+        <div className="sticky top-0 h-[calc(100vh-5rem)] overflow-y-auto">
           {/* Sidebar Header */}
           <div className="p-4 border-b sticky top-0 bg-card z-10">
           <div className="flex items-center justify-between">
@@ -1344,228 +1224,92 @@ export function DashboardView({
             </Select>
           </div>
         
-        {/* Settings Dialog with Tabs */}
+        {/* Settings Dialog - Clean & Minimal */}
         <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-          <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle className="flex items-center space-x-2">
+              <DialogTitle className="flex items-center gap-2">
                 <Settings className="w-5 h-5" />
-                <span>Dashboard Settings</span>
+                <span>Settings</span>
               </DialogTitle>
             </DialogHeader>
-            <div className="py-4">
-              <Tabs defaultValue="api" className="w-full" value={activeTab} onValueChange={handleTabChange}>
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="api">API Configuration</TabsTrigger>
-                  <TabsTrigger value="offline">Offline & PWA</TabsTrigger>
-                  <TabsTrigger value="export">Export Data</TabsTrigger>
-                  <TabsTrigger value="logs">Logs</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="api" className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="dashboard-api-url">API Base URL</Label>
-                    <Input
-                      id="dashboard-api-url"
-                      placeholder="http://192.168.68.106:3001"
-                      value={tempApiUrl}
-                      onChange={(e) => setTempApiUrl(e.target.value)}
-                      className="font-mono text-sm"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Enter the base URL for your API server. Changes will take effect after saving.
-                    </p>
+            <div className="py-4 space-y-4">
+              {/* Status Section */}
+              <div className="rounded-lg border p-3 space-y-2">
+                <h4 className="text-sm font-medium">System Status</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-orange-500'}`} />
+                    <span className="text-muted-foreground">API:</span>
+                    <span className={isConnected ? 'text-green-600' : 'text-orange-600'}>
+                      {isConnected ? 'Connected' : 'Offline'}
+                    </span>
                   </div>
-                  <div className="flex space-x-2">
-                    <Button onClick={handleSaveSettings} className="flex-1">
-                      Save Settings
-                    </Button>
-                    <Button variant="outline" onClick={() => setIsSettingsOpen(false)} className="flex-1">
-                      Cancel
-                    </Button>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`} />
+                    <span className="text-muted-foreground">Network:</span>
+                    <span className={isOnline ? 'text-green-600' : 'text-red-600'}>
+                      {isOnline ? 'Online' : 'Offline'}
+                    </span>
                   </div>
-                </TabsContent>
-                
-                <TabsContent value="offline" className="space-y-4 mt-4">
-                  <OfflineStatusPanel className="w-full" />
-                </TabsContent>
-                
-                <TabsContent value="export" className="space-y-4 mt-4">
-                  <div className="space-y-4">
-                    <div className="text-sm text-muted-foreground">
-                      Export your inventory data in different formats. All exports include {products.length} items.
-                      <br />
-                      <span className="text-xs">
-                        Data source: {dataSource === 'api' ? 'Live API' : 'Cached'} 
-                        {lastFetchTime && ` (last updated: ${lastFetchTime.toLocaleString()})`}
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 gap-3">
-                      <Card className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <FileText className="w-8 h-8 text-green-600" />
-                            <div>
-                              <h4 className="font-medium">CSV Format</h4>
-                              <p className="text-sm text-muted-foreground">
-                                Comma-separated values, ideal for spreadsheets
-                              </p>
-                            </div>
-                          </div>
-                          <Button 
-                            onClick={handleExportCSV} 
-                            disabled={isExporting || products.length === 0}
-                            size="sm"
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Export CSV
-                          </Button>
-                        </div>
-                      </Card>
-                      
-                      <Card className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <FileSpreadsheet className="w-8 h-8 text-blue-600" />
-                            <div>
-                              <h4 className="font-medium">Excel Format</h4>
-                              <p className="text-sm text-muted-foreground">
-                                Excel workbook with multiple sheets and summaries
-                              </p>
-                            </div>
-                          </div>
-                          <Button 
-                            onClick={handleExportXLSX} 
-                            disabled={isExporting || products.length === 0}
-                            size="sm"
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Export XLSX
-                          </Button>
-                        </div>
-                      </Card>
-                      
-                      <Card className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <Code className="w-8 h-8 text-orange-600" />
-                            <div>
-                              <h4 className="font-medium">JSON Format</h4>
-                              <p className="text-sm text-muted-foreground">
-                                Structured data format for developers and APIs
-                              </p>
-                            </div>
-                          </div>
-                          <Button 
-                            onClick={handleExportJSON} 
-                            disabled={isExporting || products.length === 0}
-                            size="sm"
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Export JSON
-                          </Button>
-                        </div>
-                      </Card>
-                    </div>
-                    
-                    {products.length === 0 && (
-                      <div className="text-center p-4 text-muted-foreground">
-                        <p>No data available to export. Please load inventory data first.</p>
-                      </div>
-                    )}
-                    
-                    {isExporting && (
-                      <div className="text-center p-4">
-                        <Progress value={undefined} className="w-full h-2" />
-                        <p className="text-sm text-muted-foreground mt-2">Preparing export...</p>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-                
-                <TabsContent value="logs" className="space-y-4 mt-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium">Employee Logs</h4>
-                        <p className="text-sm text-muted-foreground">Recent employee activity logs loaded automatically from the API.</p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button onClick={() => fetchLogsFromAPI(false)} size="sm" disabled={isLoadingLogs} variant="outline">
-                          <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingLogs ? 'animate-spin' : ''}`} />
-                          Refresh
-                        </Button>
-                        <Button onClick={handleExportLogsXLSX} size="sm" disabled={isExporting || logs.length === 0}>
-                          <Download className="w-4 h-4 mr-2" />
-                          Export XLSX
-                        </Button>
-                      </div>
-                    </div>
+                </div>
+                {lastFetchTime && (
+                  <p className="text-xs text-muted-foreground pt-1 border-t">
+                    Last sync: {lastFetchTime.toLocaleString()}
+                  </p>
+                )}
+              </div>
+              
+              {/* Export Section */}
+              <div className="rounded-lg border p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium">Export Inventory</h4>
+                  <span className="text-xs text-muted-foreground">{products.length} items</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleExportCSV} 
+                    disabled={isExporting || products.length === 0}
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <FileText className="w-4 h-4 mr-1" />
+                    CSV
+                  </Button>
+                  <Button 
+                    onClick={handleExportXLSX} 
+                    disabled={isExporting || products.length === 0}
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 mr-1" />
+                    Excel
+                  </Button>
+                  <Button 
+                    onClick={handleExportJSON} 
+                    disabled={isExporting || products.length === 0}
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <Code className="w-4 h-4 mr-1" />
+                    JSON
+                  </Button>
+                </div>
+              </div>
 
-                    {isLoadingLogs && (
-                      <div className="flex items-center justify-center p-8 bg-slate-800/30 rounded-md border border-slate-700">
-                        <div className="text-center">
-                          <div className="w-8 h-8 border-2 border-slate-400 border-t-slate-200 rounded-full animate-spin mx-auto mb-3"></div>
-                          <p className="text-sm text-slate-400">Loading employee logs...</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {logsError && (
-                      <div className="p-4 text-sm text-destructive">Error loading logs: {logsError}</div>
-                    )}
-
-                    {!isLoadingLogs && logs.length > 0 && (
-                      <div className="overflow-hidden bg-slate-900 rounded-md border border-slate-600">
-                        <div className="overflow-auto max-h-96">
-                          <table className="w-full text-sm table-fixed">
-                            <thead>
-                              <tr>
-                                <th className="p-2 text-left bg-slate-800 text-slate-100 sticky top-0 z-10 border-b border-slate-600 font-medium w-24">Username</th>
-                                <th className="p-2 text-left bg-slate-800 text-slate-100 sticky top-0 z-10 border-b border-slate-600 font-medium">Details</th>
-                                <th className="p-2 text-left bg-slate-800 text-slate-100 sticky top-0 z-10 border-b border-slate-600 font-medium w-24">Log Date</th>
-                                <th className="p-2 text-left bg-slate-800 text-slate-100 sticky top-0 z-10 border-b border-slate-600 font-medium w-20">Log Time</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {logs.map((l, idx) => (
-                                <tr key={idx} className={`${idx % 2 === 0 ? 'bg-slate-800/50' : 'bg-slate-700/50'} text-slate-100 hover:bg-slate-600/30 transition-colors`}>
-                                  <td className="p-2 align-top border-b border-slate-700/50 w-24">
-                                    <div className="wrap-break-words font-medium text-slate-200 text-xs">
-                                      {l.username}
-                                    </div>
-                                  </td>
-                                  <td className="p-2 align-top border-b border-slate-700/50">
-                                    <div className="wrap-break-words text-slate-300 text-xs leading-relaxed">
-                                      {l.details}
-                                    </div>
-                                  </td>
-                                  <td className="p-2 align-top border-b border-slate-700/50 w-24">
-                                    <div className="text-slate-200 text-xs whitespace-nowrap">
-                                      {l.log_date}
-                                    </div>
-                                  </td>
-                                  <td className="p-2 align-top border-b border-slate-700/50 w-20">
-                                    <div className="text-slate-200 text-xs whitespace-nowrap">
-                                      {l.log_time}
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {!isLoadingLogs && logs.length === 0 && !logsError && (
-                      <div className="p-4 text-sm text-muted-foreground">No logs loaded. Click Fetch Logs to retrieve entries from the API.</div>
-                    )}
-
-                  </div>
-                </TabsContent>
-              </Tabs>
+              {/* Actions */}
+              <div className="flex gap-2 pt-2">
+                <Button onClick={handleRefreshData} disabled={isLoadingData} className="flex-1">
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingData ? 'animate-spin' : ''}`} />
+                  Refresh Data
+                </Button>
+                <Button variant="outline" onClick={() => setIsSettingsOpen(false)}>
+                  Close
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
