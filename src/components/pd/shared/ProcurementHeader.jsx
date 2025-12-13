@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../contexts/AuthContext'
 import apiService from '../../../utils/api/api-service'
+import { ProfileMenu } from '../../shared'
 
 function ProcurementHeader({
   activeTab,
@@ -20,9 +21,7 @@ function ProcurementHeader({
 }) {
   const { user, isDarkMode, toggleDarkMode } = useAuth()
   const navigate = useNavigate()
-  const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-  const [userProfile, setUserProfile] = useState(null)
   const [isScrolled, setIsScrolled] = useState(false)
 
   useEffect(() => {
@@ -33,24 +32,6 @@ function ProcurementHeader({
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
-
-  useEffect(() => {
-    // Load user profile
-    if (user?.id) {
-      apiService.employees.getEmployee(user.id)
-        .then(response => {
-          if (response.success && response.employee) {
-            setUserProfile(response.employee)
-          }
-        })
-        .catch(error => console.error('Failed to load user profile:', error))
-    }
-  }, [user])
-
-  const getProfilePictureUrl = (user) => {
-    if (!user?.id) return null
-    return apiService.profiles.getProfileUrlByUid(user.id)
-  }
 
   const unreadCount = notifications.filter(n => !n.read).length
 
@@ -276,96 +257,14 @@ function ProcurementHeader({
               </button>
 
               {/* Profile Menu */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className={`flex items-center gap-2 p-1.5 rounded-lg transition-colors ${
-                    isDarkMode
-                      ? 'hover:bg-slate-800'
-                      : 'hover:bg-slate-100'
-                  }`}
-                  aria-label="Profile menu"
-                >
-                  <div className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ${
-                    isDarkMode ? 'bg-slate-700' : 'bg-slate-200'
-                  }`}>
-                    {getProfilePictureUrl(user) ? (
-                      <img
-                        src={getProfilePictureUrl(user)}
-                        alt="Profile"
-                        className="w-full h-full object-cover"
-                        onError={(e) => e.target.style.display = 'none'}
-                      />
-                    ) : (
-                      <span className="text-sm">👤</span>
-                    )}
-                  </div>
-                </button>
-
-                {/* Profile Dropdown */}
-                {showProfileMenu && (
-                  <div className={`absolute top-full right-0 mt-2 w-48 rounded-lg shadow-xl border overflow-hidden ${
-                    isDarkMode
-                      ? 'bg-slate-800 border-slate-700'
-                      : 'bg-white border-slate-200'
-                  }`}>
-                    <div className="p-3 space-y-1 text-sm">
-                      <div className={`px-2 py-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        <p className="font-medium">{user?.name || 'User'}</p>
-                        <p className="text-xs">{userProfile?.position || 'Officer'}</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          onViewProfile?.()
-                          setShowProfileMenu(false)
-                        }}
-                        className={`w-full text-left px-2 py-2 rounded transition-colors ${
-                          isDarkMode
-                            ? 'hover:bg-slate-700 text-slate-300'
-                            : 'hover:bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        👁️ View Profile
-                      </button>
-                      <button
-                        onClick={() => {
-                          onSettingsOpen()
-                          setShowProfileMenu(false)
-                        }}
-                        className={`w-full text-left px-2 py-2 rounded transition-colors ${
-                          isDarkMode
-                            ? 'hover:bg-slate-700 text-slate-300'
-                            : 'hover:bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        ⚙️ Settings
-                      </button>
-                      <button
-                        onClick={() => {
-                          navigate('/jjctoolbox')
-                          setShowProfileMenu(false)
-                        }}
-                        className={`w-full text-left px-2 py-2 rounded transition-colors ${
-                          isDarkMode
-                            ? 'hover:bg-slate-700 text-slate-300'
-                            : 'hover:bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        🧰 Toolbox
-                      </button>
-                      <button
-                        onClick={() => {
-                          onLogout()
-                          setShowProfileMenu(false)
-                        }}
-                        className={`w-full text-left px-2 py-2 rounded transition-colors text-red-500 hover:bg-red-500/10`}
-                      >
-                        🚪 Logout
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <ProfileMenu
+                onLogout={onLogout}
+                onViewProfile={onViewProfile}
+                onSettingsOpen={onSettingsOpen}
+                showSettings={true}
+                showToolbox={true}
+                size="md"
+              />
             </div>
           </div>
         </div>
@@ -528,95 +427,14 @@ function ProcurementHeader({
             </button>
 
             {/* Profile Menu */}
-            <div className="relative">
-              <button
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className={`flex items-center p-1 rounded-lg transition-colors ${
-                  isDarkMode
-                    ? 'hover:bg-slate-800'
-                    : 'hover:bg-slate-100'
-                }`}
-                aria-label="Profile menu"
-              >
-                <div className={`w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-xs ${
-                  isDarkMode ? 'bg-slate-700' : 'bg-slate-200'
-                }`}>
-                  {getProfilePictureUrl(user) ? (
-                    <img
-                      src={getProfilePictureUrl(user)}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                      onError={(e) => e.target.style.display = 'none'}
-                    />
-                  ) : (
-                    <span>👤</span>
-                  )}
-                </div>
-              </button>
-
-              {/* Profile Dropdown */}
-              {showProfileMenu && (
-                <div className={`absolute top-full right-0 mt-2 w-40 rounded-lg shadow-xl border overflow-hidden ${
-                  isDarkMode
-                    ? 'bg-slate-800 border-slate-700'
-                    : 'bg-white border-slate-200'
-                }`}>
-                  <div className="p-2 space-y-1 text-xs">
-                    <div className={`px-2 py-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      <p className="font-medium truncate">{user?.name || 'User'}</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        onViewProfile?.()
-                        setShowProfileMenu(false)
-                      }}
-                      className={`w-full text-left px-2 py-1 rounded transition-colors ${
-                        isDarkMode
-                          ? 'hover:bg-slate-700 text-slate-300'
-                          : 'hover:bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      👁️ View Profile
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSettingsOpen()
-                        setShowProfileMenu(false)
-                      }}
-                      className={`w-full text-left px-2 py-1 rounded transition-colors ${
-                        isDarkMode
-                          ? 'hover:bg-slate-700 text-slate-300'
-                          : 'hover:bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      ⚙️ Settings
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigate('/jjctoolbox')
-                        setShowProfileMenu(false)
-                      }}
-                      className={`w-full text-left px-2 py-1 rounded transition-colors ${
-                        isDarkMode
-                          ? 'hover:bg-slate-700 text-slate-300'
-                          : 'hover:bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      🧰 Toolbox
-                    </button>
-                    <button
-                      onClick={() => {
-                        onLogout()
-                        setShowProfileMenu(false)
-                      }}
-                      className={`w-full text-left px-2 py-1 rounded transition-colors text-red-500 hover:bg-red-500/10`}
-                    >
-                      🚪 Logout
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <ProfileMenu
+              onLogout={onLogout}
+              onViewProfile={onViewProfile}
+              onSettingsOpen={onSettingsOpen}
+              showSettings={true}
+              showToolbox={true}
+              size="sm"
+            />
           </div>
         </div>
       </header>
