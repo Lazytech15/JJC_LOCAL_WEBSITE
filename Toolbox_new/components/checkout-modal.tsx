@@ -315,7 +315,7 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30">
           <div>
             <h2 className="text-xl font-bold text-card-foreground">Checkout</h2>
-            <p className="text-sm text-muted-foreground">Step {currentStep} of 3 — {WIZARD_STEPS[currentStep - 1].title}</p>
+            <p className="text-sm text-muted-foreground">Step {currentStep} of 3 — {WIZARD_STEPS[currentStep - 1]?.title ?? ''}</p>
           </div>
           <Button 
             variant="ghost" 
@@ -626,17 +626,17 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
                     <CardContent className="p-4">
                       <div className="flex items-center gap-4">
                         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-success text-success-foreground font-bold text-lg">
-                          {selectedEmployee.firstName[0]}{selectedEmployee.lastName[0]}
+                          {selectedEmployee?.firstName?.[0] ?? ''}{selectedEmployee?.lastName?.[0] ?? ''}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-success truncate">
-                            {selectedEmployee.firstName} {selectedEmployee.middleName && selectedEmployee.middleName + ' '}{selectedEmployee.lastName}
+                            {selectedEmployee?.firstName ?? ''} {selectedEmployee?.middleName ? selectedEmployee.middleName + ' ' : ''}{selectedEmployee?.lastName ?? ''}
                           </p>
                           <p className="text-sm text-success/80 truncate">
-                            {selectedEmployee.position} • {selectedEmployee.department}
+                            {selectedEmployee?.position ?? ''} • {selectedEmployee?.department ?? ''}
                           </p>
                           <p className="text-xs text-success/70 mt-1">
-                            ID: {selectedEmployee.idNumber}
+                            ID: {selectedEmployee?.idNumber ?? ''}
                           </p>
                         </div>
                         <CheckCircle2 className="w-6 h-6 text-success flex-shrink-0" />
