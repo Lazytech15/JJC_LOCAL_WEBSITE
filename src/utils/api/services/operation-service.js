@@ -6,259 +6,259 @@ import { BaseAPIService } from "../core/base-api.js";
 export class OperationsService extends BaseAPIService {
   // ==================== ITEM METHODS ====================
 
-/**
- * Get all items with optional filtering and pagination
- * @param {Object} params - Query parameters
- * @param {string} [params.status] - Status filter
- * @param {string} [params.search] - Search term
- * @param {string} [params.priority] - Priority filter
- * @param {string} [params.client_name] - Client name filter
- * @param {number} [params.page=1] - Page number (starts at 1)
- * @param {number} [params.limit=20] - Items per page (max 100)
- * @returns {Promise<{items: Array, pagination: Object}>} Response with items array and pagination info
- */
-async getItems(params = {}) {
-  const queryParams = new URLSearchParams(params).toString();
-  const response = await this.request(
-    `/api/operations/items${queryParams ? `?${queryParams}` : ""}`
-  );
-  
-  // Handle both paginated and non-paginated responses
-  if (response && response.items && response.pagination) {
-    // Paginated response
-    return response;
-  } else if (Array.isArray(response)) {
-    // Legacy non-paginated response (single item query)
-    return {
-      items: response,
-      pagination: {
-        current_page: 1,
-        per_page: response.length,
-        total_items: response.length,
-        total_pages: 1,
-        has_next: false,
-        has_previous: false
-      }
-    };
-  } else {
-    // Unknown response format
-    return {
-      items: [],
-      pagination: {
-        current_page: 1,
-        per_page: 0,
-        total_items: 0,
-        total_pages: 0,
-        has_next: false,
-        has_previous: false
-      }
-    };
+  /**
+   * Get all items with optional filtering and pagination
+   * @param {Object} params - Query parameters
+   * @param {string} [params.status] - Status filter
+   * @param {string} [params.search] - Search term
+   * @param {string} [params.priority] - Priority filter
+   * @param {string} [params.client_name] - Client name filter
+   * @param {number} [params.page=1] - Page number (starts at 1)
+   * @param {number} [params.limit=20] - Items per page (max 100)
+   * @returns {Promise<{items: Array, pagination: Object}>} Response with items array and pagination info
+   */
+  async getItems(params = {}) {
+    const queryParams = new URLSearchParams(params).toString();
+    const response = await this.request(
+      `/api/operations/items${queryParams ? `?${queryParams}` : ""}`
+    );
+
+    // Handle both paginated and non-paginated responses
+    if (response && response.items && response.pagination) {
+      // Paginated response
+      return response;
+    } else if (Array.isArray(response)) {
+      // Legacy non-paginated response (single item query)
+      return {
+        items: response,
+        pagination: {
+          current_page: 1,
+          per_page: response.length,
+          total_items: response.length,
+          total_pages: 1,
+          has_next: false,
+          has_previous: false
+        }
+      };
+    } else {
+      // Unknown response format
+      return {
+        items: [],
+        pagination: {
+          current_page: 1,
+          per_page: 0,
+          total_items: 0,
+          total_pages: 0,
+          has_next: false,
+          has_previous: false
+        }
+      };
+    }
   }
-}
 
-/**
- * Get items with pagination
- * @param {number} page - Page number (starts at 1)
- * @param {number} limit - Items per page
- * @param {Object} filters - Additional filters (status, search, priority, client_name)
- * @returns {Promise<{items: Array, pagination: Object}>}
- */
-async getItemsPaginated(page = 1, limit = 20, filters = {}) {
-  return this.getItems({
-    page,
-    limit,
-    ...filters
-  });
-}
-
-/**
- * Get next page of items
- * @param {Object} currentPagination - Current pagination object
- * @param {Object} filters - Current filters
- * @returns {Promise<{items: Array, pagination: Object}>}
- */
-async getNextPage(currentPagination, filters = {}) {
-  if (!currentPagination.has_next) {
-    throw new Error('No next page available');
+  /**
+   * Get items with pagination
+   * @param {number} page - Page number (starts at 1)
+   * @param {number} limit - Items per page
+   * @param {Object} filters - Additional filters (status, search, priority, client_name)
+   * @returns {Promise<{items: Array, pagination: Object}>}
+   */
+  async getItemsPaginated(page = 1, limit = 20, filters = {}) {
+    return this.getItems({
+      page,
+      limit,
+      ...filters
+    });
   }
-  return this.getItemsPaginated(
-    currentPagination.current_page + 1,
-    currentPagination.per_page,
-    filters
-  );
-}
 
-/**
- * Get previous page of items
- * @param {Object} currentPagination - Current pagination object
- * @param {Object} filters - Current filters
- * @returns {Promise<{items: Array, pagination: Object}>}
- */
-async getPreviousPage(currentPagination, filters = {}) {
-  if (!currentPagination.has_previous) {
-    throw new Error('No previous page available');
+  /**
+   * Get next page of items
+   * @param {Object} currentPagination - Current pagination object
+   * @param {Object} filters - Current filters
+   * @returns {Promise<{items: Array, pagination: Object}>}
+   */
+  async getNextPage(currentPagination, filters = {}) {
+    if (!currentPagination.has_next) {
+      throw new Error('No next page available');
+    }
+    return this.getItemsPaginated(
+      currentPagination.current_page + 1,
+      currentPagination.per_page,
+      filters
+    );
   }
-  return this.getItemsPaginated(
-    currentPagination.current_page - 1,
-    currentPagination.per_page,
-    filters
-  );
-}
 
-/**
- * Get all items by fetching all pages
- * @param {Object} filters - Filters to apply
- * @param {number} maxPages - Maximum pages to fetch (safety limit)
- * @returns {Promise<Array>} All items across all pages
- */
-async getAllItems(filters = {}, maxPages = 50) {
-  let allItems = [];
-  let currentPage = 1;
-  let hasMore = true;
-  
-  while (hasMore && currentPage <= maxPages) {
-    const response = await this.getItemsPaginated(currentPage, 100, filters);
-    allItems = [...allItems, ...response.items];
-    hasMore = response.pagination.has_next;
-    currentPage++;
+  /**
+   * Get previous page of items
+   * @param {Object} currentPagination - Current pagination object
+   * @param {Object} filters - Current filters
+   * @returns {Promise<{items: Array, pagination: Object}>}
+   */
+  async getPreviousPage(currentPagination, filters = {}) {
+    if (!currentPagination.has_previous) {
+      throw new Error('No previous page available');
+    }
+    return this.getItemsPaginated(
+      currentPagination.current_page - 1,
+      currentPagination.per_page,
+      filters
+    );
   }
-  
-  return allItems;
-}
 
-/**
- * Search items with pagination
- * @param {string} searchTerm - Search query
- * @param {number} page - Page number
- * @param {number} limit - Items per page
- * @returns {Promise<{items: Array, pagination: Object}>}
- */
-async searchItemsPaginated(searchTerm, page = 1, limit = 20) {
-  return this.getItemsPaginated(page, limit, { search: searchTerm });
-}
+  /**
+   * Get all items by fetching all pages
+   * @param {Object} filters - Filters to apply
+   * @param {number} maxPages - Maximum pages to fetch (safety limit)
+   * @returns {Promise<Array>} All items across all pages
+   */
+  async getAllItems(filters = {}, maxPages = 50) {
+    let allItems = [];
+    let currentPage = 1;
+    let hasMore = true;
 
-/**
- * Get items by status with pagination
- * @param {string} status - Status filter
- * @param {number} page - Page number
- * @param {number} limit - Items per page
- * @returns {Promise<{items: Array, pagination: Object}>}
- */
-async getItemsByStatusPaginated(status, page = 1, limit = 20) {
-  return this.getItemsPaginated(page, limit, { status });
-}
+    while (hasMore && currentPage <= maxPages) {
+      const response = await this.getItemsPaginated(currentPage, 100, filters);
+      allItems = [...allItems, ...response.items];
+      hasMore = response.pagination.has_next;
+      currentPage++;
+    }
 
-/**
- * Get items by client with pagination
- * @param {string} clientName - Client name
- * @param {number} page - Page number
- * @param {number} limit - Items per page
- * @returns {Promise<{items: Array, pagination: Object}>}
- */
-async getItemsByClientPaginated(clientName, page = 1, limit = 20) {
-  return this.getItemsPaginated(page, limit, { client_name: clientName });
-}
-
-/**
- * Get items by priority with pagination
- * @param {string} priority - Priority level
- * @param {number} page - Page number
- * @param {number} limit - Items per page
- * @returns {Promise<{items: Array, pagination: Object}>}
- */
-async getItemsByPriorityPaginated(priority, page = 1, limit = 20) {
-  if (!["High", "Medium", "Low"].includes(priority)) {
-    throw new Error("priority must be High, Medium, or Low");
+    return allItems;
   }
-  return this.getItemsPaginated(page, limit, { priority });
-}
 
-/**
- * Get items with pagination and sorting
- * @param {number} page - Page number (starts at 1)
- * @param {number} limit - Items per page
- * @param {Object} filters - Filters (status, search, priority, client_name)
- * @param {string} sortBy - Field to sort by (part_number, name, client_name, priority, status, created_at, overall_progress)
- * @param {string} sortOrder - Sort direction ('ASC' or 'DESC')
- * @returns {Promise<{items: Array, pagination: Object, sorting: Object}>}
- */
-async getItemsPaginatedSorted(page = 1, limit = 20, filters = {}, sortBy = 'created_at', sortOrder = 'DESC') {
-  return this.getItems({
-    page,
-    limit,
-    sort_by: sortBy,
-    sort_order: sortOrder,
-    ...filters
-  });
-}
+  /**
+   * Search items with pagination
+   * @param {string} searchTerm - Search query
+   * @param {number} page - Page number
+   * @param {number} limit - Items per page
+   * @returns {Promise<{items: Array, pagination: Object}>}
+   */
+  async searchItemsPaginated(searchTerm, page = 1, limit = 20) {
+    return this.getItemsPaginated(page, limit, { search: searchTerm });
+  }
 
-/**
- * Get items sorted alphabetically (A-Z)
- * @param {number} page - Page number
- * @param {number} limit - Items per page
- * @param {Object} filters - Additional filters
- * @returns {Promise<{items: Array, pagination: Object}>}
- */
-async getItemsSortedAlphabetically(page = 1, limit = 20, filters = {}) {
-  return this.getItemsPaginatedSorted(page, limit, filters, 'name', 'ASC');
-}
+  /**
+   * Get items by status with pagination
+   * @param {string} status - Status filter
+   * @param {number} page - Page number
+   * @param {number} limit - Items per page
+   * @returns {Promise<{items: Array, pagination: Object}>}
+   */
+  async getItemsByStatusPaginated(status, page = 1, limit = 20) {
+    return this.getItemsPaginated(page, limit, { status });
+  }
 
-/**
- * Get items sorted by part number (A-Z)
- * @param {number} page - Page number
- * @param {number} limit - Items per page
- * @param {Object} filters - Additional filters
- * @returns {Promise<{items: Array, pagination: Object}>}
- */
-async getItemsSortedByPartNumber(page = 1, limit = 20, filters = {}) {
-  return this.getItemsPaginatedSorted(page, limit, filters, 'part_number', 'ASC');
-}
+  /**
+   * Get items by client with pagination
+   * @param {string} clientName - Client name
+   * @param {number} page - Page number
+   * @param {number} limit - Items per page
+   * @returns {Promise<{items: Array, pagination: Object}>}
+   */
+  async getItemsByClientPaginated(clientName, page = 1, limit = 20) {
+    return this.getItemsPaginated(page, limit, { client_name: clientName });
+  }
 
-/**
- * Get items sorted by client name (A-Z)
- * @param {number} page - Page number
- * @param {number} limit - Items per page
- * @param {Object} filters - Additional filters
- * @returns {Promise<{items: Array, pagination: Object}>}
- */
-async getItemsSortedByClient(page = 1, limit = 20, filters = {}) {
-  return this.getItemsPaginatedSorted(page, limit, filters, 'client_name', 'ASC');
-}
+  /**
+   * Get items by priority with pagination
+   * @param {string} priority - Priority level
+   * @param {number} page - Page number
+   * @param {number} limit - Items per page
+   * @returns {Promise<{items: Array, pagination: Object}>}
+   */
+  async getItemsByPriorityPaginated(priority, page = 1, limit = 20) {
+    if (!["High", "Medium", "Low"].includes(priority)) {
+      throw new Error("priority must be High, Medium, or Low");
+    }
+    return this.getItemsPaginated(page, limit, { priority });
+  }
 
-/**
- * Get items sorted by priority (High > Medium > Low)
- * @param {number} page - Page number
- * @param {number} limit - Items per page
- * @param {Object} filters - Additional filters
- * @returns {Promise<{items: Array, pagination: Object}>}
- */
-async getItemsSortedByPriority(page = 1, limit = 20, filters = {}) {
-  return this.getItemsPaginatedSorted(page, limit, filters, 'priority', 'ASC');
-}
+  /**
+   * Get items with pagination and sorting
+   * @param {number} page - Page number (starts at 1)
+   * @param {number} limit - Items per page
+   * @param {Object} filters - Filters (status, search, priority, client_name)
+   * @param {string} sortBy - Field to sort by (part_number, name, client_name, priority, status, created_at, overall_progress)
+   * @param {string} sortOrder - Sort direction ('ASC' or 'DESC')
+   * @returns {Promise<{items: Array, pagination: Object, sorting: Object}>}
+   */
+  async getItemsPaginatedSorted(page = 1, limit = 20, filters = {}, sortBy = 'created_at', sortOrder = 'DESC') {
+    return this.getItems({
+      page,
+      limit,
+      sort_by: sortBy,
+      sort_order: sortOrder,
+      ...filters
+    });
+  }
 
-/**
- * Get items sorted by progress (0-100%)
- * @param {number} page - Page number
- * @param {number} limit - Items per page
- * @param {Object} filters - Additional filters
- * @param {boolean} ascending - If true, sort 0-100%; if false, sort 100-0%
- * @returns {Promise<{items: Array, pagination: Object}>}
- */
-async getItemsSortedByProgress(page = 1, limit = 20, filters = {}, ascending = true) {
-  return this.getItemsPaginatedSorted(page, limit, filters, 'overall_progress', ascending ? 'ASC' : 'DESC');
-}
+  /**
+   * Get items sorted alphabetically (A-Z)
+   * @param {number} page - Page number
+   * @param {number} limit - Items per page
+   * @param {Object} filters - Additional filters
+   * @returns {Promise<{items: Array, pagination: Object}>}
+   */
+  async getItemsSortedAlphabetically(page = 1, limit = 20, filters = {}) {
+    return this.getItemsPaginatedSorted(page, limit, filters, 'name', 'ASC');
+  }
 
-/**
- * Get items sorted by creation date
- * @param {number} page - Page number
- * @param {number} limit - Items per page
- * @param {Object} filters - Additional filters
- * @param {boolean} newestFirst - If true, newest first; if false, oldest first
- * @returns {Promise<{items: Array, pagination: Object}>}
- */
-async getItemsSortedByDate(page = 1, limit = 20, filters = {}, newestFirst = true) {
-  return this.getItemsPaginatedSorted(page, limit, filters, 'created_at', newestFirst ? 'DESC' : 'ASC');
-}
+  /**
+   * Get items sorted by part number (A-Z)
+   * @param {number} page - Page number
+   * @param {number} limit - Items per page
+   * @param {Object} filters - Additional filters
+   * @returns {Promise<{items: Array, pagination: Object}>}
+   */
+  async getItemsSortedByPartNumber(page = 1, limit = 20, filters = {}) {
+    return this.getItemsPaginatedSorted(page, limit, filters, 'part_number', 'ASC');
+  }
+
+  /**
+   * Get items sorted by client name (A-Z)
+   * @param {number} page - Page number
+   * @param {number} limit - Items per page
+   * @param {Object} filters - Additional filters
+   * @returns {Promise<{items: Array, pagination: Object}>}
+   */
+  async getItemsSortedByClient(page = 1, limit = 20, filters = {}) {
+    return this.getItemsPaginatedSorted(page, limit, filters, 'client_name', 'ASC');
+  }
+
+  /**
+   * Get items sorted by priority (High > Medium > Low)
+   * @param {number} page - Page number
+   * @param {number} limit - Items per page
+   * @param {Object} filters - Additional filters
+   * @returns {Promise<{items: Array, pagination: Object}>}
+   */
+  async getItemsSortedByPriority(page = 1, limit = 20, filters = {}) {
+    return this.getItemsPaginatedSorted(page, limit, filters, 'priority', 'ASC');
+  }
+
+  /**
+   * Get items sorted by progress (0-100%)
+   * @param {number} page - Page number
+   * @param {number} limit - Items per page
+   * @param {Object} filters - Additional filters
+   * @param {boolean} ascending - If true, sort 0-100%; if false, sort 100-0%
+   * @returns {Promise<{items: Array, pagination: Object}>}
+   */
+  async getItemsSortedByProgress(page = 1, limit = 20, filters = {}, ascending = true) {
+    return this.getItemsPaginatedSorted(page, limit, filters, 'overall_progress', ascending ? 'ASC' : 'DESC');
+  }
+
+  /**
+   * Get items sorted by creation date
+   * @param {number} page - Page number
+   * @param {number} limit - Items per page
+   * @param {Object} filters - Additional filters
+   * @param {boolean} newestFirst - If true, newest first; if false, oldest first
+   * @returns {Promise<{items: Array, pagination: Object}>}
+   */
+  async getItemsSortedByDate(page = 1, limit = 20, filters = {}, newestFirst = true) {
+    return this.getItemsPaginatedSorted(page, limit, filters, 'created_at', newestFirst ? 'DESC' : 'ASC');
+  }
 
   /**
    * Get single item by part_number with full details (phases and subphases)
@@ -452,12 +452,22 @@ async getItemsSortedByDate(page = 1, limit = 20, filters = {}, newestFirst = tru
    * Update subphase by ID
    */
   async updateSubphase(id, subphaseData) {
+    // ✅ Handle expected_consumables formatting
+    if (subphaseData.expected_consumables) {
+      if (Array.isArray(subphaseData.expected_consumables)) {
+        // Convert array to JSON string for API
+        subphaseData.expected_consumables = JSON.stringify(subphaseData.expected_consumables);
+      } else if (typeof subphaseData.expected_consumables === 'object') {
+        // Convert object to JSON string
+        subphaseData.expected_consumables = JSON.stringify(subphaseData.expected_consumables);
+      }
+      // If already a string, leave as-is
+    }
+
     const result = await this.request(`/api/operations/subphases?id=${id}`, {
       method: "PUT",
       body: JSON.stringify(subphaseData),
     });
-
- 
 
     return result;
   }
@@ -484,20 +494,20 @@ async getItemsSortedByDate(page = 1, limit = 20, filters = {}, newestFirst = tru
  * @param {number} timeDuration - Duration in MINUTES (integer)
  * @returns {Promise} Success confirmation
  */
-async completeSubphaseWithDuration(
-  subphaseId,
-  completed = true,
-  timeDuration = null
-) {
-  return this.request("/api/operations/complete-subphase", {
-    method: "POST",
-    body: JSON.stringify({
-      subphase_id: subphaseId,
-      completed,
-      time_duration: timeDuration, // Now in MINUTES
-    }),
-  });
-}
+  async completeSubphaseWithDuration(
+    subphaseId,
+    completed = true,
+    timeDuration = null
+  ) {
+    return this.request("/api/operations/complete-subphase", {
+      method: "POST",
+      body: JSON.stringify({
+        subphase_id: subphaseId,
+        completed,
+        time_duration: timeDuration, // Now in MINUTES
+      }),
+    });
+  }
 
   /**
    * Assign employee to subphase
@@ -1346,535 +1356,657 @@ async completeSubphaseWithDuration(
  * @param {number} [data.sheet_row] - Row number from sheet
  * @returns {Promise} Created item
  */
-async importFromGoogleSheets(data) {
-  return this.request("/api/operations/google-sheets-import", {
-    method: "POST",
-    body: JSON.stringify({
-      ...data,
-      source: "google_sheets",
-      timestamp: new Date().toISOString()
-    }),
-  });
-}
-
-/**
- * Get items imported from Google Sheets
- * @returns {Promise} Items with source='google_sheets'
- */
-async getGoogleSheetsItems() {
-  const allItems = await this.getItems();
-  return allItems.filter(item => 
-    item.part_number && item.part_number.includes('GS-')
-  );
-}
-
-/**
- * Get clients list (unique client names from all items)
- * @returns {Promise<string[]>} Array of unique client names
- */
-async getClients() {
-  try {
-    // Use the existing /api/operations/clients endpoint
-    const response = await this.request('/api/operations/clients');
-    
-    // If the endpoint returns an array directly
-    if (Array.isArray(response)) {
-      return response.filter(Boolean); // Remove any null/undefined values
-    }
-    
-    // Fallback: fetch all items if clients endpoint doesn't exist
-    const itemsResponse = await this.getAllItems({}, 100); // Fetch up to 100 pages
-    
-    // Handle paginated response
-    let allItems = [];
-    if (Array.isArray(itemsResponse)) {
-      allItems = itemsResponse;
-    } else if (itemsResponse && Array.isArray(itemsResponse.items)) {
-      allItems = itemsResponse.items;
-    }
-    
-    const clientSet = new Set();
-    
-    allItems.forEach(item => {
-      if (item && item.client_name && item.client_name.trim()) {
-        clientSet.add(item.client_name.trim());
-      }
+  async importFromGoogleSheets(data) {
+    return this.request("/api/operations/google-sheets-import", {
+      method: "POST",
+      body: JSON.stringify({
+        ...data,
+        source: "google_sheets",
+        timestamp: new Date().toISOString()
+      }),
     });
-    
-    return Array.from(clientSet).sort();
-  } catch (error) {
-    console.error('Error loading clients:', error);
-    return [];
   }
-}
 
-/**
- * Validate Google Sheets import data
- * @param {Object} data - Data to validate
- * @returns {Object} Validation result with isValid and errors
- */
-validateGoogleSheetsImport(data) {
-  const errors = [];
-  
-  if (!data.part_number || !data.part_number.trim()) {
-    errors.push('Part number is required');
+  /**
+   * Get items imported from Google Sheets
+   * @returns {Promise} Items with source='google_sheets'
+   */
+  async getGoogleSheetsItems() {
+    const allItems = await this.getItems();
+    return allItems.filter(item =>
+      item.part_number && item.part_number.includes('GS-')
+    );
   }
-  
-  if (!data.client_name || !data.client_name.trim()) {
-    errors.push('Client name is required');
-  }
-  
-  if (!data.qty) {
-    errors.push('Quantity is required');
-  } else {
-    const qty = parseInt(data.qty);
-    if (isNaN(qty) || qty <= 0) {
-      errors.push('Quantity must be a positive number');
+
+  /**
+   * Get clients list (unique client names from all items)
+   * @returns {Promise<string[]>} Array of unique client names
+   */
+  async getClients() {
+    try {
+      // Use the existing /api/operations/clients endpoint
+      const response = await this.request('/api/operations/clients');
+
+      // If the endpoint returns an array directly
+      if (Array.isArray(response)) {
+        return response.filter(Boolean); // Remove any null/undefined values
+      }
+
+      // Fallback: fetch all items if clients endpoint doesn't exist
+      const itemsResponse = await this.getAllItems({}, 100); // Fetch up to 100 pages
+
+      // Handle paginated response
+      let allItems = [];
+      if (Array.isArray(itemsResponse)) {
+        allItems = itemsResponse;
+      } else if (itemsResponse && Array.isArray(itemsResponse.items)) {
+        allItems = itemsResponse.items;
+      }
+
+      const clientSet = new Set();
+
+      allItems.forEach(item => {
+        if (item && item.client_name && item.client_name.trim()) {
+          clientSet.add(item.client_name.trim());
+        }
+      });
+
+      return Array.from(clientSet).sort();
+    } catch (error) {
+      console.error('Error loading clients:', error);
+      return [];
     }
   }
-  
-  return {
-    isValid: errors.length === 0,
-    errors: errors
-  };
-}
 
-/**
- * Test connection to backend (for Google Sheets)
- * @returns {Promise} Health check response
- */
-async testConnection() {
-  return this.request("/api/operations/health");
-}
+  /**
+   * Validate Google Sheets import data
+   * @param {Object} data - Data to validate
+   * @returns {Object} Validation result with isValid and errors
+   */
+  validateGoogleSheetsImport(data) {
+    const errors = [];
 
-/**
- * Import item from Google Sheets and refresh cache
- * @param {Object} data - Import data
- * @returns {Promise} Created item
- */
-async importFromGoogleSheets(data) {
-  const result = await this.request("/api/operations/google-sheets-import", {
-    method: "POST",
-    body: JSON.stringify({
-      ...data,
-      source: "google_sheets",
-      timestamp: new Date().toISOString()
-    }),
-  });
-  
-  // ✅ After successful import, refresh the cache
-  if (result.success) {
-    console.log('✅ Item imported successfully, refreshing cache...');
+    if (!data.part_number || !data.part_number.trim()) {
+      errors.push('Part number is required');
+    }
+
+    if (!data.client_name || !data.client_name.trim()) {
+      errors.push('Client name is required');
+    }
+
+    if (!data.qty) {
+      errors.push('Quantity is required');
+    } else {
+      const qty = parseInt(data.qty);
+      if (isNaN(qty) || qty <= 0) {
+        errors.push('Quantity must be a positive number');
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors: errors
+    };
   }
-  
-  return result;
-}
 
-/**
- * Batch import with cache refresh
- */
-async batchImportFromGoogleSheets(items) {
-  const results = [];
-  
-  for (const item of items) {
-    try {
-      const validation = this.validateGoogleSheetsImport(item);
-      if (!validation.isValid) {
+  /**
+   * Test connection to backend (for Google Sheets)
+   * @returns {Promise} Health check response
+   */
+  async testConnection() {
+    return this.request("/api/operations/health");
+  }
+
+  /**
+   * Import item from Google Sheets and refresh cache
+   * @param {Object} data - Import data
+   * @returns {Promise} Created item
+   */
+  async importFromGoogleSheets(data) {
+    const result = await this.request("/api/operations/google-sheets-import", {
+      method: "POST",
+      body: JSON.stringify({
+        ...data,
+        source: "google_sheets",
+        timestamp: new Date().toISOString()
+      }),
+    });
+
+    // ✅ After successful import, refresh the cache
+    if (result.success) {
+      console.log('✅ Item imported successfully, refreshing cache...');
+    }
+
+    return result;
+  }
+
+  /**
+   * Batch import with cache refresh
+   */
+  async batchImportFromGoogleSheets(items) {
+    const results = [];
+
+    for (const item of items) {
+      try {
+        const validation = this.validateGoogleSheetsImport(item);
+        if (!validation.isValid) {
+          results.push({
+            success: false,
+            part_number: item.part_number,
+            errors: validation.errors
+          });
+          continue;
+        }
+
+        const result = await this.importFromGoogleSheets(item);
+        results.push({
+          success: true,
+          part_number: item.part_number,
+          data: result
+        });
+
+        // Small delay between imports
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
         results.push({
           success: false,
           part_number: item.part_number,
-          errors: validation.errors
+          error: error.message
         });
-        continue;
       }
-      
-      const result = await this.importFromGoogleSheets(item);
-      results.push({
-        success: true,
-        part_number: item.part_number,
-        data: result
-      });
-      
-      // Small delay between imports
-      await new Promise(resolve => setTimeout(resolve, 500));
-    } catch (error) {
-      results.push({
-        success: false,
-        part_number: item.part_number,
-        error: error.message
-      });
     }
+
+
+    return results;
   }
-  
-  
-  return results;
-}
 
   /**
  * Get fresh data with cache busting
  * @param {Object} filters - Optional filters
  * @returns {Promise<Array>} Fresh items
  */
-async getFreshData(filters = {}) {
-  try {
-    console.log('🔄 Fetching fresh data...')
-    
-    const response = await this.getItems({
-      ...filters,
-      _t: Date.now() // Cache buster
-    })
-    
-    // Handle both paginated and non-paginated responses
-    if (response && response.items) {
-      return response.items
-    } else if (Array.isArray(response)) {
-      return response
-    }
-    
-    return []
-  } catch (error) {
-    console.error('❌ Failed to fetch fresh data:', error)
-    throw error
-  }
-}
-
-/**
- * Get items imported from Google Sheets
- * @returns {Promise} Items with source='google_sheets'
- */
-async getGoogleSheetsItems() {
-  const allItems = await this.getItems();
-  return allItems.filter(item => 
-    item.part_number && item.part_number.includes('GS-')
-  );
-}
-
-/**
- * Validate Google Sheets import data
- * @param {Object} data - Data to validate
- * @returns {Object} Validation result with isValid and errors
- */
-validateGoogleSheetsImport(data) {
-  const errors = [];
-  
-  if (!data.part_number || !data.part_number.trim()) {
-    errors.push('Part number is required');
-  }
-  
-  // Item name is optional, but if provided, validate it's not too long
-  if (data.item_name && data.item_name.length > 200) {
-    errors.push('Item name must be 200 characters or less');
-  }
-  
-  if (!data.client_name || !data.client_name.trim()) {
-    errors.push('Client name is required');
-  }
-  
-  if (!data.qty) {
-    errors.push('Quantity is required');
-  } else {
-    const qty = parseInt(data.qty);
-    if (isNaN(qty) || qty <= 0) {
-      errors.push('Quantity must be a positive number');
-    }
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors: errors
-  };
-}
-
-/**
- * Import multiple items from Google Sheets in batch
- * @param {Array<Object>} items - Array of import data objects
- * @returns {Promise} Array of results with success/error for each item
- */
-async batchImportFromGoogleSheets(items) {
-  const results = [];
-  
-  for (const item of items) {
+  async getFreshData(filters = {}) {
     try {
-      const validation = this.validateGoogleSheetsImport(item);
-      if (!validation.isValid) {
+      console.log('🔄 Fetching fresh data...')
+
+      const response = await this.getItems({
+        ...filters,
+        _t: Date.now() // Cache buster
+      })
+
+      // Handle both paginated and non-paginated responses
+      if (response && response.items) {
+        return response.items
+      } else if (Array.isArray(response)) {
+        return response
+      }
+
+      return []
+    } catch (error) {
+      console.error('❌ Failed to fetch fresh data:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Get items imported from Google Sheets
+   * @returns {Promise} Items with source='google_sheets'
+   */
+  async getGoogleSheetsItems() {
+    const allItems = await this.getItems();
+    return allItems.filter(item =>
+      item.part_number && item.part_number.includes('GS-')
+    );
+  }
+
+  /**
+   * Validate Google Sheets import data
+   * @param {Object} data - Data to validate
+   * @returns {Object} Validation result with isValid and errors
+   */
+  validateGoogleSheetsImport(data) {
+    const errors = [];
+
+    if (!data.part_number || !data.part_number.trim()) {
+      errors.push('Part number is required');
+    }
+
+    // Item name is optional, but if provided, validate it's not too long
+    if (data.item_name && data.item_name.length > 200) {
+      errors.push('Item name must be 200 characters or less');
+    }
+
+    if (!data.client_name || !data.client_name.trim()) {
+      errors.push('Client name is required');
+    }
+
+    if (!data.qty) {
+      errors.push('Quantity is required');
+    } else {
+      const qty = parseInt(data.qty);
+      if (isNaN(qty) || qty <= 0) {
+        errors.push('Quantity must be a positive number');
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors: errors
+    };
+  }
+
+  /**
+   * Import multiple items from Google Sheets in batch
+   * @param {Array<Object>} items - Array of import data objects
+   * @returns {Promise} Array of results with success/error for each item
+   */
+  async batchImportFromGoogleSheets(items) {
+    const results = [];
+
+    for (const item of items) {
+      try {
+        const validation = this.validateGoogleSheetsImport(item);
+        if (!validation.isValid) {
+          results.push({
+            success: false,
+            part_number: item.part_number,
+            errors: validation.errors
+          });
+          continue;
+        }
+
+        const result = await this.importFromGoogleSheets(item);
+        results.push({
+          success: true,
+          part_number: item.part_number,
+          data: result
+        });
+
+        // Small delay between imports to avoid overwhelming the server
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
         results.push({
           success: false,
           part_number: item.part_number,
-          errors: validation.errors
+          error: error.message
         });
-        continue;
       }
-      
-      const result = await this.importFromGoogleSheets(item);
-      results.push({
-        success: true,
+    }
+
+    return results;
+  }
+
+  /**
+   * Get summary of Google Sheets imports
+   * @returns {Promise} Summary with counts and statistics
+   */
+  async getGoogleSheetsImportSummary() {
+    const sheetsItems = await this.getGoogleSheetsItems();
+
+    const summary = {
+      total_imports: sheetsItems.length,
+      by_status: {
+        not_started: 0,
+        in_progress: 0,
+        completed: 0
+      },
+      by_client: {},
+      recent_imports: [],
+      name_sources: {
+        provided: 0,
+        template: 0,
+        generated: 0
+      }
+    };
+
+    sheetsItems.forEach(item => {
+      // Count by status
+      if (summary.by_status[item.status] !== undefined) {
+        summary.by_status[item.status]++;
+      }
+
+      // Count by client
+      const client = item.client_name || 'No Client';
+      summary.by_client[client] = (summary.by_client[client] || 0) + 1;
+
+      // Check remarks for name source
+      if (item.remarks) {
+        if (item.remarks.includes('Custom name provided')) {
+          summary.name_sources.provided++;
+        } else if (item.remarks.includes('Template:')) {
+          summary.name_sources.template++;
+        } else {
+          summary.name_sources.generated++;
+        }
+      }
+    });
+
+    // Get 10 most recent imports
+    summary.recent_imports = sheetsItems
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, 10)
+      .map(item => ({
         part_number: item.part_number,
-        data: result
+        name: item.name,
+        client_name: item.client_name,
+        status: item.status,
+        created_at: item.created_at
+      }));
+
+    return summary;
+  }
+
+  /**
+   * Get duration variance statistics
+   * @param {Object} filters - Optional filters (status, priority, client_name)
+   * @returns {Promise} Statistics on expected vs actual durations
+   */
+  async getDurationVarianceStats(filters = {}) {
+    try {
+      const items = await this.getItems(filters);
+
+      const stats = {
+        total_items_with_estimates: 0,
+        completed_with_actual: 0,
+        over_estimate: 0,
+        under_estimate: 0,
+        on_target: 0,
+        avg_variance_hours: 0,
+        total_expected_hours: 0,
+        total_actual_hours: 0,
+        items: []
+      };
+
+      let varianceSum = 0;
+
+      items.forEach(item => {
+        if (item.expected_completion_hours) {
+          stats.total_items_with_estimates++;
+          stats.total_expected_hours += parseFloat(item.expected_completion_hours);
+
+          if (item.actual_completion_hours) {
+            stats.completed_with_actual++;
+            stats.total_actual_hours += parseFloat(item.actual_completion_hours);
+
+            const variance = item.actual_completion_hours - item.expected_completion_hours;
+            varianceSum += variance;
+
+            if (variance > 0.5) {
+              stats.over_estimate++;
+            } else if (variance < -0.5) {
+              stats.under_estimate++;
+            } else {
+              stats.on_target++;
+            }
+
+            stats.items.push({
+              part_number: item.part_number,
+              name: item.name,
+              expected_hours: item.expected_completion_hours,
+              actual_hours: item.actual_completion_hours,
+              variance: variance,
+              variance_percentage: ((variance / item.expected_completion_hours) * 100).toFixed(1)
+            });
+          }
+        }
       });
-      
-      // Small delay between imports to avoid overwhelming the server
-      await new Promise(resolve => setTimeout(resolve, 500));
+
+      if (stats.completed_with_actual > 0) {
+        stats.avg_variance_hours = (varianceSum / stats.completed_with_actual).toFixed(2);
+        stats.avg_variance_percentage = ((stats.avg_variance_hours / (stats.total_expected_hours / stats.completed_with_actual)) * 100).toFixed(1);
+      }
+
+      // Sort items by variance (worst first)
+      stats.items.sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance));
+
+      return stats;
     } catch (error) {
-      results.push({
-        success: false,
-        part_number: item.part_number,
-        error: error.message
-      });
+      console.error('Error getting duration variance stats:', error);
+      throw error;
     }
   }
-  
-  return results;
-}
 
-/**
- * Get summary of Google Sheets imports
- * @returns {Promise} Summary with counts and statistics
- */
-async getGoogleSheetsImportSummary() {
-  const sheetsItems = await this.getGoogleSheetsItems();
-  
-  const summary = {
-    total_imports: sheetsItems.length,
-    by_status: {
-      not_started: 0,
-      in_progress: 0,
-      completed: 0
-    },
-    by_client: {},
-    recent_imports: [],
-    name_sources: {
-      provided: 0,
-      template: 0,
-      generated: 0
-    }
-  };
-  
-  sheetsItems.forEach(item => {
-    // Count by status
-    if (summary.by_status[item.status] !== undefined) {
-      summary.by_status[item.status]++;
-    }
-    
-    // Count by client
-    const client = item.client_name || 'No Client';
-    summary.by_client[client] = (summary.by_client[client] || 0) + 1;
-    
-    // Check remarks for name source
-    if (item.remarks) {
-      if (item.remarks.includes('Custom name provided')) {
-        summary.name_sources.provided++;
-      } else if (item.remarks.includes('Template:')) {
-        summary.name_sources.template++;
-      } else {
-        summary.name_sources.generated++;
-      }
-    }
-  });
-  
-  // Get 10 most recent imports
-  summary.recent_imports = sheetsItems
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    .slice(0, 10)
-    .map(item => ({
-      part_number: item.part_number,
-      name: item.name,
-      client_name: item.client_name,
-      status: item.status,
-      created_at: item.created_at
-    }));
-  
-  return summary;
-}
+  /**
+   * Get items that exceeded expected duration
+   * @param {number} varianceThreshold - Minimum hours over estimate (default: 1)
+   * @returns {Promise} Items that took longer than expected
+   */
+  async getOverEstimatedItems(varianceThreshold = 1) {
+    try {
+      const items = await this.getAllItems();
 
-/**
- * Get duration variance statistics
- * @param {Object} filters - Optional filters (status, priority, client_name)
- * @returns {Promise} Statistics on expected vs actual durations
- */
-async getDurationVarianceStats(filters = {}) {
-  try {
-    const items = await this.getItems(filters);
-    
-    const stats = {
-      total_items_with_estimates: 0,
-      completed_with_actual: 0,
-      over_estimate: 0,
-      under_estimate: 0,
-      on_target: 0,
-      avg_variance_hours: 0,
-      total_expected_hours: 0,
-      total_actual_hours: 0,
-      items: []
-    };
-    
-    let varianceSum = 0;
-    
-    items.forEach(item => {
-      if (item.expected_completion_hours) {
-        stats.total_items_with_estimates++;
-        stats.total_expected_hours += parseFloat(item.expected_completion_hours);
-        
-        if (item.actual_completion_hours) {
-          stats.completed_with_actual++;
-          stats.total_actual_hours += parseFloat(item.actual_completion_hours);
-          
-          const variance = item.actual_completion_hours - item.expected_completion_hours;
-          varianceSum += variance;
-          
-          if (variance > 0.5) {
-            stats.over_estimate++;
-          } else if (variance < -0.5) {
-            stats.under_estimate++;
-          } else {
-            stats.on_target++;
+      return items.filter(item =>
+        item.expected_completion_hours &&
+        item.actual_completion_hours &&
+        (item.actual_completion_hours - item.expected_completion_hours) >= varianceThreshold
+      ).map(item => ({
+        ...item,
+        variance: item.actual_completion_hours - item.expected_completion_hours,
+        variance_percentage: (((item.actual_completion_hours - item.expected_completion_hours) / item.expected_completion_hours) * 100).toFixed(1)
+      })).sort((a, b) => b.variance - a.variance);
+    } catch (error) {
+      console.error('Error getting over-estimated items:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get items that completed faster than expected
+   * @param {number} varianceThreshold - Minimum hours under estimate (default: 1)
+   * @returns {Promise} Items that took less time than expected
+   */
+  async getUnderEstimatedItems(varianceThreshold = 1) {
+    try {
+      const items = await this.getAllItems();
+
+      return items.filter(item =>
+        item.expected_completion_hours &&
+        item.actual_completion_hours &&
+        (item.expected_completion_hours - item.actual_completion_hours) >= varianceThreshold
+      ).map(item => ({
+        ...item,
+        variance: item.expected_completion_hours - item.actual_completion_hours,
+        variance_percentage: (((item.expected_completion_hours - item.actual_completion_hours) / item.expected_completion_hours) * 100).toFixed(1)
+      })).sort((a, b) => b.variance - a.variance);
+    } catch (error) {
+      console.error('Error getting under-estimated items:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get average completion time by client
+   * @returns {Promise} Client-wise duration statistics
+   */
+  async getClientDurationStats() {
+    try {
+      const items = await this.getAllItems();
+      const clientStats = {};
+
+      items.forEach(item => {
+        if (item.client_name && item.expected_completion_hours && item.actual_completion_hours) {
+          if (!clientStats[item.client_name]) {
+            clientStats[item.client_name] = {
+              client_name: item.client_name,
+              total_items: 0,
+              total_expected: 0,
+              total_actual: 0,
+              avg_variance: 0,
+              items: []
+            };
           }
-          
-          stats.items.push({
+
+          clientStats[item.client_name].total_items++;
+          clientStats[item.client_name].total_expected += parseFloat(item.expected_completion_hours);
+          clientStats[item.client_name].total_actual += parseFloat(item.actual_completion_hours);
+          clientStats[item.client_name].items.push({
             part_number: item.part_number,
             name: item.name,
-            expected_hours: item.expected_completion_hours,
-            actual_hours: item.actual_completion_hours,
-            variance: variance,
-            variance_percentage: ((variance / item.expected_completion_hours) * 100).toFixed(1)
+            expected: item.expected_completion_hours,
+            actual: item.actual_completion_hours
           });
         }
-      }
-    });
-    
-    if (stats.completed_with_actual > 0) {
-      stats.avg_variance_hours = (varianceSum / stats.completed_with_actual).toFixed(2);
-      stats.avg_variance_percentage = ((stats.avg_variance_hours / (stats.total_expected_hours / stats.completed_with_actual)) * 100).toFixed(1);
+      });
+
+      // Calculate averages and variances
+      Object.keys(clientStats).forEach(client => {
+        const stats = clientStats[client];
+        stats.avg_expected = (stats.total_expected / stats.total_items).toFixed(2);
+        stats.avg_actual = (stats.total_actual / stats.total_items).toFixed(2);
+        stats.avg_variance = (stats.avg_actual - stats.avg_expected).toFixed(2);
+        stats.avg_variance_percentage = ((stats.avg_variance / stats.avg_expected) * 100).toFixed(1);
+      });
+
+      return Object.values(clientStats).sort((a, b) => b.total_items - a.total_items);
+    } catch (error) {
+      console.error('Error getting client duration stats:', error);
+      throw error;
     }
-    
-    // Sort items by variance (worst first)
-    stats.items.sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance));
-    
-    return stats;
-  } catch (error) {
-    console.error('Error getting duration variance stats:', error);
-    throw error;
   }
-}
 
-/**
- * Get items that exceeded expected duration
- * @param {number} varianceThreshold - Minimum hours over estimate (default: 1)
- * @returns {Promise} Items that took longer than expected
- */
-async getOverEstimatedItems(varianceThreshold = 1) {
-  try {
-    const items = await this.getAllItems();
-    
-    return items.filter(item => 
-      item.expected_completion_hours &&
-      item.actual_completion_hours &&
-      (item.actual_completion_hours - item.expected_completion_hours) >= varianceThreshold
-    ).map(item => ({
-      ...item,
-      variance: item.actual_completion_hours - item.expected_completion_hours,
-      variance_percentage: (((item.actual_completion_hours - item.expected_completion_hours) / item.expected_completion_hours) * 100).toFixed(1)
-    })).sort((a, b) => b.variance - a.variance);
-  } catch (error) {
-    console.error('Error getting over-estimated items:', error);
-    throw error;
+  /**
+   * Export duration variance report
+   * @param {Object} filters - Optional filters
+   * @returns {Promise} CSV-ready data with variance analysis
+   */
+  async exportDurationVarianceReport(filters = {}) {
+    try {
+      const stats = await this.getDurationVarianceStats(filters);
+
+      return stats.items.map(item => ({
+        part_number: item.part_number,
+        name: item.name,
+        expected_hours: item.expected_hours,
+        actual_hours: item.actual_hours,
+        variance_hours: item.variance,
+        variance_percentage: item.variance_percentage + '%',
+        status: item.variance > 0 ? 'Over Estimate' : item.variance < 0 ? 'Under Estimate' : 'On Target'
+      }));
+    } catch (error) {
+      console.error('Error exporting duration variance report:', error);
+      throw error;
+    }
   }
-}
 
-/**
- * Get items that completed faster than expected
- * @param {number} varianceThreshold - Minimum hours under estimate (default: 1)
- * @returns {Promise} Items that took less time than expected
- */
-async getUnderEstimatedItems(varianceThreshold = 1) {
-  try {
-    const items = await this.getAllItems();
-    
-    return items.filter(item => 
-      item.expected_completion_hours &&
-      item.actual_completion_hours &&
-      (item.expected_completion_hours - item.actual_completion_hours) >= varianceThreshold
-    ).map(item => ({
-      ...item,
-      variance: item.expected_completion_hours - item.actual_completion_hours,
-      variance_percentage: (((item.expected_completion_hours - item.actual_completion_hours) / item.expected_completion_hours) * 100).toFixed(1)
-    })).sort((a, b) => b.variance - a.variance);
-  } catch (error) {
-    console.error('Error getting under-estimated items:', error);
-    throw error;
+
+  /**
+   * Get items with automatic filtering (excludes Out of Stock and OPERATION PARTICULARS)
+   * @param {Object} params - Optional filters
+   * @returns {Promise} Available items
+   */
+  async getFilteredItems(params = {}) {
+    try {
+      const filters = {
+        exclude_operation_particulars: 'true', // Exclude OPERATION PARTICULARS
+        sort_by: 'item_name',
+        sort_order: 'ASC',
+        limit: 500,
+        ...params
+      };
+
+      const queryParams = new URLSearchParams(filters).toString();
+      const response = await this.request(`/api/items?${queryParams}`);
+
+      return response;
+    } catch (error) {
+      console.error('Error fetching filtered items:', error);
+      throw error;
+    }
   }
-}
 
-/**
- * Get average completion time by client
- * @returns {Promise} Client-wise duration statistics
- */
-async getClientDurationStats() {
-  try {
-    const items = await this.getAllItems();
-    const clientStats = {};
-    
-    items.forEach(item => {
-      if (item.client_name && item.expected_completion_hours && item.actual_completion_hours) {
-        if (!clientStats[item.client_name]) {
-          clientStats[item.client_name] = {
-            client_name: item.client_name,
-            total_items: 0,
-            total_expected: 0,
-            total_actual: 0,
-            avg_variance: 0,
-            items: []
-          };
-        }
-        
-        clientStats[item.client_name].total_items++;
-        clientStats[item.client_name].total_expected += parseFloat(item.expected_completion_hours);
-        clientStats[item.client_name].total_actual += parseFloat(item.actual_completion_hours);
-        clientStats[item.client_name].items.push({
-          part_number: item.part_number,
-          name: item.name,
-          expected: item.expected_completion_hours,
-          actual: item.actual_completion_hours
-        });
-      }
+  /**
+   * Search materials by name for autocomplete
+   * @param {string} searchTerm - Search query
+   * @returns {Promise} Matching materials
+   */
+  async searchOperationMaterials(searchTerm) {
+    return this.getFilteredItems({
+      search: searchTerm,
+      limit: 50
     });
-    
-    // Calculate averages and variances
-    Object.keys(clientStats).forEach(client => {
-      const stats = clientStats[client];
-      stats.avg_expected = (stats.total_expected / stats.total_items).toFixed(2);
-      stats.avg_actual = (stats.total_actual / stats.total_items).toFixed(2);
-      stats.avg_variance = (stats.avg_actual - stats.avg_expected).toFixed(2);
-      stats.avg_variance_percentage = ((stats.avg_variance / stats.avg_expected) * 100).toFixed(1);
-    });
-    
-    return Object.values(clientStats).sort((a, b) => b.total_items - a.total_items);
-  } catch (error) {
-    console.error('Error getting client duration stats:', error);
-    throw error;
   }
-}
 
-/**
- * Export duration variance report
- * @param {Object} filters - Optional filters
- * @returns {Promise} CSV-ready data with variance analysis
- */
-async exportDurationVarianceReport(filters = {}) {
-  try {
-    const stats = await this.getDurationVarianceStats(filters);
-    
-    return stats.items.map(item => ({
-      part_number: item.part_number,
-      name: item.name,
-      expected_hours: item.expected_hours,
-      actual_hours: item.actual_hours,
-      variance_hours: item.variance,
-      variance_percentage: item.variance_percentage + '%',
-      status: item.variance > 0 ? 'Over Estimate' : item.variance < 0 ? 'Under Estimate' : 'On Target'
+  /**
+   * Update subphase with expected consumables
+   * @param {number|string} subphaseId - Subphase ID
+   * @param {Array} expectedConsumables - Array of materials [{item_no, item_name, quantity, unit}]
+   * @returns {Promise} Success confirmation
+   */
+  async updateSubphaseExpectedConsumables(subphaseId, expectedConsumables) {
+    // Format for database storage
+    const formattedConsumables = expectedConsumables.map(m => ({
+      item_no: m.item_no,
+      item_name: m.item_name,
+      quantity: parseFloat(m.quantity) || 0,
+      unit: m.unit || 'pcs'
     }));
-  } catch (error) {
-    console.error('Error exporting duration variance report:', error);
-    throw error;
+
+    return this.updateSubphase(subphaseId, {
+      expected_consumables: JSON.stringify(formattedConsumables)
+    });
   }
-}
+
+  /**
+   * Get expected consumables for a subphase
+   * @param {number|string} subphaseId - Subphase ID
+   * @returns {Promise<Array>} Array of expected consumables
+   */
+  async getSubphaseExpectedConsumables(subphaseId) {
+    const subphase = await this.getSubphase(subphaseId);
+
+    if (!subphase.expected_consumables) {
+      return [];
+    }
+
+    try {
+      return typeof subphase.expected_consumables === 'string'
+        ? JSON.parse(subphase.expected_consumables)
+        : subphase.expected_consumables;
+    } catch (error) {
+      console.error('Failed to parse expected_consumables:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Add material to subphase expected consumables
+   * @param {number|string} subphaseId - Subphase ID
+   * @param {Object} material - Material to add {item_no, item_name, quantity, unit}
+   * @returns {Promise} Success confirmation
+   */
+  async addExpectedConsumable(subphaseId, material) {
+    const currentConsumables = await this.getSubphaseExpectedConsumables(subphaseId);
+
+    // Check if material already exists
+    const existingIndex = currentConsumables.findIndex(m => m.item_no === material.item_no);
+
+    if (existingIndex >= 0) {
+      // Update quantity if exists
+      currentConsumables[existingIndex].quantity = parseFloat(material.quantity);
+    } else {
+      // Add new material
+      currentConsumables.push({
+        item_no: material.item_no,
+        item_name: material.item_name,
+        quantity: parseFloat(material.quantity) || 0,
+        unit: material.unit || 'pcs'
+      });
+    }
+
+    return this.updateSubphaseExpectedConsumables(subphaseId, currentConsumables);
+  }
+
+  /**
+   * Remove material from subphase expected consumables
+   * @param {number|string} subphaseId - Subphase ID
+   * @param {number|string} itemNo - Item number to remove
+   * @returns {Promise} Success confirmation
+   */
+  async removeExpectedConsumable(subphaseId, itemNo) {
+    const currentConsumables = await this.getSubphaseExpectedConsumables(subphaseId);
+    const updatedConsumables = currentConsumables.filter(m => m.item_no !== itemNo);
+
+    return this.updateSubphaseExpectedConsumables(subphaseId, updatedConsumables);
+  }
+
 }

@@ -80,6 +80,26 @@ function Checklist({
     has_previous: false,
   });
 
+  const parseExpectedConsumables = (subphase) => {
+    try {
+      if (!subphase.expected_consumables) return [];
+
+      if (typeof subphase.expected_consumables === 'string') {
+        return JSON.parse(subphase.expected_consumables);
+      }
+
+      if (Array.isArray(subphase.expected_consumables)) {
+        return subphase.expected_consumables;
+      }
+
+      return [];
+    } catch (error) {
+      console.error('Failed to parse expected_consumables:', error);
+      return [];
+    }
+  };
+
+
   // Optimistic update helpers - update local state without full reload
   const updateItemInState = (partNumber, updates) => {
     setItems((prevItems) =>
@@ -763,7 +783,7 @@ function Checklist({
     }
   };
 
-   const handleItemExpansion = (partNumber) => {
+  const handleItemExpansion = (partNumber) => {
     setExpandedItems((prev) => {
       // If clicking the same item, just toggle it
       if (prev[partNumber]) {
@@ -2920,214 +2940,245 @@ function Checklist({
                                                             </button>
                                                           </>
                                                         )}
+
+                                                      {/* Expected Consumables Display */}
+                                                      {(() => {
+                                                        const consumables = parseExpectedConsumables(subphase);
+
+                                                        if (consumables.length === 0) return null;
+
+                                                        return (
+                                                          <div className="mb-2">
+                                                            <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                                                              Expected Consumables ({consumables.length}):
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                              {consumables.map((material, idx) => (
+                                                                <div
+                                                                  key={idx}
+                                                                  className={`flex items-center justify-between text-xs p-2 rounded ${isDarkMode
+                                                                      ? 'bg-purple-500/10 text-purple-300 border border-purple-500/30'
+                                                                      : 'bg-purple-500/10 text-purple-700 border border-purple-500/30'
+                                                                    }`}
+                                                                >
+                                                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                                    <Package size={12} className="shrink-0" />
+                                                                    <span className="truncate font-medium">
+                                                                      {material.item_name}
+                                                                    </span>
+                                                                  </div>
+                                                                  <span className="shrink-0 font-semibold ml-2">
+                                                                    {material.quantity} {material.unit}
+                                                                  </span>
+                                                                </div>
+                                                              ))}
+                                                            </div>
+                                                          </div>
+                                                        );
+                                                      })()}
                                                     </div>
 
                                                     {/* ✅ Enhanced Materials Display - RESPONSIVE VERSION */}
-{(() => {
-  // ✅ Get materials from loaded data
-  let materialsArray = [];
+                                                    {(() => {
+                                                      // ✅ Get materials from loaded data
+                                                      let materialsArray = [];
 
-  if (subphase.materials && Array.isArray(subphase.materials)) {
-    materialsArray = subphase.materials;
-  }
+                                                      if (subphase.materials && Array.isArray(subphase.materials)) {
+                                                        materialsArray = subphase.materials;
+                                                      }
 
-  console.log(`🔍 Materials for ${subphase.name}:`, materialsArray.length);
+                                                      console.log(`🔍 Materials for ${subphase.name}:`, materialsArray.length);
 
-  if (materialsArray.length > 0) {
-    return (
-      <div className="space-y-2 mb-2">
-        {/* Header with Checkout Button - Mobile Optimized */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-            Required Materials ({materialsArray.length}):
-          </div>
-          {/* Checkout button - only show if there are unchecked materials */}
-          {materialsArray.some((m) => !m.checked_out_by_uid || m.checked_out_by_uid === 'SYSTEM') && (
-            <button
-              onClick={() => handleCheckoutSubphaseMaterials(item, phase, subphase)}
-              className="w-full sm:w-auto flex items-center justify-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-3 py-2 rounded transition-colors"
-            >
-              <Package size={12} />
-              Checkout All
-            </button>
-          )}
-        </div>
+                                                      if (materialsArray.length > 0) {
+                                                        return (
+                                                          <div className="space-y-2 mb-2">
+                                                            {/* Header with Checkout Button - Mobile Optimized */}
+                                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                                              <div className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                                                                Required Materials ({materialsArray.length}):
+                                                              </div>
+                                                              {/* Checkout button - only show if there are unchecked materials */}
+                                                              {materialsArray.some((m) => !m.checked_out_by_uid || m.checked_out_by_uid === 'SYSTEM') && (
+                                                                <button
+                                                                  onClick={() => handleCheckoutSubphaseMaterials(item, phase, subphase)}
+                                                                  className="w-full sm:w-auto flex items-center justify-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-3 py-2 rounded transition-colors"
+                                                                >
+                                                                  <Package size={12} />
+                                                                  Checkout All
+                                                                </button>
+                                                              )}
+                                                            </div>
 
-        {/* Materials List - Mobile Optimized */}
-        {materialsArray.map((material, idx) => (
-          <div key={material.id || idx} className="space-y-2">
-            {/* Material Card - Stacked Layout for Mobile */}
-            <div
-              className={`rounded-lg border overflow-hidden ${
-                isDarkMode
-                  ? "bg-blue-500/10 border-blue-500/30"
-                  : "bg-blue-500/10 border-blue-500/30"
-              }`}
-            >
-              {/* Material Info Section */}
-              <div className="p-2.5">
-                <div className="flex items-start gap-2 mb-2">
-                  <Package size={14} className="text-blue-500 shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-gray-700 dark:text-gray-300 break-words">
-                      {material.material_name}
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
-                      {material.material_quantity} {material.unit_of_measure || "pcs"}
-                    </div>
-                  </div>
-                </div>
+                                                            {/* Materials List - Mobile Optimized */}
+                                                            {materialsArray.map((material, idx) => (
+                                                              <div key={material.id || idx} className="space-y-2">
+                                                                {/* Material Card - Stacked Layout for Mobile */}
+                                                                <div
+                                                                  className={`rounded-lg border overflow-hidden ${isDarkMode
+                                                                      ? "bg-blue-500/10 border-blue-500/30"
+                                                                      : "bg-blue-500/10 border-blue-500/30"
+                                                                    }`}
+                                                                >
+                                                                  {/* Material Info Section */}
+                                                                  <div className="p-2.5">
+                                                                    <div className="flex items-start gap-2 mb-2">
+                                                                      <Package size={14} className="text-blue-500 shrink-0 mt-0.5" />
+                                                                      <div className="flex-1 min-w-0">
+                                                                        <div className="text-xs font-medium text-gray-700 dark:text-gray-300 break-words">
+                                                                          {material.material_name}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                                                                          {material.material_quantity} {material.unit_of_measure || "pcs"}
+                                                                        </div>
+                                                                      </div>
+                                                                    </div>
 
-                {/* Status & Action Buttons - Mobile Optimized */}
-                <div className="flex flex-col gap-2 mt-2">
-                  {/* ✅ Check if it's a scrap-reuse material */}
-                  {material.notes && material.notes.includes('SCRAP-REUSE') ? (
-                    // ✅ For scrap-reuse materials
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <div className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs ${
-                        isDarkMode
-                          ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
-                          : "bg-orange-500/20 text-orange-700 border border-orange-500/30"
-                      }`}>
-                        <CheckCircle size={12} />
-                        <span className="font-medium">SCRAP-REUSE</span>
-                      </div>
-                      {/* ✅ Update Assignment Button */}
-                      <button
-                        onClick={() => handleUpdateScrapAssignment(item, phase, subphase, material)}
-                        className="flex items-center justify-center gap-1 text-xs bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white px-3 py-2 rounded transition-colors"
-                        title="Update employee assignment"
-                      >
-                        <User size={12} />
-                        <span>Update Assignment</span>
-                      </button>
-                    </div>
-                  ) : (
-                    // ✅ For regular warehouse materials
-                    material.checked_out_by_uid && material.checked_out_by_uid !== 'SYSTEM' ? (
-                      <div className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs ${
-                        isDarkMode
-                          ? "bg-green-500/20 text-green-300 border border-green-500/30"
-                          : "bg-green-500/20 text-green-700 border border-green-500/30"
-                      }`}>
-                        <CheckCircle size={12} />
-                        <span className="font-medium">Checked Out</span>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <div className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs ${
-                          isDarkMode
-                            ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
-                            : "bg-yellow-500/20 text-yellow-700 border border-yellow-500/30"
-                        }`}>
-                          <Clock size={12} />
-                          <span className="font-medium">Pending Checkout</span>
-                        </div>
-                        <button
-                          onClick={() => handleCheckoutSingleMaterial(item, phase, subphase, material)}
-                          className="flex items-center justify-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-3 py-2 rounded transition-colors"
-                        >
-                          <Package size={12} />
-                          <span>Checkout Now</span>
-                        </button>
-                      </div>
-                    )
-                  )}
-                </div>
-              </div>
+                                                                    {/* Status & Action Buttons - Mobile Optimized */}
+                                                                    <div className="flex flex-col gap-2 mt-2">
+                                                                      {/* ✅ Check if it's a scrap-reuse material */}
+                                                                      {material.notes && material.notes.includes('SCRAP-REUSE') ? (
+                                                                        // ✅ For scrap-reuse materials
+                                                                        <div className="flex flex-col sm:flex-row gap-2">
+                                                                          <div className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs ${isDarkMode
+                                                                              ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
+                                                                              : "bg-orange-500/20 text-orange-700 border border-orange-500/30"
+                                                                            }`}>
+                                                                            <CheckCircle size={12} />
+                                                                            <span className="font-medium">SCRAP-REUSE</span>
+                                                                          </div>
+                                                                          {/* ✅ Update Assignment Button */}
+                                                                          <button
+                                                                            onClick={() => handleUpdateScrapAssignment(item, phase, subphase, material)}
+                                                                            className="flex items-center justify-center gap-1 text-xs bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white px-3 py-2 rounded transition-colors"
+                                                                            title="Update employee assignment"
+                                                                          >
+                                                                            <User size={12} />
+                                                                            <span>Update Assignment</span>
+                                                                          </button>
+                                                                        </div>
+                                                                      ) : (
+                                                                        // ✅ For regular warehouse materials
+                                                                        material.checked_out_by_uid && material.checked_out_by_uid !== 'SYSTEM' ? (
+                                                                          <div className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs ${isDarkMode
+                                                                              ? "bg-green-500/20 text-green-300 border border-green-500/30"
+                                                                              : "bg-green-500/20 text-green-700 border border-green-500/30"
+                                                                            }`}>
+                                                                            <CheckCircle size={12} />
+                                                                            <span className="font-medium">Checked Out</span>
+                                                                          </div>
+                                                                        ) : (
+                                                                          <div className="flex flex-col sm:flex-row gap-2">
+                                                                            <div className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs ${isDarkMode
+                                                                                ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
+                                                                                : "bg-yellow-500/20 text-yellow-700 border border-yellow-500/30"
+                                                                              }`}>
+                                                                              <Clock size={12} />
+                                                                              <span className="font-medium">Pending Checkout</span>
+                                                                            </div>
+                                                                            <button
+                                                                              onClick={() => handleCheckoutSingleMaterial(item, phase, subphase, material)}
+                                                                              className="flex items-center justify-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-3 py-2 rounded transition-colors"
+                                                                            >
+                                                                              <Package size={12} />
+                                                                              <span>Checkout Now</span>
+                                                                            </button>
+                                                                          </div>
+                                                                        )
+                                                                      )}
+                                                                    </div>
+                                                                  </div>
 
-              {/* Checkout Details Section - Collapsible on Mobile */}
-              {(() => {
-                const isScrapReuse = material.notes && material.notes.includes('SCRAP-REUSE');
-                const hasCheckoutInfo = material.checked_out_by_name || material.checked_out_by;
-                
-                if (!hasCheckoutInfo) return null;
+                                                                  {/* Checkout Details Section - Collapsible on Mobile */}
+                                                                  {(() => {
+                                                                    const isScrapReuse = material.notes && material.notes.includes('SCRAP-REUSE');
+                                                                    const hasCheckoutInfo = material.checked_out_by_name || material.checked_out_by;
 
-                return (
-                  <div className={`border-t p-2.5 text-xs ${
-                    isScrapReuse
-                      ? isDarkMode
-                        ? "bg-orange-700/20 border-orange-600/30"
-                        : "bg-orange-100/80 border-orange-300/30"
-                      : isDarkMode
-                      ? "bg-gray-700/30 border-gray-600/30"
-                      : "bg-gray-100/80 border-gray-300/30"
-                  }`}>
-                    {isScrapReuse ? (
-                      // Scrap-reuse details
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1 font-semibold text-orange-700 dark:text-orange-300">
-                          <AlertTriangle size={12} />
-                          <span>REUSED SCRAP MATERIAL</span>
-                        </div>
-                        <div className="space-y-1 pl-3 text-gray-700 dark:text-gray-300">
-                          <div className="flex items-start gap-1">
-                            <span className="shrink-0">⚠️</span>
-                            <span>No warehouse deduction (reused from scrap)</span>
-                          </div>
-                          {material.checked_out_by_name && (
-                            <div className="flex items-start gap-1">
-                              <span className="shrink-0">👤</span>
-                              <span>Assigned to: <strong>{material.checked_out_by_name}</strong></span>
-                            </div>
-                          )}
-                          {material.checked_out_by && (
-                            <div className="flex items-start gap-1">
-                              <span className="shrink-0">🆔</span>
-                              <span className="break-all">{material.checked_out_by}</span>
-                            </div>
-                          )}
-                          {material.checkout_date && (
-                            <div className="flex items-start gap-1">
-                              <span className="shrink-0">📅</span>
-                              <span className="text-xs">{new Date(material.checkout_date).toLocaleString()}</span>
-                            </div>
-                          )}
-                          <button
-                            onClick={() => alert(material.notes)}
-                            className="text-blue-600 dark:text-blue-400 hover:underline text-xs mt-1 flex items-center gap-1"
-                          >
-                            <span>View Full Details</span>
-                            <span>→</span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      // Regular checkout details
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1 font-semibold text-gray-700 dark:text-gray-300">
-                          <User size={12} />
-                          <span>Checked out by:</span>
-                        </div>
-                        <div className="pl-3 space-y-1">
-                          <div className="font-medium text-gray-800 dark:text-gray-200">
-                            {material.checked_out_by_name}
-                          </div>
-                          {material.checked_out_by && (
-                            <div className="text-gray-600 dark:text-gray-400 break-all">
-                              ID: {material.checked_out_by}
-                            </div>
-                          )}
-                          {material.checkout_date && (
-                            <div className="text-gray-600 dark:text-gray-400">
-                              {new Date(material.checkout_date).toLocaleString()}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
+                                                                    if (!hasCheckoutInfo) return null;
 
-  return null;
-})()}
+                                                                    return (
+                                                                      <div className={`border-t p-2.5 text-xs ${isScrapReuse
+                                                                          ? isDarkMode
+                                                                            ? "bg-orange-700/20 border-orange-600/30"
+                                                                            : "bg-orange-100/80 border-orange-300/30"
+                                                                          : isDarkMode
+                                                                            ? "bg-gray-700/30 border-gray-600/30"
+                                                                            : "bg-gray-100/80 border-gray-300/30"
+                                                                        }`}>
+                                                                        {isScrapReuse ? (
+                                                                          // Scrap-reuse details
+                                                                          <div className="space-y-1.5">
+                                                                            <div className="flex items-center gap-1 font-semibold text-orange-700 dark:text-orange-300">
+                                                                              <AlertTriangle size={12} />
+                                                                              <span>REUSED SCRAP MATERIAL</span>
+                                                                            </div>
+                                                                            <div className="space-y-1 pl-3 text-gray-700 dark:text-gray-300">
+                                                                              <div className="flex items-start gap-1">
+                                                                                <span className="shrink-0">⚠️</span>
+                                                                                <span>No warehouse deduction (reused from scrap)</span>
+                                                                              </div>
+                                                                              {material.checked_out_by_name && (
+                                                                                <div className="flex items-start gap-1">
+                                                                                  <span className="shrink-0">👤</span>
+                                                                                  <span>Assigned to: <strong>{material.checked_out_by_name}</strong></span>
+                                                                                </div>
+                                                                              )}
+                                                                              {material.checked_out_by && (
+                                                                                <div className="flex items-start gap-1">
+                                                                                  <span className="shrink-0">🆔</span>
+                                                                                  <span className="break-all">{material.checked_out_by}</span>
+                                                                                </div>
+                                                                              )}
+                                                                              {material.checkout_date && (
+                                                                                <div className="flex items-start gap-1">
+                                                                                  <span className="shrink-0">📅</span>
+                                                                                  <span className="text-xs">{new Date(material.checkout_date).toLocaleString()}</span>
+                                                                                </div>
+                                                                              )}
+                                                                              <button
+                                                                                onClick={() => alert(material.notes)}
+                                                                                className="text-blue-600 dark:text-blue-400 hover:underline text-xs mt-1 flex items-center gap-1"
+                                                                              >
+                                                                                <span>View Full Details</span>
+                                                                                <span>→</span>
+                                                                              </button>
+                                                                            </div>
+                                                                          </div>
+                                                                        ) : (
+                                                                          // Regular checkout details
+                                                                          <div className="space-y-1.5">
+                                                                            <div className="flex items-center gap-1 font-semibold text-gray-700 dark:text-gray-300">
+                                                                              <User size={12} />
+                                                                              <span>Checked out by:</span>
+                                                                            </div>
+                                                                            <div className="pl-3 space-y-1">
+                                                                              <div className="font-medium text-gray-800 dark:text-gray-200">
+                                                                                {material.checked_out_by_name}
+                                                                              </div>
+                                                                              {material.checked_out_by && (
+                                                                                <div className="text-gray-600 dark:text-gray-400 break-all">
+                                                                                  ID: {material.checked_out_by}
+                                                                                </div>
+                                                                              )}
+                                                                              {material.checkout_date && (
+                                                                                <div className="text-gray-600 dark:text-gray-400">
+                                                                                  {new Date(material.checkout_date).toLocaleString()}
+                                                                                </div>
+                                                                              )}
+                                                                            </div>
+                                                                          </div>
+                                                                        )}
+                                                                      </div>
+                                                                    );
+                                                                  })()}
+                                                                </div>
+                                                              </div>
+                                                            ))}
+                                                          </div>
+                                                        );
+                                                      }
+
+                                                      return null;
+                                                    })()}
 
                                                     {/* Quantity Update Modal - Mobile Optimized */}
                                                     {quantityModalOpen &&

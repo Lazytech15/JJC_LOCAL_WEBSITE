@@ -31,6 +31,7 @@ export class ItemsService {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
+          "User-Agent": "Toolbox-App/1.0",
         },
         mode: "cors",
         signal: AbortSignal.timeout(15000),

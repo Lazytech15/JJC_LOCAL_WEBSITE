@@ -277,188 +277,87 @@ html.light *,
   animation: fadeIn 0.3s ease-out forwards;
 }
 
-/* ============================================
-   Global Scrollbar Styles - Compact & Subtle
-   Applied consistently to all scrollable areas
-   ============================================ */
-
-/* Base scrollbar styles for all elements */
-*,
-*::before,
-*::after {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
-}
-
-/* Webkit scrollbar - Light mode defaults */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 2px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.3);
-  border-radius: 2px;
-  transition: background 0.15s ease;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.5);
-}
-
-::-webkit-scrollbar-thumb:active {
-  background: rgba(148, 163, 184, 0.6);
-}
-
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-/* Dark mode scrollbar */
-.dark *,
-.dark *::before,
-.dark *::after,
-html.dark *,
-html.dark *::before,
-html.dark *::after {
-  scrollbar-color: rgba(71, 85, 105, 0.4) transparent;
-}
-
-.dark ::-webkit-scrollbar-thumb,
-html.dark ::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.35);
-}
-
-.dark ::-webkit-scrollbar-thumb:hover,
-html.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 0.55);
-}
-
-.dark ::-webkit-scrollbar-thumb:active,
-html.dark ::-webkit-scrollbar-thumb:active {
-  background: rgba(71, 85, 105, 0.7);
-}
-
-/* Custom scrollbar class - for explicit use (slightly more visible) */
+/* Custom Scrollbar Styles - Industrial Theme */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+  scrollbar-color: rgba(100, 116, 139, 0.4) transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.35);
-  border-radius: 2.5px;
+  background: linear-gradient(180deg, rgba(100, 116, 139, 0.4), rgba(71, 85, 105, 0.5));
+  border-radius: 3px;
+  transition: background 0.2s ease;
+  border: 1px solid rgba(51, 65, 85, 0.2);
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.5);
+  background: linear-gradient(180deg, rgba(100, 116, 139, 0.6), rgba(71, 85, 105, 0.7));
+  box-shadow: 0 0 4px rgba(59, 130, 246, 0.3);
 }
 
 .dark .custom-scrollbar {
-  scrollbar-color: rgba(71, 85, 105, 0.45) transparent;
+  scrollbar-color: rgba(71, 85, 105, 0.5) transparent;
 }
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.4);
+  background: linear-gradient(180deg, rgba(71, 85, 105, 0.5), rgba(51, 65, 85, 0.6));
+  border-color: rgba(30, 41, 59, 0.3);
 }
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 0.6);
+  background: linear-gradient(180deg, rgba(71, 85, 105, 0.7), rgba(51, 65, 85, 0.8));
+  box-shadow: 0 0 6px rgba(96, 165, 250, 0.4);
 }
 
-/* Content scrollbar - for main content areas */
+/* Main content area scrollbar */
 .content-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+  scrollbar-color: rgba(148, 163, 184, 0.4) rgba(248, 250, 252, 0.5);
 }
 
 .content-scrollbar::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 8px;
 }
 
 .content-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 2.5px;
+  background: rgba(248, 250, 252, 0.5);
+  border-radius: 4px;
 }
 
 .content-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.3);
-  border-radius: 2.5px;
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 4px;
+  border: 2px solid rgba(248, 250, 252, 0.5);
+  transition: background 0.2s ease;
 }
 
 .content-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.45);
+  background: rgba(148, 163, 184, 0.6);
 }
 
 .dark .content-scrollbar {
-  scrollbar-color: rgba(71, 85, 105, 0.4) transparent;
+  scrollbar-color: rgba(71, 85, 105, 0.5) rgba(15, 23, 42, 0.5);
+}
+
+.dark .content-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
 }
 
 .dark .content-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.35);
+  background: rgba(71, 85, 105, 0.5);
+  border-color: rgba(15, 23, 42, 0.5);
 }
 
 .dark .content-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 0.55);
-}
-
-/* Modal/Dialog scrollbar - extra subtle for overlays */
-[role="dialog"] *,
-[data-radix-dialog-content] *,
-.modal-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
-}
-
-[role="dialog"] ::-webkit-scrollbar,
-[data-radix-dialog-content] ::-webkit-scrollbar,
-.modal-scrollbar::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-
-[role="dialog"] ::-webkit-scrollbar-thumb,
-[data-radix-dialog-content] ::-webkit-scrollbar-thumb,
-.modal-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.25);
-  border-radius: 2px;
-}
-
-[role="dialog"] ::-webkit-scrollbar-thumb:hover,
-[data-radix-dialog-content] ::-webkit-scrollbar-thumb:hover,
-.modal-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.4);
-}
-
-.dark [role="dialog"] ::-webkit-scrollbar-thumb,
-.dark [data-radix-dialog-content] ::-webkit-scrollbar-thumb,
-.dark .modal-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.3);
-}
-
-.dark [role="dialog"] ::-webkit-scrollbar-thumb:hover,
-.dark [data-radix-dialog-content] ::-webkit-scrollbar-thumb:hover,
-.dark .modal-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 0.5);
-}
-
-/* Hide scrollbar but keep functionality - for minimal UI */
-.scrollbar-hidden {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.scrollbar-hidden::-webkit-scrollbar {
-  display: none;
+  background: rgba(71, 85, 105, 0.7);
 }
