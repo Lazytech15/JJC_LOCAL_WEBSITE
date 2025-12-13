@@ -35,7 +35,7 @@ function Checklist({
   apiService,
   formatTime,
   loadData,
-
+  parseExpectedConsumables,
   openTransferModal,
   newClient,
   setShowClientDropdown,
@@ -79,25 +79,6 @@ function Checklist({
     has_next: false,
     has_previous: false,
   });
-
-  const parseExpectedConsumables = (subphase) => {
-    try {
-      if (!subphase.expected_consumables) return [];
-
-      if (typeof subphase.expected_consumables === 'string') {
-        return JSON.parse(subphase.expected_consumables);
-      }
-
-      if (Array.isArray(subphase.expected_consumables)) {
-        return subphase.expected_consumables;
-      }
-
-      return [];
-    } catch (error) {
-      console.error('Failed to parse expected_consumables:', error);
-      return [];
-    }
-  };
 
 
   // Optimistic update helpers - update local state without full reload
@@ -2957,8 +2938,8 @@ function Checklist({
                                                                 <div
                                                                   key={idx}
                                                                   className={`flex items-center justify-between text-xs p-2 rounded ${isDarkMode
-                                                                      ? 'bg-purple-500/10 text-purple-300 border border-purple-500/30'
-                                                                      : 'bg-purple-500/10 text-purple-700 border border-purple-500/30'
+                                                                    ? 'bg-purple-500/10 text-purple-300 border border-purple-500/30'
+                                                                    : 'bg-purple-500/10 text-purple-700 border border-purple-500/30'
                                                                     }`}
                                                                 >
                                                                   <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -3015,8 +2996,8 @@ function Checklist({
                                                                 {/* Material Card - Stacked Layout for Mobile */}
                                                                 <div
                                                                   className={`rounded-lg border overflow-hidden ${isDarkMode
-                                                                      ? "bg-blue-500/10 border-blue-500/30"
-                                                                      : "bg-blue-500/10 border-blue-500/30"
+                                                                    ? "bg-blue-500/10 border-blue-500/30"
+                                                                    : "bg-blue-500/10 border-blue-500/30"
                                                                     }`}
                                                                 >
                                                                   {/* Material Info Section */}
@@ -3040,8 +3021,8 @@ function Checklist({
                                                                         // ✅ For scrap-reuse materials
                                                                         <div className="flex flex-col sm:flex-row gap-2">
                                                                           <div className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs ${isDarkMode
-                                                                              ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
-                                                                              : "bg-orange-500/20 text-orange-700 border border-orange-500/30"
+                                                                            ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
+                                                                            : "bg-orange-500/20 text-orange-700 border border-orange-500/30"
                                                                             }`}>
                                                                             <CheckCircle size={12} />
                                                                             <span className="font-medium">SCRAP-REUSE</span>
@@ -3060,8 +3041,8 @@ function Checklist({
                                                                         // ✅ For regular warehouse materials
                                                                         material.checked_out_by_uid && material.checked_out_by_uid !== 'SYSTEM' ? (
                                                                           <div className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs ${isDarkMode
-                                                                              ? "bg-green-500/20 text-green-300 border border-green-500/30"
-                                                                              : "bg-green-500/20 text-green-700 border border-green-500/30"
+                                                                            ? "bg-green-500/20 text-green-300 border border-green-500/30"
+                                                                            : "bg-green-500/20 text-green-700 border border-green-500/30"
                                                                             }`}>
                                                                             <CheckCircle size={12} />
                                                                             <span className="font-medium">Checked Out</span>
@@ -3069,8 +3050,8 @@ function Checklist({
                                                                         ) : (
                                                                           <div className="flex flex-col sm:flex-row gap-2">
                                                                             <div className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs ${isDarkMode
-                                                                                ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
-                                                                                : "bg-yellow-500/20 text-yellow-700 border border-yellow-500/30"
+                                                                              ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
+                                                                              : "bg-yellow-500/20 text-yellow-700 border border-yellow-500/30"
                                                                               }`}>
                                                                               <Clock size={12} />
                                                                               <span className="font-medium">Pending Checkout</span>
@@ -3097,12 +3078,12 @@ function Checklist({
 
                                                                     return (
                                                                       <div className={`border-t p-2.5 text-xs ${isScrapReuse
-                                                                          ? isDarkMode
-                                                                            ? "bg-orange-700/20 border-orange-600/30"
-                                                                            : "bg-orange-100/80 border-orange-300/30"
-                                                                          : isDarkMode
-                                                                            ? "bg-gray-700/30 border-gray-600/30"
-                                                                            : "bg-gray-100/80 border-gray-300/30"
+                                                                        ? isDarkMode
+                                                                          ? "bg-orange-700/20 border-orange-600/30"
+                                                                          : "bg-orange-100/80 border-orange-300/30"
+                                                                        : isDarkMode
+                                                                          ? "bg-gray-700/30 border-gray-600/30"
+                                                                          : "bg-gray-100/80 border-gray-300/30"
                                                                         }`}>
                                                                         {isScrapReuse ? (
                                                                           // Scrap-reuse details
@@ -3370,17 +3351,31 @@ function Checklist({
 
                                                     {/* Assign Employee Button - Full Width on Mobile */}
                                                     <button
-                                                      onClick={() =>
-                                                        handleBarcodeScan(
-                                                          item.part_number,
-                                                          phase.id,
-                                                          subphase.id
-                                                        )
-                                                      }
-                                                      className="w-full px-3 py-2.5 text-sm bg-slate-600 hover:bg-slate-700 active:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded transition-colors flex items-center justify-center gap-2 mt-2"
+                                                      onClick={() => handleBarcodeScan(item.part_number, phase.id, subphase.id)}
+                                                      className="w-full px-3 py-2.5 text-sm bg-slate-600 hover:bg-slate-700 active:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded transition-colors flex items-center justify-center gap-2 mt-2 relative group"
+                                                      title={(() => {
+                                                        const expectedConsumables = parseExpectedConsumables(subphase);
+                                                        if (expectedConsumables.length === 0) return "Assign Employee";
+
+                                                        return `Required consumables:\n${expectedConsumables
+                                                          .map(c => `• ${c.item_name}: ${c.quantity} ${c.unit}`)
+                                                          .join('\n')}`;
+                                                      })()}
                                                     >
                                                       <User size={14} />
                                                       Assign Employee
+
+                                                      {/* ✅ Badge showing number of required consumables */}
+                                                      {(() => {
+                                                        const expectedConsumables = parseExpectedConsumables(subphase);
+                                                        if (expectedConsumables.length === 0) return null;
+
+                                                        return (
+                                                          <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold border-2 border-white dark:border-gray-800">
+                                                            {expectedConsumables.length}
+                                                          </span>
+                                                        );
+                                                      })()}
                                                     </button>
 
                                                     {/* Completion Time */}

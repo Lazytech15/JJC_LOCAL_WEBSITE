@@ -6,6 +6,7 @@ import AddItems from "../op/AddItem.jsx";
 import Checklist from "../op/CheckList.jsx";
 import Reports from "../op/Report.jsx";
 import ItemComparison from "../op/ItemComparison.jsx";
+import EmployeeInventoryTab from "../op/EmployeeInventory.jsx";
 import StockMaterialsTab from "../op/StockMaterialsTab.jsx";
 import { pollingManager } from "../../utils/api/websocket/polling-manager.jsx";
 import {
@@ -354,6 +355,25 @@ function OperationsDepartment() {
       });
     }
   }, []);
+
+  const parseExpectedConsumables = (subphase) => {
+    try {
+      if (!subphase.expected_consumables) return [];
+
+      if (typeof subphase.expected_consumables === 'string') {
+        return JSON.parse(subphase.expected_consumables);
+      }
+
+      if (Array.isArray(subphase.expected_consumables)) {
+        return subphase.expected_consumables;
+      }
+
+      return [];
+    } catch (error) {
+      console.error('Failed to parse expected_consumables:', error);
+      return [];
+    }
+  };
 
   const setupPollingListeners = () => {
     console.log("📡 Setting up Operations polling listeners...");
@@ -1057,6 +1077,128 @@ function OperationsDepartment() {
     try {
       setError(null);
 
+      // ✅ NEW: Get the subphase to check expected consumables
+      const item = items.find(i => i.part_number === scanningFor.partNumber);
+      const phase = item?.phases?.find(p => p.id === scanningFor.phaseId);
+      const subphase = phase?.subphases?.find(s => s.id === scanningFor.subPhaseId);
+
+      // ✅ Parse expected consumables from subphase
+      const expectedConsumables = parseExpectedConsumables(subphase);
+
+      if (expectedConsumables.length > 0) {
+        console.log('🔍 Checking employee inventory for expected consumables...', expectedConsumables);
+
+        // ✅ Get employee UID from barcode first
+        let employeeUid = null;
+        try {
+          // Fetch employee data to get UID
+          const employeeResponse = await apiService.employees.searchEmployees({
+            search: barcodeInput.trim()
+          });
+
+          if (employeeResponse && employeeResponse.length > 0) {
+            employeeUid = employeeResponse[0].uid;
+          }
+        } catch (err) {
+          console.warn('Could not fetch employee UID:', err);
+        }
+
+        if (employeeUid) {
+          // ✅ Get employee's current inventory
+          const employeeInventory = await apiService.employeeInventory.getEmployeeInventory(
+            employeeUid,
+            { includeCompleted: false }
+          );
+
+          console.log('📦 Employee inventory:', employeeInventory);
+
+          // ✅ Check if employee has all required consumables
+          const missingConsumables = [];
+          const insufficientConsumables = [];
+
+          for (const expected of expectedConsumables) {
+            // ✅ FIXED: Match using BOTH item_no and material_name
+            const inventoryItem = employeeInventory.find(inv => {
+              // Primary match: item_no (most reliable)
+              if (inv.item_no && expected.item_no && inv.item_no === expected.item_no) {
+                return true;
+              }
+
+              // Fallback match: material_name (case-insensitive, trimmed)
+              const inventoryName = inv.material_name?.toLowerCase().trim();
+              const expectedName = expected.item_name?.toLowerCase().trim();
+
+              return inventoryName && expectedName && inventoryName === expectedName;
+            });
+
+            if (!inventoryItem) {
+              // Employee doesn't have this item at all
+              missingConsumables.push(expected);
+            } else {
+              // ✅ Calculate available quantity correctly
+              const checkedOut = parseFloat(inventoryItem.quantity_checked_out) || 0;
+              const used = parseFloat(inventoryItem.quantity_used) || 0;
+              const returned = parseFloat(inventoryItem.quantity_returned) || 0;
+              const availableQty = checkedOut - used - returned;
+
+              console.log(`📊 ${expected.item_name} (item_no: ${expected.item_no}): checked_out=${checkedOut}, used=${used}, returned=${returned}, available=${availableQty}, required=${expected.quantity}`);
+
+              if (availableQty < expected.quantity) {
+                insufficientConsumables.push({
+                  ...expected,
+                  available: availableQty
+                });
+              }
+            }
+          }
+
+          // ✅ Show error if missing or insufficient consumables
+          if (missingConsumables.length > 0 || insufficientConsumables.length > 0) {
+            let errorMessage = '⚠️ Employee cannot be assigned!\n\n';
+            errorMessage += 'This subphase requires the following consumables:\n\n';
+
+            if (missingConsumables.length > 0) {
+              errorMessage += '❌ NOT CHECKED OUT:\n';
+              missingConsumables.forEach(item => {
+                errorMessage += `   • ${item.item_name}: ${item.quantity} ${item.unit}\n`;
+              });
+              errorMessage += '\n';
+            }
+
+            if (insufficientConsumables.length > 0) {
+              errorMessage += '⚠️ INSUFFICIENT QUANTITY:\n';
+              insufficientConsumables.forEach(item => {
+                errorMessage += `   • ${item.item_name}: Need ${item.quantity} ${item.unit}, Have ${item.available} ${item.unit}\n`;
+              });
+              errorMessage += '\n';
+            }
+
+            errorMessage += 'Please checkout the required consumables first in the Employee Inventory section.';
+
+            alert(errorMessage);
+            return; // ✅ Stop assignment
+          }
+
+          // ✅ All consumables are available - show success message
+          console.log('✅ Employee has all required consumables');
+          alert(
+            `✅ Validation passed!\n\n` +
+            `Employee has all ${expectedConsumables.length} required consumable(s):\n` +
+            expectedConsumables.map(c => `• ${c.item_name}: ${c.quantity} ${c.unit}`).join('\n')
+          );
+        } else {
+          console.warn('⚠️ Could not validate employee inventory - UID not found');
+          // Optionally allow assignment without validation if UID lookup fails
+          if (!confirm(
+            'Could not verify employee inventory.\n\n' +
+            'Do you want to proceed with assignment anyway?'
+          )) {
+            return;
+          }
+        }
+      }
+
+      // ✅ Proceed with assignment if validation passed
       await apiService.operations.assignEmployee(
         scanningFor.subPhaseId,
         barcodeInput.trim()
@@ -1071,6 +1213,7 @@ function OperationsDepartment() {
       setError("Failed to assign employee: " + err.message);
     }
   };
+
   const calculatePhaseProgress = (phase) => {
     if (
       !phase ||
@@ -1154,6 +1297,7 @@ function OperationsDepartment() {
     { id: "checklist", label: "Checklist" },
     { id: "stock-materials", label: "Stock Materials" }, // NEW
     { id: "comparison", label: "Comparison" },
+    { id: "employee-inventory", label: "Employee Inventory" },
     { id: "reports", label: "Reports" },
   ];
 
@@ -2179,6 +2323,7 @@ function OperationsDepartment() {
                     setSelectedTargetSubphase={setSelectedTargetSubphase}
                     handleTransferClient={handleTransferClient}
                     getBasePartNumber={getBasePartNumber}
+                    parseExpectedConsumables={parseExpectedConsumables}
                   />
                 )}
 
@@ -2196,6 +2341,13 @@ function OperationsDepartment() {
                     apiService={apiService}
                     formatTime={formatTime}
                     calculateItemProgress={calculateItemProgress}
+                  />
+                )}
+
+                {activeTab === "employee-inventory" && (
+                  <EmployeeInventoryTab
+                    isDarkMode={isDarkMode}
+                    apiService={apiService}
                   />
                 )}
 
@@ -2412,6 +2564,47 @@ function OperationsDepartment() {
               <h3 className={`text-lg sm:text-xl font-bold mb-4 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
                 Scan Employee Barcode
               </h3>
+
+              {/* ✅ NEW: Show required consumables */}
+              {(() => {
+                const item = items.find(i => i.part_number === scanningFor.partNumber);
+                const phase = item?.phases?.find(p => p.id === scanningFor.phaseId);
+                const subphase = phase?.subphases?.find(s => s.id === scanningFor.subPhaseId);
+                const expectedConsumables = parseExpectedConsumables(subphase);
+
+                if (expectedConsumables.length > 0) {
+                  return (
+                    <div className={`mb-4 p-3 rounded-lg border ${isDarkMode
+                      ? "bg-blue-500/10 border-blue-500/30"
+                      : "bg-blue-500/10 border-blue-500/30"
+                      }`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Package size={16} className="text-blue-500" />
+                        <span className={`text-sm font-semibold ${isDarkMode ? "text-blue-300" : "text-blue-700"
+                          }`}>
+                          Required Consumables ({expectedConsumables.length}):
+                        </span>
+                      </div>
+                      <ul className="space-y-1">
+                        {expectedConsumables.map((consumable, idx) => (
+                          <li key={idx} className={`text-xs flex items-center gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                            }`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                            <span className="font-medium">{consumable.item_name}</span>
+                            <span className="text-gray-500">-</span>
+                            <span className="font-semibold">{consumable.quantity} {consumable.unit}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className={`text-xs mt-2 ${isDarkMode ? "text-yellow-300" : "text-yellow-700"}`}>
+                        ⚠️ Employee must have these items checked out in their inventory
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               <input
                 type="text"
                 placeholder="Enter barcode or employee ID"
@@ -2429,12 +2622,12 @@ function OperationsDepartment() {
                   onClick={submitBarcode}
                   className="flex-1 bg-slate-600 hover:bg-slate-700 active:bg-slate-800 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
                 >
-                  Submit
+                  Validate & Assign
                 </button>
                 <button
                   onClick={() => {
-                    setScanningFor(null)
-                    setBarcodeInput("")
+                    setScanningFor(null);
+                    setBarcodeInput("");
                   }}
                   className="flex-1 bg-gray-500 hover:bg-gray-600 active:bg-gray-700 text-white px-4 py-3 sm:py-2 rounded-lg transition-colors font-medium text-base"
                 >
