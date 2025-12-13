@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { apiService } from "../lib/api_service"
 import type { CartItem } from "../app/page"
 import type { Employee } from "../lib/Services/employees.service"
+import mainapiService from "../../src/utils/api/api-service"
 
 interface CheckoutModalProps {
   isOpen: boolean
@@ -30,6 +31,7 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
   const [loadingEmployees, setLoadingEmployees] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [purpose, setPurpose] = useState("")
+  const [savingToInventory, setSavingToInventory] = useState(false)
 
   // Load employees when modal opens
   useEffect(() => {
@@ -95,6 +97,7 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
       setError(null)
       setIsScanning(false)
       setPurpose("")
+      setSavingToInventory(false)
     }
   }, [isOpen])
 
@@ -106,7 +109,6 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
       // Store ALL employees (including disabled) so we can show proper error messages
       setEmployees(employeeData)
       console.log("[CheckoutModal] Loaded", employeeData.length, "employees")
-      console.log(employeeData)
     } catch (error) {
       console.error("[CheckoutModal] Failed to load employees:", error)
       setError("Failed to load employee data. Please check API connection.")
@@ -164,7 +166,6 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
 
     // Debug: Log what we're searching for and available employees
     console.log("[CheckoutModal] Searching for ID:", value.trim())
-    console.log("[CheckoutModal] Available employee IDs:", employees.map(e => ({ id: e.idNumber, barcode: e.idBarcode, name: e.fullName, status: e.status })).slice(0, 10))
 
     // Find employee by idNumber (try exact match first, then partial match)
     let employee = employees.find(emp => emp.idNumber === value.trim())
@@ -204,6 +205,69 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
     }
   }
 
+  /**
+   * Save checkout items to employee inventory
+   */
+  const saveToEmployeeInventory = async (employee: Employee, checkoutItems: CartItem[], purpose?: string) => {
+    setSavingToInventory(true)
+    
+    try {
+      console.log("[CheckoutModal] Saving to employee inventory for:", employee.fullName)
+      
+      // Prepare checkout data for bulk creation
+      const checkouts = checkoutItems.map(item => ({
+        employee_uid: employee.id,
+        employee_barcode: employee.idBarcode,
+        employee_name: employee.fullName,
+        material_name: item.name,
+        quantity_checked_out: item.quantity,
+        unit_of_measure: 'pcs',
+        item_no: item.id, // Link to itemsdb
+        item_description: `${item.brand} - ${item.itemType}`,
+        purpose: purpose || 'Inventory checkout',
+        checkout_location: 'Main Warehouse',
+        unit_cost: 0,
+        requires_return: true,
+        is_consumable: true,
+        // Set expected return date to 30 days from now
+        expected_return_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      }))
+
+      console.log("[CheckoutModal] Bulk checkout data:", checkouts)
+
+      // Call the bulk checkout API
+      const response = await mainapiService.employeeInventory.bulkCheckout(
+        checkouts,
+        "System" // checkout_by
+      )
+
+      if (response.success) {
+        console.log("[CheckoutModal] ✅ Successfully saved to employee inventory:", response)
+        console.log(`[CheckoutModal] Created ${response.created_count} inventory records`)
+        
+        // Show success message
+        return {
+          success: true,
+          message: `Successfully tracked ${response.created_count} items in employee inventory`,
+          data: response
+        }
+      } else {
+        throw new Error(response.error || 'Failed to save to employee inventory')
+      }
+    } catch (error: any) {
+      console.error("[CheckoutModal] ❌ Failed to save to employee inventory:", error)
+      
+      // Non-blocking error - we still want to complete the checkout
+      return {
+        success: false,
+        message: `Warning: Items checked out but not tracked in employee inventory: ${error.message}`,
+        error: error
+      }
+    } finally {
+      setSavingToInventory(false)
+    }
+  }
+
   const handleConfirm = async () => {
     if (!selectedEmployee) {
       setError("Please scan a barcode or enter a valid employee ID.")
@@ -213,26 +277,48 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
     try {
       console.log("[CheckoutModal] Processing checkout for employee:", selectedEmployee.fullName)
       
-      // Pass the employee object and purpose directly
+      // 1. First, save to employee inventory system
+      const inventoryResult = await saveToEmployeeInventory(
+        selectedEmployee, 
+        items, 
+        purpose.trim() || undefined
+      )
+
+      if (!inventoryResult.success) {
+        // Show warning but don't block checkout
+        console.warn("[CheckoutModal] Employee inventory tracking failed:", inventoryResult.message)
+      } else {
+        console.log("[CheckoutModal] Employee inventory tracking successful:", inventoryResult.message)
+      }
+
+      // 2. Continue with normal checkout process (pass to parent)
       onConfirmCheckout(selectedEmployee, purpose.trim() || undefined)
-    } catch (error) {
-      console.error("[CheckoutModal] Failed to log transaction:", error)
-      setError("Failed to save transaction log. Please try again.")
+
+      // 3. Show success notification if inventory was saved
+      if (inventoryResult.success) {
+        // You can add a toast notification here
+        console.log("✅ Checkout completed and tracked in employee inventory")
+      }
+
+    } catch (error: any) {
+      console.error("[CheckoutModal] Failed to process checkout:", error)
+      setError(`Failed to complete checkout: ${error.message}`)
     }
   }
 
   if (!isOpen) return null
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
-  const totalValue = items.reduce((sum, item) => sum + item.quantity * 10, 0) // Assuming $10 per item
+  const totalValue = items.reduce((sum, item) => sum + item.quantity * (item.pricePerUnit || 10), 0)
   const apiConfig = apiService.getConfig()
+  const isProcessing = isCommitting || savingToInventory
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-800">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle className="text-xl font-bold dark:text-slate-100">Checkout Summary</CardTitle>
-          <Button variant="ghost" size="sm" onClick={onClose} disabled={isCommitting}>
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={isProcessing}>
             <X className="w-4 h-4" />
           </Button>
         </CardHeader>
@@ -258,6 +344,16 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
             </Badge>
           </div>
 
+          {/* Processing Status */}
+          {savingToInventory && (
+            <div className="flex items-center space-x-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700">
+              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-blue-700 dark:text-blue-300">
+                Saving to employee inventory system...
+              </span>
+            </div>
+          )}
+
           {/* Order Summary */}
           <div>
             <h3 className="font-semibold mb-3 dark:text-slate-100">Order Summary</h3>
@@ -278,7 +374,9 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
                   </div>
                   <div className="text-right">
                     <p className="font-medium dark:text-slate-100">Qty: {item.quantity}</p>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">₱{(item.quantity * 10).toFixed(2)}</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      ₱{(item.quantity * (item.pricePerUnit || 10)).toFixed(2)}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -355,7 +453,7 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
                       }
                     }}
                     className="pr-10 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600"
-                    disabled={isCommitting}
+                    disabled={isProcessing}
                   />
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                     {isScanning ? (
@@ -371,7 +469,7 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
                   value={userInput}
                   onChange={(e) => handleManualInput(e.target.value)}
                   className="dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600"
-                  disabled={isCommitting}
+                  disabled={isProcessing}
                 />
               )}
 
@@ -457,7 +555,7 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
                 className="dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600"
-                disabled={isCommitting}
+                disabled={isProcessing}
                 maxLength={255}
               />
               <p className="text-xs text-slate-500 dark:text-slate-500">
@@ -471,20 +569,22 @@ export function CheckoutModal({ isOpen, onClose, items, onConfirmCheckout, isCom
             <Button
               variant="outline"
               onClick={onClose}
-              disabled={isCommitting}
+              disabled={isProcessing}
               className="flex-1 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-700 bg-transparent"
             >
               Cancel
             </Button>
             <Button
               onClick={handleConfirm}
-              disabled={!selectedEmployee || isCommitting || loadingEmployees}
+              disabled={!selectedEmployee || isProcessing || loadingEmployees}
               className="flex-1 bg-teal-600 hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600"
             >
-              {isCommitting ? (
+              {isProcessing ? (
                 <div className="flex items-center space-x-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Processing...</span>
+                  <span>
+                    {savingToInventory ? 'Saving to Inventory...' : 'Processing...'}
+                  </span>
                 </div>
               ) : (
                 "Confirm Checkout"

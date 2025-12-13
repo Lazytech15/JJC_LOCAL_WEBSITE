@@ -17,6 +17,7 @@ import {
   PackagePlus,
   CheckCircle
 } from "lucide-react"
+import MaterialSelector from './MaterialSelector';
 
 // ============================================================================
 // EDIT ITEM MODAL
@@ -382,6 +383,8 @@ function EditPhaseModal({ phase, onClose, onSave, onDelete, isDarkMode }) {
 function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, batchQty = 1, apiService, globalUnusedMaterials = [], loadingGlobalUnused = false, onRefreshGlobalUnused = null, selectedItemForEdit = null,
   selectedPhaseForEdit = null }) {
 
+  const [expectedConsumables, setExpectedConsumables] = useState([]);
+
   // Parse existing materials
   const parseExistingMaterials = () => {
     if (subphase?.materials) {
@@ -435,6 +438,7 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
   const [availableScrapMaterials, setAvailableScrapMaterials] = useState([])
   const [loadingScrapMaterials, setLoadingScrapMaterials] = useState(false)
 
+
   const [formData, setFormData] = useState({
     name: subphase?.name || "",
     expected_duration: subphase?.expected_duration || 0,
@@ -442,6 +446,30 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
     subphase_order: subphase?.subphase_order || 0,
     unused_notes: subphase?.unused_notes || ""
   })
+
+  useEffect(() => {
+    if (subphase?.expected_consumables) {
+      try {
+        const consumables = typeof subphase.expected_consumables === 'string'
+          ? JSON.parse(subphase.expected_consumables)
+          : subphase.expected_consumables;
+
+        // Transform to match MaterialSelector format
+        const formatted = (consumables || []).map(c => ({
+          item_no: c.item_no,
+          item_name: c.item_name || c.material_name || c.name,
+          quantity: parseFloat(c.quantity) || 0,
+          unit: c.unit || c.unit_of_measure || 'pcs',
+          available_stock: c.available_stock || c.balance || 0
+        }));
+
+        setExpectedConsumables(formatted);
+      } catch (error) {
+        console.error('Failed to parse expected_consumables:', error);
+        setExpectedConsumables([]);
+      }
+    }
+  }, [subphase?.expected_consumables]);
 
   useEffect(() => {
     if (subphase && subphase.id) {
@@ -1253,6 +1281,19 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
       }
     }
 
+    // ✅ Validate expected consumables
+    for (let i = 0; i < expectedConsumables.length; i++) {
+      const mat = expectedConsumables[i]
+      if (!mat.item_name || !mat.item_name.trim()) {
+        alert(`Expected Consumable #${i + 1}: Name is required`)
+        return
+      }
+      if (!mat.quantity || mat.quantity <= 0) {
+        alert(`Expected Consumable #${i + 1}: Quantity must be greater than 0`)
+        return
+      }
+    }
+
     // Validate NEW returned materials only
     const newReturnedMaterials = unusedMaterials.filter(m => m.isNew)
 
@@ -1331,16 +1372,19 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
           }
 
           // ✅ Save returned material using MaterialsService
-          await apiService.materials.createMaterial({
+          await apiService.materials.createReturnedMaterial({
+            original_material_id: returnedMat.original_material_id,
             subphase_id: subphase.id,
-            material_name: material.name,
-            material_quantity: parseFloat(material.quantity),
-            unit_of_measure: material.unit || 'pcs',
-            checked_out_by: material.checkout_by || 'SYSTEM',
-            checked_out_by_name: material.checkout_by_name || 'Pending',
-            checked_out_by_uid: material.checkout_by_uid || 'SYSTEM',
-            status: 'checked_out', // ✅ Changed - always use checked_out for new materials
-            notes: material.notes || null
+            material_name: returnedMat.name,
+            quantity_returned: parseFloat(returnedMat.quantity),
+            unit_of_measure: returnedMat.unit || 'pcs',
+            returned_by: returnedMat.assigned_user_barcode || 'SYSTEM',
+            returned_by_name: returnedMat.assigned_user_name || 'Unknown',
+            returned_by_uid: returnedMat.assigned_user_uid || 'SYSTEM',
+            condition_status: returnedMat.condition_status || 'good',
+            return_reason: returnedMat.reason,
+            is_reusable: returnedMat.is_reusable !== false,
+            notes: `Returned from operations - Subphase: ${formData.name}`
           })
 
           console.log(`✅ Returned material saved to database: ${returnedMat.name}`)
@@ -1388,17 +1432,28 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
       }
 
       // ============================================================
-      // STEP 3: Save subphase basic info
+      // STEP 3: Save subphase basic info + expected_consumables
       // ============================================================
+      const formattedConsumables = expectedConsumables.map(m => ({
+        item_no: m.item_no,
+        item_name: m.item_name,
+        quantity: parseFloat(m.quantity) || 0,
+        unit: m.unit || 'pcs'
+      }))
+
       const saveData = {
         name: formData.name,
         expected_duration: formData.expected_duration,
         expected_quantity: formData.expected_quantity,
         subphase_order: formData.subphase_order,
-        unused_notes: formData.unused_notes
+        unused_notes: formData.unused_notes,
+
+        expected_consumables: formattedConsumables
       }
 
       console.log('💾 Saving subphase data:', saveData)
+      console.log('🔍 Expected consumables being saved:', formattedConsumables)
+
       await onSave(saveData)
 
       // ============================================================
@@ -1417,6 +1472,7 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
       const checkedOutCount = materials.filter(m => m.checked_out).length
       const newReturnCount = newReturnedMaterials.length
       const newMaterialsCount = materials.filter(m => !m.id).length
+      const consumablesCount = expectedConsumables.length
 
       let successMessage = '✅ Subphase saved successfully!'
 
@@ -1430,6 +1486,10 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
 
       if (newReturnCount > 0) {
         successMessage += `\n• ${newReturnCount} returned material(s) saved to inventory`
+      }
+
+      if (consumablesCount > 0) {
+        successMessage += `\n• ${consumablesCount} expected consumable(s) configured`
       }
 
       alert(successMessage)
@@ -1787,6 +1847,15 @@ function EditSubphaseModal({ subphase, onClose, onSave, onDelete, isDarkMode, ba
                     ? "bg-gray-700 border border-gray-600 text-gray-100"
                     : "bg-gray-100 border border-gray-300 text-gray-800"
                     }`}
+                />
+              </div>
+
+              <div className="col-span-2">
+                <MaterialSelector
+                  value={expectedConsumables}
+                  onChange={setExpectedConsumables}
+                  apiService={apiService}
+                  disabled={false}
                 />
               </div>
 
